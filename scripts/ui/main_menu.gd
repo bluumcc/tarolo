@@ -1,0 +1,279 @@
+extends Control
+## MainMenu.tscn — navegação para os modos, Loja de Cosméticos e Configurações.
+
+var overlay_layer: Control
+var fragments_label: Label
+
+
+func _ready() -> void:
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(UIKit.background())
+	_spawn_stars()
+
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	add_child(scroll)
+	var center := CenterContainer.new()
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.add_child(center)
+
+	var col := VBoxContainer.new()
+	col.custom_minimum_size = Vector2(400, 0)
+	col.add_theme_constant_override("separation", 12)
+	center.add_child(col)
+
+	var title := UIKit.label("TAROLO", 64, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	col.add_child(title)
+	var sub := UIKit.label("— ROGUELIKE DE VAZAS —", 20, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	col.add_child(sub)
+	col.add_child(_spacer(12))
+
+	var classic := UIKit.button("MODO CLÁSSICO")
+	classic.pressed.connect(func():
+		GameState.mode = GameState.Mode.CLASSIC
+		get_tree().change_scene_to_file("res://scenes/GameScene.tscn"))
+	col.add_child(classic)
+	col.add_child(_caption("Vazas com regras fechadas, sem caos."))
+
+	if GameState.has_run():
+		var r := GameState.run()
+		var cont := UIKit.button("ARCADE · CONTINUAR (FASE %d)" % int(r["stage"]), UIKit.OK)
+		cont.pressed.connect(func():
+			GameState.mode = GameState.Mode.ARCADE
+			get_tree().change_scene_to_file("res://scenes/GameScene.tscn"))
+		col.add_child(cont)
+	var arcade := UIKit.button("ARCADE · NOVA RUN" if GameState.has_run() else "MODO ARCADE")
+	arcade.pressed.connect(func():
+		if GameState.has_run():
+			GameState.abandon_run()
+		GameState.start_arcade_run()
+		get_tree().change_scene_to_file("res://scenes/GameScene.tscn"))
+	col.add_child(arcade)
+	var best := int(SaveManager.section("arcade")["best_stage"])
+	col.add_child(_caption("Roguelike: vença o Chefe de cada fase. Recorde: fase %d." % best))
+
+	var rk := GameState.ranked()
+	var tier := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
+	var ranked := UIKit.button("MODO RANQUEADO", Color(Ranked.TIER_COLORS[tier["tier"]]))
+	ranked.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn"))
+	col.add_child(ranked)
+	col.add_child(_caption("Temporada %d · %s · %d LP" % [int(rk["season"]), tier["label"], int(tier["lp"])]))
+
+	col.add_child(_spacer(6))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	col.add_child(row)
+	var cosm := UIKit.button("COSMÉTICOS", UIKit.MUTED, 16)
+	cosm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cosm.pressed.connect(_open_cosmetics)
+	row.add_child(cosm)
+	var sett := UIKit.button("CONFIGURAÇÕES", UIKit.MUTED, 16)
+	sett.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sett.pressed.connect(_open_settings)
+	row.add_child(sett)
+	var rules := UIKit.button("COMO JOGAR", UIKit.MUTED, 16)
+	rules.pressed.connect(_open_rules)
+	col.add_child(rules)
+	if not OS.has_feature("mobile") and not OS.has_feature("web"):
+		var quit := UIKit.button("SAIR", UIKit.DANGER, 16)
+		quit.pressed.connect(func(): get_tree().quit())
+		col.add_child(quit)
+
+	fragments_label = UIKit.label("", 14, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	col.add_child(fragments_label)
+	_refresh_fragments()
+
+	overlay_layer = Control.new()
+	overlay_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(overlay_layer)
+
+	classic.grab_focus.call_deferred()
+	title.pivot_offset = Vector2(170, 30)
+	title.modulate.a = 0.0
+	create_tween().tween_property(title, "modulate:a", 1.0, GameState.anim(0.6))
+
+
+func _refresh_fragments() -> void:
+	var prof := SaveManager.section("profile")
+	fragments_label.text = "%s · %d partidas · %d vitórias · ◆ %s Fragmentos" % [prof["name"], int(prof["matches"]), int(prof["wins"]), UIKit.fmt_int(int(prof["fragments"]))]
+
+
+func _spacer(h: int) -> Control:
+	var c := Control.new()
+	c.custom_minimum_size = Vector2(0, h)
+	return c
+
+
+func _caption(text: String) -> Label:
+	var l := UIKit.label(text, 13, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	return l
+
+
+func _spawn_stars() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var vp := get_viewport_rect().size
+	for i in range(14):
+		var s := UIKit.label("✶" if i % 3 else "♦", rng.randi_range(12, 30), UIKit.PURPLE.lightened(0.25))
+		s.position = Vector2(rng.randf() * vp.x, rng.randf() * vp.y)
+		s.modulate.a = rng.randf_range(0.15, 0.5)
+		add_child(s)
+		var tw := s.create_tween().set_loops()
+		tw.tween_property(s, "position:y", s.position.y - 30.0, rng.randf_range(3.0, 6.0)).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(s, "position:y", s.position.y, rng.randf_range(3.0, 6.0)).set_trans(Tween.TRANS_SINE)
+
+
+func _modal(title: String) -> VBoxContainer:
+	var ov := UIKit.overlay()
+	overlay_layer.add_child(ov)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 24)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 12)
+	v.custom_minimum_size = Vector2(360, 0)
+	box.add_child(v)
+	v.add_child(UIKit.label(title, 30, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var center := CenterContainer.new()
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	center.add_child(box)
+	scroll.add_child(center)
+	ov.add_child(scroll)
+	return v
+
+
+func _close_button(v: VBoxContainer) -> void:
+	var close := UIKit.button("FECHAR", UIKit.MUTED)
+	close.pressed.connect(func():
+		overlay_layer.get_child(overlay_layer.get_child_count() - 1).queue_free())
+	v.add_child(close)
+	close.grab_focus.call_deferred()
+
+
+func _open_settings() -> void:
+	var v := _modal("CONFIGURAÇÕES")
+	var s := GameState.settings()
+	for entry in [["Música", "music_volume"], ["Efeitos", "sfx_volume"]]:
+		v.add_child(UIKit.label(entry[0], 16))
+		var sl := HSlider.new()
+		sl.min_value = 0.0
+		sl.max_value = 1.0
+		sl.step = 0.05
+		sl.value = float(s[entry[1]])
+		sl.custom_minimum_size = Vector2(0, 32)
+		var key: String = entry[1]
+		sl.value_changed.connect(func(val: float):
+			s[key] = val
+			GameState.apply_settings())
+		v.add_child(sl)
+	v.add_child(UIKit.label("Velocidade das animações", 16))
+	var speed := OptionButton.new()
+	var speeds := [0.75, 1.0, 1.5, 2.0]
+	for sp in speeds:
+		speed.add_item("%sx" % UIKit.fmt_dec(sp, 2 if sp == 0.75 else 1))
+	speed.selected = maxi(speeds.find(float(s["anim_speed"])), 1)
+	speed.item_selected.connect(func(i: int): s["anim_speed"] = speeds[i])
+	v.add_child(speed)
+	if not OS.has_feature("mobile"):
+		var fs := CheckButton.new()
+		fs.text = "Tela cheia"
+		fs.button_pressed = bool(s["fullscreen"])
+		fs.toggled.connect(func(on: bool):
+			s["fullscreen"] = on
+			GameState.apply_settings())
+		v.add_child(fs)
+	var reset := UIKit.button("APAGAR PROGRESSO", UIKit.DANGER, 14)
+	reset.pressed.connect(func():
+		SaveManager.reset()
+		get_tree().reload_current_scene())
+	v.add_child(reset)
+	var close := UIKit.button("SALVAR E FECHAR")
+	close.pressed.connect(func():
+		SaveManager.save_game()
+		overlay_layer.get_child(overlay_layer.get_child_count() - 1).queue_free())
+	v.add_child(close)
+
+
+func _open_cosmetics() -> void:
+	var v := _modal("LOJA DE COSMÉTICOS")
+	var cos := SaveManager.section("cosmetics")
+	var prof := SaveManager.section("profile")
+	var rk := GameState.ranked()
+	var peak_tier := int(Ranked.tier_info(int(rk["peak_points"]), int(rk["mmr"]))["tier"])
+	v.add_child(UIKit.label("◆ %s Fragmentos" % UIKit.fmt_int(int(prof["fragments"])), 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	for id in UIKit.CARD_BACKS.keys():
+		var back: Dictionary = UIKit.CARD_BACKS[id]
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		var swatch := Panel.new()
+		swatch.custom_minimum_size = Vector2(36, 50)
+		swatch.add_theme_stylebox_override("panel", UIKit.box(Color(back["color"]), UIKit.GOLD.darkened(0.35), 3, 4, 0))
+		row.add_child(swatch)
+		var name_l := UIKit.label(str(back["name"]), 18)
+		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(name_l)
+		var owned: Array = cos["owned"]
+		var btn: Button
+		if str(cos["equipped"]) == id:
+			btn = UIKit.button("EQUIPADO", UIKit.OK, 14)
+			btn.disabled = true
+		elif owned.has(id):
+			btn = UIKit.button("EQUIPAR", UIKit.OK, 14)
+			btn.pressed.connect(func():
+				cos["equipped"] = id
+				SaveManager.save_game()
+				_reopen_cosmetics())
+		elif back.has("requires_tier"):
+			var req := int(back["requires_tier"])
+			btn = UIKit.button("DESBLOQUEAR" if peak_tier >= req else "REQ. %s" % Ranked.TIERS[req].to_upper(), UIKit.GOLD, 14)
+			btn.disabled = peak_tier < req
+			btn.pressed.connect(func():
+				owned.append(id)
+				Sfx.play("buy")
+				SaveManager.save_game()
+				_reopen_cosmetics())
+		else:
+			var price := int(back["price"])
+			btn = UIKit.button("◆ %d" % price, UIKit.GOLD, 14)
+			btn.disabled = int(prof["fragments"]) < price
+			btn.pressed.connect(func():
+				prof["fragments"] = int(prof["fragments"]) - price
+				owned.append(id)
+				Sfx.play("buy")
+				SaveManager.save_game()
+				_refresh_fragments()
+				_reopen_cosmetics())
+		btn.custom_minimum_size = Vector2(130, 44)
+		row.add_child(btn)
+		v.add_child(row)
+	_close_button(v)
+
+
+func _reopen_cosmetics() -> void:
+	for c in overlay_layer.get_children():
+		c.queue_free()
+	_open_cosmetics()
+
+
+func _open_rules() -> void:
+	var v := _modal("COMO JOGAR")
+	var text := """• Baralho de 52 cartas (Ouros, Paus, Copas, Espadas, Ás a Rei) + 4 Arcanos Maiores. Cada jogador recebe 14 cartas.
+• O Ás vale 1: é a menor carta do naipe.
+• Quem abre a vaza define o naipe líder. Os demais devem segui-lo se puderem; sem o naipe, jogam qualquer carta.
+• Arcanos Maiores (valor 15) podem ser jogados a qualquer momento, ignorando o naipe, e vencem a vaza (o primeiro jogado prevalece).
+• Quem vence a vaza marca Fichas × Mult de todas as cartas da mesa.
+• Monopólio de Naipe (todas do mesmo naipe): x2 Mult. Sequência Caótica (valores consecutivos): x2,5 Mult.
+• Foil: +50 Fichas. Polychrome: x2 Mult.
+• Arcade: supere o Chefe (☠) no placar para avançar e gaste Ouro na Loja Arcana.
+• Ranqueado: sua colocação entre 4 jogadores define LP e MMR."""
+	var l := UIKit.label(text, 15, UIKit.INK)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size = Vector2(420, 0)
+	v.add_child(l)
+	_close_button(v)
