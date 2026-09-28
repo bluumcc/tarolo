@@ -208,6 +208,8 @@ func _layout_table() -> void:
 			pos.x -= 80.0
 			pos.y = maxf(pos.y - 26.0, 0.0)
 		var av_pos := pos + Vector2(80.0 - av_size.x / 2.0, -av_size.y - 6.0)
+		if p == 2:
+			av_pos.y = maxf(av_pos.y, 4.0)
 		avatar.position = av_pos
 		avatar.pivot_offset = av_size / 2.0
 		l.position = pos - Vector2(0, 12)
@@ -247,7 +249,20 @@ func _rebuild_hand() -> void:
 		cv.tapped.connect(_on_card_tapped)
 		cv.play_requested.connect(_on_card_play)
 		cv.zoom_requested.connect(_show_zoom)
+		_apply_modifier_badge(cv, card)
 	_layout_hand.call_deferred()
+
+
+## Mostra na própria carta o valor real dela sob o modificador ativo, pra decisão de
+## qual jogar ser visível e não só matemática escondida no placar.
+func _apply_modifier_badge(cv: CardView, card: CardData) -> void:
+	var base := card.points()
+	var eff := engine.card_value(card)
+	if is_equal_approx(eff, base):
+		return
+	var boosted := eff > base
+	cv.points_label.text = "%s ➜ %s pts" % [UIKit.fmt_dec(base, 1), UIKit.fmt_dec(eff, 1)]
+	cv.points_label.add_theme_color_override("font_color", UIKit.OK if boosted else UIKit.DANGER)
 
 
 func _current_turn_player() -> int:
@@ -332,7 +347,7 @@ func _speech_bubble(player: int, text: String) -> void:
 func _announce_round() -> void:
 	var title := "RODADA %d/%d" % [engine.round_index + 1, ChaosEngine.ROUNDS]
 	var mod_text := ChaosModifiers.label(engine.modifier, engine.weak_suit)
-	var body := "Modificador: %s" % mod_text
+	var body := "Modificador: %s\n%s" % [mod_text, str(ChaosModifiers.TIPS[engine.modifier])]
 	if engine.folego_player != -1:
 		body += "\n🔥 Fôlego pra %s (pontos ×%s nessa rodada)" % [str(config["names"][engine.folego_player]), UIKit.fmt_dec(ChaosEngine.FOLEGO_MULT, 1)]
 	_show_round_banner(title, body)
@@ -464,6 +479,7 @@ func _animate_play(player: int, card: CardData, from: Vector2) -> void:
 	table_center.add_child(cv)
 	cv.set_playable(true)
 	cv.zoom_requested.connect(_show_zoom)
+	_apply_modifier_badge(cv, card)
 	cv.global_position = from
 	cv.scale = Vector2(0.9, 0.9)
 	cv.rotation = randf_range(-0.25, 0.25)
@@ -661,6 +677,7 @@ func _open_help() -> void:
 
 MODIFICADOR
 • Cada rodada sorteia uma regra especial diferente, sempre visível na barra logo acima da mesa.
+• As cartas afetadas mostram o valor real (com bônus ou penalidade) direto na carta — decida o que jogar olhando pra esse número, não só pro placar.
 
 FÔLEGO
 • A partir da 2ª rodada, quem estiver em último no total ganha Fôlego: os pontos que capturar nessa rodada valem x1,5. É a chance de virar o jogo.

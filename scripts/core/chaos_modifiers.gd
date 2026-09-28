@@ -33,6 +33,18 @@ const DESCRIPTIONS := {
 	Modifier.NAIPE_FRACO: "Um naipe sorteado vale só METADE dos pontos nessa rodada.",
 }
 
+## Dica de jogada — o que fazer DIFERENTE por causa do modificador ativo. Mostrada no
+## banner de início de rodada, pra deixar claro que é uma decisão do jogador, não só
+## matemática passiva.
+const TIPS := {
+	Modifier.TRUNFO_DOBRO: "Seus trunfos valem o dobro agora — não gaste os fracos à toa, guarde os fortes pra vazas que valem a pena ganhar.",
+	Modifier.REIS_DOBRO: "Seus Reis valem o dobro — não descarte um Rei numa vaza qualquer, espere o momento certo pra fazer ele valer.",
+	Modifier.LOUCO_VENCE: "O Louco pode roubar a vaza de qualquer naipe comum nessa rodada — use-o como arma, não como fuga.",
+	Modifier.PRIMEIRA_DOBRO: "A 1ª vaza vale dobro — abra com força total, essa é a hora de arriscar.",
+	Modifier.ULTIMA_TRIPLO: "A última vaza vale TRIPLO — segure suas melhores cartas até o fim, mesmo que doa perder vazas no meio.",
+	Modifier.NAIPE_FRACO: "As cartas desse naipe valem metade — livre-se delas cedo, elas não vão te ajudar a pontuar.",
+}
+
 
 static func random_modifier(rng: RandomNumberGenerator) -> int:
 	return ALL[rng.randi_range(0, ALL.size() - 1)]

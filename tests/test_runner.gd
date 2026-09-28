@@ -260,24 +260,24 @@ func _test_bonuses() -> void:
 
 
 func _test_chaos() -> void:
-	# _card_value: efeito de cada modificador de pontos.
+	# card_value: efeito de cada modificador de pontos.
 	var e := ChaosEngine.new()
 	e.setup_match({"seed": 11})
 	check((e.hands[0] as Array).size() == ChaosEngine.HAND_SIZE, "Caos: 8 cartas por jogador")
 	check(e.folego_player == -1, "primeira rodada não tem Fôlego (ninguém ficou pra trás ainda)")
 
 	e.modifier = ChaosModifiers.Modifier.TRUNFO_DOBRO
-	check(e._card_value(c(4, 5)) == 1.0, "Trunfo em Dobro: 0,5 vira 1,0")
-	check(e._card_value(c(0, 14)) == 4.5, "Trunfo em Dobro não afeta Rei de naipe comum")
+	check(e.card_value(c(4, 5)) == 1.0, "Trunfo em Dobro: 0,5 vira 1,0")
+	check(e.card_value(c(0, 14)) == 4.5, "Trunfo em Dobro não afeta Rei de naipe comum")
 
 	e.modifier = ChaosModifiers.Modifier.REIS_DOBRO
-	check(e._card_value(c(0, 14)) == 9.0, "Reis em Dobro: Rei de 4,5 vira 9,0")
-	check(e._card_value(c(4, 14)) == 0.5, "Reis em Dobro não afeta Trunfo 14 (não é Rei)")
+	check(e.card_value(c(0, 14)) == 9.0, "Reis em Dobro: Rei de 4,5 vira 9,0")
+	check(e.card_value(c(4, 14)) == 0.5, "Reis em Dobro não afeta Trunfo 14 (não é Rei)")
 
 	e.modifier = ChaosModifiers.Modifier.NAIPE_FRACO
 	e.weak_suit = CardData.Suit.OUROS
-	check(e._card_value(c(0, 14)) == 2.25, "Naipe Fraco: Rei de Ouros de 4,5 vira 2,25")
-	check(e._card_value(c(1, 14)) == 4.5, "Naipe Fraco não afeta naipe diferente do sorteado")
+	check(e.card_value(c(0, 14)) == 2.25, "Naipe Fraco: Rei de Ouros de 4,5 vira 2,25")
+	check(e.card_value(c(1, 14)) == 4.5, "Naipe Fraco não afeta naipe diferente do sorteado")
 
 	# O Louco Vence: TrickRules trata O Louco como Trunfo fraco (perde pra Trunfo real).
 	var louco_plays := [

@@ -114,7 +114,7 @@ func play(player: int, card: CardData) -> Dictionary:
 
 ## Valor de uma carta já considerando o modificador ativo (não considera Fôlego — esse
 ## se aplica à vaza inteira, não carta a carta).
-func _card_value(c: CardData) -> float:
+func card_value(c: CardData) -> float:
 	var v := c.points()
 	match modifier:
 		ChaosModifiers.Modifier.TRUNFO_DOBRO:
@@ -136,7 +136,7 @@ func _resolve_trick() -> Dictionary:
 	captured[winner].append_array(cards)
 	var base_points := 0.0
 	for c in cards:
-		base_points += _card_value(c)
+		base_points += card_value(c)
 	var mult := 1.0
 	if modifier == ChaosModifiers.Modifier.PRIMEIRA_DOBRO and trick_number == 0:
 		mult *= 2.0
@@ -192,7 +192,7 @@ func advance_round() -> void:
 func points_of(player: int) -> float:
 	var total := 0.0
 	for c in captured[player]:
-		total += _card_value(c)
+		total += card_value(c)
 	return total
 
 
