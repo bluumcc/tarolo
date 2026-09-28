@@ -5,10 +5,12 @@ extends Control
 ## esquerda, 2 = topo, 3 = direita (sentido horário) — mesmo layout do Vanilla.
 
 signal human_card_chosen(card: CardData)
+signal item_chosen(item: int)
 signal match_finished(summary: Dictionary)
 
 const CARD_SCENE := preload("res://scenes/Card.tscn")
 const SEAT_SLOTS := [Vector2(0.5, 0.74), Vector2(0.2, 0.5), Vector2(0.5, 0.26), Vector2(0.8, 0.5)]
+const TOP_RESERVE := 78.0  ## espaço fixo reservado pro avatar+nome do topo, nunca invadido pela mesa
 
 var engine := ChaosEngine.new()
 var config: Dictionary = {}
@@ -32,6 +34,7 @@ var status_label: Label
 var trick_label: Label
 var info_label: Label
 var modifier_label: Label
+var wager_label: Label
 var popup_layer: Control
 var overlay_layer: Control
 var table_views: Array = []
@@ -41,6 +44,13 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bot_rng.randomize()
 	config = GameState.chaos_config()
+	if not bool(config.get("entered", true)):
+		add_child(UIKit.background())
+		overlay_layer = Control.new()
+		overlay_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		add_child(overlay_layer)
+		_show_insufficient_fichas()
+		return
 	engine.setup_match(config)
 	_build_ui()
 	get_viewport().size_changed.connect(_on_resize)
@@ -50,6 +60,26 @@ func _ready() -> void:
 	if not is_inside_tree():
 		return
 	_run_round.call_deferred()
+
+
+func _show_insufficient_fichas() -> void:
+	var ov := UIKit.overlay()
+	overlay_layer.add_child(ov)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.DANGER, 24)
+	box.custom_minimum_size = Vector2(360, 0)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 12)
+	box.add_child(v)
+	v.add_child(UIKit.label("FICHAS INSUFICIENTES", 22, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+	var l := UIKit.label("Você precisa de %d fichas pra entrar na Mesa Caos. Jogue Vanilla ou Ranqueado, ou volte ao menu e peça um empréstimo da casa." % int(config["buy_in"]), 14, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size = Vector2(320, 0)
+	v.add_child(l)
+	var btn := UIKit.button("VOLTAR AO MENU", UIKit.MUTED)
+	btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
+	v.add_child(btn)
+	ov.add_child(UIKit.centered(box))
+	btn.grab_focus.call_deferred()
 
 
 # ------------------------------------------------------------------ UI
@@ -110,10 +140,15 @@ func _build_ui() -> void:
 	mod_box.add_child(modifier_label)
 	root.add_child(mod_box)
 
+	var wager_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 8)
+	wager_label = UIKit.label("", 13, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	wager_box.add_child(wager_label)
+	root.add_child(wager_box)
+
 	# Mesa -------------------------------------------------------------
 	table_area = Control.new()
 	table_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	table_area.custom_minimum_size = Vector2(0, 260)
+	table_area.custom_minimum_size = Vector2(0, 260 + TOP_RESERVE)
 	table_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(table_area)
 
@@ -184,11 +219,12 @@ func _layout_table() -> void:
 	if table_area == null:
 		return
 	var area := table_area.size
-	var portrait := area.y > area.x
+	var usable_h := maxf(area.y - TOP_RESERVE, 120.0)
+	var portrait := usable_h > area.x
 	var w := minf(area.x - 40.0, 560.0)
-	var h := minf(area.y - 4.0, 460.0 if portrait else 340.0)
-	table_center.size = Vector2(maxf(w, 280.0), maxf(h, 200.0))
-	table_center.position = (area - table_center.size) / 2.0
+	var h := minf(usable_h - 4.0, 460.0 if portrait else 340.0)
+	table_center.size = Vector2(maxf(w, 280.0), maxf(h, 180.0))
+	table_center.position = Vector2((area.x - table_center.size.x) / 2.0, TOP_RESERVE + (usable_h - table_center.size.y) / 2.0)
 	var anchors := [Vector2(0.5, 1.0), Vector2(0.0, 0.5), Vector2(0.5, 0.0), Vector2(1.0, 0.5)]
 	var av_size := Vector2(60, 60)
 	for p in range(seat_labels.size()):
@@ -198,18 +234,22 @@ func _layout_table() -> void:
 		if p == 0:
 			l.visible = false
 			continue
+		if p == 2:
+			# Assento do topo tem uma faixa própria acima da mesa (TOP_RESERVE), fora do
+			# alcance de table_center — nunca mais disputa espaço com o que fica acima
+			# de table_area (barra de modificador/apostas).
+			var cx := area.x / 2.0
+			avatar.position = Vector2(cx - av_size.x / 2.0, 0.0)
+			avatar.pivot_offset = av_size / 2.0
+			l.position = Vector2(cx - l.size.x / 2.0, av_size.y + 2.0)
+			continue
 		var a: Vector2 = anchors[p]
 		var pos := table_center.position + table_center.size * a
 		if p == 1:
 			pos.x = maxf(pos.x - 170.0, 0.0)
 		elif p == 3:
 			pos.x = minf(pos.x + 10.0, area.x - 160.0)
-		elif p == 2:
-			pos.x -= 80.0
-			pos.y = maxf(pos.y - 26.0, 0.0)
 		var av_pos := pos + Vector2(80.0 - av_size.x / 2.0, -av_size.y - 6.0)
-		if p == 2:
-			av_pos.y = maxf(av_pos.y, 4.0)
 		avatar.position = av_pos
 		avatar.pivot_offset = av_size / 2.0
 		l.position = pos - Vector2(0, 12)
@@ -253,15 +293,16 @@ func _rebuild_hand() -> void:
 	_layout_hand.call_deferred()
 
 
-## Mostra na própria carta o valor real dela sob o modificador ativo, pra decisão de
-## qual jogar ser visível e não só matemática escondida no placar.
-func _apply_modifier_badge(cv: CardView, card: CardData) -> void:
+## Mostra na própria carta o valor real dela sob o modificador + item ativos, pra decisão
+## de qual jogar ser visível e não só matemática escondida no placar. Mantém o texto do
+## mesmo tamanho do padrão ("X,Y pts") pra não esticar a carta — só o ícone e a cor mudam.
+func _apply_modifier_badge(cv: CardView, card: CardData, player: int = 0) -> void:
 	var base := card.points()
-	var eff := engine.card_value(card)
+	var eff := engine.card_value(card, player)
 	if is_equal_approx(eff, base):
 		return
 	var boosted := eff > base
-	cv.points_label.text = "%s ➜ %s pts" % [UIKit.fmt_dec(base, 1), UIKit.fmt_dec(eff, 1)]
+	cv.points_label.text = "%s %s pts" % ["▲" if boosted else "▼", UIKit.fmt_dec(eff, 1)]
 	cv.points_label.add_theme_color_override("font_color", UIKit.OK if boosted else UIKit.DANGER)
 
 
@@ -280,12 +321,16 @@ func _refresh_hud() -> void:
 		var turn := p == turn_player
 		(hud_badges[p] as PanelContainer).modulate = Color(1, 1, 1, 1) if turn else Color(0.78, 0.76, 0.85, 1)
 		var lead_accent := UIKit.GOLD if p == engine.folego_player else UIKit.MUTED
-		(hud_titles[p] as Label).text = "🔥 %s" % str(config["names"][p]).to_upper() if p == engine.folego_player else str(config["names"][p]).to_upper()
+		var item_icon: String = ChaosItems.ICONS.get(engine.player_items[p], "") if p < engine.player_items.size() else ""
+		var prefix := ("🔥 " if p == engine.folego_player else "") + (item_icon + " " if item_icon != "" else "")
+		(hud_titles[p] as Label).text = "%s%s" % [prefix, str(config["names"][p]).to_upper()]
 		(hud_titles[p] as Label).add_theme_color_override("font_color", lead_accent)
 		if p > 0:
 			(seat_labels[p] as Label).text = "%s · %d cartas" % [config["names"][p], (engine.hands[p] as Array).size()]
 	info_label.text = "CAOS  ·  Rodada %d/%d  ·  Vaza %d/%d" % [engine.round_index + 1, ChaosEngine.ROUNDS, mini(engine.trick_number + 1, ChaosEngine.HAND_SIZE), ChaosEngine.HAND_SIZE]
 	modifier_label.text = "✦ %s — %s" % [ChaosModifiers.label(engine.modifier, engine.weak_suit), ChaosModifiers.DESCRIPTIONS[engine.modifier]]
+	var profile := SaveManager.section("profile")
+	wager_label.text = "🪙 Suas fichas: %d   ·   Pote da mesa: %d (buy-in %d)" % [int(profile["fichas"]), int(engine.pot), int(engine.buy_in)]
 	_update_turn_highlight(turn_player)
 
 
@@ -369,7 +414,7 @@ func _show_round_banner(title: String, body: String) -> void:
 	v.add_child(body_label)
 	popup_layer.add_child(panel)
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	panel.position.y = 190
+	panel.position.y = 232
 	panel.modulate.a = 0.0
 	var tw := create_tween()
 	tw.tween_property(panel, "modulate:a", 1.0, GameState.anim(0.15))
@@ -415,10 +460,57 @@ func _run_round() -> void:
 		_finish_match()
 	else:
 		engine.advance_round()
+		await _choose_items()
+		if not is_inside_tree():
+			return
 		await _announce_round()
 		if not is_inside_tree():
 			return
 		_run_round.call_deferred()
+
+
+## Entre rodadas (a partir da 2ª): cada jogador escolhe 1 de 2 itens sorteados pra usar
+## só nessa rodada — a decisão ativa que faltava, além de reagir ao modificador da vez.
+func _choose_items() -> void:
+	var options := ChaosItems.offer(engine.rng)
+	for p in range(1, engine.num_players):
+		engine.set_item(p, ChaosItems.bot_choose(options, engine.modifier, bot_rng))
+	if GameState.autoplay:
+		engine.set_item(0, ChaosItems.bot_choose(options, engine.modifier, bot_rng))
+		return
+	var choice: int = await _show_item_modal(options)
+	if not is_inside_tree():
+		return
+	engine.set_item(0, choice)
+
+
+func _show_item_modal(options: Array) -> int:
+	var ov := UIKit.overlay()
+	overlay_layer.add_child(ov)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 24)
+	box.custom_minimum_size = Vector2(420, 0)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	box.add_child(v)
+	v.add_child(UIKit.label("ESCOLHA SEU ITEM", 24, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("Vale só pra você, só na Rodada %d/%d — modificador: %s" % [engine.round_index + 1, ChaosEngine.ROUNDS, ChaosModifiers.label(engine.modifier, engine.weak_suit)], 13, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(HSeparator.new())
+	for item in options:
+		var btn := UIKit.button("%s  %s" % [ChaosItems.ICONS[item], ChaosItems.NAMES[item]], UIKit.OK)
+		btn.pressed.connect(func(): item_chosen.emit(item))
+		v.add_child(btn)
+		var desc := UIKit.label(ChaosItems.DESCRIPTIONS[item], 12, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc.custom_minimum_size = Vector2(360, 0)
+		v.add_child(desc)
+	ov.add_child(UIKit.centered(box))
+	box.scale = Vector2(0.85, 0.85)
+	box.pivot_offset = box.custom_minimum_size / 2.0
+	create_tween().tween_property(box, "scale", Vector2.ONE, GameState.anim(0.2)).set_trans(Tween.TRANS_BACK)
+	var chosen: int = await item_chosen
+	if is_inside_tree():
+		ov.queue_free()
+	return chosen
 
 
 func _wait(seconds: float) -> void:
@@ -479,7 +571,7 @@ func _animate_play(player: int, card: CardData, from: Vector2) -> void:
 	table_center.add_child(cv)
 	cv.set_playable(true)
 	cv.zoom_requested.connect(_show_zoom)
-	_apply_modifier_badge(cv, card)
+	_apply_modifier_badge(cv, card, -1)  # na mesa só mostra o efeito do modificador — o item só conta se essa carta vencer a vaza
 	cv.global_position = from
 	cv.scale = Vector2(0.9, 0.9)
 	cv.rotation = randf_range(-0.25, 0.25)
@@ -515,6 +607,9 @@ func _resolve_trick(result: Dictionary) -> void:
 	trick_label.text = "%s venceu a vaza · +%s pts%s" % [str(config["names"][winner]).to_upper(), UIKit.fmt_dec(points, 1), extra]
 	Sfx.play("chip")
 	_float_points(winner, points, bool(result.get("folego_applied", false)))
+	if bool(result.get("roubo_applied", false)):
+		var target: int = result["roubo_target"]
+		_speech_bubble(winner, "🗡 roubou %s pts de %s!" % [UIKit.fmt_dec(float(result["roubo_amount"]), 1), str(config["names"][target]).to_upper()])
 	await _wait(0.7)
 	if not is_inside_tree():
 		return
@@ -594,7 +689,10 @@ func _finish_match() -> void:
 	if finished:
 		return
 	finished = true
-	var summary := GameState.report_chaos_match(engine.match_result)
+	var result := engine.match_result.duplicate()
+	result["payout"] = engine.payout_for(engine.placement_of(0))
+	result["buy_in"] = engine.buy_in
+	var summary := GameState.report_chaos_match(result)
 	Sfx.play("win" if summary["won"] else "lose")
 	status_label.text = ""
 	_show_results(summary)
@@ -676,11 +774,17 @@ func _open_help() -> void:
 • Vence a partida quem somar mais pontos no total das 5 rodadas.
 
 MODIFICADOR
-• Cada rodada sorteia uma regra especial diferente, sempre visível na barra logo acima da mesa.
+• Cada rodada sorteia uma regra especial diferente (nunca repete duas vezes na mesma partida), sempre visível na barra logo acima da mesa.
 • As cartas afetadas mostram o valor real (com bônus ou penalidade) direto na carta — decida o que jogar olhando pra esse número, não só pro placar.
+
+ITENS
+• A partir da Rodada 2, antes de cada rodada você escolhe 1 de 2 itens sorteados — uma vantagem ativa só sua, só naquela rodada (Escudo, Trunfo Afiado, Fôlego Pessoal ou Roubo de Vaza). Os bots escolhem também.
 
 FÔLEGO
 • A partir da 2ª rodada, quem estiver em último no total ganha Fôlego: os pontos que capturar nessa rodada valem x1,5. É a chance de virar o jogo.
+
+FICHAS
+• Entrar na mesa custa um buy-in em fichas, que forma o pote da partida. No fim, o pote é pago por colocação: 1º leva 50%, 2º 30%, 3º 15%, 4º 5%. Seu saldo de fichas e o pote ficam sempre visíveis na barra acima da mesa.
 
 CARTAS
 • Mesmas regras de vaza do Vanilla: seguir naipe, cortar com Trunfo se não tiver, cobrir com Trunfo maior se alguém já cortou. O Louco nunca vence, a não ser no modificador "O Louco Vence"."""

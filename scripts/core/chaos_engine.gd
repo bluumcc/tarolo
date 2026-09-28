@@ -12,20 +12,29 @@ signal match_finished(result: Dictionary)
 const HAND_SIZE := 8
 const ROUNDS := 5
 const FOLEGO_MULT := 1.5   # bônus de pontos pra quem tá em último ANTES da rodada começar
+const ITEM_MULT := 1.25    # bônus do item Fôlego Pessoal
+const ITEM_STEAL := 4.0    # pontos roubados pelo item Roubo de Vaza
+const BUY_IN := 100.0
+const PAYOUT_SHARES := [0.5, 0.3, 0.15, 0.05]  # fatia do pote por colocação (1º a 4º)
 
 var num_players := 4
 var rng := RandomNumberGenerator.new()
 
 var totals: Array = []        # pontos acumulados no total da partida
 var round_index := 0
+var modifier_sequence: Array = []  # ordem embaralhada dos modificadores, sem repetir na partida
 var modifier := -1
 var weak_suit := -1
 var folego_player := -1       # quem recebe o bônus de virada nessa rodada (-1 = ninguém)
+var buy_in := BUY_IN
+var pot := 0.0
 
 var hands: Array = []
 var plays: Array = []
 var captured: Array = []
 var round_points: Array = []  # pontos ganhos só nessa rodada, por jogador
+var player_items: Array = []  # item ativo de cada jogador nessa rodada (ChaosItems.Item)
+var roubo_used: Array = []    # se o jogador já usou o Roubo de Vaza nessa rodada
 var leader := -1
 var current := -1
 var trick_number := 0
@@ -34,9 +43,11 @@ var round_result: Dictionary = {}
 var match_result: Dictionary = {}
 
 
-## config: { players, seed }
+## config: { players, seed, buy_in }
 func setup_match(config: Dictionary) -> void:
 	num_players = int(config.get("players", 4))
+	buy_in = float(config.get("buy_in", BUY_IN))
+	pot = buy_in * num_players
 	if config.has("seed"):
 		rng.seed = int(config["seed"])
 	else:
@@ -46,6 +57,8 @@ func setup_match(config: Dictionary) -> void:
 		totals.append(0.0)
 	round_index = 0
 	match_result = {}
+	modifier_sequence = ChaosModifiers.ALL.duplicate()
+	Deck.shuffle(modifier_sequence, rng)
 	_setup_round()
 
 
@@ -55,10 +68,14 @@ func _setup_round() -> void:
 	hands = dealt["hands"]
 	captured = []
 	round_points = []
+	player_items = []
+	roubo_used = []
 	for p in range(num_players):
 		captured.append([])
 		round_points.append(0.0)
-	modifier = ChaosModifiers.random_modifier(rng)
+		player_items.append(ChaosItems.Item.NONE)
+		roubo_used.append(false)
+	modifier = modifier_sequence[round_index % modifier_sequence.size()]
 	weak_suit = -1
 	if modifier == ChaosModifiers.Modifier.NAIPE_FRACO:
 		var suits := [CardData.Suit.OUROS, CardData.Suit.PAUS, CardData.Suit.COPAS, CardData.Suit.ESPADAS]
@@ -72,12 +89,30 @@ func _setup_round() -> void:
 	round_result = {}
 
 
+## Define o item escolhido por um jogador pra rodada atual — chamado pela UI depois que
+## humano/bots decidem, logo após advance_round() preparar a rodada nova.
+func set_item(player: int, item: int) -> void:
+	player_items[player] = item
+
+
+func payout_for(placement: int) -> float:
+	return pot * PAYOUT_SHARES[clampi(placement, 0, PAYOUT_SHARES.size() - 1)]
+
+
 func _lowest_player() -> int:
 	var lowest := 0
 	for p in range(1, num_players):
 		if totals[p] < totals[lowest]:
 			lowest = p
 	return lowest
+
+
+func _highest_player() -> int:
+	var highest := 0
+	for p in range(1, num_players):
+		if totals[p] > totals[highest]:
+			highest = p
+	return highest
 
 
 ## Verdadeiro no modificador "O Louco Vence" — usado pela UI/bots pra saber se O Louco
@@ -112,9 +147,10 @@ func play(player: int, card: CardData) -> Dictionary:
 	return {"ok": true, "trick_complete": true, "result": _resolve_trick()}
 
 
-## Valor de uma carta já considerando o modificador ativo (não considera Fôlego — esse
-## se aplica à vaza inteira, não carta a carta).
-func card_value(c: CardData) -> float:
+## Valor de uma carta já considerando o modificador ativo e, se um jogador for passado,
+## o item pessoal dele (não considera Fôlego/item de rodada — esses se aplicam à vaza
+## inteira, não carta a carta).
+func card_value(c: CardData, player: int = -1) -> float:
 	var v := c.points()
 	match modifier:
 		ChaosModifiers.Modifier.TRUNFO_DOBRO:
@@ -126,6 +162,12 @@ func card_value(c: CardData) -> float:
 		ChaosModifiers.Modifier.NAIPE_FRACO:
 			if c.suit == weak_suit:
 				v *= 0.5
+	if player != -1 and player < player_items.size():
+		var item: int = player_items[player]
+		if item == ChaosItems.Item.ESCUDO_NAIPE and modifier == ChaosModifiers.Modifier.NAIPE_FRACO and c.suit == weak_suit:
+			v = c.points()
+		elif item == ChaosItems.Item.TRUNFO_AFIADO and c.is_trunfo():
+			v += 1.0
 	return v
 
 
@@ -136,7 +178,7 @@ func _resolve_trick() -> Dictionary:
 	captured[winner].append_array(cards)
 	var base_points := 0.0
 	for c in cards:
-		base_points += card_value(c)
+		base_points += card_value(c, winner)
 	var mult := 1.0
 	if modifier == ChaosModifiers.Modifier.PRIMEIRA_DOBRO and trick_number == 0:
 		mult *= 2.0
@@ -145,7 +187,22 @@ func _resolve_trick() -> Dictionary:
 	var folego_applied := winner == folego_player
 	if folego_applied:
 		mult *= FOLEGO_MULT
+	var item_folego: bool = winner < player_items.size() and player_items[winner] == ChaosItems.Item.FOLEGO_PESSOAL
+	if item_folego:
+		mult *= ITEM_MULT
 	var points := base_points * mult
+	var roubo_applied := false
+	var roubo_amount := 0.0
+	var roubo_target := -1
+	if winner < player_items.size() and player_items[winner] == ChaosItems.Item.ROUBO_VAZA and not roubo_used[winner]:
+		roubo_used[winner] = true
+		var target := _highest_player()
+		if target != winner:
+			roubo_amount = minf(ITEM_STEAL, totals[target])
+			totals[target] -= roubo_amount
+			round_points[target] -= roubo_amount
+			roubo_applied = roubo_amount > 0.0
+			roubo_target = target
 	var trick_result := {
 		"winner": winner,
 		"winning_index": idx,
@@ -154,11 +211,15 @@ func _resolve_trick() -> Dictionary:
 		"base_points": base_points,
 		"mult": mult,
 		"folego_applied": folego_applied,
+		"item_folego": item_folego,
+		"roubo_applied": roubo_applied,
+		"roubo_amount": roubo_amount,
+		"roubo_target": roubo_target,
 		"trick_number": trick_number,
 	}
 	history.append(trick_result)
-	round_points[winner] += points
-	totals[winner] += points
+	round_points[winner] += points + roubo_amount
+	totals[winner] += points + roubo_amount
 	plays = []
 	trick_number += 1
 	leader = winner
@@ -192,7 +253,7 @@ func advance_round() -> void:
 func points_of(player: int) -> float:
 	var total := 0.0
 	for c in captured[player]:
-		total += card_value(c)
+		total += card_value(c, player)
 	return total
 
 

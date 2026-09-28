@@ -37,6 +37,7 @@ mouse_filter = 2
 [node name="Rank" type="Label" parent="Body/Margin/VBox/Top"]
 layout_mode = 2
 size_flags_horizontal = 3
+clip_text = true
 theme_override_font_sizes/font_size = 22
 text = "A"
 
@@ -66,6 +67,7 @@ mouse_filter = 2
 [node name="Points" type="Label" parent="Body/Margin/VBox/Bottom"]
 layout_mode = 2
 size_flags_horizontal = 3
+clip_text = true
 theme_override_font_sizes/font_size = 13
 text = "+1"
 

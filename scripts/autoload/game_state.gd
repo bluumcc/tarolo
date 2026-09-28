@@ -1,7 +1,5 @@
 extends Node
 ## Estado da sessão: modo atual, lobby ranqueado e fechamento de partidas.
-## Arcade e a camada Caos (Curingas, modificadores) estão temporariamente desligados
-## enquanto o baralho de 78 cartas do Tarot é reconstruído — voltam na Fase 3.
 
 enum Mode { CLASSIC, RANKED }
 
@@ -108,19 +106,30 @@ func player_name() -> String:
 
 ## Configuração da partida pra ChaosScene / ChaosEngine — todo mundo joga pra si, sem
 ## Tomador/Defesa, então não precisa de dificuldade especial pro assento do jogador.
+## Já cobra o buy-in das fichas do jogador (config["entered"] = false se não tinha saldo).
 func chaos_config() -> Dictionary:
 	var names := BOT_NAMES.duplicate()
 	names.shuffle()
+	var profile := SaveManager.section("profile")
+	var buy_in := ChaosEngine.BUY_IN
+	var entered := int(profile["fichas"]) >= buy_in
+	if entered:
+		profile["fichas"] = int(profile["fichas"]) - buy_in
+		SaveManager.save_game()
 	return {
 		"players": 4,
 		"names": [player_name(), names[0], names[1], names[2]],
 		"difficulty": [BotAI.Difficulty.NORMAL, BotAI.Difficulty.NORMAL, BotAI.Difficulty.NORMAL, BotAI.Difficulty.NORMAL],
+		"buy_in": buy_in,
+		"entered": entered,
 	}
 
 
 ## Fecha uma partida de Caos e devolve um resumo pra tela de resultado. Dá Fragmentos
-## conforme a colocação, mas não mexe em LP/elo — isso é só do Ranqueado (Vanilla).
-## result: { standings: Array, totals: Array }
+## conforme a colocação e paga a fatia do pote correspondente em fichas (o buy-in já
+## saiu do bolso na entrada, via chaos_config). Não mexe em LP/elo — isso é só do
+## Ranqueado (Vanilla).
+## result: { standings: Array, totals: Array, payout: float, buy_in: float }
 func report_chaos_match(result: Dictionary) -> Dictionary:
 	var standings: Array = result["standings"]
 	var placement := standings.find(0)
@@ -132,11 +141,20 @@ func report_chaos_match(result: Dictionary) -> Dictionary:
 	var frag_by_place := [15, 10, 6, 3]
 	var frag: int = frag_by_place[clampi(placement, 0, 3)]
 	profile["fragments"] = int(profile["fragments"]) + frag
+	var payout := int(round(float(result.get("payout", 0.0))))
+	var buy_in := int(round(float(result.get("buy_in", 0.0))))
+	profile["fichas"] = int(profile["fichas"]) + payout
 	SaveManager.save_game()
+	var net := payout - buy_in
 	var summary := {
 		"placement": placement,
 		"won": won,
-		"lines": ["%s%d Fragmentos" % ["+" if frag >= 0 else "", frag]],
+		"lines": [
+			"%s%d Fragmentos" % ["+" if frag >= 0 else "", frag],
+			"%s%d fichas nessa mesa (pote pagou %d)" % ["+" if net >= 0 else "", net, payout],
+		],
+		"payout": payout,
+		"net_fichas": net,
 	}
 	last_summary = summary
 	return summary

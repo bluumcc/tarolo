@@ -45,9 +45,9 @@ func _ready() -> void:
 	col.add_child(_caption("Tarot clássico: baralho de 78 cartas, trunfo e O Louco."))
 
 	var chaos := UIKit.button("MODO CAOS", UIKit.DANGER)
-	chaos.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn"))
+	chaos.pressed.connect(_open_chaos_confirm)
 	col.add_child(chaos)
-	col.add_child(_caption("5 rodadas relâmpago, modificador novo a cada uma, Fôlego pra quem tá por baixo."))
+	col.add_child(_caption("5 rodadas relâmpago, item novo por rodada, fichas na mesa, Fôlego pra quem tá por baixo."))
 
 	var rk := GameState.ranked()
 	var tier := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
@@ -93,7 +93,7 @@ func _ready() -> void:
 
 func _refresh_fragments() -> void:
 	var prof := SaveManager.section("profile")
-	fragments_label.text = "%s · %d partidas · %d vitórias · ◆ %s Fragmentos" % [prof["name"], int(prof["matches"]), int(prof["wins"]), UIKit.fmt_int(int(prof["fragments"]))]
+	fragments_label.text = "%s · %d partidas · %d vitórias · ◆ %s Fragmentos · 🪙 %s Fichas" % [prof["name"], int(prof["matches"]), int(prof["wins"]), UIKit.fmt_int(int(prof["fragments"])), UIKit.fmt_int(int(prof["fichas"]))]
 
 
 func _spacer(h: int) -> Control:
@@ -273,6 +273,36 @@ func _reopen_cosmetics() -> void:
 	for c in overlay_layer.get_children():
 		c.queue_free()
 	_open_cosmetics()
+
+
+func _open_chaos_confirm() -> void:
+	var v := _modal("MESA CAOS")
+	var profile := SaveManager.section("profile")
+	var buy_in := int(ChaosEngine.BUY_IN)
+	var fichas := int(profile["fichas"])
+	v.add_child(UIKit.label("Buy-in: %d fichas" % buy_in, 18, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("Você tem %d fichas" % fichas, 14, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	var pot_text := "Pote da mesa (4 jogadores): %d fichas\n1º leva 50%% · 2º 30%% · 3º 15%% · 4º 5%%" % (buy_in * 4)
+	var pot_l := UIKit.label(pot_text, 13, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	pot_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	pot_l.custom_minimum_size = Vector2(320, 0)
+	v.add_child(pot_l)
+	if fichas < buy_in:
+		v.add_child(UIKit.label("Fichas insuficientes pra entrar.", 14, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+		var loan := UIKit.button("EMPRÉSTIMO DA CASA (%d fichas)" % buy_in, UIKit.GOLD)
+		loan.pressed.connect(func():
+			profile["fichas"] = buy_in
+			SaveManager.save_game()
+			_refresh_fragments()
+			overlay_layer.get_child(overlay_layer.get_child_count() - 1).queue_free()
+			_open_chaos_confirm())
+		v.add_child(loan)
+		_close_button(v)
+		return
+	var enter := UIKit.button("ENTRAR NA MESA", UIKit.DANGER)
+	enter.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn"))
+	v.add_child(enter)
+	_close_button(v)
 
 
 func _open_rules() -> void:

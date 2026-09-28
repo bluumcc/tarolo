@@ -344,3 +344,53 @@ func _test_chaos() -> void:
 	var totals: Array = e3.match_result["totals"]
 	for i in range(standings.size() - 1):
 		check(float(totals[standings[i]]) >= float(totals[standings[i + 1]]), "pódio ordenado do maior pro menor total")
+
+	# Modificadores não repetem dentro da mesma partida (só 5 rodadas pra 6 modificadores).
+	var e4 := ChaosEngine.new()
+	e4.setup_match({"seed": 42})
+	var seen_mods := {}
+	for r in range(ChaosEngine.ROUNDS):
+		check(not seen_mods.has(e4.modifier), "modificador da rodada %d não repetiu na partida" % (r + 1))
+		seen_mods[e4.modifier] = true
+		if r < ChaosEngine.ROUNDS - 1:
+			e4.advance_round()
+
+	# Pote/buy-in: pago integralmente pelas 4 fatias de colocação.
+	var e5 := ChaosEngine.new()
+	e5.setup_match({"seed": 7, "buy_in": 100})
+	check(e5.pot == 400.0, "pote = buy-in x jogadores (100 x 4 = 400)")
+	var paid := 0.0
+	for pl in range(4):
+		paid += e5.payout_for(pl)
+	check(is_equal_approx(paid, e5.pot), "a soma dos pagamentos por colocação esgota o pote")
+	check(e5.payout_for(0) > e5.payout_for(1) and e5.payout_for(1) > e5.payout_for(2) and e5.payout_for(2) > e5.payout_for(3), "pagamento cai a cada colocação pior")
+
+	# Itens: efeito de cada um em card_value/roubo, isolado do jogador que não tem o item.
+	var e6 := ChaosEngine.new()
+	e6.setup_match({"seed": 5})
+	e6.modifier = ChaosModifiers.Modifier.NAIPE_FRACO
+	e6.weak_suit = CardData.Suit.OUROS
+	e6.player_items[0] = ChaosItems.Item.ESCUDO_NAIPE
+	check(e6.card_value(c(0, 14), 0) == 4.5, "Escudo de Naipe cancela a penalidade do Naipe Fraco pra quem tem o item")
+	check(e6.card_value(c(0, 14), 1) == 2.25, "Escudo de Naipe não afeta quem não tem o item")
+
+	e6.modifier = -1
+	e6.weak_suit = -1
+	e6.player_items[0] = ChaosItems.Item.TRUNFO_AFIADO
+	check(e6.card_value(c(4, 5), 0) == 1.5, "Trunfo Afiado soma +1 pt fixo no Trunfo de quem tem o item")
+	check(e6.card_value(c(4, 5), 1) == 0.5, "Trunfo Afiado não afeta quem não tem o item")
+
+	e6.totals = [0.0, 20.0, 0.0, 0.0]
+	e6.player_items = [ChaosItems.Item.ROUBO_VAZA, ChaosItems.Item.NONE, ChaosItems.Item.NONE, ChaosItems.Item.NONE]
+	e6.roubo_used = [false, false, false, false]
+	e6.plays = [
+		{"player": 1, "card": c(CardData.Suit.PAUS, 3)},
+		{"player": 2, "card": c(CardData.Suit.PAUS, 5)},
+		{"player": 3, "card": c(CardData.Suit.PAUS, 7)},
+		{"player": 0, "card": c(CardData.Suit.PAUS, 10)},
+	]
+	e6.trick_number = 1
+	var steal_result := e6._resolve_trick()
+	check(bool(steal_result["roubo_applied"]), "Roubo de Vaza dispara na 1ª vaza vencida com o item")
+	check(int(steal_result["roubo_target"]) == 1, "Roubo de Vaza mira em quem está em 1º lugar no total")
+	check(e6.totals[1] == 16.0, "alvo do roubo perde os pontos roubados")
