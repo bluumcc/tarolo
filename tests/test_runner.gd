@@ -16,6 +16,7 @@ func _init() -> void:
 	_test_louco()
 	_test_winner()
 	_test_bidding()
+	_test_bonuses()
 	print("\n%d ok, %d falhas" % [passed, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -185,6 +186,48 @@ func _test_winner() -> void:
 	]
 	check(TrickRules.winning_index(plays) == 3, "maior do naipe líder vence (Rei de outro naipe não)")
 	check(TrickRules.winning_index([{"player": 0, "card": c(2, 1)}, {"player": 1, "card": c(2, 2)}]) == 1, "Ás é a menor carta do naipe")
+
+
+func _test_bonuses() -> void:
+	check(Scoring.poignee_bonus(9) == 0.0, "menos de 10 trunfos não dá Poignée")
+	check(Scoring.poignee_bonus(10) == 20.0, "10 trunfos = Poignée simples (+20)")
+	check(Scoring.poignee_bonus(12) == 20.0, "12 trunfos ainda é Poignée simples")
+	check(Scoring.poignee_bonus(13) == 30.0, "13 trunfos = Poignée dupla (+30)")
+	check(Scoring.poignee_bonus(15) == 40.0, "15 trunfos = Poignée tripla (+40)")
+
+	var r := Scoring.resolve(60.0, 1, Scoring.Contract.GARDE, {"poignee": 20.0, "chelem": 200.0, "petit_au_bout": 10.0})
+	check(r["bonus_total"] == 230.0, "bônus somam 230 antes de aplicar ao placar")
+	check(r["score"] > 230.0, "placar final inclui o resultado do contrato mais os bônus")
+
+	var r2 := Scoring.resolve(60.0, 1, Scoring.Contract.GARDE, {"petit_au_bout": -10.0})
+	check(r2["bonus_total"] == -10.0, "petit au bout a favor da defesa entra negativo pro tomador")
+
+	# Detecção automática via MatchEngine: monta um estado final manualmente (sem rodar
+	# a partida inteira) e confere se _round_bonuses() lê tudo certo.
+	var e := MatchEngine.new()
+	e.setup({"seed": 42, "players": 4})
+	e.num_players = 4
+	e.taker = 0
+	e.taker_trump_count = 13
+	e.captured = [[], [], [], []]  # ninguém além do tomador capturou nada -> chelem
+	e.captured[0].append(c(4, 5))
+	var petit := c(4, CardData.PETIT)
+	e.history = [{
+		"winner": 0,
+		"plays": [{"player": 0, "card": petit}, {"player": 1, "card": c(0, 3)}, {"player": 2, "card": c(1, 4)}, {"player": 3, "card": c(2, 6)}],
+	}]
+	var bonuses: Dictionary = e._round_bonuses()
+	check(bonuses["poignee"] == 30.0, "MatchEngine detecta Poignée dupla (13 trunfos)")
+	check(bonuses["chelem"] == 200.0, "MatchEngine detecta Chelem quando só o tomador capturou algo")
+	check(bonuses["petit_au_bout"] == 10.0, "MatchEngine detecta Petit au bout a favor do tomador quando ele vence a última vaza com Le Petit")
+
+	e.taker = 1  # agora o Petit foi vencido por outro jogador na última vaza
+	e.history = [{
+		"winner": 0,
+		"plays": [{"player": 0, "card": petit}, {"player": 1, "card": c(0, 3)}, {"player": 2, "card": c(1, 4)}, {"player": 3, "card": c(2, 6)}],
+	}]
+	var bonuses2: Dictionary = e._round_bonuses()
+	check(bonuses2["petit_au_bout"] == -10.0, "Petit au bout vira pra defesa quando quem vence a última vaza não é o tomador")
 
 	var cut := [
 		{"player": 0, "card": c(2, 14)},

@@ -92,6 +92,11 @@ func _build_ui() -> void:
 	info_box.add_child(info_label)
 	hud.add_child(info_box)
 
+	var help_btn := UIKit.button("?", UIKit.GOLD, 20)
+	help_btn.custom_minimum_size = Vector2(52, 52)
+	help_btn.pressed.connect(_open_help)
+	hud.add_child(help_btn)
+
 	var menu_btn := UIKit.button("☰", UIKit.MUTED, 20)
 	menu_btn.custom_minimum_size = Vector2(52, 52)
 	menu_btn.pressed.connect(_open_pause)
@@ -322,23 +327,36 @@ func _show_bid_prompt(opts: Array, forced: bool) -> void:
 	v.add_theme_constant_override("separation", 8)
 	panel.add_child(v)
 	v.add_child(UIKit.label("SUA VEZ DE LICITAR", 15, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	if forced:
+		v.add_child(UIKit.label("Ninguém mais licitou — você é obrigado a assumir um contrato", 12, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	v.add_child(row)
 	var first_btn: Button
 	if not forced:
+		var pass_col := VBoxContainer.new()
+		pass_col.add_theme_constant_override("separation", 2)
+		row.add_child(pass_col)
 		var pass_btn := UIKit.button("PASSAR", UIKit.MUTED, 14)
 		pass_btn.pressed.connect(func():
 			panel.queue_free()
 			human_bid_chosen.emit(-1))
-		row.add_child(pass_btn)
+		pass_col.add_child(pass_btn)
+		pass_col.add_child(UIKit.label("Desiste dessa rodada", 10, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 		first_btn = pass_btn
 	for c in opts:
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 2)
+		col.custom_minimum_size = Vector2(150, 0)
+		row.add_child(col)
 		var b := UIKit.button(Scoring.CONTRACT_NAMES[c], UIKit.GOLD, 14)
 		b.pressed.connect(func(cc = c):
 			panel.queue_free()
 			human_bid_chosen.emit(cc))
-		row.add_child(b)
+		col.add_child(b)
+		var hint := UIKit.label(str(Scoring.CONTRACT_HINTS[c]), 10, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		hint.autowrap_mode = TextServer.AUTOWRAP_WORD
+		col.add_child(hint)
 		if first_btn == null:
 			first_btn = b
 	popup_layer.add_child(panel)
@@ -551,6 +569,20 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 		"+" if r["margin"] >= 0.0 else "",
 		UIKit.fmt_dec(r["margin"], 1),
 	], 14, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	var bonuses: Dictionary = r.get("bonuses", {})
+	var bonus_lines: Array = []
+	if float(bonuses.get("poignee", 0.0)) > 0.0:
+		bonus_lines.append("✦ Poignée — %s tinha muitos trunfos (+%d)" % [str(config["names"][r["taker"]]), int(bonuses["poignee"])])
+	if float(bonuses.get("chelem", 0.0)) > 0.0:
+		bonus_lines.append("✦ Chelem — %s venceu todas as vazas (+%d)" % [str(config["names"][r["taker"]]), int(bonuses["chelem"])])
+	var petit: float = float(bonuses.get("petit_au_bout", 0.0))
+	if petit > 0.0:
+		bonus_lines.append("✦ Petit au bout a favor do Tomador (+%d)" % int(petit))
+	elif petit < 0.0:
+		bonus_lines.append("✦ Petit au bout a favor da Defesa (%d)" % int(petit))
+	if not bonus_lines.is_empty():
+		for line in bonus_lines:
+			v.add_child(UIKit.label(str(line), 12, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	for p in engine.standings():
 		var delta := int(r["deltas"][p])
@@ -609,6 +641,33 @@ func _show_zoom(view: CardView) -> void:
 	ov.gui_input.connect(func(e: InputEvent):
 		if e is InputEventMouseButton and e.pressed:
 			ov.queue_free())
+
+
+func _open_help() -> void:
+	var v := UIKit.modal(overlay_layer, "COMO FUNCIONA")
+	var text := """CARTAS
+• 78 cartas: 4 naipes de 14 (Ás a Rei), 21 Trunfos e O Louco.
+• Trunfo sempre vence naipe comum. Entre trunfos, vence o maior número.
+• Bouts (as 3 cartas mais valiosas): Le Petit (trunfo 1), Le Monde (trunfo 21) e O Louco.
+
+LICITAÇÃO
+• Na sua vez: PASSAR ou dar um lance mais alto que o anterior.
+• O lance não custa nada — é só uma declaração de confiança na sua mão.
+• Petite (x1) → Garde (x2) → Garde Sans (x4, não vê o talão mas ele ainda conta) → Garde Contre (x6, não vê e ele vira ponto da defesa).
+• Quem der o lance mais alto vira o Tomador e joga sozinho contra os outros 3.
+
+META
+• O Tomador soma os pontos que capturou. Precisa bater: 56 pts com 0 Bouts, 51 com 1, 41 com 2, 36 com 3.
+
+BÔNUS AUTOMÁTICOS
+• Poignée: Tomador com muitos trunfos na mão inicial ganha pontos extras.
+• Chelem: Tomador vence as 18 vazas sozinho.
+• Petit au bout: quem vence a última vaza com Le Petit dentro leva +10."""
+	var l := UIKit.label(text, 13, UIKit.INK)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size = Vector2(340, 0)
+	v.add_child(l)
+	UIKit.close_button(overlay_layer, v)
 
 
 func _open_pause() -> void:

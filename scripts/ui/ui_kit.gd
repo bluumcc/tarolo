@@ -131,6 +131,37 @@ static func fmt_dec(x: float, decimals: int = 1) -> String:
 	return ("-" if x < 0 else "") + fmt_int(whole) + ("," + frac_str if decimals > 0 else "")
 
 
+## Modal genérico (fundo escurecido + painel com scroll) usado fora do menu principal —
+## ex: o botão de ajuda dentro da partida, pra explicar regras sem exigir decorar tudo antes.
+static func modal(overlay_layer: Control, title: String, width: float = 380.0) -> VBoxContainer:
+	var ov := overlay()
+	overlay_layer.add_child(ov)
+	var box_p := panel(PURPLE_DEEP, GOLD, 24)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	v.custom_minimum_size = Vector2(width, 0)
+	box_p.add_child(v)
+	v.add_child(label(title, 26, GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var center := CenterContainer.new()
+	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	center.add_child(box_p)
+	scroll.add_child(center)
+	ov.add_child(scroll)
+	return v
+
+
+static func close_button(overlay_layer: Control, v: VBoxContainer) -> void:
+	var close := button("FECHAR", MUTED)
+	close.pressed.connect(func():
+		overlay_layer.get_child(overlay_layer.get_child_count() - 1).queue_free())
+	v.add_child(close)
+	close.grab_focus.call_deferred()
+
+
 static func is_portrait(node: Control) -> bool:
 	var s := node.get_viewport_rect().size
 	return s.y > s.x

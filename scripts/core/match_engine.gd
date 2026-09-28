@@ -28,6 +28,7 @@ var highest_bid := -1
 var highest_bidder := -1
 var bidding_done := false
 var bidding_void := false      # todos passaram (mão anulada — chamador deve refazer o setup)
+var taker_trump_count := 0     # trunfos na mão do tomador já com o talão resolvido (Poignée)
 
 
 ## config: { seed, players }
@@ -147,6 +148,10 @@ func _finalize_taker() -> void:
 	total_tricks = (hands[0] as Array).size()
 	leader = (taker + 1) % num_players
 	current = leader
+	taker_trump_count = 0
+	for c in hands[taker]:
+		if (c as CardData).is_trunfo():
+			taker_trump_count += 1
 
 
 ## Descarta as `n` cartas mais fracas (nunca um Bout) de `hand`, devolve as descartadas.
@@ -218,12 +223,40 @@ func _finish() -> Dictionary:
 			bouts += 1
 	# Garde Sans/Contre: o talão nunca entrou na mão do tomador (não é jogado em vaza
 	# nenhuma), então ele só entra na conta final aqui — não nos dois casos acima.
-	var r := Scoring.resolve(taker_points, bouts, contract)
+	var bonuses := _round_bonuses()
+	var r := Scoring.resolve(taker_points, bouts, contract, bonuses)
 	r["taker"] = taker
 	r["taker_points"] = taker_points
 	r["bouts"] = bouts
 	r["deltas"] = Scoring.distribute(r["score"], taker, num_players)
 	return r
+
+
+## Detecta Poignée (mão inicial do tomador), Chelem (tomador venceu todas as vazas) e
+## Petit au bout (Le Petit na última vaza) — tudo automático, sem exigir declaração.
+func _round_bonuses() -> Dictionary:
+	var poignee := Scoring.poignee_bonus(taker_trump_count)
+	var chelem := 0.0
+	var taker_won_all := true
+	for p in range(num_players):
+		if p != taker and not (captured[p] as Array).is_empty():
+			taker_won_all = false
+			break
+	if taker_won_all:
+		chelem = Scoring.CHELEM_BONUS
+	var petit_au_bout := 0.0
+	if not history.is_empty():
+		var last_trick: Dictionary = history[-1]
+		var has_petit := false
+		for entry in (last_trick["plays"] as Array):
+			var card: CardData = entry["card"]
+			if card.is_trunfo() and card.rank == CardData.PETIT:
+				has_petit = true
+				break
+		if has_petit:
+			var winner: int = last_trick["winner"]
+			petit_au_bout = Scoring.PETIT_AU_BOUT_BONUS if winner == taker else -Scoring.PETIT_AU_BOUT_BONUS
+	return {"poignee": poignee, "chelem": chelem, "petit_au_bout": petit_au_bout}
 
 
 ## Pontos capturados até agora por um jogador (visível durante a partida — o placar

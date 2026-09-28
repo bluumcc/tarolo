@@ -6,24 +6,55 @@ extends RefCounted
 ## Quanto mais Bouts o tomador guarda, menos pontos precisa pra bater a meta.
 const TARGET_BY_BOUTS := {0: 56.0, 1: 51.0, 2: 41.0, 3: 36.0}
 
-## Contratos de licitação e seus multiplicadores (Petite/Garde ativos hoje; os outros dois
-## — Garde Sans/Garde Contre le Chien — entram quando a licitação interativa existir).
+## Contratos de licitação e seus multiplicadores, do mais leve ao mais arriscado.
 enum Contract { PETITE, GARDE, GARDE_SANS, GARDE_CONTRE }
 const CONTRACT_NAMES := ["Petite", "Garde", "Garde Sans", "Garde Contre"]
 const CONTRACT_MULT := {Contract.PETITE: 1, Contract.GARDE: 2, Contract.GARDE_SANS: 4, Contract.GARDE_CONTRE: 6}
+## Explicação curta de cada contrato pra mostrar na tela de licitação — o jogo tem
+## regras demais pra aprender de uma vez, então isso fica sempre visível ao lado do botão.
+const CONTRACT_HINTS := [
+	"Compromisso leve — multiplica x1",
+	"Mais confiança — multiplica x2",
+	"Não vê o talão, mas ele ainda conta pra você — x4",
+	"Não vê o talão, e ele vira ponto da defesa — x6",
+]
 
 ## Toda rodada dá um piso de 25 pontos de aposta, que se soma à distância (pra mais ou
 ## pra menos) da meta — e só depois é multiplicado pelo contrato.
 const BASE_SCORE := 25.0
+
+## Poignée: bônus por segurar muitos trunfos na mão inicial (detectado automaticamente,
+## sem exigir declaração — pra não pesar no aprendizado). Valores oficiais de mesa com
+## 4 jogadores; soma-se ao placar já multiplicado, não entra na conta da meta.
+const POIGNEE_THRESHOLDS := [[15, 40.0], [13, 30.0], [10, 20.0]]  # [trunfos mínimos, bônus]
+
+## Chelem: o tomador vence as 18 vazas sozinho. Usa o valor de "chelem não anunciado"
+## (o anunciado renderia mais, mas exigiria declarar antes — fica pra depois).
+const CHELEM_BONUS := 200.0
+
+## Petit au bout: quem vence a última vaza com Le Petit dentro leva 10 pontos extras —
+## a favor do tomador se for ele, da defesa se for outro jogador.
+const PETIT_AU_BOUT_BONUS := 10.0
 
 
 static func target_for_bouts(bouts: int) -> float:
 	return TARGET_BY_BOUTS[clampi(bouts, 0, 3)]
 
 
+## Maior bônus de Poignée que `trump_count` trunfos na mão inicial alcança (0 se nenhum).
+static func poignee_bonus(trump_count: int) -> float:
+	for pair in POIGNEE_THRESHOLDS:
+		if trump_count >= pair[0]:
+			return pair[1]
+	return 0.0
+
+
 ## `taker_points` = soma de `CardData.points()` de tudo que o tomador capturou
 ## (vazas vencidas + talão). `bouts` = quantos dos 3 Bouts estão nesse total.
-static func resolve(taker_points: float, bouts: int, contract: int = Contract.PETITE) -> Dictionary:
+## `bonuses` (opcional) = { poignee, chelem, petit_au_bout }, já com o sinal certo
+## (positivo a favor do tomador, negativo a favor da defesa) — somados depois do
+## multiplicador do contrato, como no jogo real.
+static func resolve(taker_points: float, bouts: int, contract: int = Contract.PETITE, bonuses: Dictionary = {}) -> Dictionary:
 	var target := target_for_bouts(bouts)
 	var margin := taker_points - target
 	var success := margin >= 0.0
@@ -31,6 +62,8 @@ static func resolve(taker_points: float, bouts: int, contract: int = Contract.PE
 	var score := (BASE_SCORE + absf(margin)) * mult
 	if not success:
 		score = -score
+	var bonus_total := float(bonuses.get("poignee", 0.0)) + float(bonuses.get("chelem", 0.0)) + float(bonuses.get("petit_au_bout", 0.0))
+	score += bonus_total
 	return {
 		"target": target,
 		"margin": margin,
@@ -38,6 +71,8 @@ static func resolve(taker_points: float, bouts: int, contract: int = Contract.PE
 		"score": score,
 		"contract": contract,
 		"contract_mult": mult,
+		"bonuses": bonuses,
+		"bonus_total": bonus_total,
 	}
 
 

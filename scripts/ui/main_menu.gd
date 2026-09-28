@@ -256,7 +256,9 @@ func _open_rules() -> void:
 • Obrigado a seguir o naipe líder. Sem ele, é obrigado a jogar Trunfo — e se alguém já cortou, precisa cobrir com um Trunfo maior, se tiver.
 • O Louco pode ser jogado a qualquer momento, nunca vence a vaza, mas o dono guarda os pontos dele.
 • Le Petit (trunfo 1), Le Monde (trunfo 21) e O Louco são os 3 Bouts — as cartas mais valiosas do jogo.
-• Quem tem a mão mais forte vira o Tomador e joga sozinho contra os outros 3. No fim, some os pontos que capturou: precisa de 56 pts com 0 Bouts, 51 com 1, 41 com 2 ou 36 com 3 pra vencer a rodada.
+• Licitação: cada jogador, na sua vez, passa ou dá um lance mais alto (Petite x1, Garde x2, Garde Sans x4, Garde Contre x6). O lance não custa fichas — é só a declaração de quão confiante você está. Quem der o maior lance vira o Tomador e joga sozinho contra os outros 3.
+• No fim, o Tomador some os pontos que capturou: precisa de 56 pts com 0 Bouts, 51 com 1, 41 com 2 ou 36 com 3 pra vencer a rodada.
+• Bônus automáticos: Poignée (muitos trunfos na mão), Chelem (vencer as 18 vazas sozinho) e Petit au bout (vencer a última vaza com Le Petit).
 • Ranqueado: sua colocação entre 4 jogadores define LP e MMR."""
 	var l := UIKit.label(text, 15, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
