@@ -73,6 +73,7 @@ func setup_tutorial() -> void:
 	for r in [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]:
 		remaining.append(CardData.make(CardData.Suit.TRUNFO, r))
 
+	Deck.shuffle(remaining, rng)
 	var bots := [[], [], []]
 	for i in range(54):
 		bots[i % 3].append(remaining[i])
