@@ -153,6 +153,25 @@ func _close_button(v: VBoxContainer) -> void:
 
 func _open_settings() -> void:
 	var v := _modal("CONFIGURAÇÕES")
+	var profile := SaveManager.section("profile")
+	v.add_child(UIKit.label("Seu nome", 16))
+	var name_edit := LineEdit.new()
+	name_edit.text = str(profile["name"])
+	name_edit.max_length = 16
+	name_edit.custom_minimum_size = Vector2(0, 40)
+	name_edit.add_theme_stylebox_override("normal", UIKit.box(UIKit.PURPLE_DEEP, UIKit.MUTED, 2, 6, 10))
+	name_edit.add_theme_stylebox_override("focus", UIKit.box(UIKit.PURPLE_DEEP, UIKit.GOLD, 2, 6, 10))
+	name_edit.add_theme_color_override("font_color", UIKit.INK)
+	name_edit.add_theme_color_override("font_placeholder_color", UIKit.MUTED)
+	name_edit.placeholder_text = "Arcanista"
+	name_edit.text_submitted.connect(func(_t: String): name_edit.release_focus())
+	name_edit.focus_exited.connect(func():
+		var clean := name_edit.text.strip_edges()
+		profile["name"] = clean if not clean.is_empty() else "Arcanista"
+		name_edit.text = str(profile["name"])
+		SaveManager.save_game()
+		_refresh_fragments())
+	v.add_child(name_edit)
 	var s := GameState.settings()
 	for entry in [["Música", "music_volume"], ["Efeitos", "sfx_volume"]]:
 		v.add_child(UIKit.label(entry[0], 16))
