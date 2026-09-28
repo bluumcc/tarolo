@@ -59,6 +59,20 @@ static func bid_choice(hand: Array, options: Array, forced: bool, difficulty: in
 	return next_opt if forced else -1
 
 
+## Declarar Poignée é sempre vantajoso pro bot (não há como a IA hoje usar a informação
+## revelada contra ele mesmo), então declara sempre que elegível.
+static func decide_poignee(trump_count: int) -> bool:
+	return trump_count >= 10
+
+
+## Anunciar Chelem só compensa com uma mão excepcional — a penalidade de falhar é alta.
+## Só bots Normal/Difícil arriscam, e só ocasionalmente mesmo com mão muito forte.
+static func decide_chelem(hand_strength: float, difficulty: int, rng: RandomNumberGenerator) -> bool:
+	if difficulty == Difficulty.EASY or hand_strength < 38.0:
+		return false
+	return rng.randf() < 0.35
+
+
 static func choose(hand: Array, plays: Array, player: int, num_players: int, difficulty: int, rng: RandomNumberGenerator) -> CardData:
 	var legal := TrickRules.legal_cards(hand, plays)
 	if legal.size() == 1:

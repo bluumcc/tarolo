@@ -10,9 +10,11 @@ func _ready() -> void:
 		args[kv[0]] = kv[1] if kv.size() > 1 else ""
 	SaveManager.persist = false
 	var scene: String = str(args.get("scene", "menu"))
-	var lookup := {"menu": "res://scenes/MainMenu.tscn", "game": "res://scenes/GameScene.tscn", "bid": "res://scenes/GameScene.tscn", "ranked": "res://scenes/RankedLobby.tscn"}
+	var lookup := {"menu": "res://scenes/MainMenu.tscn", "game": "res://scenes/GameScene.tscn", "bid": "res://scenes/GameScene.tscn", "tutorial": "res://scenes/GameScene.tscn", "ranked": "res://scenes/RankedLobby.tscn"}  # "tutorial" reusa a mesa, só troca a mão/dicas
 	var path: String = lookup[scene]
 	GameState.autoplay = scene == "game"
+	if scene == "tutorial":
+		GameState.start_tutorial()
 	add_child(load(path).instantiate())
 	await get_tree().create_timer(float(args.get("wait", "1.0"))).timeout
 	var img := get_viewport().get_texture().get_image()

@@ -202,8 +202,9 @@ func _test_bonuses() -> void:
 	var r2 := Scoring.resolve(60.0, 1, Scoring.Contract.GARDE, {"petit_au_bout": -10.0})
 	check(r2["bonus_total"] == -10.0, "petit au bout a favor da defesa entra negativo pro tomador")
 
-	# Detecção automática via MatchEngine: monta um estado final manualmente (sem rodar
-	# a partida inteira) e confere se _round_bonuses() lê tudo certo.
+	# Detecção via MatchEngine: monta um estado final manualmente (sem rodar a partida
+	# inteira) e confere se _round_bonuses() lê tudo certo — Poignée/Chelem só contam
+	# se o tomador escolheu declarar/anunciar (ver `declare_poignee`/`announce_chelem`).
 	var e := MatchEngine.new()
 	e.setup({"seed": 42, "players": 4})
 	e.num_players = 4
@@ -216,10 +217,20 @@ func _test_bonuses() -> void:
 		"winner": 0,
 		"plays": [{"player": 0, "card": petit}, {"player": 1, "card": c(0, 3)}, {"player": 2, "card": c(1, 4)}, {"player": 3, "card": c(2, 6)}],
 	}]
+	var bonuses_undeclared: Dictionary = e._round_bonuses()
+	check(bonuses_undeclared["poignee"] == 0.0, "Poignée não declarado não soma bônus")
+	check(bonuses_undeclared["chelem"] == 200.0, "Chelem não anunciado ainda dá +200 sem risco quando vence todas por acaso")
+	check(bonuses_undeclared["petit_au_bout"] == 10.0, "Petit au bout a favor do tomador é sempre automático")
+
+	e.declare_poignee(true)
+	e.announce_chelem(true)
 	var bonuses: Dictionary = e._round_bonuses()
-	check(bonuses["poignee"] == 30.0, "MatchEngine detecta Poignée dupla (13 trunfos)")
-	check(bonuses["chelem"] == 200.0, "MatchEngine detecta Chelem quando só o tomador capturou algo")
-	check(bonuses["petit_au_bout"] == 10.0, "MatchEngine detecta Petit au bout a favor do tomador quando ele vence a última vaza com Le Petit")
+	check(bonuses["poignee"] == 30.0, "Poignée declarado soma o bônus (dupla, 13 trunfos)")
+	check(bonuses["chelem"] == 400.0, "Chelem anunciado e cumprido vale o dobro (+400)")
+
+	e.captured[1].append(c(0, 2))  # agora outro jogador venceu alguma vaza -> Chelem falha
+	var bonuses_failed: Dictionary = e._round_bonuses()
+	check(bonuses_failed["chelem"] == -200.0, "Chelem anunciado e não cumprido pune o tomador (-200)")
 
 	e.taker = 1  # agora o Petit foi vencido por outro jogador na última vaza
 	e.history = [{

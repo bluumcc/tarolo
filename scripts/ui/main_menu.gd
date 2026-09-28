@@ -30,6 +30,13 @@ func _ready() -> void:
 	col.add_child(sub)
 	col.add_child(_spacer(12))
 
+	var tut := UIKit.button("TUTORIAL", UIKit.OK)
+	tut.pressed.connect(func():
+		GameState.start_tutorial()
+		get_tree().change_scene_to_file("res://scenes/GameScene.tscn"))
+	col.add_child(tut)
+	col.add_child(_caption("Primeira vez? Uma mão guiada, com dicas em cada regra nova."))
+
 	var classic := UIKit.button("MODO VANILLA")
 	classic.pressed.connect(func():
 		GameState.mode = GameState.Mode.CLASSIC
@@ -258,8 +265,9 @@ func _open_rules() -> void:
 • Le Petit (trunfo 1), Le Monde (trunfo 21) e O Louco são os 3 Bouts — as cartas mais valiosas do jogo.
 • Licitação: cada jogador, na sua vez, passa ou dá um lance mais alto (Petite x1, Garde x2, Garde Sans x4, Garde Contre x6). O lance não custa fichas — é só a declaração de quão confiante você está. Quem der o maior lance vira o Tomador e joga sozinho contra os outros 3.
 • No fim, o Tomador some os pontos que capturou: precisa de 56 pts com 0 Bouts, 51 com 1, 41 com 2 ou 36 com 3 pra vencer a rodada.
-• Bônus automáticos: Poignée (muitos trunfos na mão), Chelem (vencer as 18 vazas sozinho) e Petit au bout (vencer a última vaza com Le Petit).
-• Ranqueado: sua colocação entre 4 jogadores define LP e MMR."""
+• Depois da licitação, o Tomador escolhe: declarar Poignée (mostra os trunfos, ganha pontos extras se tiver 10+) e/ou anunciar Chelem (apostar que vence as 18 vazas — rende mais se anunciado, mas pune se falhar). Petit au bout (vencer a última vaza com Le Petit) é automático.
+• Ranqueado: sua colocação entre 4 jogadores define LP e MMR.
+• Primeira vez? Joga o TUTORIAL — uma mão guiada com dicas em cada regra nova."""
 	var l := UIKit.label(text, 15, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(420, 0)

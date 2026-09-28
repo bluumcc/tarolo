@@ -13,6 +13,13 @@ var mode: int = Mode.CLASSIC
 var autoplay := false
 ## Remove esperas de animação (testes headless).
 var fast := false
+## Partida de tutorial: mão fixa + dicas contextuais, não mexe em Fragmentos/elo.
+var tutorial := false
+
+
+func start_tutorial() -> void:
+	mode = Mode.CLASSIC
+	tutorial = true
 
 var ranked_lobby: Array = []   # [{name, mmr}] adversários encontrados no matchmaking
 var last_summary: Dictionary = {}
@@ -107,6 +114,7 @@ func match_config() -> Dictionary:
 		"players": 4,
 		"names": [player_name(), names[0], names[1], names[2]],
 		"difficulty": [BotAI.Difficulty.HARD, BotAI.Difficulty.NORMAL, BotAI.Difficulty.NORMAL, BotAI.Difficulty.NORMAL],
+		"tutorial": tutorial,
 	}
 	if mode == Mode.RANKED:
 		var diff := Ranked.bot_difficulty_for_mmr(int(ranked()["mmr"]))
@@ -120,6 +128,21 @@ func match_config() -> Dictionary:
 ## result: { placement: int, taker: int, contract: int, success: bool, deltas: Array }
 func report_match(result: Dictionary) -> Dictionary:
 	var placement := int(result["placement"])
+	if tutorial:
+		tutorial = false
+		var was_taker_t: bool = int(result.get("taker", -1)) == 0
+		var role_t := "Tomador" if was_taker_t else "Defesa"
+		var outcome_t := "bateu a meta" if bool(result.get("success", false)) else "não bateu a meta"
+		return {
+			"mode": mode,
+			"placement": placement,
+			"won": placement == 0,
+			"lines": [
+				"%s · %s" % [role_t, outcome_t] if was_taker_t else role_t,
+				"%s%d pontos" % ["+" if int(result["deltas"][0]) >= 0 else "", int(result["deltas"][0])],
+			],
+			"next": "menu",
+		}
 	var profile := SaveManager.section("profile")
 	profile["matches"] = int(profile["matches"]) + 1
 	var won := placement == 0

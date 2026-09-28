@@ -4,6 +4,7 @@ extends Control
 
 signal human_card_chosen(card: CardData)
 signal human_bid_chosen(choice: int)
+signal human_yesno_chosen(v: bool)
 signal match_finished(summary: Dictionary)
 
 const CARD_SCENE := preload("res://scenes/Card.tscn")
@@ -31,21 +32,34 @@ var popup_layer: Control
 var overlay_layer: Control
 var table_views: Array = []
 
+var tutorial := false
+var tutorial_label: Label
+var tutorial_seen: Dictionary = {}    # dicas de uso único já mostradas nesta partida
+
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bot_rng.randomize()
 	config = GameState.match_config()
-	engine.setup(config)
+	tutorial = bool(config.get("tutorial", false))
+	if tutorial:
+		engine.setup_tutorial()
+	else:
+		engine.setup(config)
 	_build_ui()
 	get_viewport().size_changed.connect(_on_resize)
 	_refresh_hud()
 	_rebuild_hand()
+	if tutorial:
+		_tutorial_hint("Bem-vindo! Essa mão foi montada pra você passar pelas principais regras do Vanilla. Sua vez de licitar já aparece embaixo — dá uma olhada na sua mão primeiro.")
 	await _run_bidding()
 	if not is_inside_tree():
 		return
 	_update_taker_badge()
 	_refresh_hud()
+	await _run_declarations()
+	if not is_inside_tree():
+		return
 	_run_round.call_deferred()
 
 
@@ -101,6 +115,14 @@ func _build_ui() -> void:
 	menu_btn.custom_minimum_size = Vector2(52, 52)
 	menu_btn.pressed.connect(_open_pause)
 	hud.add_child(menu_btn)
+
+	if tutorial:
+		var tut_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.OK, 10)
+		tutorial_label = UIKit.label("", 13, UIKit.OK)
+		tutorial_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		tutorial_label.custom_minimum_size = Vector2(0, 0)
+		tut_box.add_child(tutorial_label)
+		root.add_child(tut_box)
 
 	# Mesa -------------------------------------------------------------
 	table_area = Control.new()
@@ -268,6 +290,8 @@ func _update_taker_badge() -> void:
 # ------------------------------------------------------------------ licitação
 
 func _run_bidding() -> void:
+	if tutorial:
+		_tutorial_hint("Licitação: na sua vez, PASSE ou dê um lance mais alto (Petite/Garde/Garde Sans/Garde Contre). O lance não custa fichas — é só sua confiança na mão. Quem der o maior lance vira o Tomador e joga sozinho contra os outros 3.")
 	while true:
 		while not engine.bidding_done:
 			if not is_inside_tree():
@@ -297,12 +321,20 @@ func _run_bidding() -> void:
 			await _wait(1.0)
 			if not is_inside_tree():
 				return
-			engine.setup(config)
+			if tutorial:
+				engine.setup_tutorial()
+			else:
+				engine.setup(config)
 			_rebuild_hand()
 			continue
 		break
 	status_label.text = "%s é o Tomador! Contrato: %s" % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract]]
 	trick_label.text = ""
+	if tutorial:
+		if engine.taker == 0:
+			_tutorial_hint("Você é o Tomador! Contrato: %s. %s" % [Scoring.CONTRACT_NAMES[engine.contract], Scoring.CONTRACT_HINTS[engine.contract]])
+		else:
+			_tutorial_hint("%s é o Tomador (contrato %s) e joga sozinho contra o resto da mesa, incluindo você. Sua missão agora é ajudar a Defesa a impedir que ele bata a meta." % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract]])
 	await _wait(1.1)
 
 
@@ -366,6 +398,84 @@ func _show_bid_prompt(opts: Array, forced: bool) -> void:
 		first_btn.grab_focus.call_deferred()
 
 
+# ------------------------------------------------------------------ declarações (Poignée / Chelem)
+
+## Depois da licitação, o Tomador escolhe se declara Poignée (se elegível) e se anuncia
+## Chelem — as duas são apostas estratégicas dele, não bônus automáticos.
+func _run_declarations() -> void:
+	if engine.taker == -1:
+		return
+	var eligible := engine.poignee_eligible()
+	if engine.taker == 0 and not GameState.autoplay:
+		if eligible:
+			var bonus := int(Scoring.poignee_bonus(engine.taker_trump_count))
+			var declare: bool = await _ask_yes_no("POIGNÉE", "Você tem %d trunfos na mão — pode declarar Poignée e ganhar +%d pontos no final, mas isso mostra seus trunfos pros outros jogadores. Declarar?" % [engine.taker_trump_count, bonus])
+			if not is_inside_tree():
+				return
+			engine.declare_poignee(declare)
+			if declare:
+				_announce_toast("Você declarou Poignée! (+%d se a rodada fechar)" % bonus)
+				await _wait(0.6)
+		var chelem: bool = await _ask_yes_no("CHELEM", "Quer anunciar Chelem — apostar que vai vencer as 18 vazas sozinho? Se conseguir: +400. Se falhar: -200. Sem anunciar, ainda ganha +200 de bônus se vencer todas por acaso, sem risco.")
+		if not is_inside_tree():
+			return
+		engine.announce_chelem(chelem)
+		if chelem:
+			_announce_toast("Você anunciou Chelem! Vença as 18 vazas pra garantir o bônus.")
+			await _wait(0.6)
+	else:
+		var strength := BotAI.hand_strength(engine.hands[engine.taker])
+		if eligible and BotAI.decide_poignee(engine.taker_trump_count):
+			engine.declare_poignee(true)
+			_announce_toast("%s declarou Poignée!" % config["names"][engine.taker])
+			await _wait(0.6)
+			if not is_inside_tree():
+				return
+		if BotAI.decide_chelem(strength, int(config["difficulty"][engine.taker]), bot_rng):
+			engine.announce_chelem(true)
+			_announce_toast("%s anunciou Chelem!" % config["names"][engine.taker])
+			await _wait(0.6)
+			if not is_inside_tree():
+				return
+
+
+func _announce_toast(text: String) -> void:
+	trick_label.text = text
+	Sfx.play("tick")
+
+
+func _ask_yes_no(title: String, body: String) -> bool:
+	var panel := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 14)
+	panel.name = "YesNoPrompt"
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	panel.add_child(v)
+	v.add_child(UIKit.label(title, 15, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	var body_label := UIKit.label(body, 12, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body_label.custom_minimum_size = Vector2(340, 0)
+	v.add_child(body_label)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	v.add_child(row)
+	var no_btn := UIKit.button("NÃO", UIKit.MUTED, 14)
+	no_btn.pressed.connect(func():
+		panel.queue_free()
+		human_yesno_chosen.emit(false))
+	row.add_child(no_btn)
+	var yes_btn := UIKit.button("SIM", UIKit.GOLD, 14)
+	yes_btn.pressed.connect(func():
+		panel.queue_free()
+		human_yesno_chosen.emit(true))
+	row.add_child(yes_btn)
+	popup_layer.add_child(panel)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	panel.position.y = 130
+	no_btn.grab_focus.call_deferred()
+	var v_result: bool = await human_yesno_chosen
+	return v_result
+
+
 # ------------------------------------------------------------------ loop de turnos
 
 func _run_round() -> void:
@@ -405,6 +515,20 @@ func _wait(seconds: float) -> void:
 		await get_tree().create_timer(0.1).timeout
 
 
+func _tutorial_hint(text: String) -> void:
+	if not tutorial or tutorial_label == null:
+		return
+	tutorial_label.text = "💡 " + text
+
+
+## Dica de uso único (não repete depois de mostrada nesta partida).
+func _tutorial_once(key: String, text: String) -> void:
+	if not tutorial or tutorial_seen.get(key, false):
+		return
+	tutorial_seen[key] = true
+	_tutorial_hint(text)
+
+
 func _wait_human() -> CardData:
 	human_turn = true
 	var ls := TrickRules.lead_suit(engine.plays)
@@ -414,10 +538,37 @@ func _wait_human() -> CardData:
 		status_label.text = "Sua vez — precisa cobrir com Trunfo maior, se tiver"
 	else:
 		status_label.text = "Sua vez — siga %s (ou corte com Trunfo, ou jogue O Louco)" % CardData.SUIT_NAMES[ls]
+	if tutorial:
+		_check_tutorial_trick_hints(ls)
 	_rebuild_hand()
 	var card: CardData = await human_card_chosen
 	human_turn = false
 	return card
+
+
+## Detecta, na vez do jogador, situações que valem explicar: sem o naipe líder (obrigado
+## a cortar), obrigado a cobrir com Trunfo maior, e a chance de jogar O Louco.
+func _check_tutorial_trick_hints(ls: int) -> void:
+	var hand: Array = engine.hands[0]
+	var legal: Array = engine.legal_for(0)
+	if ls != -1 and ls != CardData.Suit.TRUNFO:
+		var has_suit := false
+		for c in hand:
+			if (c as CardData).suit == ls:
+				has_suit = true
+				break
+		if not has_suit:
+			_tutorial_once("forced_trunfo", "Você não tem mais %s — por isso é obrigado a jogar Trunfo (ou O Louco). Essa é a regra de corte obrigatório." % CardData.SUIT_NAMES[ls])
+			return
+	var hand_trunfos := (hand as Array).filter(func(c: CardData) -> bool: return c.is_trunfo()).size()
+	var legal_trunfos := (legal as Array).filter(func(c: CardData) -> bool: return c.is_trunfo()).size()
+	if hand_trunfos > legal_trunfos and legal_trunfos > 0:
+		_tutorial_once("forced_cover", "Já tem Trunfo jogado nessa vaza e você tem um maior — por isso só os Trunfos mais altos aparecem jogáveis. É a regra de cobrir o corte.")
+		return
+	for c in hand:
+		if (c as CardData).is_louco():
+			_tutorial_once("louco", "Você tem O Louco na mão — pode jogá-lo quando quiser, ele nunca vence a vaza mas você guarda os pontos dele (conta como um Rei).")
+			return
 
 
 func _on_card_tapped(view: CardView) -> void:
@@ -488,6 +639,15 @@ func _resolve_trick(result: Dictionary) -> void:
 
 	trick_label.text = "%s venceu a vaza · +%s pts" % [str(config["names"][winner]).to_upper(), UIKit.fmt_dec(points, 1)]
 	Sfx.play("chip")
+
+	if tutorial and engine.is_round_over():
+		var has_petit := false
+		for entry in (result["plays"] as Array):
+			if (entry["card"] as CardData).rank == CardData.PETIT and (entry["card"] as CardData).is_trunfo():
+				has_petit = true
+				break
+		if has_petit:
+			_tutorial_hint("Le Petit apareceu na última vaza! Quem venceu essa vaza leva um bônus extra de 10 pontos — é o Petit au bout.")
 
 	_float_points(winner, points)
 	await _wait(0.75)
@@ -572,9 +732,14 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 	var bonuses: Dictionary = r.get("bonuses", {})
 	var bonus_lines: Array = []
 	if float(bonuses.get("poignee", 0.0)) > 0.0:
-		bonus_lines.append("✦ Poignée — %s tinha muitos trunfos (+%d)" % [str(config["names"][r["taker"]]), int(bonuses["poignee"])])
-	if float(bonuses.get("chelem", 0.0)) > 0.0:
-		bonus_lines.append("✦ Chelem — %s venceu todas as vazas (+%d)" % [str(config["names"][r["taker"]]), int(bonuses["chelem"])])
+		bonus_lines.append("✦ Poignée declarado — %s tinha muitos trunfos (+%d)" % [str(config["names"][r["taker"]]), int(bonuses["poignee"])])
+	var chelem: float = float(bonuses.get("chelem", 0.0))
+	if chelem > 0.0 and engine.chelem_announced:
+		bonus_lines.append("✦ Chelem anunciado e cumprido — %s venceu todas as vazas (+%d)" % [str(config["names"][r["taker"]]), int(chelem)])
+	elif chelem > 0.0:
+		bonus_lines.append("✦ Chelem — %s venceu todas as vazas sem anunciar (+%d)" % [str(config["names"][r["taker"]]), int(chelem)])
+	elif chelem < 0.0:
+		bonus_lines.append("✦ Chelem anunciado e não cumprido — %s errou a aposta (%d)" % [str(config["names"][r["taker"]]), int(chelem)])
 	var petit: float = float(bonuses.get("petit_au_bout", 0.0))
 	if petit > 0.0:
 		bonus_lines.append("✦ Petit au bout a favor do Tomador (+%d)" % int(petit))
@@ -591,11 +756,20 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 	v.add_child(HSeparator.new())
 	for line in summary["lines"]:
 		v.add_child(UIKit.label(str(line), 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	if tutorial:
+		v.add_child(HSeparator.new())
+		var tut_close := UIKit.label("Tutorial concluído! Isso não afeta suas Fragmentos nem seu elo — quando quiser, jogue de verdade no Vanilla ou Ranqueado.", 13, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
+		tut_close.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		tut_close.custom_minimum_size = Vector2(340, 0)
+		v.add_child(tut_close)
 	var next: String = summary["next"]
 	var btn: Button
 	if next == "ranked":
 		btn = UIKit.button("VOLTAR AO LOBBY")
 		btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn"))
+	elif tutorial:
+		btn = UIKit.button("MENU PRINCIPAL")
+		btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
 	else:
 		var again := UIKit.button("NOVA RODADA")
 		again.pressed.connect(func(): get_tree().reload_current_scene())
@@ -659,10 +833,10 @@ LICITAÇÃO
 META
 • O Tomador soma os pontos que capturou. Precisa bater: 56 pts com 0 Bouts, 51 com 1, 41 com 2, 36 com 3.
 
-BÔNUS AUTOMÁTICOS
-• Poignée: Tomador com muitos trunfos na mão inicial ganha pontos extras.
-• Chelem: Tomador vence as 18 vazas sozinho.
-• Petit au bout: quem vence a última vaza com Le Petit dentro leva +10."""
+BÔNUS (o Tomador escolhe se arrisca)
+• Poignée: com 10+ trunfos, pode declarar — mostra suas cartas de trunfo, mas ganha pontos extras se a rodada fechar.
+• Chelem: pode anunciar que vai vencer as 18 vazas sozinho — anunciado rende mais (+400) mas pune se falhar (-200); sem anunciar, ainda rende +200 se acontecer, sem risco.
+• Petit au bout: automático — quem vence a última vaza com Le Petit dentro leva +10."""
 	var l := UIKit.label(text, 13, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(340, 0)

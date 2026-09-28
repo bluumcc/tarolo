@@ -23,14 +23,18 @@ const CONTRACT_HINTS := [
 ## pra menos) da meta — e só depois é multiplicado pelo contrato.
 const BASE_SCORE := 25.0
 
-## Poignée: bônus por segurar muitos trunfos na mão inicial (detectado automaticamente,
-## sem exigir declaração — pra não pesar no aprendizado). Valores oficiais de mesa com
-## 4 jogadores; soma-se ao placar já multiplicado, não entra na conta da meta.
+## Poignée: bônus por segurar muitos trunfos na mão inicial. É uma escolha do tomador —
+## declarar mostra as cartas de trunfo pros outros (dá informação), então só entra se
+## `poignee_declared` estiver marcado. Valores oficiais de mesa com 4 jogadores; soma-se
+## ao placar já multiplicado, não entra na conta da meta.
 const POIGNEE_THRESHOLDS := [[15, 40.0], [13, 30.0], [10, 20.0]]  # [trunfos mínimos, bônus]
 
-## Chelem: o tomador vence as 18 vazas sozinho. Usa o valor de "chelem não anunciado"
-## (o anunciado renderia mais, mas exigiria declarar antes — fica pra depois).
-const CHELEM_BONUS := 200.0
+## Chelem: o tomador vence as 18 vazas sozinho. Também é uma escolha: anunciar antes de
+## jogar vale mais se conseguir, mas pune se falhar; não anunciar é mais seguro (só rende
+## se acontecer, sem risco).
+const CHELEM_ANNOUNCED_BONUS := 400.0
+const CHELEM_ANNOUNCED_FAIL_PENALTY := 200.0
+const CHELEM_UNANNOUNCED_BONUS := 200.0
 
 ## Petit au bout: quem vence a última vaza com Le Petit dentro leva 10 pontos extras —
 ## a favor do tomador se for ele, da defesa se for outro jogador.

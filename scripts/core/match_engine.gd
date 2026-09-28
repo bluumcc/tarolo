@@ -29,6 +29,8 @@ var highest_bidder := -1
 var bidding_done := false
 var bidding_void := false      # todos passaram (mão anulada — chamador deve refazer o setup)
 var taker_trump_count := 0     # trunfos na mão do tomador já com o talão resolvido (Poignée)
+var poignee_declared := false  # escolha do tomador: mostrar os trunfos pra valer o bônus
+var chelem_announced := false  # escolha do tomador: apostar alto em vencer as 18 vazas
 
 
 ## config: { seed, players }
@@ -40,8 +42,46 @@ func setup(config: Dictionary) -> void:
 		rng.randomize()
 	var deck := Deck.build(rng)
 	var dealt := Deck.deal(deck, num_players, 18)
-	hands = dealt["hands"]
-	chien = dealt["rest"]
+	_reset_state(dealt["hands"], dealt["rest"])
+
+
+## Mão fixa (não aleatória) usada no tutorial: dá ao jogador humano cartas que garantem
+## vivenciar seguir naipe, ser forçado a cortar/cobrir com Trunfo, O Louco, os Bouts e
+## trunfos suficientes pra poder declarar Poignée — tudo dentro de uma única partida real.
+func setup_tutorial() -> void:
+	num_players = 4
+	rng.randomize()
+	var human: Array = []
+	for r in [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21]:
+		human.append(CardData.make(CardData.Suit.TRUNFO, r))
+	human.append(CardData.louco())
+	for r in [1, 7, 11, 14]:
+		human.append(CardData.make(CardData.Suit.COPAS, r))
+	for r in [5, 12]:
+		human.append(CardData.make(CardData.Suit.ESPADAS, r))
+
+	var remaining: Array = []
+	for r in range(1, 15):
+		remaining.append(CardData.make(CardData.Suit.OUROS, r))
+	for r in range(1, 15):
+		remaining.append(CardData.make(CardData.Suit.PAUS, r))
+	for r in [2, 3, 4, 5, 6, 8, 9, 10, 12, 13]:
+		remaining.append(CardData.make(CardData.Suit.COPAS, r))
+	for r in [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 13, 14]:
+		remaining.append(CardData.make(CardData.Suit.ESPADAS, r))
+	for r in [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]:
+		remaining.append(CardData.make(CardData.Suit.TRUNFO, r))
+
+	var bots := [[], [], []]
+	for i in range(54):
+		bots[i % 3].append(remaining[i])
+	var chien_cards: Array = remaining.slice(54, 60)
+	_reset_state([human, bots[0], bots[1], bots[2]], chien_cards)
+
+
+func _reset_state(dealt_hands: Array, dealt_chien: Array) -> void:
+	hands = dealt_hands
+	chien = dealt_chien
 	captured = []
 	for p in range(num_players):
 		captured.append([])
@@ -56,6 +96,9 @@ func setup(config: Dictionary) -> void:
 	highest_bidder = -1
 	bidding_done = false
 	bidding_void = false
+	taker_trump_count = 0
+	poignee_declared = false
+	chelem_announced = false
 
 	leader = -1
 	current = -1
@@ -154,6 +197,20 @@ func _finalize_taker() -> void:
 			taker_trump_count += 1
 
 
+## Verdadeiro se o tomador tem trunfos suficientes pra ter direito de declarar Poignée
+## (a escolha de mostrar a mão pra valer o bônus é dele — ver `declare_poignee`).
+func poignee_eligible() -> bool:
+	return taker_trump_count >= 10
+
+
+func declare_poignee(v: bool) -> void:
+	poignee_declared = v
+
+
+func announce_chelem(v: bool) -> void:
+	chelem_announced = v
+
+
 ## Descarta as `n` cartas mais fracas (nunca um Bout) de `hand`, devolve as descartadas.
 static func _auto_discard(hand: Array, n: int) -> Array:
 	var pool: Array = hand.filter(func(c: CardData) -> bool: return not c.is_bout())
@@ -232,18 +289,21 @@ func _finish() -> Dictionary:
 	return r
 
 
-## Detecta Poignée (mão inicial do tomador), Chelem (tomador venceu todas as vazas) e
-## Petit au bout (Le Petit na última vaza) — tudo automático, sem exigir declaração.
+## Poignée e Chelem só valem se o tomador escolheu declarar/anunciar (ver `declare_poignee`
+## e `announce_chelem`) — são apostas estratégicas dele, não bônus automáticos. Petit au
+## bout é o único automático: depende só de como a última vaza terminou, ninguém declara.
 func _round_bonuses() -> Dictionary:
-	var poignee := Scoring.poignee_bonus(taker_trump_count)
-	var chelem := 0.0
+	var poignee := Scoring.poignee_bonus(taker_trump_count) if poignee_declared else 0.0
 	var taker_won_all := true
 	for p in range(num_players):
 		if p != taker and not (captured[p] as Array).is_empty():
 			taker_won_all = false
 			break
-	if taker_won_all:
-		chelem = Scoring.CHELEM_BONUS
+	var chelem := 0.0
+	if chelem_announced:
+		chelem = Scoring.CHELEM_ANNOUNCED_BONUS if taker_won_all else -Scoring.CHELEM_ANNOUNCED_FAIL_PENALTY
+	elif taker_won_all:
+		chelem = Scoring.CHELEM_UNANNOUNCED_BONUS
 	var petit_au_bout := 0.0
 	if not history.is_empty():
 		var last_trick: Dictionary = history[-1]
