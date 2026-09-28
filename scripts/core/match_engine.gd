@@ -46,32 +46,47 @@ func setup(config: Dictionary) -> void:
 	_reset_state(dealt["hands"], dealt["rest"])
 
 
-## Mão fixa (não aleatória) usada no tutorial: dá ao jogador humano cartas que garantem
-## vivenciar seguir naipe, ser forçado a cortar/cobrir com Trunfo, O Louco, os Bouts e
-## trunfos suficientes pra poder declarar Poignée — tudo dentro de uma única partida real.
+## Mão do tutorial: sorteada de verdade a cada partida, mas com garantias mínimas pra
+## que os cenários de ensino apareçam — 10 a 14 trunfos (dá pra declarar Poignée), O
+## Louco (sempre pelo menos 1 Bout na mão) e 2 naipes comuns totalmente ausentes (força
+## cortar com Trunfo mais cedo ou mais tarde). Tudo o resto — quais trunfos, quais
+## cartas dos outros 2 naipes, mãos dos bots, talão — é sorteio de verdade.
 func setup_tutorial() -> void:
 	num_players = 4
 	rng.randomize()
-	var human: Array = []
-	for r in [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21]:
-		human.append(CardData.make(CardData.Suit.TRUNFO, r))
+
+	var all_trunfos: Array = []
+	for r in range(1, 22):
+		all_trunfos.append(CardData.make(CardData.Suit.TRUNFO, r))
+	Deck.shuffle(all_trunfos, rng)
+	var trunfo_count := rng.randi_range(10, 14)
+	var human: Array = all_trunfos.slice(0, trunfo_count)
+	var trunfo_pool: Array = all_trunfos.slice(trunfo_count)
 	human.append(CardData.louco())
-	for r in [1, 7, 11, 14]:
-		human.append(CardData.make(CardData.Suit.COPAS, r))
-	for r in [5, 12]:
-		human.append(CardData.make(CardData.Suit.ESPADAS, r))
+
+	var suits := [CardData.Suit.OUROS, CardData.Suit.PAUS, CardData.Suit.COPAS, CardData.Suit.ESPADAS]
+	var void_suits: Array = []
+	while void_suits.size() < 2:
+		var s: int = suits[rng.randi_range(0, suits.size() - 1)]
+		if not void_suits.has(s):
+			void_suits.append(s)
+	var play_suits: Array = suits.filter(func(s: int) -> bool: return not void_suits.has(s))
+
+	var suit_pool: Array = []
+	for s in play_suits:
+		for r in range(1, 15):
+			suit_pool.append(CardData.make(s, r))
+	Deck.shuffle(suit_pool, rng)
+	var need := 18 - human.size()
+	human.append_array(suit_pool.slice(0, need))
+	var leftover_suit_pool: Array = suit_pool.slice(need)
 
 	var remaining: Array = []
-	for r in range(1, 15):
-		remaining.append(CardData.make(CardData.Suit.OUROS, r))
-	for r in range(1, 15):
-		remaining.append(CardData.make(CardData.Suit.PAUS, r))
-	for r in [2, 3, 4, 5, 6, 8, 9, 10, 12, 13]:
-		remaining.append(CardData.make(CardData.Suit.COPAS, r))
-	for r in [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 13, 14]:
-		remaining.append(CardData.make(CardData.Suit.ESPADAS, r))
-	for r in [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]:
-		remaining.append(CardData.make(CardData.Suit.TRUNFO, r))
+	remaining.append_array(trunfo_pool)
+	remaining.append_array(leftover_suit_pool)
+	for s in void_suits:
+		for r in range(1, 15):
+			remaining.append(CardData.make(s, r))
 
 	Deck.shuffle(remaining, rng)
 	var bots := [[], [], []]

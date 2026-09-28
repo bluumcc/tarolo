@@ -23,6 +23,16 @@ static func hand_strength(hand: Array) -> float:
 	return s
 
 
+## Limiares calibrados numa simulação de 2000 mãos aleatórias (`hand_strength` real):
+## mín=10,7 · p25=20,5 · mediana=23,5 · p75=26,8 · p90=29,8 · p97=32,6 · máx=41,6.
+## Antes disso os limiares eram mais baixos que a MEDIANA — mais da metade das mãos já
+## batia Garde, por isso os bots pareciam sempre arriscar demais. Agora só a minoria das
+## mãos (as de verdade boas) sobe além de Petite, como numa mesa real.
+const STRENGTH_PETITE := 24.0
+const STRENGTH_GARDE := 27.5
+const STRENGTH_GARDE_SANS := 31.0
+const STRENGTH_GARDE_CONTRE := 35.0
+
 ## Decide o lance do bot na licitação. `options` = contratos disponíveis agora
 ## (Scoring.Contract, já filtrados pra maiores que o lance atual). `forced` = true
 ## quando o bot é obrigado a dar algum lance (último ativo, ninguém arrematou ainda).
@@ -31,20 +41,20 @@ static func bid_choice(hand: Array, options: Array, forced: bool, difficulty: in
 	var strength := hand_strength(hand)
 	match difficulty:
 		Difficulty.EASY:
-			strength += rng.randf_range(-10.0, 10.0)
+			strength += rng.randf_range(-6.0, 6.0)
 		Difficulty.NORMAL:
-			strength += rng.randf_range(-4.0, 4.0)
+			strength += rng.randf_range(-3.0, 3.0)
 		_:
-			strength += rng.randf_range(-1.5, 1.5)
+			strength += rng.randf_range(-1.0, 1.0)
 
 	var desired := -1
-	if strength >= 34.0:
+	if strength >= STRENGTH_GARDE_CONTRE:
 		desired = Scoring.Contract.GARDE_CONTRE
-	elif strength >= 28.0:
+	elif strength >= STRENGTH_GARDE_SANS:
 		desired = Scoring.Contract.GARDE_SANS
-	elif strength >= 21.0:
+	elif strength >= STRENGTH_GARDE:
 		desired = Scoring.Contract.GARDE
-	elif strength >= 14.0:
+	elif strength >= STRENGTH_PETITE:
 		desired = Scoring.Contract.PETITE
 
 	if options.is_empty():
