@@ -59,6 +59,14 @@ static func bid_choice(hand: Array, options: Array, forced: bool, difficulty: in
 	return next_opt if forced else -1
 
 
+## Escolhe as `n` cartas mais fracas dentre as elegíveis pro descarte (écart) — mesma
+## lógica que um jogador cuidadoso usaria: nunca joga fora o que ainda pode render pontos.
+static func choose_discard(legal: Array, n: int) -> Array:
+	var pool: Array = legal.duplicate()
+	pool.sort_custom(func(a: CardData, b: CardData) -> bool: return a.points() < b.points())
+	return pool.slice(0, mini(n, pool.size()))
+
+
 ## Declarar Poignée é sempre vantajoso pro bot (não há como a IA hoje usar a informação
 ## revelada contra ele mesmo), então declara sempre que elegível.
 static func decide_poignee(trump_count: int) -> bool:

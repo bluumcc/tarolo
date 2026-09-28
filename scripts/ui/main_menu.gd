@@ -264,6 +264,7 @@ func _open_rules() -> void:
 • O Louco pode ser jogado a qualquer momento, nunca vence a vaza, mas o dono guarda os pontos dele.
 • Le Petit (trunfo 1), Le Monde (trunfo 21) e O Louco são os 3 Bouts — as cartas mais valiosas do jogo.
 • Licitação: cada jogador, na sua vez, passa ou dá um lance mais alto (Petite x1, Garde x2, Garde Sans x4, Garde Contre x6). O lance não custa fichas — é só a declaração de quão confiante você está. Quem der o maior lance vira o Tomador e joga sozinho contra os outros 3.
+• Com Petite ou Garde, o talão (6 cartas escondidas) entra na sua mão e você mesmo escolhe 6 cartas pra devolver — nunca Reis ou Bouts, só cartas comuns (Trunfo comum só se faltar carta comum).
 • No fim, o Tomador some os pontos que capturou: precisa de 56 pts com 0 Bouts, 51 com 1, 41 com 2 ou 36 com 3 pra vencer a rodada.
 • Depois da licitação, o Tomador escolhe: declarar Poignée (mostra os trunfos, ganha pontos extras se tiver 10+) e/ou anunciar Chelem (apostar que vence as 18 vazas — rende mais se anunciado, mas pune se falhar). Petit au bout (vencer a última vaza com Le Petit) é automático.
 • Ranqueado: sua colocação entre 4 jogadores define LP e MMR.

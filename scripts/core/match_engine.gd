@@ -31,6 +31,7 @@ var bidding_void := false      # todos passaram (mão anulada — chamador deve 
 var taker_trump_count := 0     # trunfos na mão do tomador já com o talão resolvido (Poignée)
 var poignee_declared := false  # escolha do tomador: mostrar os trunfos pra valer o bônus
 var chelem_announced := false  # escolha do tomador: apostar alto em vencer as 18 vazas
+var awaiting_discard := false  # Petite/Garde: esperando o tomador escolher o descarte (écart)
 
 
 ## config: { seed, players }
@@ -99,6 +100,7 @@ func _reset_state(dealt_hands: Array, dealt_chien: Array) -> void:
 	taker_trump_count = 0
 	poignee_declared = false
 	chelem_announced = false
+	awaiting_discard = false
 
 	leader = -1
 	current = -1
@@ -171,23 +173,26 @@ func _advance_bidding() -> void:
 			return
 
 
-## Aplica as regras do contrato vencedor sobre o talão e prepara o início das vazas.
-## Petite/Garde: o tomador vê o talão e descarta 6 cartas de volta (contam pra ele).
-## Garde Sans: o tomador não vê o talão, mas ele conta pra ele mesmo assim.
+## Aplica as regras do contrato vencedor sobre o talão. Petite/Garde: o tomador vê o
+## talão, incorpora na mão e escolhe (ele mesmo, não o jogo) 6 cartas pra descartar de
+## volta — as vazas só começam depois disso (ver `awaiting_discard`/`legal_discards`/
+## `discard`). Garde Sans: o tomador não vê o talão, mas ele conta pra ele mesmo assim.
 ## Garde Contre: o tomador não vê o talão, e ele NÃO conta pra ele (fica com a defesa).
 func _finalize_taker() -> void:
 	match contract:
 		Scoring.Contract.PETITE, Scoring.Contract.GARDE:
 			(hands[taker] as Array).append_array(chien)
 			Deck.sort_hand(hands[taker])
-			var discarded := _auto_discard(hands[taker], Deck.CHIEN_SIZE)
-			for c in discarded:
-				(hands[taker] as Array).erase(c)
-			captured[taker].append_array(discarded)
+			awaiting_discard = true
+			return
 		Scoring.Contract.GARDE_SANS:
 			captured[taker].append_array(chien)
 		Scoring.Contract.GARDE_CONTRE:
 			pass  # talão não entra na jogada nem pontua pro tomador
+	_start_tricks()
+
+
+func _start_tricks() -> void:
 	total_tricks = (hands[0] as Array).size()
 	leader = (taker + 1) % num_players
 	current = leader
@@ -195,6 +200,34 @@ func _finalize_taker() -> void:
 	for c in hands[taker]:
 		if (c as CardData).is_trunfo():
 			taker_trump_count += 1
+
+
+## Cartas elegíveis pro descarte (écart): nunca um Bout, nunca um Rei — e Trunfo comum
+## só entra na lista se não sobrarem cartas normais suficientes pra completar as 6
+## (regra oficial: só corta Trunfo pro talão em último caso).
+func legal_discards(hand: Array) -> Array:
+	var safe: Array = (hand as Array).filter(func(c: CardData) -> bool: return not c.is_bout() and not c.is_trunfo() and c.rank != 14)
+	if safe.size() >= Deck.CHIEN_SIZE:
+		return safe
+	var extra: Array = (hand as Array).filter(func(c: CardData) -> bool: return c.is_trunfo() and not c.is_bout())
+	return safe + extra
+
+
+## Aplica o descarte escolhido pelo tomador (humano ou bot) e libera o início das vazas.
+func discard(cards: Array) -> Dictionary:
+	if not awaiting_discard or cards.size() != Deck.CHIEN_SIZE:
+		return {"ok": false, "error": "descarte inválido"}
+	var legal: Array = legal_discards(hands[taker])
+	for c in cards:
+		var card: CardData = c
+		if not (legal as Array).any(func(l: CardData) -> bool: return l.equals(card)):
+			return {"ok": false, "error": "carta não pode ir pro descarte"}
+	for c in cards:
+		(hands[taker] as Array).erase(c)
+	captured[taker].append_array(cards)
+	awaiting_discard = false
+	_start_tricks()
+	return {"ok": true}
 
 
 ## Verdadeiro se o tomador tem trunfos suficientes pra ter direito de declarar Poignée
@@ -209,13 +242,6 @@ func declare_poignee(v: bool) -> void:
 
 func announce_chelem(v: bool) -> void:
 	chelem_announced = v
-
-
-## Descarta as `n` cartas mais fracas (nunca um Bout) de `hand`, devolve as descartadas.
-static func _auto_discard(hand: Array, n: int) -> Array:
-	var pool: Array = hand.filter(func(c: CardData) -> bool: return not c.is_bout())
-	pool.sort_custom(func(a: CardData, b: CardData) -> bool: return a.points() < b.points())
-	return pool.slice(0, mini(n, pool.size()))
 
 
 # ------------------------------------------------------------------ vazas

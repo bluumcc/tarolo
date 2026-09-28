@@ -144,8 +144,17 @@ func _test_bidding() -> void:
 	check(not e.place_bid(3, -1)["ok"], "não pode passar quando é obrigado a licitar")
 	check(e.place_bid(3, Scoring.Contract.PETITE)["ok"], "jogador 3 assume com Petite")
 	check(e.bidding_done and e.taker == 3 and e.contract == Scoring.Contract.PETITE, "jogador 3 vira tomador")
-	check((e.hands[3] as Array).size() == 18, "tomador descartou de volta pro talão (18 cartas)")
+	check(e.awaiting_discard and (e.hands[3] as Array).size() == 24, "Petite: talão entra na mão (24 cartas) e espera o tomador escolher o descarte")
+	var legal3 := e.legal_discards(e.hands[3])
+	check(not (legal3 as Array).any(func(c: CardData) -> bool: return c.is_bout()), "Bout nunca pode ir pro descarte")
+	check(not (legal3 as Array).any(func(c: CardData) -> bool: return c.rank == 14), "Rei nunca pode ir pro descarte")
+	var bad_discard := (e.hands[3] as Array).filter(func(c: CardData) -> bool: return c.is_bout())
+	if bad_discard.size() >= 1:
+		check(not e.discard(bad_discard.slice(0, 1) + legal3.slice(0, 5))["ok"], "descarte com Bout é rejeitado")
+	check(e.discard(legal3.slice(0, Deck.CHIEN_SIZE))["ok"], "tomador escolhe o próprio descarte")
+	check((e.hands[3] as Array).size() == 18, "depois do descarte, mão volta pra 18 cartas")
 	check(e.total_tricks == 18, "18 vazas no Vanilla")
+	check(not e.awaiting_discard, "descarte resolvido libera o início das vazas")
 
 	# Lance mais baixo que o atual é rejeitado; lance maior sobrepõe.
 	var e2 := MatchEngine.new()

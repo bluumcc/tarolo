@@ -5,6 +5,7 @@ extends Control
 signal human_card_chosen(card: CardData)
 signal human_bid_chosen(choice: int)
 signal human_yesno_chosen(v: bool)
+signal human_discard_chosen(cards: Array)
 signal match_finished(summary: Dictionary)
 
 const CARD_SCENE := preload("res://scenes/Card.tscn")
@@ -57,6 +58,10 @@ func _ready() -> void:
 		return
 	_update_taker_badge()
 	_refresh_hud()
+	await _run_discard()
+	if not is_inside_tree():
+		return
+	_rebuild_hand()
 	await _run_declarations()
 	if not is_inside_tree():
 		return
@@ -396,6 +401,82 @@ func _show_bid_prompt(opts: Array, forced: bool) -> void:
 	panel.position.y = 130
 	if first_btn:
 		first_btn.grab_focus.call_deferred()
+
+
+# ------------------------------------------------------------------ descarte (écart)
+
+## Petite/Garde: o tomador escolhe (de verdade) quais 6 cartas devolve pro talão —
+## nunca automático. Garde Sans/Garde Contre nem passam por aqui (`awaiting_discard`
+## fica falso pra esses contratos, já que o talão nem entra na mão do tomador).
+func _run_discard() -> void:
+	if not engine.awaiting_discard:
+		return
+	if engine.taker == 0 and not GameState.autoplay:
+		if tutorial:
+			_tutorial_hint("O talão (6 cartas escondidas) entrou na sua mão. Agora escolha 6 cartas pra devolver — elas contam como pontos seus, mas nunca podem ser Reis ou Bouts (a não ser que faltem cartas comuns, aí um Trunfo comum vale).")
+		var chosen: Array = await _wait_human_discard()
+		if not is_inside_tree():
+			return
+		engine.discard(chosen)
+	else:
+		status_label.text = "%s está escolhendo o descarte..." % config["names"][engine.taker]
+		await _wait(0.5)
+		if not is_inside_tree():
+			return
+		var legal := engine.legal_discards(engine.hands[engine.taker])
+		var chosen := BotAI.choose_discard(legal, Deck.CHIEN_SIZE)
+		engine.discard(chosen)
+
+
+func _wait_human_discard() -> Array:
+	var hand: Array = engine.hands[0]
+	var legal: Array = engine.legal_discards(hand)
+	status_label.text = "Escolha 6 cartas pra descartar no talão"
+	var selected: Array = []
+	var panel := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 14)
+	panel.name = "DiscardPrompt"
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	panel.add_child(v)
+	v.add_child(UIKit.label("ESCOLHA 6 CARTAS PRO DESCARTE", 15, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("Elas contam como pontos seus no final. Reis e Bouts (em cinza) não podem ir.", 11, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	var counter := UIKit.label("0 / %d selecionadas" % Deck.CHIEN_SIZE, 12, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(counter)
+	var flow := HFlowContainer.new()
+	flow.add_theme_constant_override("h_separation", 6)
+	flow.add_theme_constant_override("v_separation", 6)
+	flow.custom_minimum_size = Vector2(420, 0)
+	v.add_child(flow)
+	var confirm := UIKit.button("CONFIRMAR", UIKit.GOLD, 14)
+	confirm.disabled = true
+	for c in hand:
+		var card: CardData = c
+		var is_legal: bool = (legal as Array).any(func(l: CardData) -> bool: return l.equals(card))
+		var b := UIKit.button("%s%s" % [card.rank_label(), card.suit_symbol()], UIKit.GOLD if is_legal else UIKit.MUTED, 13)
+		b.custom_minimum_size = Vector2(52, 52)
+		b.disabled = not is_legal
+		b.toggle_mode = true
+		b.pressed.connect(func():
+			if selected.has(card):
+				selected.erase(card)
+				b.button_pressed = false
+			else:
+				if selected.size() >= Deck.CHIEN_SIZE:
+					b.button_pressed = false
+					return
+				selected.append(card)
+			counter.text = "%d / %d selecionadas" % [selected.size(), Deck.CHIEN_SIZE]
+			confirm.disabled = selected.size() != Deck.CHIEN_SIZE)
+		flow.add_child(b)
+	confirm.pressed.connect(func():
+		panel.queue_free()
+		human_discard_chosen.emit(selected.duplicate()))
+	v.add_child(confirm)
+	popup_layer.add_child(panel)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	panel.position.y = 90
+	var chosen: Array = await human_discard_chosen
+	return chosen
 
 
 # ------------------------------------------------------------------ declarações (Poignée / Chelem)
@@ -829,6 +910,10 @@ LICITAÇÃO
 • O lance não custa nada — é só uma declaração de confiança na sua mão.
 • Petite (x1) → Garde (x2) → Garde Sans (x4, não vê o talão mas ele ainda conta) → Garde Contre (x6, não vê e ele vira ponto da defesa).
 • Quem der o lance mais alto vira o Tomador e joga sozinho contra os outros 3.
+
+DESCARTE (só Petite/Garde)
+• O talão (6 cartas escondidas) entra na sua mão e você escolhe 6 pra devolver.
+• Nunca pode descartar Reis ou Bouts — só cartas comuns (e Trunfo comum, se faltar carta comum).
 
 META
 • O Tomador soma os pontos que capturou. Precisa bater: 56 pts com 0 Bouts, 51 com 1, 41 com 2, 36 com 3.
