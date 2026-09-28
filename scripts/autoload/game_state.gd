@@ -106,6 +106,42 @@ func player_name() -> String:
 	return str(SaveManager.section("profile")["name"])
 
 
+## Configuração da partida pra ChaosScene / ChaosEngine — todo mundo joga pra si, sem
+## Tomador/Defesa, então não precisa de dificuldade especial pro assento do jogador.
+func chaos_config() -> Dictionary:
+	var names := BOT_NAMES.duplicate()
+	names.shuffle()
+	return {
+		"players": 4,
+		"names": [player_name(), names[0], names[1], names[2]],
+		"difficulty": [BotAI.Difficulty.NORMAL, BotAI.Difficulty.NORMAL, BotAI.Difficulty.NORMAL, BotAI.Difficulty.NORMAL],
+	}
+
+
+## Fecha uma partida de Caos e devolve um resumo pra tela de resultado. Dá Fragmentos
+## conforme a colocação, mas não mexe em LP/elo — isso é só do Ranqueado (Vanilla).
+## result: { standings: Array, totals: Array }
+func report_chaos_match(result: Dictionary) -> Dictionary:
+	var standings: Array = result["standings"]
+	var placement := standings.find(0)
+	var profile := SaveManager.section("profile")
+	profile["matches"] = int(profile["matches"]) + 1
+	var won := placement == 0
+	if won:
+		profile["wins"] = int(profile["wins"]) + 1
+	var frag_by_place := [15, 10, 6, 3]
+	var frag: int = frag_by_place[clampi(placement, 0, 3)]
+	profile["fragments"] = int(profile["fragments"]) + frag
+	SaveManager.save_game()
+	var summary := {
+		"placement": placement,
+		"won": won,
+		"lines": ["%s%d Fragmentos" % ["+" if frag >= 0 else "", frag]],
+	}
+	last_summary = summary
+	return summary
+
+
 ## Configuração da partida para a GameScene / MatchEngine conforme o modo.
 func match_config() -> Dictionary:
 	var names := BOT_NAMES.duplicate()

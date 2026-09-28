@@ -44,10 +44,10 @@ func _ready() -> void:
 	col.add_child(classic)
 	col.add_child(_caption("Tarot clássico: baralho de 78 cartas, trunfo e O Louco."))
 
-	var arcade := UIKit.button("MODO CAOS (em construção)", UIKit.MUTED)
-	arcade.disabled = true
-	col.add_child(arcade)
-	col.add_child(_caption("Combos, modificadores e viradas — chegando na próxima fase."))
+	var chaos := UIKit.button("MODO CAOS", UIKit.DANGER)
+	chaos.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn"))
+	col.add_child(chaos)
+	col.add_child(_caption("5 rodadas relâmpago, modificador novo a cada uma, Fôlego pra quem tá por baixo."))
 
 	var rk := GameState.ranked()
 	var tier := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))

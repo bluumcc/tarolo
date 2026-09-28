@@ -73,30 +73,41 @@ static func is_legal(card: CardData, hand: Array, plays: Array) -> bool:
 	return false
 
 
-## Índice (dentro de `plays`) da carta vencedora. O Louco nunca vence: Trunfo mais alto
-## vence qualquer naipe comum; sem Trunfo, vence a maior carta do naipe líder.
-static func winning_index(plays: Array) -> int:
+## Índice (dentro de `plays`) da carta vencedora. Por padrão O Louco nunca vence: Trunfo
+## mais alto vence qualquer naipe comum; sem Trunfo, vence a maior carta do naipe líder.
+## `louco_can_win` (modo Caos, modificador "O Louco Vence"): O Louco passa a valer como
+## um Trunfo fraquinho — perde pra qualquer Trunfo de verdade, mas vence naipe comum.
+static func winning_index(plays: Array, louco_can_win: bool = false) -> int:
 	var ls := lead_suit(plays)
 	var best := -1
 	var best_is_trunfo := false
+	var best_rank := -1
 	for i in range(plays.size()):
 		var c: CardData = plays[i]["card"]
 		if c.is_louco():
-			continue
-		if c.is_trunfo():
-			if best == -1 or not best_is_trunfo or c.rank > (plays[best]["card"] as CardData).rank:
+			if not louco_can_win:
+				continue
+			if best == -1 or not best_is_trunfo:
 				best = i
 				best_is_trunfo = true
-		elif not best_is_trunfo and c.suit == ls:
-			if best == -1 or c.rank > (plays[best]["card"] as CardData).rank:
+				best_rank = -1
+			continue
+		if c.is_trunfo():
+			if best == -1 or not best_is_trunfo or c.rank > best_rank:
 				best = i
+				best_is_trunfo = true
+				best_rank = c.rank
+		elif not best_is_trunfo and c.suit == ls:
+			if best == -1 or c.rank > best_rank:
+				best = i
+				best_rank = c.rank
 	return best
 
 
 ## Se `card` fosse jogada agora pelo `player`, ela venceria a vaza parcial?
-static func would_win(card: CardData, player: int, plays: Array) -> bool:
-	if card.is_louco():
+static func would_win(card: CardData, player: int, plays: Array, louco_can_win: bool = false) -> bool:
+	if card.is_louco() and not louco_can_win:
 		return false
 	var sim := plays.duplicate()
 	sim.append({"player": player, "card": card})
-	return winning_index(sim) == sim.size() - 1
+	return winning_index(sim, louco_can_win) == sim.size() - 1

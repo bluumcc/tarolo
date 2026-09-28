@@ -91,7 +91,7 @@ static func decide_chelem(hand_strength: float, difficulty: int, rng: RandomNumb
 	return rng.randf() < 0.35
 
 
-static func choose(hand: Array, plays: Array, player: int, num_players: int, difficulty: int, rng: RandomNumberGenerator) -> CardData:
+static func choose(hand: Array, plays: Array, player: int, num_players: int, difficulty: int, rng: RandomNumberGenerator, louco_can_win: bool = false) -> CardData:
 	var legal := TrickRules.legal_cards(hand, plays)
 	if legal.size() == 1:
 		return legal[0]
@@ -113,7 +113,8 @@ static func choose(hand: Array, plays: Array, player: int, num_players: int, dif
 		return pool[0]
 
 	var is_last := plays.size() == num_players - 1
-	var winning := real.filter(func(c: CardData) -> bool: return TrickRules.would_win(c, player, plays))
+	var win_pool: Array = legal if louco_can_win else real
+	var winning := win_pool.filter(func(c: CardData) -> bool: return TrickRules.would_win(c, player, plays, louco_can_win))
 	winning.sort_custom(func(a: CardData, b: CardData) -> bool: return a.rank < b.rank)
 
 	if not winning.is_empty():

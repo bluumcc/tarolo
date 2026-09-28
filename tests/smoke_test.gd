@@ -4,6 +4,7 @@ extends Node
 ## Uso: godot --headless --path . res://tests/Smoke.tscn
 
 const GAME := preload("res://scenes/GameScene.tscn")
+const CHAOS := preload("res://scenes/ChaosScene.tscn")
 
 var failures := 0
 
@@ -50,6 +51,18 @@ func _play(mode: int) -> Dictionary:
 	return summary
 
 
+func _play_chaos() -> Dictionary:
+	var g: Node = CHAOS.instantiate()
+	add_child(g)
+	var summary: Dictionary = await g.match_finished
+	check(g.engine.round_index >= ChaosEngine.ROUNDS - 1 and g.engine.is_round_over(), "partida de Caos terminou (%d/%d rodadas)" % [g.engine.round_index + 1, ChaosEngine.ROUNDS])
+	check(not g.engine.match_result.is_empty(), "match_result preenchido no fim")
+	await get_tree().process_frame
+	g.queue_free()
+	await get_tree().process_frame
+	return summary
+
+
 func _run() -> void:
 	var menu := await _open("res://scenes/MainMenu.tscn")
 	menu._open_settings()
@@ -72,3 +85,7 @@ func _run() -> void:
 	check((GameState.ranked()["history"] as Array).size() == 6, "histórico ranqueado")
 	lobby = await _open("res://scenes/RankedLobby.tscn")
 	lobby.queue_free()
+
+	for i in range(4):
+		var s := await _play_chaos()
+		print("Caos %d: %dº lugar | %s" % [i + 1, int(s["placement"]) + 1, " | ".join(s["lines"])])

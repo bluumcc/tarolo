@@ -10,7 +10,7 @@ func _ready() -> void:
 		args[kv[0]] = kv[1] if kv.size() > 1 else ""
 	SaveManager.persist = false
 	var scene: String = str(args.get("scene", "menu"))
-	var lookup := {"menu": "res://scenes/MainMenu.tscn", "game": "res://scenes/GameScene.tscn", "bid": "res://scenes/GameScene.tscn", "tutorial": "res://scenes/GameScene.tscn", "ranked": "res://scenes/RankedLobby.tscn"}  # "tutorial" reusa a mesa, só troca a mão/dicas
+	var lookup := {"menu": "res://scenes/MainMenu.tscn", "game": "res://scenes/GameScene.tscn", "bid": "res://scenes/GameScene.tscn", "tutorial": "res://scenes/GameScene.tscn", "ranked": "res://scenes/RankedLobby.tscn", "chaos": "res://scenes/ChaosScene.tscn"}  # "tutorial" reusa a mesa, só troca a mão/dicas
 	var path: String = lookup[scene]
 	GameState.autoplay = scene == "game"
 	if scene == "tutorial":

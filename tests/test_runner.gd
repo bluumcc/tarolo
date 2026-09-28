@@ -17,6 +17,7 @@ func _init() -> void:
 	_test_winner()
 	_test_bidding()
 	_test_bonuses()
+	_test_chaos()
 	print("\n%d ok, %d falhas" % [passed, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -256,3 +257,90 @@ func _test_bonuses() -> void:
 		{"player": 3, "card": c(2, 3)},
 	]
 	check(TrickRules.winning_index(cut) == 2, "trunfo mais alto vence quando a vaza é cortada")
+
+
+func _test_chaos() -> void:
+	# _card_value: efeito de cada modificador de pontos.
+	var e := ChaosEngine.new()
+	e.setup_match({"seed": 11})
+	check((e.hands[0] as Array).size() == ChaosEngine.HAND_SIZE, "Caos: 8 cartas por jogador")
+	check(e.folego_player == -1, "primeira rodada não tem Fôlego (ninguém ficou pra trás ainda)")
+
+	e.modifier = ChaosModifiers.Modifier.TRUNFO_DOBRO
+	check(e._card_value(c(4, 5)) == 1.0, "Trunfo em Dobro: 0,5 vira 1,0")
+	check(e._card_value(c(0, 14)) == 4.5, "Trunfo em Dobro não afeta Rei de naipe comum")
+
+	e.modifier = ChaosModifiers.Modifier.REIS_DOBRO
+	check(e._card_value(c(0, 14)) == 9.0, "Reis em Dobro: Rei de 4,5 vira 9,0")
+	check(e._card_value(c(4, 14)) == 0.5, "Reis em Dobro não afeta Trunfo 14 (não é Rei)")
+
+	e.modifier = ChaosModifiers.Modifier.NAIPE_FRACO
+	e.weak_suit = CardData.Suit.OUROS
+	check(e._card_value(c(0, 14)) == 2.25, "Naipe Fraco: Rei de Ouros de 4,5 vira 2,25")
+	check(e._card_value(c(1, 14)) == 4.5, "Naipe Fraco não afeta naipe diferente do sorteado")
+
+	# O Louco Vence: TrickRules trata O Louco como Trunfo fraco (perde pra Trunfo real).
+	var louco_plays := [
+		{"player": 0, "card": c(2, 14)},
+		{"player": 1, "card": CardData.louco()},
+		{"player": 2, "card": c(2, 3)},
+		{"player": 3, "card": c(2, 9)},
+	]
+	check(TrickRules.winning_index(louco_plays, true) == 1, "com O Louco Vence, ele bate qualquer carta de naipe comum")
+	check(TrickRules.winning_index(louco_plays, false) == 0, "sem o modificador, O Louco nunca vence (regra normal intacta)")
+	var louco_vs_trunfo := louco_plays + [{"player": 0, "card": c(4, 3)}]
+	check(TrickRules.winning_index(louco_vs_trunfo, true) == 4, "O Louco perde pra um Trunfo de verdade mesmo com o modificador ativo")
+
+	# Uma rodada completa (8 vazas) jogando sempre a primeira carta legal — só valida que
+	# o motor fecha a rodada sozinho e preenche round_result corretamente.
+	var e2 := ChaosEngine.new()
+	e2.setup_match({"seed": 21})
+	var guard := 0
+	while not e2.is_round_over() and guard < 200:
+		var p := e2.current
+		var legal: Array = e2.legal_for(p)
+		e2.play(p, legal[0])
+		guard += 1
+	check(e2.is_round_over(), "8 jogadas por jogador fecham a rodada (8 vazas)")
+	check(not e2.round_result.is_empty(), "round_finished preenche round_result")
+	check(int(e2.round_result["round"]) == 0, "primeira rodada tem índice 0")
+	var sum_round_pts := 0.0
+	for pts in (e2.round_result["round_points"] as Array):
+		sum_round_pts += float(pts)
+	var sum_totals := 0.0
+	for t in e2.totals:
+		sum_totals += float(t)
+	check(is_equal_approx(sum_round_pts, sum_totals), "depois da 1ª rodada, pontos da rodada e total da partida batem")
+
+	e2.advance_round()
+	check(e2.round_index == 1, "advance_round avança o índice da rodada")
+	check((e2.hands[0] as Array).size() == ChaosEngine.HAND_SIZE, "rodada nova também dá 8 cartas")
+
+	# Fôlego: quem estava em último antes da 2ª rodada recebe o bônus dessa vez.
+	var expected_folego := 0
+	for p in range(1, 4):
+		if e2.totals[p] < e2.totals[expected_folego]:
+			expected_folego = p
+	check(e2.folego_player == expected_folego, "Fôlego mira em quem está em último no total acumulado")
+
+	# Partida completa (5 rodadas) até o fim, jogando sempre a primeira carta legal.
+	var e3 := ChaosEngine.new()
+	e3.setup_match({"seed": 99})
+	var rounds_played := 0
+	var safety := 0
+	while rounds_played < ChaosEngine.ROUNDS and safety < 1000:
+		var p := e3.current
+		var legal: Array = e3.legal_for(p)
+		e3.play(p, legal[0])
+		safety += 1
+		if e3.is_round_over():
+			rounds_played += 1
+			if rounds_played < ChaosEngine.ROUNDS:
+				e3.advance_round()
+	check(rounds_played == ChaosEngine.ROUNDS, "partida de Caos tem %d rodadas" % ChaosEngine.ROUNDS)
+	check(not e3.match_result.is_empty(), "match_finished preenche match_result no fim da última rodada")
+	var standings: Array = e3.match_result["standings"]
+	check(standings.size() == 4, "pódio final tem os 4 jogadores")
+	var totals: Array = e3.match_result["totals"]
+	for i in range(standings.size() - 1):
+		check(float(totals[standings[i]]) >= float(totals[standings[i + 1]]), "pódio ordenado do maior pro menor total")
