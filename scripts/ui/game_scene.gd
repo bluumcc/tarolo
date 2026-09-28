@@ -10,6 +10,7 @@ signal match_finished(summary: Dictionary)
 
 const CARD_SCENE := preload("res://scenes/Card.tscn")
 const SEAT_SLOTS := [Vector2(0.5, 0.74), Vector2(0.2, 0.5), Vector2(0.5, 0.26), Vector2(0.8, 0.5)]
+const TOP_RESERVE := 78.0  ## espaço fixo reservado pro avatar+nome do topo, nunca invadido pela mesa
 
 var engine := MatchEngine.new()
 var config: Dictionary = {}
@@ -140,7 +141,7 @@ func _build_ui() -> void:
 	# Mesa -------------------------------------------------------------
 	table_area = Control.new()
 	table_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	table_area.custom_minimum_size = Vector2(0, 260)
+	table_area.custom_minimum_size = Vector2(0, 260 + TOP_RESERVE)
 	table_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(table_area)
 
@@ -179,6 +180,7 @@ func _build_ui() -> void:
 	hand_scroll.custom_minimum_size = Vector2(0, CardView.SIZE.y + 30)
 	hand_scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(hand_scroll)
+	hand_scroll.resized.connect(_layout_hand)  # tamanho real só fica pronto depois do 1º sort — nunca confiar em call_deferred sozinho
 	hand_container = HBoxContainer.new()
 	hand_container.name = "HandContainer"
 	hand_container.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -211,11 +213,12 @@ func _layout_table() -> void:
 	if table_area == null:
 		return
 	var area := table_area.size
-	var portrait := area.y > area.x
+	var usable_h := maxf(area.y - TOP_RESERVE, 120.0)
+	var portrait := usable_h > area.x
 	var w := minf(area.x - 40.0, 560.0)
-	var h := minf(area.y - 4.0, 460.0 if portrait else 340.0)
-	table_center.size = Vector2(maxf(w, 280.0), maxf(h, 200.0))
-	table_center.position = (area - table_center.size) / 2.0
+	var h := minf(usable_h - 4.0, 640.0 if portrait else 340.0)
+	table_center.size = Vector2(maxf(w, 280.0), maxf(h, 180.0))
+	table_center.position = Vector2((area.x - table_center.size.x) / 2.0, TOP_RESERVE + (usable_h - table_center.size.y) / 2.0)
 	var anchors := [Vector2(0.5, 1.0), Vector2(0.0, 0.5), Vector2(0.5, 0.0), Vector2(1.0, 0.5)]
 	var av_size := Vector2(60, 60)
 	for p in range(seat_labels.size()):
@@ -225,15 +228,21 @@ func _layout_table() -> void:
 		if p == 0:
 			l.visible = false
 			continue
+		if p == 2:
+			# Assento do topo tem uma faixa própria acima da mesa (TOP_RESERVE), fora do
+			# alcance de table_center — nunca mais disputa espaço com o que fica acima
+			# de table_area (barra de info/tutorial).
+			var cx := area.x / 2.0
+			avatar.position = Vector2(cx - av_size.x / 2.0, 0.0)
+			avatar.pivot_offset = av_size / 2.0
+			l.position = Vector2(cx - l.size.x / 2.0, av_size.y + 2.0)
+			continue
 		var a: Vector2 = anchors[p]
 		var pos := table_center.position + table_center.size * a
 		if p == 1:
 			pos.x = maxf(pos.x - 170.0, 0.0)
 		elif p == 3:
 			pos.x = minf(pos.x + 10.0, area.x - 160.0)
-		elif p == 2:
-			pos.x -= 80.0
-			pos.y = maxf(pos.y - 26.0, 0.0)
 		var av_pos := pos + Vector2(80.0 - av_size.x / 2.0, -av_size.y - 6.0)
 		avatar.position = av_pos
 		avatar.pivot_offset = av_size / 2.0
@@ -247,6 +256,9 @@ func _slot_pos(player: int) -> Vector2:
 	return table_center.size * (SEAT_SLOTS[player] as Vector2) - CardView.SIZE / 2.0
 
 
+## Encaixa a mão inteira na largura disponível, mesmo em celular: primeiro reduz o
+## espaçamento até as cartas se sobreporem (efeito "leque"); se ainda faltar espaço
+## (mãos grandes numa tela estreita), encolhe a mão inteira de leve — nunca corta carta.
 func _layout_hand() -> void:
 	if hand_container == null:
 		return
@@ -254,11 +266,25 @@ func _layout_hand() -> void:
 	if n == 0:
 		return
 	var avail := (hand_container.get_parent() as Control).size.x - 8.0
-	var needed := n * CardView.SIZE.x
+	var card_w := CardView.SIZE.x
 	var sep := 6
-	if needed + (n - 1) * sep > avail:
-		sep = int(floor((avail - needed) / maxf(n - 1, 1)))
+	var scale := 1.0
+	if n > 1:
+		var gaps := n - 1
+		var max_overlap := card_w * 0.62
+		var min_needed := n * card_w - gaps * max_overlap
+		if min_needed > avail:
+			scale = clampf(avail / min_needed, 0.4, 1.0)
+			sep = int(-max_overlap)
+		else:
+			var natural := float(n * card_w)
+			if natural > avail:
+				sep = int(floor((avail - natural) / float(gaps)))
+	elif card_w > avail:
+		scale = clampf(avail / card_w, 0.4, 1.0)
 	hand_container.add_theme_constant_override("separation", sep)
+	hand_container.pivot_offset = Vector2(hand_container.size.x / 2.0, hand_container.size.y)
+	hand_container.scale = Vector2(scale, scale)
 
 
 func _rebuild_hand() -> void:
@@ -475,8 +501,9 @@ func _show_bid_prompt(opts: Array, forced: bool) -> void:
 	v.add_child(bid_sub)
 	if forced:
 		v.add_child(UIKit.label("Ninguém mais licitou — você é obrigado a assumir um contrato", 12, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
+	var row := HFlowContainer.new()  # quebra linha em telas estreitas — 5 colunas não cabem num celular
+	row.add_theme_constant_override("h_separation", 8)
+	row.add_theme_constant_override("v_separation", 8)
 	v.add_child(row)
 	var first_btn: Button
 	if not forced:

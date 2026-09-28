@@ -187,6 +187,7 @@ func _build_ui() -> void:
 	hand_scroll.custom_minimum_size = Vector2(0, CardView.SIZE.y + 30)
 	hand_scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(hand_scroll)
+	hand_scroll.resized.connect(_layout_hand)  # tamanho real só fica pronto depois do 1º sort — nunca confiar em call_deferred sozinho
 	hand_container = HBoxContainer.new()
 	hand_container.name = "HandContainer"
 	hand_container.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -222,7 +223,7 @@ func _layout_table() -> void:
 	var usable_h := maxf(area.y - TOP_RESERVE, 120.0)
 	var portrait := usable_h > area.x
 	var w := minf(area.x - 40.0, 560.0)
-	var h := minf(usable_h - 4.0, 460.0 if portrait else 340.0)
+	var h := minf(usable_h - 4.0, 640.0 if portrait else 340.0)
 	table_center.size = Vector2(maxf(w, 280.0), maxf(h, 180.0))
 	table_center.position = Vector2((area.x - table_center.size.x) / 2.0, TOP_RESERVE + (usable_h - table_center.size.y) / 2.0)
 	var anchors := [Vector2(0.5, 1.0), Vector2(0.0, 0.5), Vector2(0.5, 0.0), Vector2(1.0, 0.5)]
@@ -262,6 +263,9 @@ func _slot_pos(player: int) -> Vector2:
 	return table_center.size * (SEAT_SLOTS[player] as Vector2) - CardView.SIZE / 2.0
 
 
+## Encaixa a mão inteira na largura disponível, mesmo em celular: primeiro reduz o
+## espaçamento até as cartas se sobreporem (efeito "leque"); se ainda faltar espaço
+## (mãos grandes numa tela estreita), encolhe a mão inteira de leve — nunca corta carta.
 func _layout_hand() -> void:
 	if hand_container == null:
 		return
@@ -269,11 +273,25 @@ func _layout_hand() -> void:
 	if n == 0:
 		return
 	var avail := (hand_container.get_parent() as Control).size.x - 8.0
-	var needed := n * CardView.SIZE.x
+	var card_w := CardView.SIZE.x
 	var sep := 6
-	if needed + (n - 1) * sep > avail:
-		sep = int(floor((avail - needed) / maxf(n - 1, 1)))
+	var scale := 1.0
+	if n > 1:
+		var gaps := n - 1
+		var max_overlap := card_w * 0.62
+		var min_needed := n * card_w - gaps * max_overlap
+		if min_needed > avail:
+			scale = clampf(avail / min_needed, 0.4, 1.0)
+			sep = int(-max_overlap)
+		else:
+			var natural := float(n * card_w)
+			if natural > avail:
+				sep = int(floor((avail - natural) / float(gaps)))
+	elif card_w > avail:
+		scale = clampf(avail / card_w, 0.4, 1.0)
 	hand_container.add_theme_constant_override("separation", sep)
+	hand_container.pivot_offset = Vector2(hand_container.size.x / 2.0, hand_container.size.y)
+	hand_container.scale = Vector2(scale, scale)
 
 
 func _rebuild_hand() -> void:
