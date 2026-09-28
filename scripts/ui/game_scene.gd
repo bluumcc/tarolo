@@ -52,7 +52,9 @@ func _ready() -> void:
 	_refresh_hud()
 	_rebuild_hand()
 	if tutorial:
-		_tutorial_hint("Bem-vindo! Essa mão foi montada pra você passar pelas principais regras do Vanilla. Sua vez de licitar já aparece embaixo — dá uma olhada na sua mão primeiro.")
+		await _tutorial_modal("BEM-VINDO AO TUTORIAL", "Essa mão foi montada pra você passar pelas principais regras do Vanilla, com uma explicação antes de cada decisão nova. Não tem pressa — cada tela só avança quando você clicar em ENTENDI ou escolher uma opção.\n\nDá uma olhada na sua mão (embaixo da tela) antes de continuar.")
+		if not is_inside_tree():
+			return
 	await _run_bidding()
 	if not is_inside_tree():
 		return
@@ -62,6 +64,9 @@ func _ready() -> void:
 	if not is_inside_tree():
 		return
 	_rebuild_hand()
+	await _run_talao_reveal()
+	if not is_inside_tree():
+		return
 	await _run_declarations()
 	if not is_inside_tree():
 		return
@@ -296,7 +301,9 @@ func _update_taker_badge() -> void:
 
 func _run_bidding() -> void:
 	if tutorial:
-		_tutorial_hint("Licitação: na sua vez, PASSE ou dê um lance mais alto (Petite/Garde/Garde Sans/Garde Contre). O lance não custa fichas — é só sua confiança na mão. Quem der o maior lance vira o Tomador e joga sozinho contra os outros 3.")
+		await _tutorial_modal("COMO FUNCIONA A LICITAÇÃO", "Toda rodada começa com uma licitação: os 4 jogadores decidem, em ordem, quem vai virar o ATAQUE (Tomador) — quem joga sozinho contra os outros 3, que viram a DEFESA.\n\nNa sua vez, você PASSA (desiste dessa rodada) ou dá um LANCE: um dos 4 contratos, sempre mais alto que o lance de quem já jogou. O lance não custa fichas nem nada — é só uma declaração de quão confiante você está na sua mão.\n\nQuem der o lance mais alto vira o Tomador. Cada contrato abaixo tem uma explicação curta de qual é o risco dele.")
+		if not is_inside_tree():
+			return
 	while true:
 		while not engine.bidding_done:
 			if not is_inside_tree():
@@ -307,7 +314,7 @@ func _run_bidding() -> void:
 				choice = await _wait_human_bid()
 			else:
 				status_label.text = "%s está decidindo..." % config["names"][p] if p != 0 else "Autoplay..."
-				await _wait(0.35)
+				await _wait(0.35 if not tutorial else 0.7)
 				if not is_inside_tree():
 					return
 				var opts := engine.bid_options(p)
@@ -317,15 +324,20 @@ func _run_bidding() -> void:
 			if not res.get("ok", false):
 				continue
 			_announce_bid(p, choice)
-			await _wait(0.45)
+			await _wait(0.45 if not tutorial else 0.9)
 			if not is_inside_tree():
 				return
 		if engine.bidding_void:
 			status_label.text = "Todos passaram — nova mão."
 			trick_label.text = ""
-			await _wait(1.0)
-			if not is_inside_tree():
-				return
+			if tutorial:
+				await _tutorial_modal("TODOS PASSARAM", "Quando ninguém dá lance, a mão é anulada e as cartas são redistribuídas do zero — não conta como rodada jogada. Vai acontecer de novo agora.")
+				if not is_inside_tree():
+					return
+			else:
+				await _wait(1.0)
+				if not is_inside_tree():
+					return
 			if tutorial:
 				engine.setup_tutorial()
 			else:
@@ -337,10 +349,13 @@ func _run_bidding() -> void:
 	trick_label.text = ""
 	if tutorial:
 		if engine.taker == 0:
-			_tutorial_hint("Você é o Tomador! Contrato: %s. %s" % [Scoring.CONTRACT_NAMES[engine.contract], Scoring.CONTRACT_HINTS[engine.contract]])
+			await _tutorial_modal("VOCÊ É O ATAQUE (TOMADOR)", "Você venceu a licitação com %s. %s\n\nAgora você joga sozinho contra os outros 3 (a Defesa). No fim da rodada, todos os pontos que as SUAS cartas capturarem nas vazas (mais o talão, dependendo do contrato) são somados — se bater a meta, você ganha pontos dos outros 3; se não bater, você paga." % [Scoring.CONTRACT_NAMES[engine.contract], Scoring.CONTRACT_HINTS[engine.contract]])
 		else:
-			_tutorial_hint("%s é o Tomador (contrato %s) e joga sozinho contra o resto da mesa, incluindo você. Sua missão agora é ajudar a Defesa a impedir que ele bata a meta." % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract]])
-	await _wait(1.1)
+			await _tutorial_modal("VOCÊ É DA DEFESA", "%s venceu a licitação com %s e virou o ATAQUE (Tomador) — joga sozinho contra a mesa toda, incluindo você.\n\nVocê e os outros 2 são a DEFESA: tudo que vocês capturarem nas vazas ajuda a impedir %s de bater a meta dele. Se ele não bater, todo mundo da Defesa ganha pontos; se ele bater, todo mundo da Defesa paga." % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract], config["names"][engine.taker]])
+		if not is_inside_tree():
+			return
+	else:
+		await _wait(1.1)
 
 
 func _announce_bid(player: int, choice: int) -> void:
@@ -364,6 +379,10 @@ func _show_bid_prompt(opts: Array, forced: bool) -> void:
 	v.add_theme_constant_override("separation", 8)
 	panel.add_child(v)
 	v.add_child(UIKit.label("SUA VEZ DE LICITAR", 15, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	var bid_sub := UIKit.label("PASSAR = fica na Defesa. Qualquer contrato = você tenta virar o ATAQUE (Tomador), jogando sozinho contra os outros 3.", 11, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	bid_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	bid_sub.custom_minimum_size = Vector2(420, 0)
+	v.add_child(bid_sub)
 	if forced:
 		v.add_child(UIKit.label("Ninguém mais licitou — você é obrigado a assumir um contrato", 12, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
 	var row := HBoxContainer.new()
@@ -413,7 +432,9 @@ func _run_discard() -> void:
 		return
 	if engine.taker == 0 and not GameState.autoplay:
 		if tutorial:
-			_tutorial_hint("O talão (6 cartas escondidas) entrou na sua mão. Agora escolha 6 cartas pra devolver — elas contam como pontos seus, mas nunca podem ser Reis ou Bouts (a não ser que faltem cartas comuns, aí um Trunfo comum vale).")
+			await _tutorial_modal("O TALÃO ENTROU NA SUA MÃO", "O talão são 6 cartas que ficam escondidas até a licitação acabar. Com %s, elas entraram direto na sua mão — na próxima tela, as cartas com borda roxa são exatamente essas 6.\n\nAgora você escolhe 6 cartas (de qualquer origem) pra devolver ao talão — elas somam pontos pra você no final, mas nunca podem ser Reis ou Bouts." % Scoring.CONTRACT_NAMES[engine.contract])
+			if not is_inside_tree():
+				return
 		var chosen: Array = await _wait_human_discard()
 		if not is_inside_tree():
 			return
@@ -428,6 +449,22 @@ func _run_discard() -> void:
 		engine.discard(chosen)
 
 
+## Explica o talão pros casos que não passam pela tela de descarte: quando um bot é o
+## Tomador (ele decide sozinho, sem mostrar tela), ou quando o contrato é Garde Sans/
+## Garde Contre (o talão nem chega a entrar na mão de ninguém pra escolher).
+func _run_talao_reveal() -> void:
+	if not tutorial or engine.taker == -1:
+		return
+	match engine.contract:
+		Scoring.Contract.PETITE, Scoring.Contract.GARDE:
+			if engine.taker != 0:
+				await _tutorial_modal("O TALÃO (DESCARTE DO BOT)", "%s era o Tomador, então o talão (6 cartas escondidas) entrou na mão dele e ele escolheu sozinho o que devolver — você não vê essa escolha, só o resultado final na pontuação." % config["names"][engine.taker])
+		Scoring.Contract.GARDE_SANS:
+			await _tutorial_modal("O TALÃO (GARDE SANS)", "Com Garde Sans, %s nem chegou a ver o talão — ninguém escolhe nada. Mas as 6 cartas dele já contam a favor do Tomador mesmo assim: %s." % [config["names"][engine.taker], _describe_cards(engine.chien)])
+		Scoring.Contract.GARDE_CONTRE:
+			await _tutorial_modal("O TALÃO (GARDE CONTRE)", "Com Garde Contre, %s nem chegou a ver o talão — e dessa vez essas 6 cartas nem contam pra ninguém, ficam fora da rodada: %s." % [config["names"][engine.taker], _describe_cards(engine.chien)])
+
+
 func _wait_human_discard() -> Array:
 	var hand: Array = engine.hands[0]
 	var legal: Array = engine.legal_discards(hand)
@@ -439,7 +476,10 @@ func _wait_human_discard() -> Array:
 	v.add_theme_constant_override("separation", 8)
 	panel.add_child(v)
 	v.add_child(UIKit.label("ESCOLHA 6 CARTAS PRO DESCARTE", 15, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("Elas contam como pontos seus no final. Reis e Bouts (em cinza) não podem ir.", 11, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	var sub_hint := "Elas contam como pontos seus no final. Reis e Bouts (em cinza) não podem ir."
+	if tutorial:
+		sub_hint += " As marcadas \"talão\" são as 6 que acabaram de entrar na sua mão."
+	v.add_child(UIKit.label(sub_hint, 11, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	var counter := UIKit.label("0 / %d selecionadas" % Deck.CHIEN_SIZE, 12, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(counter)
 	var flow := HFlowContainer.new()
@@ -449,13 +489,20 @@ func _wait_human_discard() -> Array:
 	v.add_child(flow)
 	var confirm := UIKit.button("CONFIRMAR", UIKit.GOLD, 14)
 	confirm.disabled = true
+	var chien_ref: Array = engine.chien
 	for c in hand:
 		var card: CardData = c
 		var is_legal: bool = (legal as Array).any(func(l: CardData) -> bool: return l.equals(card))
+		var from_chien: bool = tutorial and (chien_ref as Array).any(func(l: CardData) -> bool: return l.equals(card))
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 1)
 		var b := UIKit.button("%s%s" % [card.rank_label(), card.suit_symbol()], UIKit.GOLD if is_legal else UIKit.MUTED, 13)
 		b.custom_minimum_size = Vector2(52, 52)
 		b.disabled = not is_legal
 		b.toggle_mode = true
+		if from_chien:
+			b.add_theme_stylebox_override("normal", UIKit.box(UIKit.PURPLE, UIKit.OK, 3, 2, 6))
+			b.add_theme_stylebox_override("disabled", UIKit.box(UIKit.PURPLE_DEEP, UIKit.OK, 3, 2, 6))
 		b.pressed.connect(func():
 			if selected.has(card):
 				selected.erase(card)
@@ -467,7 +514,10 @@ func _wait_human_discard() -> Array:
 				selected.append(card)
 			counter.text = "%d / %d selecionadas" % [selected.size(), Deck.CHIEN_SIZE]
 			confirm.disabled = selected.size() != Deck.CHIEN_SIZE)
-		flow.add_child(b)
+		col.add_child(b)
+		if from_chien:
+			col.add_child(UIKit.label("talão", 8, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER))
+		flow.add_child(col)
 	confirm.pressed.connect(func():
 		panel.queue_free()
 		human_discard_chosen.emit(selected.duplicate()))
@@ -608,6 +658,36 @@ func _tutorial_once(key: String, text: String) -> void:
 		return
 	tutorial_seen[key] = true
 	_tutorial_hint(text)
+
+
+## Modal bloqueante (só no tutorial): a partida só continua quando o jogador clicar em
+## ENTENDI. Existe porque um banner de texto que já vai sendo coberto pelo próximo popup
+## não dá tempo de ler nada — aqui ninguém avança sem confirmar que leu.
+func _tutorial_modal(title: String, body: String, button_text: String = "ENTENDI, PRÓXIMO") -> void:
+	if not tutorial or GameState.autoplay:
+		return
+	var v := UIKit.modal(overlay_layer, title, 380.0)
+	var l := UIKit.label(body, 14, UIKit.INK)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size = Vector2(340, 0)
+	v.add_child(l)
+	var btn := UIKit.button(button_text, UIKit.OK)
+	v.add_child(btn)
+	var ov: Control = overlay_layer.get_child(overlay_layer.get_child_count() - 1)
+	btn.grab_focus.call_deferred()
+	await btn.pressed
+	if is_inside_tree():
+		ov.queue_free()
+
+
+## Descreve uma lista de cartas em texto corrido, tipo "Rei de Ouros, 7 de Copas e Ás de Paus".
+func _describe_cards(cards: Array) -> String:
+	var names: Array = []
+	for c in cards:
+		names.append((c as CardData).display_name())
+	if names.size() <= 1:
+		return ", ".join(names)
+	return ", ".join(names.slice(0, names.size() - 1)) + " e " + str(names[names.size() - 1])
 
 
 func _wait_human() -> CardData:

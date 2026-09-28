@@ -12,11 +12,12 @@ const CONTRACT_NAMES := ["Petite", "Garde", "Garde Sans", "Garde Contre"]
 const CONTRACT_MULT := {Contract.PETITE: 1, Contract.GARDE: 2, Contract.GARDE_SANS: 4, Contract.GARDE_CONTRE: 6}
 ## Explicação curta de cada contrato pra mostrar na tela de licitação — o jogo tem
 ## regras demais pra aprender de uma vez, então isso fica sempre visível ao lado do botão.
+## Em linguagem direta: o que muda de verdade se você vencer ou perder com esse contrato.
 const CONTRACT_HINTS := [
-	"Compromisso leve — multiplica x1",
-	"Mais confiança — multiplica x2",
-	"Não vê o talão, mas ele ainda conta pra você — x4",
-	"Não vê o talão, e ele vira ponto da defesa — x6",
+	"Risco baixo. Você vê e troca o talão. Se bater a meta, ganha pouco de cada um; se não bater, perde pouco.",
+	"Risco médio. Você vê e troca o talão. Dobra (x2) o que ganha ou perde perto da Petite.",
+	"Risco alto. Você NÃO vê o talão, mas ele ainda soma pontos a seu favor. Multiplica por 4 o que ganha ou perde.",
+	"Risco máximo. Você NÃO vê o talão, e os pontos dele vão pra Defesa. Multiplica por 6 o que ganha ou perde.",
 ]
 
 ## Toda rodada dá um piso de 25 pontos de aposta, que se soma à distância (pra mais ou
