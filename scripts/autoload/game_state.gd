@@ -4,7 +4,7 @@ extends Node
 enum Mode { CLASSIC, ARCADE, RANKED }
 
 const MODE_NAMES := ["Clássico", "Arcade", "Ranqueado"]
-const BOT_NAMES := ["Sibila", "Vesper", "Nyx", "Oráculo", "Cartomante", "Hécate", "Umbra", "Lumen", "Corvo", "Selene", "Íris", "Mercúrio"]
+const BOT_NAMES := ["João", "Ana", "Felipe", "Mateus", "Lucas", "Sabrina", "Joana", "Pedro", "Márcio", "Júnior", "Fábio", "Marcos"]
 const ARCADE_BASE_GOLD := 4
 
 var mode: int = Mode.CLASSIC
