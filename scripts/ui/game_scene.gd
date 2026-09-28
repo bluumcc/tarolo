@@ -23,6 +23,9 @@ var hud_titles: Array = []       # Label — nome do jogador (atualizado quando 
 var hud_points: Array = []       # Label — pontos capturados até agora (provisório)
 var hud_tricks: Array = []       # Label — vazas vencidas / colocação
 var seat_labels: Array = []      # Label de mão dos bots (contagem de cartas)
+var seat_avatars: Array = []     # PanelContainer circular por assento (destaca de quem é a vez)
+var seat_avatar_labels: Array = []
+var turn_pulse_token := 0        # invalida pulsos de destaque antigos quando a vez muda
 var table_center: Control
 var table_area: Control
 var hand_container: HBoxContainer
@@ -148,6 +151,19 @@ func _build_ui() -> void:
 	table_area.add_child(table_center)
 
 	for p in range(engine.num_players):
+		var avatar := PanelContainer.new()
+		avatar.custom_minimum_size = Vector2(60, 60)
+		avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		avatar.add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE, UIKit.MUTED, 2, 30, 0))
+		var av_label := UIKit.label(str(config["names"][p]).substr(0, 1).to_upper(), 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+		av_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		av_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		avatar.add_child(av_label)
+		avatar.visible = p != 0   # o jogador humano já vê a própria mão embaixo
+		table_area.add_child(avatar)
+		seat_avatars.append(avatar)
+		seat_avatar_labels.append(av_label)
+
 		var l := UIKit.label("", 14, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 		table_area.add_child(l)
 		seat_labels.append(l)
@@ -201,9 +217,11 @@ func _layout_table() -> void:
 	table_center.size = Vector2(maxf(w, 280.0), maxf(h, 200.0))
 	table_center.position = (area - table_center.size) / 2.0
 	var anchors := [Vector2(0.5, 1.0), Vector2(0.0, 0.5), Vector2(0.5, 0.0), Vector2(1.0, 0.5)]
+	var av_size := Vector2(60, 60)
 	for p in range(seat_labels.size()):
 		var l: Label = seat_labels[p]
 		l.size = Vector2(160, 24)
+		var avatar: Control = seat_avatars[p]
 		if p == 0:
 			l.visible = false
 			continue
@@ -216,6 +234,9 @@ func _layout_table() -> void:
 		elif p == 2:
 			pos.x -= 80.0
 			pos.y = maxf(pos.y - 26.0, 0.0)
+		var av_pos := pos + Vector2(80.0 - av_size.x / 2.0, -av_size.y - 6.0)
+		avatar.position = av_pos
+		avatar.pivot_offset = av_size / 2.0
 		l.position = pos - Vector2(0, 12)
 	for v in table_views:
 		var cv: CardView = v["view"]
@@ -256,19 +277,33 @@ func _rebuild_hand() -> void:
 	_layout_hand.call_deferred()
 
 
+## Quem tem a vez agora, em qualquer fase (licitação, descarte ou vaza) — usado pra
+## destacar o avatar certo na mesa, não só durante as vazas.
+func _current_turn_player() -> int:
+	if not engine.bidding_done:
+		return engine.bid_turn
+	if engine.awaiting_discard:
+		return engine.taker
+	if engine.is_round_over():
+		return -1
+	return engine.current
+
+
 func _refresh_hud() -> void:
 	var trick_wins := []
 	for p in range(engine.num_players):
 		trick_wins.append(0)
 	for t in engine.history:
 		trick_wins[int(t["winner"])] += 1
+	var turn_player := _current_turn_player()
 	for p in range(engine.num_players):
 		(hud_points[p] as Label).text = "%s pts" % UIKit.fmt_dec(engine.points_of(p), 1)
 		(hud_tricks[p] as Label).text = "%d vazas" % trick_wins[p]
-		var turn := p == engine.current and not engine.is_round_over()
+		var turn := p == turn_player
 		(hud_badges[p] as PanelContainer).modulate = Color(1, 1, 1, 1) if turn else Color(0.78, 0.76, 0.85, 1)
 		if p > 0:
 			(seat_labels[p] as Label).text = "%s · %d cartas" % [config["names"][p], (engine.hands[p] as Array).size()]
+	_update_turn_highlight(turn_player)
 	var mode_name: String = GameState.MODE_NAMES[GameState.mode]
 	var extra := ""
 	if engine.taker != -1:
@@ -285,6 +320,58 @@ func _refresh_hud() -> void:
 		info_label.text = "%s  ·  Licitação" % mode_name.to_upper()
 	else:
 		info_label.text = "%s  ·  Vaza %d/%d%s" % [mode_name.to_upper(), mini(engine.trick_number + 1, engine.total_tricks), engine.total_tricks, extra]
+
+
+## Destaca com borda dourada + pulso o avatar de quem tem a vez agora (bots só — o
+## jogador humano já vê a própria mão liberada quando é a vez dele).
+func _update_turn_highlight(turn_player: int) -> void:
+	turn_pulse_token += 1
+	var my_token := turn_pulse_token
+	for p in range(1, seat_avatars.size()):
+		var avatar: PanelContainer = seat_avatars[p]
+		var active := p == turn_player
+		avatar.add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE, UIKit.GOLD if active else UIKit.MUTED, 4 if active else 2, 30, 0))
+		if not active:
+			avatar.scale = Vector2.ONE
+	if turn_player > 0:
+		_pulse_avatar(seat_avatars[turn_player], my_token)
+
+
+func _pulse_avatar(avatar: PanelContainer, token: int) -> void:
+	while token == turn_pulse_token and is_inside_tree():
+		var tw := create_tween()
+		tw.tween_property(avatar, "scale", Vector2(1.1, 1.1), 0.5).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(avatar, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_SINE)
+		await tw.finished
+		if not is_inside_tree():
+			return
+
+
+## Balão de texto curto acima do avatar de `player` (ou perto da mão, se for o humano) —
+## dá pra ver ESPACIALMENTE quem fez o quê, em vez de um texto genérico no topo da tela.
+func _speech_bubble(player: int, text: String) -> void:
+	if not is_inside_tree():
+		return
+	var anchor_pos: Vector2
+	if player == 0:
+		anchor_pos = table_area.global_position - popup_layer.global_position + Vector2(table_area.size.x / 2.0, table_area.size.y - 20.0)
+	else:
+		var avatar: Control = seat_avatars[player]
+		anchor_pos = avatar.global_position - popup_layer.global_position + avatar.size / 2.0
+	var l := UIKit.label(text, 13, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var box := PanelContainer.new()
+	box.add_theme_stylebox_override("panel", UIKit.box(Color(0.03, 0.03, 0.07, 0.92), UIKit.GOLD, 2, 8, 8))
+	box.add_child(l)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	popup_layer.add_child(box)
+	await get_tree().process_frame
+	box.position = anchor_pos - Vector2(box.size.x / 2.0, box.size.y + 40.0)
+	box.modulate.a = 0.0
+	var tw := create_tween()
+	tw.tween_property(box, "modulate:a", 1.0, GameState.anim(0.12))
+	tw.tween_interval(GameState.anim(1.1))
+	tw.tween_property(box, "modulate:a", 0.0, GameState.anim(0.3))
+	tw.tween_callback(box.queue_free)
 
 
 func _update_taker_badge() -> void:
@@ -309,6 +396,7 @@ func _run_bidding() -> void:
 			if not is_inside_tree():
 				return
 			var p := engine.bid_turn
+			_refresh_hud()
 			var choice: int
 			if p == 0 and not GameState.autoplay:
 				choice = await _wait_human_bid()
@@ -359,7 +447,9 @@ func _run_bidding() -> void:
 
 
 func _announce_bid(player: int, choice: int) -> void:
+	var text := "Passou" if choice == -1 else "%s!" % Scoring.CONTRACT_NAMES[choice]
 	trick_label.text = "%s passou." % config["names"][player] if choice == -1 else "%s deu %s!" % [config["names"][player], Scoring.CONTRACT_NAMES[choice]]
+	_speech_bubble(player, text)
 	Sfx.play("tick")
 
 
@@ -546,6 +636,7 @@ func _run_declarations() -> void:
 			engine.declare_poignee(declare)
 			if declare:
 				_announce_toast("Você declarou Poignée! (+%d se a rodada fechar)" % bonus)
+				_speech_bubble(0, "Poignée!")
 				await _wait(0.6)
 		var chelem: bool = await _ask_yes_no("CHELEM", "Quer anunciar Chelem — apostar que vai vencer as 18 vazas sozinho? Se conseguir: +400. Se falhar: -200. Sem anunciar, ainda ganha +200 de bônus se vencer todas por acaso, sem risco.")
 		if not is_inside_tree():
@@ -553,18 +644,21 @@ func _run_declarations() -> void:
 		engine.announce_chelem(chelem)
 		if chelem:
 			_announce_toast("Você anunciou Chelem! Vença as 18 vazas pra garantir o bônus.")
+			_speech_bubble(0, "Chelem!")
 			await _wait(0.6)
 	else:
 		var strength := BotAI.hand_strength(engine.hands[engine.taker])
 		if eligible and BotAI.decide_poignee(engine.taker_trump_count):
 			engine.declare_poignee(true)
 			_announce_toast("%s declarou Poignée!" % config["names"][engine.taker])
+			_speech_bubble(engine.taker, "Poignée!")
 			await _wait(0.6)
 			if not is_inside_tree():
 				return
 		if BotAI.decide_chelem(strength, int(config["difficulty"][engine.taker]), bot_rng):
 			engine.announce_chelem(true)
 			_announce_toast("%s anunciou Chelem!" % config["names"][engine.taker])
+			_speech_bubble(engine.taker, "Chelem!")
 			await _wait(0.6)
 			if not is_inside_tree():
 				return
