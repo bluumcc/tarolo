@@ -8,18 +8,26 @@ signal round_finished()
 
 var num_players := 4
 var hands: Array = []          # Array[Array[CardData]]
-var chien: Array = []          # talão (6 cartas), incorporado à mão do tomador no setup
-var taker := 0
-var contract := 0              # Scoring.Contract — V1: escolhido automaticamente pela força da mão
+var chien: Array = []          # talão (6 cartas)
 var plays: Array = []          # vaza atual: [{player, card}]
-var captured: Array = []       # Array[Array[CardData]] capturado por cada jogador (vazas + talão do tomador)
-var leader := 0
-var current := 0
+var captured: Array = []       # Array[Array[CardData]] capturado por cada jogador
+var leader := -1
+var current := -1
 var trick_number := 0
-var total_tricks := 0
+var total_tricks := -1
 var history: Array = []        # resultados das vazas
 var result: Dictionary = {}    # preenchido quando a rodada acaba (round_finished)
 var rng := RandomNumberGenerator.new()
+
+# ------------------------------------------------------------------ licitação
+var taker := -1
+var contract := -1
+var bid_turn := 0
+var bid_active: Array = []     # ainda não passou
+var highest_bid := -1
+var highest_bidder := -1
+var bidding_done := false
+var bidding_void := false      # todos passaram (mão anulada — chamador deve refazer o setup)
 
 
 ## config: { seed, players }
@@ -37,55 +45,108 @@ func setup(config: Dictionary) -> void:
 	for p in range(num_players):
 		captured.append([])
 
-	taker = _pick_taker()
-	contract = _contract_for(taker)
-	# O tomador incorpora o talão e descarta 6 cartas de volta (sem Bouts, se possível) —
-	# essas 6 já contam como capturadas por ele pra pontuação final.
-	(hands[taker] as Array).append_array(chien)
-	Deck.sort_hand(hands[taker])
-	var discarded := _auto_discard(hands[taker], Deck.CHIEN_SIZE)
-	for c in discarded:
-		(hands[taker] as Array).erase(c)
-	captured[taker].append_array(discarded)
+	taker = -1
+	contract = -1
+	bid_turn = 0
+	bid_active = []
+	for p in range(num_players):
+		bid_active.append(true)
+	highest_bid = -1
+	highest_bidder = -1
+	bidding_done = false
+	bidding_void = false
 
-	total_tricks = (hands[0] as Array).size()
-	leader = (taker + 1) % num_players
-	current = leader
+	leader = -1
+	current = -1
 	trick_number = 0
+	total_tricks = -1
 	plays = []
 	history = []
 	result = {}
 
 
-## V1: sem licitação interativa — quem tem a mão mais forte assume como tomador.
-## (a licitação de verdade — Passe/Petite/Garde/Garde Sans/Garde Contre, escolhida
-## pelo jogador — entra numa próxima fase.)
-func _pick_taker() -> int:
-	var best := 0
-	var best_strength := -1.0
+# ------------------------------------------------------------------ licitação
+
+## Contratos que `player` pode oferecer agora (estritamente acima do lance atual).
+## Passar sempre é permitido à parte, exceto quando `is_bidding_forced`.
+func bid_options(player: int) -> Array:
+	var opts: Array = []
+	for c in range(highest_bid + 1, Scoring.Contract.GARDE_CONTRE + 1):
+		opts.append(c)
+	return opts
+
+
+## Verdadeiro quando `player` é o único que ainda não passou e ninguém deu lance —
+## nesse caso, alguém precisa assumir (não pode passar), como no jogo real.
+func is_bidding_forced(player: int) -> bool:
+	if highest_bidder != -1 or not bid_active[player]:
+		return false
 	for p in range(num_players):
-		var s := _hand_strength(hands[p])
-		if s > best_strength:
-			best_strength = s
-			best = p
-	return best
+		if p != player and bid_active[p]:
+			return false
+	return true
 
 
-func _hand_strength(hand: Array) -> float:
-	var s := 0.0
-	for c in hand:
-		var card: CardData = c
-		if card.is_bout():
-			s += 3.0
-		elif card.is_trunfo():
-			s += 1.0
-		else:
-			s += card.points()
-	return s
+## `choice` = -1 (passar) ou um valor de `Scoring.Contract`.
+func place_bid(player: int, choice: int) -> Dictionary:
+	if bidding_done or player != bid_turn or not bid_active[player]:
+		return {"ok": false, "error": "fora de vez"}
+	if choice == -1:
+		if is_bidding_forced(player):
+			return {"ok": false, "error": "obrigado a dar um lance"}
+		bid_active[player] = false
+	else:
+		if choice <= highest_bid:
+			return {"ok": false, "error": "lance muito baixo"}
+		highest_bid = choice
+		highest_bidder = player
+	_advance_bidding()
+	return {"ok": true, "done": bidding_done}
 
 
-func _contract_for(taker_seat: int) -> int:
-	return Scoring.Contract.GARDE if _hand_strength(hands[taker_seat]) >= 26.0 else Scoring.Contract.PETITE
+func _advance_bidding() -> void:
+	var active_count := 0
+	for a in bid_active:
+		if a:
+			active_count += 1
+	if active_count == 0:
+		bidding_done = true
+		bidding_void = true
+		return
+	if active_count == 1 and highest_bidder != -1 and bid_active[highest_bidder]:
+		bidding_done = true
+		taker = highest_bidder
+		contract = highest_bid
+		_finalize_taker()
+		return
+	var attempts := 0
+	while attempts < num_players:
+		bid_turn = (bid_turn + 1) % num_players
+		attempts += 1
+		if bid_active[bid_turn] and bid_turn != highest_bidder:
+			return
+
+
+## Aplica as regras do contrato vencedor sobre o talão e prepara o início das vazas.
+## Petite/Garde: o tomador vê o talão e descarta 6 cartas de volta (contam pra ele).
+## Garde Sans: o tomador não vê o talão, mas ele conta pra ele mesmo assim.
+## Garde Contre: o tomador não vê o talão, e ele NÃO conta pra ele (fica com a defesa).
+func _finalize_taker() -> void:
+	match contract:
+		Scoring.Contract.PETITE, Scoring.Contract.GARDE:
+			(hands[taker] as Array).append_array(chien)
+			Deck.sort_hand(hands[taker])
+			var discarded := _auto_discard(hands[taker], Deck.CHIEN_SIZE)
+			for c in discarded:
+				(hands[taker] as Array).erase(c)
+			captured[taker].append_array(discarded)
+		Scoring.Contract.GARDE_SANS:
+			captured[taker].append_array(chien)
+		Scoring.Contract.GARDE_CONTRE:
+			pass  # talão não entra na jogada nem pontua pro tomador
+	total_tricks = (hands[0] as Array).size()
+	leader = (taker + 1) % num_players
+	current = leader
 
 
 ## Descarta as `n` cartas mais fracas (nunca um Bout) de `hand`, devolve as descartadas.
@@ -95,12 +156,14 @@ static func _auto_discard(hand: Array, n: int) -> Array:
 	return pool.slice(0, mini(n, pool.size()))
 
 
+# ------------------------------------------------------------------ vazas
+
 func legal_for(player: int) -> Array:
 	return TrickRules.legal_cards(hands[player], plays)
 
 
 func is_round_over() -> bool:
-	return trick_number >= total_tricks
+	return total_tricks > 0 and trick_number >= total_tricks
 
 
 ## Joga `card` pelo jogador da vez. Retorna { ok, trick_complete, result? }.
@@ -153,6 +216,8 @@ func _finish() -> Dictionary:
 		taker_points += card.points()
 		if card.is_bout():
 			bouts += 1
+	# Garde Sans/Contre: o talão nunca entrou na mão do tomador (não é jogado em vaza
+	# nenhuma), então ele só entra na conta final aqui — não nos dois casos acima.
 	var r := Scoring.resolve(taker_points, bouts, contract)
 	r["taker"] = taker
 	r["taker_points"] = taker_points

@@ -8,6 +8,57 @@ enum Difficulty { EASY, NORMAL, HARD }
 const DIFFICULTY_NAMES := ["Fácil", "Normal", "Difícil"]
 
 
+## Força estimada de uma mão pra decidir lance na licitação: soma os pontos das cartas,
+## com peso extra pra Trunfos e principalmente pros Bouts.
+static func hand_strength(hand: Array) -> float:
+	var s := 0.0
+	for c in hand:
+		var card: CardData = c
+		if card.is_bout():
+			s += 4.0
+		elif card.is_trunfo():
+			s += 1.2
+		else:
+			s += card.points()
+	return s
+
+
+## Decide o lance do bot na licitação. `options` = contratos disponíveis agora
+## (Scoring.Contract, já filtrados pra maiores que o lance atual). `forced` = true
+## quando o bot é obrigado a dar algum lance (último ativo, ninguém arrematou ainda).
+## Retorna -1 (passar) ou um valor de Scoring.Contract.
+static func bid_choice(hand: Array, options: Array, forced: bool, difficulty: int, rng: RandomNumberGenerator) -> int:
+	var strength := hand_strength(hand)
+	match difficulty:
+		Difficulty.EASY:
+			strength += rng.randf_range(-10.0, 10.0)
+		Difficulty.NORMAL:
+			strength += rng.randf_range(-4.0, 4.0)
+		_:
+			strength += rng.randf_range(-1.5, 1.5)
+
+	var desired := -1
+	if strength >= 34.0:
+		desired = Scoring.Contract.GARDE_CONTRE
+	elif strength >= 28.0:
+		desired = Scoring.Contract.GARDE_SANS
+	elif strength >= 21.0:
+		desired = Scoring.Contract.GARDE
+	elif strength >= 14.0:
+		desired = Scoring.Contract.PETITE
+
+	if options.is_empty():
+		return -1 if not forced else options[0]  # ninguém pode subir mais (alguém já deu Garde Contre)
+	if desired != -1 and options.has(desired):
+		return desired
+	# o que o bot queria já não está mais disponível (alguém arrematou antes) —
+	# só sobe um degrau além do que pretendia, senão desiste.
+	var next_opt: int = options[0]
+	if desired != -1 and next_opt <= desired + 1:
+		return next_opt
+	return next_opt if forced else -1
+
+
 static func choose(hand: Array, plays: Array, player: int, num_players: int, difficulty: int, rng: RandomNumberGenerator) -> CardData:
 	var legal := TrickRules.legal_cards(hand, plays)
 	if legal.size() == 1:

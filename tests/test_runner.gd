@@ -15,6 +15,7 @@ func _init() -> void:
 	_test_cover_trunfo()
 	_test_louco()
 	_test_winner()
+	_test_bidding()
 	print("\n%d ok, %d falhas" % [passed, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -125,6 +126,54 @@ func _test_louco() -> void:
 	]
 	check(TrickRules.winning_index(full) == 3, "trunfo vence naipe comum mesmo com Louco na mesa")
 	check(not TrickRules.would_win(CardData.louco(), 0, []), "O Louco nunca vence a vaza")
+
+
+func _test_bidding() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	var e := MatchEngine.new()
+	e.setup({"seed": 3})
+	check(e.taker == -1 and not e.bidding_done, "licitação começa sem tomador definido")
+
+	# 3 passam, o 4º é obrigado a dar um lance (não pode passar sendo o único restante).
+	check(e.place_bid(0, -1)["ok"], "jogador 0 passa")
+	check(e.place_bid(1, -1)["ok"], "jogador 1 passa")
+	check(e.place_bid(2, -1)["ok"], "jogador 2 passa")
+	check(e.is_bidding_forced(3), "último jogador ativo é obrigado a dar lance")
+	check(not e.place_bid(3, -1)["ok"], "não pode passar quando é obrigado a licitar")
+	check(e.place_bid(3, Scoring.Contract.PETITE)["ok"], "jogador 3 assume com Petite")
+	check(e.bidding_done and e.taker == 3 and e.contract == Scoring.Contract.PETITE, "jogador 3 vira tomador")
+	check((e.hands[3] as Array).size() == 18, "tomador descartou de volta pro talão (18 cartas)")
+	check(e.total_tricks == 18, "18 vazas no Vanilla")
+
+	# Lance mais baixo que o atual é rejeitado; lance maior sobrepõe.
+	var e2 := MatchEngine.new()
+	e2.setup({"seed": 4})
+	e2.place_bid(0, Scoring.Contract.GARDE)
+	check(not e2.place_bid(1, Scoring.Contract.PETITE)["ok"], "lance abaixo do atual é rejeitado")
+	check(e2.place_bid(1, Scoring.Contract.GARDE_SANS)["ok"], "lance maior sobrepõe o anterior")
+	e2.place_bid(2, -1)
+	e2.place_bid(3, -1)
+	check(not e2.bidding_done, "jogador 0 ainda não passou: licitação continua com ele")
+	e2.place_bid(0, -1)  # 0 desiste de cobrir o Garde Sans
+	check(e2.bidding_done and e2.taker == 1 and e2.contract == Scoring.Contract.GARDE_SANS, "quem arrematou por último vence a licitação")
+	check((e2.hands[1] as Array).size() == 18, "Garde Sans: tomador não incorpora o talão na mão")
+	var chien_pts := 0.0
+	for c in e2.chien:
+		chien_pts += (c as CardData).points()
+	var captured_pts := 0.0
+	for c in e2.captured[1]:
+		captured_pts += (c as CardData).points()
+	check(is_equal_approx(captured_pts, chien_pts), "Garde Sans: talão inteiro já conta pro tomador antes de qualquer vaza")
+
+	var e3 := MatchEngine.new()
+	e3.setup({"seed": 5})
+	e3.place_bid(0, Scoring.Contract.GARDE_CONTRE)
+	e3.place_bid(1, -1)
+	e3.place_bid(2, -1)
+	e3.place_bid(3, -1)
+	check((e3.hands[0] as Array).size() == 18 and e3.captured[0].is_empty(), "Garde Contre: talão não entra em lugar nenhum pro tomador")
+	check(e3.bid_options(0).is_empty(), "ninguém pode superar Garde Contre")
 
 
 func _test_winner() -> void:

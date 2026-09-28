@@ -3,6 +3,7 @@ extends Control
 ## Assentos: 0 = jogador (baixo), 1 = esquerda, 2 = topo, 3 = direita (sentido horário).
 
 signal human_card_chosen(card: CardData)
+signal human_bid_chosen(choice: int)
 signal match_finished(summary: Dictionary)
 
 const CARD_SCENE := preload("res://scenes/Card.tscn")
@@ -16,6 +17,7 @@ var finished := false
 var paused := false
 
 var hud_badges: Array = []       # PanelContainer por jogador
+var hud_titles: Array = []       # Label — nome do jogador (atualizado quando o tomador é definido)
 var hud_points: Array = []       # Label — pontos capturados até agora (provisório)
 var hud_tricks: Array = []       # Label — vazas vencidas / colocação
 var seat_labels: Array = []      # Label de mão dos bots (contagem de cartas)
@@ -39,6 +41,11 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_on_resize)
 	_refresh_hud()
 	_rebuild_hand()
+	await _run_bidding()
+	if not is_inside_tree():
+		return
+	_update_taker_badge()
+	_refresh_hud()
 	_run_round.call_deferred()
 
 
@@ -63,22 +70,20 @@ func _build_ui() -> void:
 	hud.add_theme_constant_override("v_separation", 8)
 	root.add_child(hud)
 	for p in range(engine.num_players):
-		var accent := UIKit.GOLD if p == engine.taker else UIKit.MUTED
-		var badge := UIKit.panel(UIKit.PURPLE_DEEP, accent, 8)
+		var badge := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MUTED, 8)
 		badge.custom_minimum_size = Vector2(160, 0)
 		var v := VBoxContainer.new()
 		v.add_theme_constant_override("separation", 0)
 		badge.add_child(v)
-		var title := str(config["names"][p])
-		if p == engine.taker:
-			title = "♛ " + title
-		v.add_child(UIKit.label(title.to_upper(), 13, accent))
+		var title_label := UIKit.label(str(config["names"][p]).to_upper(), 13, UIKit.MUTED)
+		v.add_child(title_label)
 		var pts := UIKit.label("0,0 pts", 22, UIKit.INK)
 		v.add_child(pts)
 		var tr := UIKit.label("0 vazas", 12, UIKit.MUTED)
 		v.add_child(tr)
 		hud.add_child(badge)
 		hud_badges.append(badge)
+		hud_titles.append(title_label)
 		hud_points.append(pts)
 		hud_tricks.append(tr)
 
@@ -228,16 +233,119 @@ func _refresh_hud() -> void:
 		if p > 0:
 			(seat_labels[p] as Label).text = "%s · %d cartas" % [config["names"][p], (engine.hands[p] as Array).size()]
 	var mode_name: String = GameState.MODE_NAMES[GameState.mode]
-	var bouts_now := 0
-	for c in engine.captured[engine.taker]:
-		if (c as CardData).is_bout():
-			bouts_now += 1
-	var target := Scoring.target_for_bouts(bouts_now)
-	var extra := "  ·  Tomador: %s (%s)  ·  Meta: %s pts" % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract], UIKit.fmt_dec(target, 1)]
+	var extra := ""
+	if engine.taker != -1:
+		var bouts_now := 0
+		for c in engine.captured[engine.taker]:
+			if (c as CardData).is_bout():
+				bouts_now += 1
+		var target := Scoring.target_for_bouts(bouts_now)
+		extra = "  ·  Tomador: %s (%s)  ·  Meta: %s pts" % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract], UIKit.fmt_dec(target, 1)]
 	if GameState.mode == GameState.Mode.RANKED:
 		var t := Ranked.tier_info(int(GameState.ranked()["points"]), int(GameState.ranked()["mmr"]))
 		extra += "  ·  %s" % t["label"]
-	info_label.text = "%s  ·  Vaza %d/%d%s" % [mode_name.to_upper(), mini(engine.trick_number + 1, engine.total_tricks), engine.total_tricks, extra]
+	if engine.taker == -1:
+		info_label.text = "%s  ·  Licitação" % mode_name.to_upper()
+	else:
+		info_label.text = "%s  ·  Vaza %d/%d%s" % [mode_name.to_upper(), mini(engine.trick_number + 1, engine.total_tricks), engine.total_tricks, extra]
+
+
+func _update_taker_badge() -> void:
+	for p in range(engine.num_players):
+		var accent := UIKit.GOLD if p == engine.taker else UIKit.MUTED
+		(hud_badges[p] as PanelContainer).add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, accent, 3, 4, 8))
+		var title: Label = hud_titles[p]
+		var base_name := str(config["names"][p]).to_upper()
+		title.text = "♛ " + base_name if p == engine.taker else base_name
+		title.add_theme_color_override("font_color", accent)
+
+
+# ------------------------------------------------------------------ licitação
+
+func _run_bidding() -> void:
+	while true:
+		while not engine.bidding_done:
+			if not is_inside_tree():
+				return
+			var p := engine.bid_turn
+			var choice: int
+			if p == 0 and not GameState.autoplay:
+				choice = await _wait_human_bid()
+			else:
+				status_label.text = "%s está decidindo..." % config["names"][p] if p != 0 else "Autoplay..."
+				await _wait(0.35)
+				if not is_inside_tree():
+					return
+				var opts := engine.bid_options(p)
+				var forced := engine.is_bidding_forced(p)
+				choice = BotAI.bid_choice(engine.hands[p], opts, forced, int(config["difficulty"][p]), bot_rng)
+			var res := engine.place_bid(p, choice)
+			if not res.get("ok", false):
+				continue
+			_announce_bid(p, choice)
+			await _wait(0.45)
+			if not is_inside_tree():
+				return
+		if engine.bidding_void:
+			status_label.text = "Todos passaram — nova mão."
+			trick_label.text = ""
+			await _wait(1.0)
+			if not is_inside_tree():
+				return
+			engine.setup(config)
+			_rebuild_hand()
+			continue
+		break
+	status_label.text = "%s é o Tomador! Contrato: %s" % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract]]
+	trick_label.text = ""
+	await _wait(1.1)
+
+
+func _announce_bid(player: int, choice: int) -> void:
+	trick_label.text = "%s passou." % config["names"][player] if choice == -1 else "%s deu %s!" % [config["names"][player], Scoring.CONTRACT_NAMES[choice]]
+	Sfx.play("tick")
+
+
+func _wait_human_bid() -> int:
+	var opts := engine.bid_options(0)
+	var forced := engine.is_bidding_forced(0)
+	status_label.text = "Sua vez de licitar — olhe sua mão antes de decidir"
+	_show_bid_prompt(opts, forced)
+	var choice: int = await human_bid_chosen
+	return choice
+
+
+func _show_bid_prompt(opts: Array, forced: bool) -> void:
+	var panel := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 14)
+	panel.name = "BidPrompt"
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	panel.add_child(v)
+	v.add_child(UIKit.label("SUA VEZ DE LICITAR", 15, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	v.add_child(row)
+	var first_btn: Button
+	if not forced:
+		var pass_btn := UIKit.button("PASSAR", UIKit.MUTED, 14)
+		pass_btn.pressed.connect(func():
+			panel.queue_free()
+			human_bid_chosen.emit(-1))
+		row.add_child(pass_btn)
+		first_btn = pass_btn
+	for c in opts:
+		var b := UIKit.button(Scoring.CONTRACT_NAMES[c], UIKit.GOLD, 14)
+		b.pressed.connect(func(cc = c):
+			panel.queue_free()
+			human_bid_chosen.emit(cc))
+		row.add_child(b)
+		if first_btn == null:
+			first_btn = b
+	popup_layer.add_child(panel)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	panel.position.y = 130
+	if first_btn:
+		first_btn.grab_focus.call_deferred()
 
 
 # ------------------------------------------------------------------ loop de turnos
@@ -532,8 +640,9 @@ func _abandon() -> void:
 	finished = true
 	match GameState.mode:
 		GameState.Mode.RANKED:
-			var deltas := Scoring.distribute(-25.0, engine.taker, engine.num_players)
-			GameState.report_match({"placement": engine.num_players - 1, "taker": engine.taker, "contract": engine.contract, "success": false, "deltas": deltas})
+			var taker_seat := maxi(engine.taker, 0)
+			var deltas := Scoring.distribute(-25.0, taker_seat, engine.num_players)
+			GameState.report_match({"placement": engine.num_players - 1, "taker": taker_seat, "contract": maxi(engine.contract, 0), "success": false, "deltas": deltas})
 			get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn")
 		_:
 			get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")

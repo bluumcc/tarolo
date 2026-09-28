@@ -41,7 +41,9 @@ func _play(mode: int) -> Dictionary:
 	var total_captured := 0
 	for hand in g.engine.captured:
 		total_captured += (hand as Array).size()
-	check(total_captured == 78, "as 78 cartas foram todas capturadas (tem %d)" % total_captured)
+	# No Garde Contre le Chien, o talão (6 cartas) fica fora da jogada de propósito.
+	var expected := 78 if g.engine.contract != Scoring.Contract.GARDE_CONTRE else 78 - Deck.CHIEN_SIZE
+	check(total_captured == expected, "todas as cartas relevantes foram capturadas (tem %d, esperava %d)" % [total_captured, expected])
 	await get_tree().process_frame
 	g.queue_free()
 	await get_tree().process_frame
