@@ -1,103 +1,50 @@
 class_name Scoring
 extends RefCounted
-## O "coração Balatro": Fichas x Mult de cada vaza.
-## Ordem de aplicação: Fichas (base + Foil + curingas) -> +Mult -> xMult (Polychrome,
-## sinergias, curingas, multiplicador de fase).
+## Pontuação oficial do Jeu de Tarot: o "tomador" precisa somar, nas cartas que capturou
+## (vazas vencidas + talão), um total de pontos que depende de quantos Bouts ele tem.
 
-const BASE_MULT := 1.0
-const MONOPOLY_XMULT := 2.0
-const SEQUENCE_XMULT := 2.5
-const SEQUENCE_MIN_CARDS := 3
+## Quanto mais Bouts o tomador guarda, menos pontos precisa pra bater a meta.
+const TARGET_BY_BOUTS := {0: 56.0, 1: 51.0, 2: 41.0, 3: 36.0}
 
+## Contratos de licitação e seus multiplicadores (Petite/Garde ativos hoje; os outros dois
+## — Garde Sans/Garde Contre le Chien — entram quando a licitação interativa existir).
+enum Contract { PETITE, GARDE, GARDE_SANS, GARDE_CONTRE }
+const CONTRACT_NAMES := ["Petite", "Garde", "Garde Sans", "Garde Contre"]
+const CONTRACT_MULT := {Contract.PETITE: 1, Contract.GARDE: 2, Contract.GARDE_SANS: 4, Contract.GARDE_CONTRE: 6}
 
-## Monopólio de Naipe: todas as cartas da vaza do mesmo naipe (Arcanos quebram o monopólio).
-## `tolerance` = quantas cartas podem destoar (curinga Caos Ordenado = 1).
-static func is_monopoly(cards: Array, tolerance: int = 0) -> bool:
-	if cards.size() < 2:
-		return false
-	var counts := {}
-	for c in cards:
-		var s: int = (c as CardData).suit
-		counts[s] = counts.get(s, 0) + 1
-	var best_suit := -1
-	var best := 0
-	for s in counts.keys():
-		if s != CardData.Suit.ARCANA and counts[s] > best:
-			best = counts[s]
-			best_suit = s
-	if best_suit == -1:
-		return false
-	return cards.size() - best <= tolerance and best >= 2
+## Toda rodada dá um piso de 25 pontos de aposta, que se soma à distância (pra mais ou
+## pra menos) da meta — e só depois é multiplicado pelo contrato.
+const BASE_SCORE := 25.0
 
 
-## Sequência Caótica: valores consecutivos (em qualquer ordem de jogada), ex. 4-5-6-7.
-static func is_sequence(cards: Array) -> bool:
-	if cards.size() < SEQUENCE_MIN_CARDS:
-		return false
-	var ranks: Array = []
-	for c in cards:
-		if (c as CardData).is_arcana():
-			return false
-		ranks.append((c as CardData).rank)
-	ranks.sort()
-	for i in range(1, ranks.size()):
-		if ranks[i] != ranks[i - 1] + 1:
-			return false
-	return true
+static func target_for_bouts(bouts: int) -> float:
+	return TARGET_BY_BOUTS[clampi(bouts, 0, 3)]
 
 
-## Avalia a pontuação de uma vaza para quem a venceu.
-## `winner_card` = carta que venceu; `jokers` = ids dos curingas do vencedor.
-static func evaluate(cards: Array, winner_card: CardData, jokers: Array = [], stage_mult: float = 1.0) -> Dictionary:
-	var chips := 0
-	var add_mult := BASE_MULT
-	var x_mult := 1.0
-	var synergies: Array = []
-	var modified := 0
-
-	var foil_bonus := CardData.FOIL_CHIPS * (2 if jokers.has("espelho") else 1)
-	var poly_x := 3.0 if jokers.has("prisma") else CardData.POLY_XMULT
-
-	for c in cards:
-		var card: CardData = c
-		chips += card.base_chips()
-		if card.is_arcana() and jokers.has("eclipse"):
-			chips += 30
-		if card.rank == 1 and not card.is_arcana() and jokers.has("as_oculto"):
-			chips += 25
-		if card.suit == CardData.Suit.COPAS and jokers.has("copas_sangrentas"):
-			add_mult += 3
-		match card.modifier:
-			CardData.Modifier.FOIL:
-				chips += foil_bonus
-				modified += 1
-			CardData.Modifier.POLYCHROME:
-				x_mult *= poly_x
-				modified += 1
-
-	if jokers.has("mesa_cheia"):
-		chips += 8 * cards.size()
-	if jokers.has("louco"):
-		add_mult += 4
-
-	if is_monopoly(cards, 1 if jokers.has("caos") else 0):
-		x_mult *= MONOPOLY_XMULT
-		synergies.append("Monopólio de Naipe")
-	if is_sequence(cards):
-		x_mult *= 3.5 if jokers.has("escada_ceu") else SEQUENCE_XMULT
-		synergies.append("Sequência Caótica")
-	if jokers.has("monarca") and winner_card != null and not winner_card.is_arcana() and winner_card.rank == 13:
-		x_mult *= 1.5
-		synergies.append("Monarca")
-	if jokers.has("torre") and modified >= 2:
-		x_mult *= 2.0
-		synergies.append("A Torre")
-
-	x_mult *= stage_mult
-	var mult := add_mult * x_mult
+## `taker_points` = soma de `CardData.points()` de tudo que o tomador capturou
+## (vazas vencidas + talão). `bouts` = quantos dos 3 Bouts estão nesse total.
+static func resolve(taker_points: float, bouts: int, contract: int = Contract.PETITE) -> Dictionary:
+	var target := target_for_bouts(bouts)
+	var margin := taker_points - target
+	var success := margin >= 0.0
+	var mult: int = CONTRACT_MULT[clampi(contract, 0, 3)]
+	var score := (BASE_SCORE + absf(margin)) * mult
+	if not success:
+		score = -score
 	return {
-		"chips": chips,
-		"mult": mult,
-		"total": int(round(chips * mult)),
-		"synergies": synergies,
+		"target": target,
+		"margin": margin,
+		"success": success,
+		"score": score,
+		"contract": contract,
+		"contract_mult": mult,
 	}
+
+
+## Delta de pontos pra cada assento: o tomador ganha/perde `score` de cada um dos outros
+## 3 (ou perde/ganha, se o contrato falhou — o sinal já vem certo de `resolve`).
+static func distribute(score: float, taker: int, players: int = 4) -> Array:
+	var deltas: Array = []
+	for p in range(players):
+		deltas.append(int(round(-score)) if p != taker else int(round(score * (players - 1))))
+	return deltas

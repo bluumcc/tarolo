@@ -1,6 +1,7 @@
 extends Node
-## Smoke test das cenas com autoloads: abre menus/loja/lobby e joga partidas completas em
-## autoplay nos três modos. Uso: godot --headless --path . res://tests/Smoke.tscn
+## Smoke test das cenas com autoloads: abre o menu e o lobby, e joga rodadas completas
+## de Tarot Vanilla em autoplay nos modos Vanilla e Ranqueado.
+## Uso: godot --headless --path . res://tests/Smoke.tscn
 
 const GAME := preload("res://scenes/GameScene.tscn")
 
@@ -37,6 +38,10 @@ func _play(mode: int) -> Dictionary:
 	add_child(g)
 	var summary: Dictionary = await g.match_finished
 	check(g.engine.is_round_over(), "partida terminou")
+	var total_captured := 0
+	for hand in g.engine.captured:
+		total_captured += (hand as Array).size()
+	check(total_captured == 78, "as 78 cartas foram todas capturadas (tem %d)" % total_captured)
 	await get_tree().process_frame
 	g.queue_free()
 	await get_tree().process_frame
@@ -51,36 +56,17 @@ func _run() -> void:
 	await get_tree().process_frame
 	menu.queue_free()
 
-	var s := await _play(GameState.Mode.CLASSIC)
-	check(int(SaveManager.section("profile")["matches"]) == 1, "clássico contabilizado")
-	print("Clássico: %dº lugar" % (int(s["placement"]) + 1))
-
-	GameState.start_arcade_run()
-	var stages := 0
-	for i in range(6):
-		s = await _play(GameState.Mode.ARCADE)
-		if not s["won"]:
-			break
-		stages += 1
-		var shop := await _open("res://scenes/Shop.tscn")
-		GameState.run()["gold"] = 50
-		shop._render()
-		await get_tree().process_frame
-		if not shop.offers_jokers.is_empty():
-			shop._buy_joker(shop.offers_jokers[0], 1)
-		if not shop.offers_cards.is_empty():
-			shop._buy_card(0)
-		shop.queue_free()
-		await get_tree().process_frame
-	print("Arcade: %d fases superadas, curingas %s" % [stages, GameState.run().get("jokers", [])])
-	check(stages == 6 or not GameState.has_run(), "run encerrada ao perder")
+	for i in range(8):
+		var s := await _play(GameState.Mode.CLASSIC)
+		print("Vanilla %d: %dº lugar · %s" % [i + 1, int(s["placement"]) + 1, " | ".join(s["lines"])])
+	check(int(SaveManager.section("profile")["matches"]) == 8, "vanilla contabilizado (%d)" % int(SaveManager.section("profile")["matches"]))
 
 	var lobby := await _open("res://scenes/RankedLobby.tscn")
 	lobby.queue_free()
-	for i in range(5):
+	for i in range(6):
 		GameState.find_ranked_lobby()
-		s = await _play(GameState.Mode.RANKED)
-		print("Ranqueado: %dº · %s" % [int(s["placement"]) + 1, " | ".join(s["lines"])])
-	check((GameState.ranked()["history"] as Array).size() == 5, "histórico ranqueado")
+		var s := await _play(GameState.Mode.RANKED)
+		print("Ranqueado %d: %dº · %s" % [i + 1, int(s["placement"]) + 1, " | ".join(s["lines"])])
+	check((GameState.ranked()["history"] as Array).size() == 6, "histórico ranqueado")
 	lobby = await _open("res://scenes/RankedLobby.tscn")
 	lobby.queue_free()

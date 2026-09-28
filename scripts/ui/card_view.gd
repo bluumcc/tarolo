@@ -11,9 +11,6 @@ const SIZE := Vector2(96, 138)
 const DRAG_PLAY_DISTANCE := 70.0
 const LONG_PRESS := 0.45
 
-const FOIL_SHADER := preload("res://shaders/foil.gdshader")
-const HOLO_SHADER := preload("res://shaders/holo.gdshader")
-
 var data: CardData
 var face_up := true
 var playable := false
@@ -32,9 +29,8 @@ var _lift_tween: Tween
 @onready var suit_small: Label = $Body/Margin/VBox/Top/Suit
 @onready var center_label: Label = $Body/Margin/VBox/Center
 @onready var name_label: Label = $Body/Margin/VBox/Name
-@onready var chips_label: Label = $Body/Margin/VBox/Bottom/Chips
-@onready var mod_label: Label = $Body/Margin/VBox/Bottom/Mod
-@onready var sheen: ColorRect = $Body/Sheen
+@onready var points_label: Label = $Body/Margin/VBox/Bottom/Points
+@onready var bout_label: Label = $Body/Margin/VBox/Bottom/Bout
 
 
 func _ready() -> void:
@@ -42,7 +38,7 @@ func _ready() -> void:
 	size = SIZE
 	pivot_offset = SIZE / 2.0
 	body.pivot_offset = SIZE / 2.0
-	for n in [rank_label, suit_small, center_label, name_label, chips_label, mod_label]:
+	for n in [rank_label, suit_small, center_label, name_label, points_label, bout_label]:
 		(n as Label).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mouse_entered.connect(_on_hover.bind(true))
 	mouse_exited.connect(_on_hover.bind(false))
@@ -75,8 +71,6 @@ func set_selected(value: bool) -> void:
 func _refresh() -> void:
 	if data == null:
 		return
-	var color: Color = UIKit.SUIT_COLORS[data.suit]
-	sheen.visible = false
 	if not face_up:
 		var back_id := str(SaveManager.section("cosmetics")["equipped"])
 		var back_col := Color(UIKit.CARD_BACKS.get(back_id, UIKit.CARD_BACKS["noite"])["color"])
@@ -86,9 +80,10 @@ func _refresh() -> void:
 		center_label.text = "✶"
 		center_label.add_theme_color_override("font_color", UIKit.GOLD)
 		name_label.text = ""
-		chips_label.text = ""
-		mod_label.text = ""
+		points_label.text = ""
+		bout_label.text = ""
 		return
+	var color: Color = UIKit.SUIT_COLORS[data.suit]
 	_refresh_border()
 	rank_label.text = data.rank_label()
 	rank_label.add_theme_color_override("font_color", color)
@@ -96,39 +91,29 @@ func _refresh() -> void:
 	suit_small.add_theme_color_override("font_color", color)
 	center_label.text = data.suit_symbol()
 	center_label.add_theme_color_override("font_color", color)
-	name_label.text = CardData.MAJOR_ARCANA[data.rank] if data.is_arcana() else ""
-	chips_label.text = "+%d" % data.base_chips()
-	chips_label.add_theme_color_override("font_color", UIKit.CHIPS)
-	match data.modifier:
-		CardData.Modifier.FOIL:
-			mod_label.text = "FOIL"
-			mod_label.add_theme_color_override("font_color", Color("#CFF4FF"))
-			_set_sheen(FOIL_SHADER)
-		CardData.Modifier.POLYCHROME:
-			mod_label.text = "POLY"
-			mod_label.add_theme_color_override("font_color", Color("#FFB3F0"))
-			_set_sheen(HOLO_SHADER)
-		_:
-			mod_label.text = ""
+	name_label.text = data.display_name() if (data.is_louco() or (data.is_trunfo() and data.is_bout())) else ""
+	points_label.text = "%s pts" % UIKit.fmt_dec(data.points(), 1)
+	points_label.add_theme_color_override("font_color", UIKit.MUTED)
+	bout_label.text = "BOUT" if data.is_bout() else ""
+	bout_label.add_theme_color_override("font_color", UIKit.GOLD)
 
 
 func _refresh_border() -> void:
 	if data == null or not face_up:
 		return
 	var border := UIKit.BLACK
-	if data.is_arcana():
-		border = UIKit.SUIT_COLORS[CardData.Suit.ARCANA]
+	var bg := Color("#15122A")
+	if data.is_louco():
+		border = UIKit.SUIT_COLORS[CardData.Suit.LOUCO]
+		bg = Color("#241a33")
+	elif data.is_trunfo():
+		border = UIKit.SUIT_COLORS[CardData.Suit.TRUNFO]
+		bg = Color("#221436")
+	if data.is_bout():
+		border = UIKit.GOLD
 	if selected:
 		border = UIKit.GOLD
-	var bg := Color("#15122A") if not data.is_arcana() else Color("#221436")
 	body.add_theme_stylebox_override("panel", UIKit.box(bg, border, 4 if selected else 3, 6, 6))
-
-
-func _set_sheen(shader: Shader) -> void:
-	var mat := ShaderMaterial.new()
-	mat.shader = shader
-	sheen.material = mat
-	sheen.visible = true
 
 
 # ------------------------------------------------------------------ input
@@ -206,13 +191,9 @@ func describe() -> String:
 	if data == null:
 		return ""
 	var lines: Array = [data.display_name()]
-	if data.is_arcana():
-		lines.append("Arcano Maior · vale %d · pode ser jogado sobre qualquer naipe e vence a vaza." % CardData.ARCANA_VALUE)
-	else:
-		lines.append("%d Fichas base" % data.base_chips())
-	match data.modifier:
-		CardData.Modifier.FOIL:
-			lines.append("FOIL: +%d Fichas" % CardData.FOIL_CHIPS)
-		CardData.Modifier.POLYCHROME:
-			lines.append("POLYCHROME: x%s Mult" % UIKit.fmt_dec(CardData.POLY_XMULT, 1))
+	lines.append("%s pontos" % UIKit.fmt_dec(data.points(), 1))
+	if data.is_bout():
+		lines.append("Bout — uma das 3 cartas mais valiosas do jogo.")
+	elif data.is_trunfo():
+		lines.append("Trunfo — sempre vence carta de naipe comum.")
 	return "\n".join(lines)

@@ -2,6 +2,24 @@
 
 > Nome provisório. Título original do documento: *Tarot Arena: Chaos Edition*.
 
+> **Status atual (pivô de arquitetura):** o jogo passou a ter dois modos de regras
+> claramente separados, ambos sobre o **baralho real do Jeu de Tarot (78 cartas)**:
+> - **Vanilla** — o jogo de vazas clássico: 4 naipes de 14 cartas, 21 Trunfos, O Louco,
+>   obrigação de seguir naipe/cortar/cobrir com Trunfo, Tomador vs Defesa, pontuação por
+>   Bouts (implementado). Cada jogador recebe 18 cartas + talão de 6. **Falta**: licitação
+>   interativa (hoje o Tomador é escolhido automaticamente pela força da mão — isso deixa
+>   o Tomador perdendo com frequência maior que o ideal, porque ele não pode recusar uma
+>   mão fraca) e os bônus raros (Poignée, Chelem, Petit au bout).
+> - **Caos** — a camada dinâmica (Energia, Cartas de Ruptura, Curingas, Fôlego para
+>   viradas), mão de 8 cartas do mesmo baralho de 78. **Ainda não implementado**
+>   (o antigo protótipo com Foil/Polychrome/52 cartas foi removido nessa reescrita).
+> - Apostas com Fichas fictícias (buy-in por mesa, payout 65/25/10 de rake) valem só pro
+>   Vanilla — ainda não implementadas.
+>
+> O texto abaixo é o brief criativo original (Balatro-esque, baralho de 52+4 Arcanos) que
+> deu origem ao projeto; várias seções (Loja Arcana, Foil/Polychrome, Arcade) descrevem o
+> protótipo anterior e serão revisadas para refletir o Caos de verdade.
+
 ## 1. Visão Geral
 - **Gênero:** Roguelike Deckbuilder / Card Battler tático de vazas, com sinergias, matemática de combos, gestão de recursos e alta rejogabilidade (Balatro + a competitividade de Hearthstone/LoL).
 - **Plataformas:** PC (Steam — Windows/macOS) e Mobile (iOS/Android).

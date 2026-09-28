@@ -26,33 +26,21 @@ func _ready() -> void:
 
 	var title := UIKit.label("TAROLO", 64, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	col.add_child(title)
-	var sub := UIKit.label("— ROGUELIKE DE VAZAS —", 20, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	var sub := UIKit.label("— JOGO DE VAZAS —", 20, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	col.add_child(sub)
 	col.add_child(_spacer(12))
 
-	var classic := UIKit.button("MODO CLÁSSICO")
+	var classic := UIKit.button("MODO VANILLA")
 	classic.pressed.connect(func():
 		GameState.mode = GameState.Mode.CLASSIC
 		get_tree().change_scene_to_file("res://scenes/GameScene.tscn"))
 	col.add_child(classic)
-	col.add_child(_caption("Vazas com regras fechadas, sem caos."))
+	col.add_child(_caption("Tarot clássico: baralho de 78 cartas, trunfo e O Louco."))
 
-	if GameState.has_run():
-		var r := GameState.run()
-		var cont := UIKit.button("ARCADE · CONTINUAR (FASE %d)" % int(r["stage"]), UIKit.OK)
-		cont.pressed.connect(func():
-			GameState.mode = GameState.Mode.ARCADE
-			get_tree().change_scene_to_file("res://scenes/GameScene.tscn"))
-		col.add_child(cont)
-	var arcade := UIKit.button("ARCADE · NOVA RUN" if GameState.has_run() else "MODO ARCADE")
-	arcade.pressed.connect(func():
-		if GameState.has_run():
-			GameState.abandon_run()
-		GameState.start_arcade_run()
-		get_tree().change_scene_to_file("res://scenes/GameScene.tscn"))
+	var arcade := UIKit.button("MODO CAOS (em construção)", UIKit.MUTED)
+	arcade.disabled = true
 	col.add_child(arcade)
-	var best := int(SaveManager.section("arcade")["best_stage"])
-	col.add_child(_caption("Roguelike: vença o Chefe de cada fase. Recorde: fase %d." % best))
+	col.add_child(_caption("Combos, modificadores e viradas — chegando na próxima fase."))
 
 	var rk := GameState.ranked()
 	var tier := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
@@ -263,14 +251,12 @@ func _reopen_cosmetics() -> void:
 
 func _open_rules() -> void:
 	var v := _modal("COMO JOGAR")
-	var text := """• Baralho de 52 cartas (Ouros, Paus, Copas, Espadas, Ás a Rei) + 4 Arcanos Maiores. Cada jogador recebe 14 cartas.
-• O Ás vale 1: é a menor carta do naipe.
-• Quem abre a vaza define o naipe líder. Os demais devem segui-lo se puderem; sem o naipe, jogam qualquer carta.
-• Arcanos Maiores (valor 15) podem ser jogados a qualquer momento, ignorando o naipe, e vencem a vaza (o primeiro jogado prevalece).
-• Quem vence a vaza marca Fichas × Mult de todas as cartas da mesa.
-• Monopólio de Naipe (todas do mesmo naipe): x2 Mult. Sequência Caótica (valores consecutivos): x2,5 Mult.
-• Foil: +50 Fichas. Polychrome: x2 Mult.
-• Arcade: supere o Chefe (☠) no placar para avançar e gaste Ouro na Loja Arcana.
+	var text := """• Baralho de 78 cartas: 4 naipes de 14 (Ás a Rei, com Cavaleiro entre Valete e Dama), 21 Trunfos e O Louco.
+• Dentro do naipe, Ás é a carta mais baixa; sobe até Rei. Trunfo sempre vence naipe comum; entre trunfos, vence o maior número.
+• Obrigado a seguir o naipe líder. Sem ele, é obrigado a jogar Trunfo — e se alguém já cortou, precisa cobrir com um Trunfo maior, se tiver.
+• O Louco pode ser jogado a qualquer momento, nunca vence a vaza, mas o dono guarda os pontos dele.
+• Le Petit (trunfo 1), Le Monde (trunfo 21) e O Louco são os 3 Bouts — as cartas mais valiosas do jogo.
+• Quem tem a mão mais forte vira o Tomador e joga sozinho contra os outros 3. No fim, some os pontos que capturou: precisa de 56 pts com 0 Bouts, 51 com 1, 41 com 2 ou 36 com 3 pra vencer a rodada.
 • Ranqueado: sua colocação entre 4 jogadores define LP e MMR."""
 	var l := UIKit.label(text, 15, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

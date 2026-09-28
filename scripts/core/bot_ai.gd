@@ -1,7 +1,7 @@
 class_name BotAI
 extends RefCounted
-## IA dos bots. Fácil = aleatório legal; Normal = heurística gulosa; Difícil = gulosa
-## com gestão de Arcanos e leitura do valor da vaza.
+## IA dos bots. `TrickRules.legal_cards` já garante seguir naipe / cortar / cobrir com
+## Trunfo — o bot só decide qual carta legal jogar.
 
 enum Difficulty { EASY, NORMAL, HARD }
 
@@ -15,54 +15,34 @@ static func choose(hand: Array, plays: Array, player: int, num_players: int, dif
 	if difficulty == Difficulty.EASY:
 		return legal[rng.randi_range(0, legal.size() - 1)]
 
-	var numeric := legal.filter(func(c: CardData) -> bool: return not c.is_arcana())
-	var arcana := legal.filter(func(c: CardData) -> bool: return c.is_arcana())
+	var louco := legal.filter(func(c: CardData) -> bool: return c.is_louco())
+	var real := legal.filter(func(c: CardData) -> bool: return not c.is_louco())
 
-	# Abrindo a vaza: puxa a carta mais forte do naipe mais longo (força os outros a gastar).
 	if plays.is_empty():
-		if numeric.is_empty():
-			return arcana[0]
-		var suit_len := {}
-		for c in numeric:
-			suit_len[c.suit] = suit_len.get(c.suit, 0) + 1
-		numeric.sort_custom(func(a: CardData, b: CardData) -> bool:
-			if suit_len[a.suit] != suit_len[b.suit]:
-				return suit_len[a.suit] > suit_len[b.suit]
-			return a.rank > b.rank)
-		if difficulty == Difficulty.NORMAL and rng.randf() < 0.25:
-			return numeric[rng.randi_range(0, numeric.size() - 1)]
-		return numeric[0]
+		# Abrindo a vaza: evita gastar Bouts ou Trunfos altos à toa.
+		var safe := real.filter(func(c: CardData) -> bool: return not c.is_trunfo() and not c.is_bout())
+		var pool: Array = safe if not safe.is_empty() else real
+		pool.sort_custom(func(a: CardData, b: CardData) -> bool: return a.rank < b.rank)
+		if pool.is_empty():
+			return louco[0]
+		if difficulty == Difficulty.NORMAL and rng.randf() < 0.2:
+			return pool[rng.randi_range(0, pool.size() - 1)]
+		return pool[0]
 
 	var is_last := plays.size() == num_players - 1
-	var table_chips := 0
-	for p in plays:
-		table_chips += (p["card"] as CardData).base_chips()
-		if (p["card"] as CardData).modifier != CardData.Modifier.NONE:
-			table_chips += 40
+	var winning := real.filter(func(c: CardData) -> bool: return TrickRules.would_win(c, player, plays))
+	winning.sort_custom(func(a: CardData, b: CardData) -> bool: return a.rank < b.rank)
 
-	var winning_numeric := numeric.filter(func(c: CardData) -> bool: return TrickRules.would_win(c, player, plays))
-	winning_numeric.sort_custom(func(a: CardData, b: CardData) -> bool: return a.rank < b.rank)
+	if not winning.is_empty():
+		# Último a jogar: vence com o mínimo necessário. Senão, garante com o máximo.
+		return winning[0] if is_last else winning[winning.size() - 1]
 
-	if not winning_numeric.is_empty():
-		# Último a jogar: vence com a menor carta suficiente. Senão, garante com a maior.
-		return winning_numeric[0] if is_last else winning_numeric[winning_numeric.size() - 1]
+	if real.is_empty():
+		return louco[0]
 
-	# Não dá para vencer com carta numérica: decide se gasta um Arcano.
-	var arcana_on_table := plays.any(func(p) -> bool: return (p["card"] as CardData).is_arcana())
-	if not arcana.is_empty() and not arcana_on_table:
-		var threshold := 30 if difficulty == Difficulty.HARD else 20
-		var spend := table_chips >= threshold or (is_last and difficulty == Difficulty.HARD and table_chips >= 18)
-		if difficulty == Difficulty.NORMAL and rng.randf() < 0.2:
-			spend = true
-		if spend or numeric.is_empty():
-			return arcana[0]
-
-	# Descarta a carta mais fraca (sem jogar fora cartas modificadas se puder).
-	var pool := numeric if not numeric.is_empty() else legal
-	pool.sort_custom(func(a: CardData, b: CardData) -> bool:
-		var am := 1 if a.modifier != CardData.Modifier.NONE else 0
-		var bm := 1 if b.modifier != CardData.Modifier.NONE else 0
-		if am != bm and difficulty == Difficulty.HARD:
-			return am < bm
-		return a.rank < b.rank)
+	# Não dá pra vencer: descarta a carta mais fraca, evitando jogar um Bout fora à toa.
+	var pool: Array = real.filter(func(c: CardData) -> bool: return not c.is_bout())
+	if pool.is_empty():
+		pool = real
+	pool.sort_custom(func(a: CardData, b: CardData) -> bool: return a.rank < b.rank)
 	return pool[0]

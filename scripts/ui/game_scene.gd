@@ -1,5 +1,5 @@
 extends Control
-## GameScene.tscn — mesa polivalente (Clássico, Arcade e Ranqueado).
+## GameScene.tscn — mesa de Tarot Vanilla (Clássico e Ranqueado usam a mesma mesa).
 ## Assentos: 0 = jogador (baixo), 1 = esquerda, 2 = topo, 3 = direita (sentido horário).
 
 signal human_card_chosen(card: CardData)
@@ -16,16 +16,15 @@ var finished := false
 var paused := false
 
 var hud_badges: Array = []       # PanelContainer por jogador
-var hud_scores: Array = []       # Label
-var hud_tricks: Array = []       # Label
+var hud_points: Array = []       # Label — pontos capturados até agora (provisório)
+var hud_tricks: Array = []       # Label — vazas vencidas / colocação
 var seat_labels: Array = []      # Label de mão dos bots (contagem de cartas)
 var table_center: Control
 var table_area: Control
 var hand_container: HBoxContainer
 var status_label: Label
-var combo_label: Label
+var trick_label: Label           # resultado transitório da última vaza
 var info_label: Label
-var joker_bar: HBoxContainer
 var popup_layer: Control
 var overlay_layer: Control
 var table_views: Array = []
@@ -64,27 +63,27 @@ func _build_ui() -> void:
 	hud.add_theme_constant_override("v_separation", 8)
 	root.add_child(hud)
 	for p in range(engine.num_players):
-		var accent := UIKit.GOLD if p == 0 else (UIKit.DANGER if p == config["boss_seat"] else UIKit.MUTED)
+		var accent := UIKit.GOLD if p == engine.taker else UIKit.MUTED
 		var badge := UIKit.panel(UIKit.PURPLE_DEEP, accent, 8)
-		badge.custom_minimum_size = Vector2(150, 0)
+		badge.custom_minimum_size = Vector2(160, 0)
 		var v := VBoxContainer.new()
 		v.add_theme_constant_override("separation", 0)
 		badge.add_child(v)
 		var title := str(config["names"][p])
-		if p == config["boss_seat"]:
-			title = "☠ " + title
+		if p == engine.taker:
+			title = "♛ " + title
 		v.add_child(UIKit.label(title.to_upper(), 13, accent))
-		var sc := UIKit.label("0", 24, UIKit.INK)
-		v.add_child(sc)
+		var pts := UIKit.label("0,0 pts", 22, UIKit.INK)
+		v.add_child(pts)
 		var tr := UIKit.label("0 vazas", 12, UIKit.MUTED)
 		v.add_child(tr)
 		hud.add_child(badge)
 		hud_badges.append(badge)
-		hud_scores.append(sc)
+		hud_points.append(pts)
 		hud_tricks.append(tr)
 
 	var info_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BLACK, 8)
-	info_label = UIKit.label("", 14, UIKit.INK)
+	info_label = UIKit.label("", 13, UIKit.INK)
 	info_box.add_child(info_label)
 	hud.add_child(info_box)
 
@@ -92,18 +91,6 @@ func _build_ui() -> void:
 	menu_btn.custom_minimum_size = Vector2(52, 52)
 	menu_btn.pressed.connect(_open_pause)
 	hud.add_child(menu_btn)
-
-	# Curingas (Arcade) ------------------------------------------------
-	joker_bar = HBoxContainer.new()
-	joker_bar.add_theme_constant_override("separation", 6)
-	root.add_child(joker_bar)
-	for id in config["jokers"]:
-		var j := Jokers.info(id)
-		var chip := UIKit.panel(UIKit.PURPLE, UIKit.GOLD, 6)
-		chip.add_child(UIKit.label("🃏 " + str(j["name"]), 12, UIKit.GOLD))
-		chip.tooltip_text = str(j["desc"])
-		joker_bar.add_child(chip)
-	joker_bar.visible = joker_bar.get_child_count() > 0
 
 	# Mesa -------------------------------------------------------------
 	table_area = Control.new()
@@ -123,8 +110,8 @@ func _build_ui() -> void:
 		table_area.add_child(l)
 		seat_labels.append(l)
 
-	combo_label = UIKit.label("", 16, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	root.add_child(combo_label)
+	trick_label = UIKit.label("", 16, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	root.add_child(trick_label)
 
 	status_label = UIKit.label("", 18, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	root.add_child(status_label)
@@ -228,22 +215,28 @@ func _rebuild_hand() -> void:
 
 
 func _refresh_hud() -> void:
-	var standings := engine.standings()
+	var trick_wins := []
 	for p in range(engine.num_players):
-		(hud_scores[p] as Label).text = UIKit.fmt_int(int(engine.scores[p]))
-		(hud_tricks[p] as Label).text = "%d vazas · %dº" % [engine.tricks_won[p], standings.find(p) + 1]
+		trick_wins.append(0)
+	for t in engine.history:
+		trick_wins[int(t["winner"])] += 1
+	for p in range(engine.num_players):
+		(hud_points[p] as Label).text = "%s pts" % UIKit.fmt_dec(engine.points_of(p), 1)
+		(hud_tricks[p] as Label).text = "%d vazas" % trick_wins[p]
 		var turn := p == engine.current and not engine.is_round_over()
 		(hud_badges[p] as PanelContainer).modulate = Color(1, 1, 1, 1) if turn else Color(0.78, 0.76, 0.85, 1)
 		if p > 0:
 			(seat_labels[p] as Label).text = "%s · %d cartas" % [config["names"][p], (engine.hands[p] as Array).size()]
 	var mode_name: String = GameState.MODE_NAMES[GameState.mode]
-	var extra := ""
-	if GameState.mode == GameState.Mode.ARCADE:
-		var r := GameState.run()
-		extra = "  ·  Fase %d  ·  Ouro %d (+%d)" % [int(r["stage"]), int(r["gold"]), engine.gold_earned]
-	elif GameState.mode == GameState.Mode.RANKED:
+	var bouts_now := 0
+	for c in engine.captured[engine.taker]:
+		if (c as CardData).is_bout():
+			bouts_now += 1
+	var target := Scoring.target_for_bouts(bouts_now)
+	var extra := "  ·  Tomador: %s (%s)  ·  Meta: %s pts" % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract], UIKit.fmt_dec(target, 1)]
+	if GameState.mode == GameState.Mode.RANKED:
 		var t := Ranked.tier_info(int(GameState.ranked()["points"]), int(GameState.ranked()["mmr"]))
-		extra = "  ·  %s" % t["label"]
+		extra += "  ·  %s" % t["label"]
 	info_label.text = "%s  ·  Vaza %d/%d%s" % [mode_name.to_upper(), mini(engine.trick_number + 1, engine.total_tricks), engine.total_tricks, extra]
 
 
@@ -291,8 +284,10 @@ func _wait_human() -> CardData:
 	var ls := TrickRules.lead_suit(engine.plays)
 	if ls == -1:
 		status_label.text = "Sua vez — abra a vaza"
+	elif ls == CardData.Suit.TRUNFO:
+		status_label.text = "Sua vez — precisa cobrir com Trunfo maior, se tiver"
 	else:
-		status_label.text = "Sua vez — siga %s (ou jogue um Arcano)" % CardData.SUIT_NAMES[ls]
+		status_label.text = "Sua vez — siga %s (ou corte com Trunfo, ou jogue O Louco)" % CardData.SUIT_NAMES[ls]
 	_rebuild_hand()
 	var card: CardData = await human_card_chosen
 	human_turn = false
@@ -302,7 +297,7 @@ func _wait_human() -> CardData:
 func _on_card_tapped(view: CardView) -> void:
 	if not human_turn or not view.playable:
 		if human_turn and not view.playable:
-			status_label.text = "Você precisa seguir o naipe líder."
+			status_label.text = "Jogada ilegal — você é obrigado a seguir o naipe ou cortar com Trunfo."
 		return
 	if view.selected:
 		_on_card_play(view)
@@ -351,7 +346,7 @@ func _animate_play(player: int, card: CardData, from: Vector2) -> void:
 
 func _resolve_trick(result: Dictionary) -> void:
 	var winner: int = result["winner"]
-	var ev: Dictionary = result["eval"]
+	var points: float = result["points"]
 	var win_view: CardView
 	for v in table_views:
 		if int(v["player"]) == winner:
@@ -365,20 +360,11 @@ func _resolve_trick(result: Dictionary) -> void:
 		pulse.tween_property(win_view, "scale", Vector2(1.18, 1.18), GameState.anim(0.12))
 		pulse.tween_property(win_view, "scale", Vector2(1.08, 1.08), GameState.anim(0.12))
 
-	var syn: Array = ev["synergies"]
-	if not syn.is_empty():
-		combo_label.text = "✶ " + "  +  ".join(syn).to_upper() + " ✶"
-		Sfx.play("combo")
-		var flash := create_tween()
-		combo_label.scale = Vector2(1.3, 1.3)
-		combo_label.pivot_offset = combo_label.size / 2.0
-		flash.tween_property(combo_label, "scale", Vector2.ONE, GameState.anim(0.3)).set_trans(Tween.TRANS_BACK)
-	else:
-		combo_label.text = ""
+	trick_label.text = "%s venceu a vaza · +%s pts" % [str(config["names"][winner]).to_upper(), UIKit.fmt_dec(points, 1)]
+	Sfx.play("chip")
 
-	_float_score(winner, ev)
-	await _count_up(winner, int(engine.scores[winner]) - int(ev["total"]), int(engine.scores[winner]))
-	await _wait(0.55)
+	_float_points(winner, points)
+	await _wait(0.75)
 	if not is_inside_tree():
 		return
 
@@ -393,41 +379,25 @@ func _resolve_trick(result: Dictionary) -> void:
 	for v in table_views:
 		(v["view"] as CardView).queue_free()
 	table_views.clear()
+	trick_label.text = ""
 	_refresh_hud()
 
 
-func _float_score(winner: int, ev: Dictionary) -> void:
-	var l := UIKit.label("+%s" % UIKit.fmt_int(int(ev["total"])), 34, UIKit.GOLD if winner == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	var detail := UIKit.label("%s Fichas × %s Mult" % [UIKit.fmt_int(int(ev["chips"])), UIKit.fmt_dec(float(ev["mult"]), 1)], 15, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+func _float_points(winner: int, points: float) -> void:
+	var l := UIKit.label("+%s pts" % UIKit.fmt_dec(points, 1), 30, UIKit.GOLD if winner == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	var box := PanelContainer.new()
-	box.add_theme_stylebox_override("panel", UIKit.box(Color(0.03, 0.03, 0.07, 0.85), UIKit.GOLD if winner == 0 else UIKit.PURPLE, 2, 4, 8))
-	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 0)
-	col.add_child(l)
-	col.add_child(detail)
-	box.add_child(col)
+	box.add_theme_stylebox_override("panel", UIKit.box(Color(0.03, 0.03, 0.07, 0.85), UIKit.GOLD if winner == 0 else UIKit.PURPLE, 2, 4, 10))
+	box.add_child(l)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	popup_layer.add_child(box)
-	box.size = Vector2(260, 80)
+	box.size = Vector2(160, 50)
 	box.global_position = table_center.global_position + table_center.size / 2.0 - box.size / 2.0
 	box.modulate.a = 0.0
 	var tw := create_tween()
 	tw.tween_property(box, "modulate:a", 1.0, GameState.anim(0.12))
-	tw.parallel().tween_property(box, "position:y", box.position.y - 40.0, GameState.anim(0.9)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(box, "modulate:a", 0.0, GameState.anim(0.3))
+	tw.parallel().tween_property(box, "position:y", box.position.y - 30.0, GameState.anim(0.75)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(box, "modulate:a", 0.0, GameState.anim(0.25))
 	tw.tween_callback(box.queue_free)
-
-
-## Contador de pontos rolando (batidas de ficha de cassino).
-func _count_up(player: int, from: int, to: int) -> void:
-	var steps := 8
-	for i in range(1, steps + 1):
-		if not is_inside_tree():
-			return
-		(hud_scores[player] as Label).text = UIKit.fmt_int(from + (to - from) * i / steps)
-		if i % 2 == 0:
-			Sfx.play("chip", 1.0 + i * 0.03)
-		await _wait(0.035)
 
 
 # ------------------------------------------------------------------ fim de partida
@@ -437,59 +407,61 @@ func _finish_match() -> void:
 		return
 	finished = true
 	_refresh_hud()
+	var r := engine.result
 	var placement := engine.placement_of(0)
 	var result := {
 		"placement": placement,
-		"scores": engine.scores.duplicate(),
-		"tricks_won": engine.tricks_won.duplicate(),
-		"gold_earned": engine.gold_earned,
+		"taker": r["taker"],
+		"contract": r["contract"],
+		"success": r["success"],
+		"deltas": r["deltas"],
 	}
-	var boss := int(config["boss_seat"])
-	if boss >= 0:
-		result["beat_boss"] = int(engine.scores[0]) > int(engine.scores[boss])
 	var summary := GameState.report_match(result)
 	Sfx.play("win" if summary["won"] else "lose")
 	status_label.text = ""
-	_show_results(summary)
+	_show_results(summary, r)
 	match_finished.emit(summary)
 
 
-func _show_results(summary: Dictionary) -> void:
+func _show_results(summary: Dictionary, r: Dictionary) -> void:
 	var ov := UIKit.overlay()
 	overlay_layer.add_child(ov)
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD if summary["won"] else UIKit.DANGER, 24)
-	box.custom_minimum_size = Vector2(380, 0)
+	box.custom_minimum_size = Vector2(400, 0)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	box.add_child(v)
-	var title := "VITÓRIA" if summary["won"] else "DERROTA"
-	if GameState.mode == GameState.Mode.ARCADE:
-		title = "FASE SUPERADA" if summary["won"] else "RUN ENCERRADA"
-	elif GameState.mode == GameState.Mode.RANKED:
+	var title := "TOMADOR BATEU A META" if r["success"] else "TOMADOR NÃO BATEU A META"
+	if GameState.mode == GameState.Mode.RANKED:
 		title = "%dº LUGAR" % (int(summary["placement"]) + 1)
-	v.add_child(UIKit.label(title, 40, UIKit.GOLD if summary["won"] else UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label(title, 26, UIKit.GOLD if r["success"] else UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("%s · %s · %s / %s pts (%s%s)" % [
+		str(config["names"][r["taker"]]),
+		Scoring.CONTRACT_NAMES[r["contract"]],
+		UIKit.fmt_dec(r["taker_points"], 1),
+		UIKit.fmt_dec(r["target"], 1),
+		"+" if r["margin"] >= 0.0 else "",
+		UIKit.fmt_dec(r["margin"], 1),
+	], 14, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(HSeparator.new())
 	for p in engine.standings():
-		var line := "%s  %s" % [str(config["names"][p]).to_upper(), UIKit.fmt_int(int(engine.scores[p]))]
+		var delta := int(r["deltas"][p])
+		var line := "%s%s  %s%d" % ["♛ " if p == r["taker"] else "", str(config["names"][p]).to_upper(), "+" if delta >= 0 else "", delta]
 		v.add_child(UIKit.label(line, 18, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	for line in summary["lines"]:
 		v.add_child(UIKit.label(str(line), 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	var next: String = summary["next"]
 	var btn: Button
-	match next:
-		"shop":
-			btn = UIKit.button("LOJA ARCANA  →")
-			btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/Shop.tscn"))
-		"ranked":
-			btn = UIKit.button("VOLTAR AO LOBBY")
-			btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn"))
-		_:
-			if GameState.mode == GameState.Mode.CLASSIC:
-				var again := UIKit.button("JOGAR NOVAMENTE")
-				again.pressed.connect(func(): get_tree().reload_current_scene())
-				v.add_child(again)
-			btn = UIKit.button("MENU PRINCIPAL", UIKit.MUTED)
-			btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
+	if next == "ranked":
+		btn = UIKit.button("VOLTAR AO LOBBY")
+		btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn"))
+	else:
+		var again := UIKit.button("NOVA RODADA")
+		again.pressed.connect(func(): get_tree().reload_current_scene())
+		v.add_child(again)
+		btn = UIKit.button("MENU PRINCIPAL", UIKit.MUTED)
+		btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
 	v.add_child(btn)
 	ov.add_child(UIKit.centered(box))
 	box.scale = Vector2(0.85, 0.85)
@@ -560,10 +532,10 @@ func _abandon() -> void:
 	finished = true
 	match GameState.mode:
 		GameState.Mode.RANKED:
-			GameState.report_match({"placement": engine.num_players - 1, "scores": engine.scores.duplicate(), "tricks_won": engine.tricks_won.duplicate(), "gold_earned": 0})
+			var deltas := Scoring.distribute(-25.0, engine.taker, engine.num_players)
+			GameState.report_match({"placement": engine.num_players - 1, "taker": engine.taker, "contract": engine.contract, "success": false, "deltas": deltas})
 			get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn")
 		_:
-			# No Arcade a run fica salva e pode ser continuada do início da fase.
 			get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
 
 

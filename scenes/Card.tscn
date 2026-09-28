@@ -63,17 +63,13 @@ autowrap_mode = 3
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Chips" type="Label" parent="Body/Margin/VBox/Bottom"]
+[node name="Points" type="Label" parent="Body/Margin/VBox/Bottom"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 13
 text = "+1"
 
-[node name="Mod" type="Label" parent="Body/Margin/VBox/Bottom"]
+[node name="Bout" type="Label" parent="Body/Margin/VBox/Bottom"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 11
+theme_override_font_sizes/font_size = 9
 
-[node name="Sheen" type="ColorRect" parent="Body"]
-visible = false
-layout_mode = 2
-mouse_filter = 2

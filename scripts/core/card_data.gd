@@ -1,69 +1,79 @@
 class_name CardData
 extends RefCounted
-## Dados puros de uma carta. Não conhece a UI.
+## Uma carta do baralho de Tarot (78 cartas): 4 naipes de 14 cartas, 21 Trunfos e O Louco.
+## Compartilhada pelos modos Vanilla e Caos — só muda quantas cartas cada um recebe na mão.
 
-enum Suit { OUROS, PAUS, COPAS, ESPADAS, ARCANA }
-enum Modifier { NONE, FOIL, POLYCHROME }
+enum Suit { OUROS, PAUS, COPAS, ESPADAS, TRUNFO, LOUCO }
 
-const SUIT_NAMES := ["Ouros", "Paus", "Copas", "Espadas", "Arcano Maior"]
-const SUIT_SYMBOLS := ["♦", "♣", "♥", "♠", "✶"]
-const MODIFIER_NAMES := ["Padrão", "Foil", "Polychrome"]
-const ARCANA_VALUE := 15
-const FOIL_CHIPS := 50
-const POLY_XMULT := 2.0
+const SUIT_NAMES := ["Ouros", "Paus", "Copas", "Espadas", "Trunfo", "O Louco"]
+const SUIT_SYMBOLS := ["♦", "♣", "♥", "♠", "✦", "✶"]
 
-const MAJOR_ARCANA := [
-	"O Louco", "O Mago", "A Sacerdotisa", "A Imperatriz", "O Imperador",
-	"O Hierofante", "Os Enamorados", "O Carro", "A Força", "O Eremita",
-	"A Roda da Fortuna", "A Justiça", "O Enforcado", "A Morte", "A Temperança",
-	"O Diabo", "A Torre", "A Estrela", "A Lua", "O Sol", "O Julgamento", "O Mundo",
-]
-const ROMAN := [
-	"0", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
-	"XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX", "XXI",
-]
+## Os 3 "Bouts" (cartas de ponta): Le Petit, Le Monde e O Louco. Valem 4,5 pontos cada,
+## igual a um Rei — são as cartas que decidem a pontuação da rodada.
+const PETIT := 1
+const MONDE := 21
 
 var suit: int = Suit.OUROS
-## 1 (Ás) a 13 (Rei). Para Arcanos Maiores, índice 0..21 do arcano.
+## Naipes comuns: 1 (Ás) a 14 (Rei). Trunfo: 1 a 21. O Louco: sempre 0.
 var rank: int = 1
-var modifier: int = Modifier.NONE
 
 
-static func make(p_suit: int, p_rank: int, p_modifier: int = Modifier.NONE) -> CardData:
+static func make(p_suit: int, p_rank: int) -> CardData:
 	var c := CardData.new()
 	c.suit = p_suit
 	c.rank = p_rank
-	c.modifier = p_modifier
 	return c
 
 
-func is_arcana() -> bool:
-	return suit == Suit.ARCANA
+static func louco() -> CardData:
+	return make(Suit.LOUCO, 0)
 
 
-## Valor numérico usado na disputa da vaza. O Ás vale 1 (menor carta do naipe).
+func is_trunfo() -> bool:
+	return suit == Suit.TRUNFO
+
+
+func is_louco() -> bool:
+	return suit == Suit.LOUCO
+
+
+## Bout: as 3 cartas mais valiosas do baralho (Le Petit, Le Monde e O Louco).
+func is_bout() -> bool:
+	return is_louco() or (is_trunfo() and (rank == PETIT or rank == MONDE))
+
+
+## Valor de comparação dentro do próprio naipe/trunfo (maior vence). O Louco nunca é
+## comparado por valor — ele nunca vence uma vaza (ver TrickRules.winning_index).
 func value() -> int:
-	return ARCANA_VALUE if is_arcana() else rank
+	return rank
 
 
-## Fichas base que a carta soma ao placar (sem modificadores).
-func base_chips() -> int:
-	return value()
-
-
-## Identificador estável da carta dentro do baralho (usado para upgrades da loja).
-func key() -> String:
-	return "%d:%d" % [suit, rank]
+## Pontuação oficial do Jeu de Tarot: Rei/Bout = 4,5 · Dama = 3,5 · Cavaleiro = 2,5 ·
+## Valete = 1,5 · qualquer outra carta (números e trunfos comuns) = 0,5.
+func points() -> float:
+	if is_bout():
+		return 4.5
+	if is_trunfo():
+		return 0.5
+	match rank:
+		14: return 4.5  # Rei
+		13: return 3.5  # Dama
+		12: return 2.5  # Cavaleiro
+		11: return 1.5  # Valete
+		_: return 0.5
 
 
 func rank_label() -> String:
-	if is_arcana():
-		return ROMAN[rank]
+	if is_louco():
+		return "✶"
+	if is_trunfo():
+		return str(rank)
 	match rank:
 		1: return "A"
-		11: return "J"
-		12: return "Q"
-		13: return "K"
+		11: return "V"
+		12: return "C"
+		13: return "D"
+		14: return "R"
 	return str(rank)
 
 
@@ -72,11 +82,18 @@ func suit_symbol() -> String:
 
 
 func display_name() -> String:
-	if is_arcana():
-		return "%s (%s)" % [MAJOR_ARCANA[rank], ROMAN[rank]]
-	var names := {1: "Ás", 11: "Valete", 12: "Dama", 13: "Rei"}
+	if is_louco():
+		return "O Louco"
+	if is_trunfo():
+		var label := "Le Petit" if rank == PETIT else ("Le Monde" if rank == MONDE else "Trunfo %d" % rank)
+		return label
+	var names := {1: "Ás", 11: "Valete", 12: "Cavaleiro", 13: "Dama", 14: "Rei"}
 	var r: String = names.get(rank, str(rank))
 	return "%s de %s" % [r, SUIT_NAMES[suit]]
+
+
+func key() -> String:
+	return "%d:%d" % [suit, rank]
 
 
 func equals(other: CardData) -> bool:
@@ -84,15 +101,8 @@ func equals(other: CardData) -> bool:
 
 
 func to_dict() -> Dictionary:
-	return {"suit": suit, "rank": rank, "modifier": modifier}
+	return {"suit": suit, "rank": rank}
 
 
 static func from_dict(d: Dictionary) -> CardData:
-	return make(int(d.get("suit", 0)), int(d.get("rank", 1)), int(d.get("modifier", 0)))
-
-
-static func key_to_name(k: String) -> String:
-	var parts := k.split(":")
-	if parts.size() != 2:
-		return k
-	return make(int(parts[0]), int(parts[1])).display_name()
+	return make(int(d.get("suit", 0)), int(d.get("rank", 1)))

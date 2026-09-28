@@ -1,39 +1,24 @@
 class_name Deck
 extends RefCounted
-## Montagem, embaralhamento e distribuição do baralho.
+## Monta e distribui o baralho fixo de 78 cartas do Tarot: 4 naipes × 14 (Ás a Rei,
+## passando por Valete/Cavaleiro/Dama) + 21 Trunfos + O Louco.
 
-const DROP_POLYCHROME := 0.04
-const DROP_FOIL := 0.08
+const TOTAL_CARDS := 78
+const CHIEN_SIZE := 6  # talão do modo Vanilla (4 jogadores × 18 cartas + 6 = 78)
 
 
-## Baralho padrão de 52 cartas (4 naipes x 13) + `arcana_count` Arcanos Maiores sorteados.
-## `with_modifiers` aplica a taxa de drop do Arcade (88% / 8% / 4%).
-## `upgrades` (chave -> Modifier) força modificadores comprados na Loja Arcana.
-static func build(rng: RandomNumberGenerator, arcana_count: int = 4, with_modifiers: bool = false, upgrades: Dictionary = {}) -> Array:
+## Baralho completo e embaralhado. Sempre as mesmas 78 cartas — nada é sorteado "dentre"
+## um subconjunto, como no protótipo antigo.
+static func build(rng: RandomNumberGenerator) -> Array:
 	var cards: Array = []
 	for s in [CardData.Suit.OUROS, CardData.Suit.PAUS, CardData.Suit.COPAS, CardData.Suit.ESPADAS]:
-		for r in range(1, 14):
+		for r in range(1, 15):
 			cards.append(CardData.make(s, r))
-	var arcana_pool: Array = range(CardData.MAJOR_ARCANA.size())
-	shuffle(arcana_pool, rng)
-	for i in range(clampi(arcana_count, 0, arcana_pool.size())):
-		cards.append(CardData.make(CardData.Suit.ARCANA, arcana_pool[i]))
-	for c in cards:
-		if upgrades.has(c.key()):
-			c.modifier = int(upgrades[c.key()])
-		elif with_modifiers:
-			c.modifier = roll_modifier(rng)
+	for r in range(1, 22):
+		cards.append(CardData.make(CardData.Suit.TRUNFO, r))
+	cards.append(CardData.louco())
 	shuffle(cards, rng)
 	return cards
-
-
-static func roll_modifier(rng: RandomNumberGenerator) -> int:
-	var roll := rng.randf()
-	if roll < DROP_POLYCHROME:
-		return CardData.Modifier.POLYCHROME
-	if roll < DROP_POLYCHROME + DROP_FOIL:
-		return CardData.Modifier.FOIL
-	return CardData.Modifier.NONE
 
 
 ## Fisher-Yates determinístico (usa o RNG da partida para permitir seeds/replays).
@@ -45,17 +30,22 @@ static func shuffle(arr: Array, rng: RandomNumberGenerator) -> void:
 		arr[j] = tmp
 
 
-## Distribui as cartas igualmente; sobras ficam fora da rodada.
-static func deal(cards: Array, players: int) -> Array:
+## Distribui `per_player` cartas para cada jogador a partir do baralho já embaralhado.
+## O que sobra vira "rest" — no Vanilla (18 cartas/jogador) são as 6 do talão (chien);
+## no Caos (8 cartas/jogador) é o restante do baralho, não usado nessa rodada.
+static func deal(cards: Array, players: int, per_player: int) -> Dictionary:
 	var hands: Array = []
 	for p in range(players):
 		hands.append([])
-	var per_player := cards.size() / players
-	for i in range(per_player * players):
-		hands[i % players].append(cards[i])
+	var idx := 0
+	for p in range(players):
+		for i in range(per_player):
+			hands[p].append(cards[idx])
+			idx += 1
+	var rest: Array = cards.slice(idx)
 	for h in hands:
 		sort_hand(h)
-	return hands
+	return {"hands": hands, "rest": rest}
 
 
 static func sort_hand(hand: Array) -> void:
