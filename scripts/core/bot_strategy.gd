@@ -9,7 +9,8 @@ extends RefCounted
 ##   mais pontos (até Bouts); quando o Tomador ainda vai jogar, segura as cartas boas.
 ## - Ninguém corta o próprio parceiro; só toma a vaza do Tomador se compensa (trunfo caro
 ##   só por vaza com pontos).
-## - O Louco vale pontos pra quem levar a vaza, então nunca é jogado à toa.
+## - O Louco fica com quem o joga (paga uma carta de 0,5 ao vencedor), então é jogado antes
+##   da última vaza, quando não dá pra vencer: assim não se perde na última.
 ## - O Petit é guardado pro fim (Petit au bout).
 ## - O Tomador puxa os trunfos dos outros com os seus altos e segura os Bouts.
 ## - Nível Difícil conta as cartas que já saíram: joga as cartas "mestras" (que ninguém
@@ -164,7 +165,7 @@ static func _follow(e: MatchEngine, p: int, legal: Array, seen: Dictionary, deep
 				var wc: CardData = plays[widx]["card"]
 				if _is_master(wc, seen) and (wc.is_trunfo() or _unseen_trumps(seen) == 0):
 					safe = true   # a carta do parceiro ninguém mais bate: pode alimentar
-			var pool: Array = legal.duplicate()
+			var pool: Array = real.duplicate() if not real.is_empty() else legal.duplicate()
 			if safe:
 				pool.sort_custom(_by_value_high)          # alimenta com o que tiver de mais valioso
 				return pool[0]
@@ -180,6 +181,8 @@ static func _follow(e: MatchEngine, p: int, legal: Array, seen: Dictionary, deep
 			var free := not cheapest.is_trunfo() or TrickRules.lead_suit(plays) == T
 			if free or table_pts >= 2.0 or (last and table_pts >= 1.0):
 				return cheapest
+		if not louco.is_empty() and (e.hands[p] as Array).size() > 1:
+			return louco[0]   # sem chance de vencer: aproveita pra soltar o Louco
 		var dump: Array = real.filter(func(c: CardData) -> bool: return not c.is_bout() and c.rank != 14)
 		if dump.is_empty():
 			dump = real if not real.is_empty() else louco
@@ -203,6 +206,8 @@ static func _follow(e: MatchEngine, p: int, legal: Array, seen: Dictionary, deep
 			if table_pts >= 4.0:
 				wins.sort_custom(func(a: CardData, b: CardData) -> bool: return a.rank > b.rank)
 				return wins[0]
+	if not louco.is_empty() and (e.hands[p] as Array).size() > 1:
+		return louco[0]
 	var dump_t: Array = real.filter(func(c: CardData) -> bool: return not c.is_bout() and c.rank != 14)
 	if dump_t.is_empty():
 		dump_t = real if not real.is_empty() else louco

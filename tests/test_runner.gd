@@ -14,6 +14,7 @@ func _init() -> void:
 	_test_trunfo_forced()
 	_test_cover_trunfo()
 	_test_louco()
+	_test_louco_ownership()
 	_test_winner()
 	_test_bidding()
 	_test_bonuses()
@@ -437,3 +438,56 @@ func _test_bot_strategy() -> void:
 		check(illegal == 0, "bot estratégico (nível %d) só joga cartas legais" % def_level)
 	check(int(results[BotAI.Difficulty.HARD]) < int(results[-1]), "defesa Difícil segura o Tomador mais que a simples (%d < %d)" % [results[BotAI.Difficulty.HARD], results[-1]])
 	check(int(results[BotAI.Difficulty.NORMAL]) < int(results[-1]), "defesa Normal também segura mais que a simples (%d < %d)" % [results[BotAI.Difficulty.NORMAL], results[-1]])
+
+
+## O Louco fica com quem o jogou (menos na última vaza) e o dono paga o vencedor com uma
+## carta de 0,5 ponto das que já capturou.
+func _test_louco_ownership() -> void:
+	var e := MatchEngine.new()
+	e.setup({"players": 4, "tutorial": false})
+	e.total_tricks = 18
+	e.trick_number = 2
+	e.taker = 1
+	e.captured[0] = [c(1, 2)]
+	e.plays = [
+		{"player": 0, "card": CardData.louco()},
+		{"player": 1, "card": c(0, 3)},
+		{"player": 2, "card": c(0, 9)},
+		{"player": 3, "card": c(0, 4)},
+	]
+	var r := e._resolve_trick()
+	check(r["winner"] == 2, "vaza com Louco: vence a maior carta do naipe")
+	check((e.captured[0] as Array).any(func(x: CardData) -> bool: return x.is_louco()), "o dono guarda o Louco")
+	check(not (e.captured[2] as Array).any(func(x: CardData) -> bool: return x.is_louco()), "o vencedor não leva o Louco")
+	check((e.captured[2] as Array).any(func(x: CardData) -> bool: return x.suit == 1 and x.rank == 2), "o dono paga o vencedor com uma carta de 0,5")
+	check(is_equal_approx(float(r["points"]), 1.5), "pontos da vaza não contam o Louco (1,5)")
+
+	# sem carta de 0,5 ainda: a dívida fica pra quando tiver
+	var e2 := MatchEngine.new()
+	e2.setup({"players": 4, "tutorial": false})
+	e2.total_tricks = 18
+	e2.trick_number = 0
+	e2.taker = 1
+	e2.plays = [
+		{"player": 0, "card": CardData.louco()},
+		{"player": 1, "card": c(0, 3)},
+		{"player": 2, "card": c(0, 9)},
+		{"player": 3, "card": c(0, 4)},
+	]
+	e2._resolve_trick()
+	check(e2.louco_owed.has(0), "Louco na 1ª vaza: dono fica devendo a carta de 0,5")
+
+	# última vaza: o Louco vai pro vencedor
+	var e3 := MatchEngine.new()
+	e3.setup({"players": 4, "tutorial": false})
+	e3.total_tricks = 18
+	e3.trick_number = 17
+	e3.taker = 1
+	e3.plays = [
+		{"player": 0, "card": CardData.louco()},
+		{"player": 1, "card": c(0, 3)},
+		{"player": 2, "card": c(0, 9)},
+		{"player": 3, "card": c(0, 4)},
+	]
+	e3._resolve_trick()
+	check((e3.captured[2] as Array).any(func(x: CardData) -> bool: return x.is_louco()), "última vaza: o Louco vai pro vencedor")

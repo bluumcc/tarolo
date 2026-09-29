@@ -97,7 +97,7 @@ func _ready() -> void:
 	_refresh_hud()
 	_rebuild_hand()
 	if tutorial:
-		await _tutorial_modal("BEM-VINDO AO TUTORIAL", "Essa mão foi montada pra você passar pelas principais regras do Vanilla, com uma explicação antes de cada decisão nova. Não tem pressa — cada tela só avança quando você clicar em ENTENDI ou escolher uma opção.\n\nDá uma olhada na sua mão (embaixo da tela) antes de continuar.")
+		await _tutorial_modal("BEM-VINDO AO TUTORIAL", "Essa mão foi montada pra você aprender as regras principais. Antes de cada decisão nova tem uma explicação curta. Não tem pressa: a tela só avança quando você toca em ENTENDI.\n\nOlhe sua mão (embaixo da tela) e continue.")
 		if not is_inside_tree():
 			return
 	await _run_bidding()
@@ -918,7 +918,7 @@ func _show_intro() -> void:
 
 func _run_bidding() -> void:
 	if tutorial:
-		await _tutorial_modal("COMO FUNCIONA A LICITAÇÃO", "Toda rodada começa com uma licitação: os 4 jogadores decidem, em ordem, quem vai virar o ATAQUE (Tomador) — quem joga sozinho contra os outros 3, que viram a DEFESA.\n\nNa sua vez, você PASSA (desiste dessa rodada) ou dá um LANCE: um dos 4 contratos, sempre mais alto que o lance de quem já jogou. O lance não custa fichas nem nada — é só uma declaração de quão confiante você está na sua mão.\n\nQuem der o lance mais alto vira o Tomador. Cada contrato abaixo tem uma explicação curta de qual é o risco dele.")
+		await _tutorial_modal("COMO FUNCIONA A LICITAÇÃO", "Toda rodada começa com a licitação: cada jogador, em ordem, diz se quer jogar sozinho contra os outros 3.\n\nQuem joga sozinho é o TOMADOR (o ataque). Os outros 3 formam a DEFESA.\n\nNa sua vez, você PASSA ou dá um LANCE mais alto que o anterior. O lance não custa nada: é só dizer que você confia na sua mão.\n\nO lance mais alto vira o Tomador. Cada contrato tem uma explicação curta do risco dele.")
 		if not is_inside_tree():
 			return
 	while true:
@@ -950,7 +950,7 @@ func _run_bidding() -> void:
 			status_label.text = "Todos passaram — nova mão."
 			trick_label.text = ""
 			if tutorial:
-				await _tutorial_modal("TODOS PASSARAM", "Quando ninguém dá lance, a mão é anulada e as cartas são redistribuídas do zero — não conta como rodada jogada. Vai acontecer de novo agora.")
+				await _tutorial_modal("TODOS PASSARAM", "Se ninguém der lance, a mão é anulada e as cartas são distribuídas de novo. Não conta como rodada. Vai acontecer agora.")
 				if not is_inside_tree():
 					return
 			else:
@@ -969,9 +969,9 @@ func _run_bidding() -> void:
 	trick_label.text = ""
 	if tutorial:
 		if engine.taker == 0:
-			await _tutorial_modal("VOCÊ É O ATAQUE (TOMADOR)", "Você venceu a licitação com %s. %s\n\nAgora você joga sozinho contra os outros 3 (a Defesa). No fim da rodada, todos os pontos que as SUAS cartas capturarem nas vazas (mais as 6 cartas do monte, dependendo do contrato) são somados — se bater a meta, você ganha pontos dos outros 3; se não bater, você paga." % [Scoring.CONTRACT_NAMES[engine.contract], Scoring.CONTRACT_HINTS[engine.contract]])
+			await _tutorial_modal("VOCÊ É O ATAQUE (TOMADOR)", "Você deu o maior lance: %s. %s\n\nAgora você joga sozinho contra os outros 3 (a Defesa). No fim, somam-se os pontos das cartas que você ganhou nas vazas (e do monte, dependendo do contrato). Se chegar na meta, você ganha pontos dos outros 3. Se não chegar, você paga." % [Scoring.CONTRACT_NAMES[engine.contract], Scoring.CONTRACT_HINTS[engine.contract]])
 		else:
-			await _tutorial_modal("VOCÊ É DA DEFESA", "%s venceu a licitação com %s e virou o ATAQUE (Tomador) — joga sozinho contra a mesa toda, incluindo você.\n\nVocê e os outros 2 são a DEFESA: tudo que vocês capturarem nas vazas ajuda a impedir %s de bater a meta dele. Se ele não bater, todo mundo da Defesa ganha pontos; se ele bater, todo mundo da Defesa paga." % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract], config["names"][engine.taker]])
+			await _tutorial_modal("VOCÊ É DA DEFESA", "%s deu o maior lance (%s) e é o TOMADOR: joga sozinho contra os outros 3, incluindo você.\n\nVocê e mais 2 jogadores são a DEFESA. Os pontos que vocês ganharem nas vazas ajudam a impedir %s de chegar na meta. Se ele não chegar, a Defesa ganha pontos. Se chegar, a Defesa paga." % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract], config["names"][engine.taker]])
 		if not is_inside_tree():
 			return
 	else:
@@ -1012,7 +1012,7 @@ func _run_discard() -> void:
 		return
 	if engine.taker == 0 and not GameState.autoplay:
 		if tutorial:
-			await _tutorial_modal("O MONTE ENTROU NA SUA MÃO", "O monte são 6 cartas viradas no meio da mesa, que ninguém vê até a licitação acabar. Com %s, elas entraram direto na sua mão — na próxima tela, as cartas marcadas como \"monte\" são exatamente essas 6.\n\nAgora você escolhe 6 cartas da sua mão (de qualquer origem) pra devolver ao monte — elas somam pontos pra você no final, mas nunca podem ser Reis ou Bouts." % Scoring.CONTRACT_NAMES[engine.contract])
+			await _tutorial_modal("O MONTE ENTROU NA SUA MÃO", "O monte são 6 cartas viradas no meio da mesa, que ninguém vê até a licitação acabar. Com %s, elas entraram na sua mão. Na próxima tela, as marcadas como \"monte\" são essas 6.\n\nAgora escolha 6 cartas da sua mão pra devolver. Os pontos delas ficam com você no final. Reis e Bouts não podem ser devolvidos." % Scoring.CONTRACT_NAMES[engine.contract])
 			if not is_inside_tree():
 				return
 		var chosen: Array = await _wait_human_discard()
@@ -1038,11 +1038,11 @@ func _run_talao_reveal() -> void:
 	match engine.contract:
 		Scoring.Contract.PETITE, Scoring.Contract.GARDE:
 			if engine.taker != 0:
-				await _tutorial_modal("O MONTE (ESCOLHA DO BOT)", "%s era o Tomador, então pegou o monte (6 cartas viradas), olhou e devolveu 6 da mão dele — você não vê essa escolha, só o resultado final na pontuação." % config["names"][engine.taker])
+				await _tutorial_modal("O MONTE (ESCOLHA DO BOT)", "%s é o Tomador, então pegou o monte (6 cartas), olhou e devolveu 6 da mão dele. Você não vê essa escolha." % config["names"][engine.taker])
 		Scoring.Contract.GARDE_SANS:
-			await _tutorial_modal("O MONTE (GARDE SANS)", "Com Garde Sans, %s não pegou o monte, nem chegou a ver as 6 cartas — ninguém escolhe nada. Mas os pontos delas já contam a favor do Tomador mesmo assim: %s." % [config["names"][engine.taker], _describe_cards(engine.chien)])
+			await _tutorial_modal("O MONTE (GARDE SANS)", "Com Garde Sans, %s não pegou o monte nem viu as 6 cartas. Mesmo assim, os pontos delas contam pro Tomador: %s." % [config["names"][engine.taker], _describe_cards(engine.chien)])
 		Scoring.Contract.GARDE_CONTRE:
-			await _tutorial_modal("O MONTE (GARDE CONTRE)", "Com Garde Contre, %s não pegou o monte, nem chegou a ver as 6 cartas — e dessa vez os pontos delas vão pra Defesa: %s." % [config["names"][engine.taker], _describe_cards(engine.chien)])
+			await _tutorial_modal("O MONTE (GARDE CONTRE)", "Com Garde Contre, %s não pegou o monte nem viu as 6 cartas. Dessa vez os pontos delas vão pra Defesa: %s." % [config["names"][engine.taker], _describe_cards(engine.chien)])
 
 
 func _wait_human_discard() -> Array:
@@ -1120,34 +1120,34 @@ func _run_declarations() -> void:
 	if engine.taker == 0 and not GameState.autoplay:
 		if eligible:
 			var bonus := int(Scoring.poignee_bonus(engine.taker_trump_count))
-			var declare: bool = await _ask_yes_no("POIGNÉE", "Você tem %d trunfos na mão — pode declarar Poignée e ganhar +%d pontos no final, mas isso mostra seus trunfos pros outros jogadores. Declarar?" % [engine.taker_trump_count, bonus])
+			var declare: bool = await _ask_yes_no("MOSTRAR OS TRUNFOS?", "Você tem %d trunfos. Se mostrar (Poignée), ganha +%d pontos no fim, mas os outros veem seus trunfos. Mostrar?" % [engine.taker_trump_count, bonus])
 			if not is_inside_tree():
 				return
 			engine.declare_poignee(declare)
 			if declare:
-				_announce_toast("Você declarou Poignée! (+%d se a rodada fechar)" % bonus)
+				_announce_toast("Você mostrou os trunfos (Poignée)! +%d se fechar a rodada" % bonus)
 				_speech_bubble(0, "Poignée!")
 				await _wait(0.6)
-		var chelem: bool = await _ask_yes_no("CHELEM", "Quer anunciar Chelem — apostar que vai vencer as 18 vazas sozinho? Se conseguir: +400. Se falhar: -200. Sem anunciar, ainda ganha +200 de bônus se vencer todas por acaso, sem risco.")
+		var chelem: bool = await _ask_yes_no("CHELEM: GANHAR TODAS AS VAZAS?", "Quer avisar que vai ganhar as 18 vazas? Se conseguir: +400. Se falhar: -200. Sem avisar, se ganhar todas mesmo assim: +200, sem risco.")
 		if not is_inside_tree():
 			return
 		engine.announce_chelem(chelem)
 		if chelem:
-			_announce_toast("Você anunciou Chelem! Vença as 18 vazas pra garantir o bônus.")
+			_announce_toast("Você avisou Chelem! Ganhe as 18 vazas pro bônus.")
 			_speech_bubble(0, "Chelem!")
 			await _wait(0.6)
 	else:
 		var strength := BotAI.hand_strength(engine.hands[engine.taker])
 		if eligible and BotAI.decide_poignee(engine.taker_trump_count):
 			engine.declare_poignee(true)
-			_announce_toast("%s declarou Poignée!" % config["names"][engine.taker])
+			_announce_toast("%s mostrou os trunfos (Poignée)!" % config["names"][engine.taker])
 			_speech_bubble(engine.taker, "Poignée!")
 			await _wait(0.6)
 			if not is_inside_tree():
 				return
 		if BotAI.decide_chelem(strength, int(config["difficulty"][engine.taker]), bot_rng):
 			engine.announce_chelem(true)
-			_announce_toast("%s anunciou Chelem!" % config["names"][engine.taker])
+			_announce_toast("%s avisou Chelem: vai tentar ganhar as 18 vazas!" % config["names"][engine.taker])
 			_speech_bubble(engine.taker, "Chelem!")
 			await _wait(0.6)
 			if not is_inside_tree():
@@ -1324,16 +1324,16 @@ func _check_tutorial_trick_hints(ls: int) -> void:
 				has_suit = true
 				break
 		if not has_suit:
-			_tutorial_once("forced_trunfo", "Você não tem mais %s — por isso é obrigado a jogar Trunfo (ou O Louco). Essa é a regra de corte obrigatório." % CardData.SUIT_NAMES[ls])
+			_tutorial_once("forced_trunfo", "Você não tem mais %s, então tem que jogar um Trunfo (ou O Louco). Isso se chama cortar." % CardData.SUIT_NAMES[ls])
 			return
 	var hand_trunfos := (hand as Array).filter(func(c: CardData) -> bool: return c.is_trunfo()).size()
 	var legal_trunfos := (legal as Array).filter(func(c: CardData) -> bool: return c.is_trunfo()).size()
 	if hand_trunfos > legal_trunfos and legal_trunfos > 0:
-		_tutorial_once("forced_cover", "Já tem Trunfo jogado nessa vaza e você tem um maior — por isso só os Trunfos mais altos aparecem jogáveis. É a regra de cobrir o corte.")
+		_tutorial_once("forced_cover", "Já tem um Trunfo na mesa e você tem um maior, então só os Trunfos maiores podem ser jogados.")
 		return
 	for c in hand:
 		if (c as CardData).is_louco():
-			_tutorial_once("louco", "Você tem O Louco na mão — pode jogá-lo quando quiser, ele nunca vence a vaza mas você guarda os pontos dele (conta como um Rei).")
+			_tutorial_once("louco", "Você tem O Louco. Pode jogá-lo quando quiser: ele nunca ganha a vaza, mas você fica com ele e com os 4,5 pontos dele (só na última vaza ele vai pra quem ganhar).")
 			return
 
 
@@ -1429,7 +1429,7 @@ func _resolve_trick(result: Dictionary) -> void:
 				has_petit = true
 				break
 		if has_petit:
-			_tutorial_hint("Le Petit apareceu na última vaza! Quem venceu essa vaza leva um bônus extra de 10 pontos — é o Petit au bout.")
+			_tutorial_hint("O Trunfo 1 (Le Petit) apareceu na última vaza! Quem ganhou essa vaza leva +10 pontos.")
 
 	# A barra do chefe só se mexe agora, junto do número que sobe da mesa.
 	hold_boss = false
@@ -1539,19 +1539,19 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 	var bonuses: Dictionary = r.get("bonuses", {})
 	var bonus_lines: Array = []
 	if float(bonuses.get("poignee", 0.0)) > 0.0:
-		bonus_lines.append("✦ Poignée declarado — %s tinha muitos trunfos (+%d)" % [str(config["names"][r["taker"]]), int(bonuses["poignee"])])
+		bonus_lines.append("✦ Poignée: %s mostrou os trunfos (+%d)" % [str(config["names"][r["taker"]]), int(bonuses["poignee"])])
 	var chelem: float = float(bonuses.get("chelem", 0.0))
 	if chelem > 0.0 and engine.chelem_announced:
-		bonus_lines.append("✦ Chelem anunciado e cumprido — %s venceu todas as vazas (+%d)" % [str(config["names"][r["taker"]]), int(chelem)])
+		bonus_lines.append("✦ Chelem avisado e cumprido: %s ganhou todas as vazas (+%d)" % [str(config["names"][r["taker"]]), int(chelem)])
 	elif chelem > 0.0:
-		bonus_lines.append("✦ Chelem — %s venceu todas as vazas sem anunciar (+%d)" % [str(config["names"][r["taker"]]), int(chelem)])
+		bonus_lines.append("✦ Chelem: %s ganhou todas as vazas sem avisar (+%d)" % [str(config["names"][r["taker"]]), int(chelem)])
 	elif chelem < 0.0:
-		bonus_lines.append("✦ Chelem anunciado e não cumprido — %s errou a aposta (%d)" % [str(config["names"][r["taker"]]), int(chelem)])
+		bonus_lines.append("✦ Chelem avisado e não cumprido: %s errou (%d)" % [str(config["names"][r["taker"]]), int(chelem)])
 	var petit: float = float(bonuses.get("petit_au_bout", 0.0))
 	if petit > 0.0:
-		bonus_lines.append("✦ Petit au bout a favor do Tomador (+%d)" % int(petit))
+		bonus_lines.append("✦ Petit na última vaza: ponto pro Tomador (+%d)" % int(petit))
 	elif petit < 0.0:
-		bonus_lines.append("✦ Petit au bout a favor da Defesa (%d)" % int(petit))
+		bonus_lines.append("✦ Petit na última vaza: ponto pra Defesa (%d)" % int(petit))
 	if not bonus_lines.is_empty():
 		for line in bonus_lines:
 			v.add_child(UIKit.label(str(line), 12, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
@@ -1626,28 +1626,34 @@ func _show_zoom(view: CardView) -> void:
 
 func _open_help() -> void:
 	var v := UIKit.modal(overlay_layer, "COMO FUNCIONA")
-	var text := """CARTAS
-• 78 cartas: 4 naipes de 14 (Ás a Rei), 21 Trunfos e O Louco.
-• Trunfo sempre vence naipe comum. Entre trunfos, vence o maior número.
-• Bouts (as 3 cartas mais valiosas): Le Petit (trunfo 1), Le Monde (trunfo 21) e O Louco.
+	var text := """O BÁSICO
+• Uma vaza é uma jogada de 4 cartas, uma de cada jogador. Quem jogou a carta mais forte leva as 4 e os pontos delas.
+• Você tem que jogar o naipe da primeira carta. Se não tiver, tem que jogar um Trunfo. Se também não tiver Trunfo, joga qualquer carta.
+• O Trunfo ganha de qualquer naipe. Entre trunfos, o número maior ganha.
+• Em cada naipe, do menor pro maior: Ás, 2 a 10, Valete (J), Cavaleiro (N), Rainha (Q), Rei (K).
 
-LICITAÇÃO
-• Na sua vez: PASSAR ou dar um lance mais alto que o anterior.
-• O lance não custa nada — é só uma declaração de confiança na sua mão.
-• Petite (x1) → Garde (x2) → Garde Sans (x4, você não pega o monte, mas os pontos dele contam pra você) → Garde Contre (x6, não pega o monte e os pontos dele vão pra Defesa).
-• Quem der o lance mais alto vira o Tomador e joga sozinho contra os outros 3.
+OS BOUTS
+• São as 3 cartas mais valiosas: o Trunfo 1 (Le Petit), o Trunfo 21 (Le Monde) e O Louco. Valem 4,5 pontos cada, como um Rei.
+• O Louco nunca ganha a vaza. Quem o joga fica com ele (só na última vaza ele vai pra quem ganhar).
 
-O MONTE (só Petite/Garde)
-• O monte são 6 cartas viradas no meio da mesa. Quem toma pega elas, olha e escolhe 6 cartas da mão pra devolver.
-• Nunca pode devolver Reis ou Bouts — só cartas comuns (e Trunfo comum, se faltar carta comum).
+LICITAÇÃO: QUEM JOGA SOZINHO
+• Cada um passa ou dá um lance. O lance mais alto vira o Tomador: ele joga sozinho contra os outros 3 (a Defesa).
+• Do mais leve ao mais arriscado: Petite ×1, Garde ×2, Garde Sans ×4, Garde Contre ×6. O número é quanto você ganha ou perde.
+• O lance não custa nada. É só dizer que você confia na sua mão.
 
-META
-• O Tomador soma os pontos que capturou. Precisa bater: 56 pts com 0 Bouts, 51 com 1, 41 com 2, 36 com 3.
+O MONTE
+• São 6 cartas viradas no meio da mesa.
+• Petite e Garde: o Tomador pega o monte, olha e devolve 6 cartas da mão (nunca Reis nem Bouts).
+• Garde Sans: não pega; os pontos do monte contam pra ele. Garde Contre: não pega; os pontos vão pra Defesa.
 
-BÔNUS (o Tomador escolhe se arrisca)
-• Poignée: com 10+ trunfos, pode declarar — mostra suas cartas de trunfo, mas ganha pontos extras se a rodada fechar.
-• Chelem: pode anunciar que vai vencer as 18 vazas sozinho — anunciado rende mais (+400) mas pune se falhar (-200); sem anunciar, ainda rende +200 se acontecer, sem risco.
-• Petit au bout: automático — quem vence a última vaza com Le Petit dentro leva +10."""
+COMO SE GANHA
+• O Tomador precisa somar estes pontos com as cartas que ganhar: 56 sem Bout, 51 com 1 Bout, 41 com 2, 36 com 3.
+• Se conseguir, ganha pontos dos outros 3. Se não, paga.
+
+BÔNUS (só o Tomador escolhe)
+• Poignée: com 10 ou mais trunfos, ele pode mostrá-los pra ganhar pontos extras.
+• Chelem: ganhar as 18 vazas. Se avisar antes e conseguir: +400. Se avisar e falhar: -200. Sem avisar, se acontecer: +200.
+• Petit na última vaza: quem ganhar a última vaza com o Trunfo 1 nela leva +10."""
 	var l := UIKit.label(text, 13, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(340, 0)

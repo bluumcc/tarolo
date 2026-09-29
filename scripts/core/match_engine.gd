@@ -32,6 +32,7 @@ var taker_trump_count := 0     # trunfos na mão do tomador já com o talão res
 var poignee_declared := false  # escolha do tomador: mostrar os trunfos pra valer o bônus
 var chelem_announced := false  # escolha do tomador: apostar alto em vencer as 18 vazas
 var awaiting_discard := false  # Petite/Garde: esperando o tomador escolher o descarte (écart)
+var louco_owed := {}           # dono do Louco -> vencedor a quem ainda deve uma carta de 0,5
 
 
 ## config: { seed, players }
@@ -117,6 +118,7 @@ func _reset_state(dealt_hands: Array, dealt_chien: Array) -> void:
 	poignee_declared = false
 	chelem_announced = false
 	awaiting_discard = false
+	louco_owed = {}
 
 	leader = -1
 	current = -1
@@ -288,8 +290,25 @@ func play(player: int, card: CardData) -> Dictionary:
 func _resolve_trick() -> Dictionary:
 	var idx := TrickRules.winning_index(plays)
 	var winner: int = plays[idx]["player"]
-	var cards: Array = plays.map(func(p): return p["card"])
+	# O Louco fica com quem o jogou (só troca de dono na última vaza). Em troca, o dono
+	# entrega ao vencedor uma carta de 0,5 ponto das que já capturou.
+	var is_last := trick_number == total_tricks - 1
+	var louco_owner := -1
+	var louco_card: CardData = null
+	var cards: Array = []
+	for entry in plays:
+		var cd: CardData = entry["card"]
+		if cd.is_louco() and not is_last:
+			louco_owner = int(entry["player"])
+			louco_card = cd
+		else:
+			cards.append(cd)
 	captured[winner].append_array(cards)
+	if louco_owner != -1:
+		captured[louco_owner].append(louco_card)
+		if louco_owner != winner:
+			louco_owed[louco_owner] = winner
+	_settle_louco_debts()
 	var points := 0.0
 	for c in cards:
 		points += (c as CardData).points()
@@ -310,6 +329,21 @@ func _resolve_trick() -> Dictionary:
 		result = _finish()
 		round_finished.emit()
 	return trick_result
+
+
+## Troco do Louco: o dono entrega ao vencedor da vaza uma carta de 0,5 ponto (nunca Bout)
+## do que já capturou. Se ainda não tem nenhuma (Louco na 1ª vaza), a dívida fica pra
+## quando tiver.
+func _settle_louco_debts() -> void:
+	for owner in louco_owed.keys():
+		var pile: Array = captured[owner]
+		for i in range(pile.size()):
+			var cd: CardData = pile[i]
+			if not cd.is_bout() and is_equal_approx(cd.points(), 0.5):
+				pile.remove_at(i)
+				captured[int(louco_owed[owner])].append(cd)
+				louco_owed.erase(owner)
+				break
 
 
 func _finish() -> Dictionary:

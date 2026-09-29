@@ -345,17 +345,16 @@ func _open_chaos_confirm() -> void:
 
 func _open_rules() -> void:
 	var v := _modal("COMO JOGAR")
-	var text := """• Baralho de 78 cartas: 4 naipes de 14 (Ás a Rei, com Cavaleiro entre Valete e Rainha), 21 Trunfos e O Louco.
-• Dentro do naipe, Ás é a carta mais baixa; sobe até Rei. Trunfo sempre vence naipe comum; entre trunfos, vence o maior número.
-• Obrigado a seguir o naipe líder. Sem ele, é obrigado a jogar Trunfo — e se alguém já cortou, precisa cobrir com um Trunfo maior, se tiver.
-• O Louco pode ser jogado a qualquer momento, nunca vence a vaza, mas o dono guarda os pontos dele.
-• Le Petit (trunfo 1), Le Monde (trunfo 21) e O Louco são os 3 Bouts — as cartas mais valiosas do jogo.
-• Licitação: cada jogador, na sua vez, passa ou dá um lance mais alto (Petite x1, Garde x2, Garde Sans x4, Garde Contre x6). O lance não custa fichas — é só a declaração de quão confiante você está. Quem der o maior lance vira o Tomador e joga sozinho contra os outros 3.
-• Com Petite ou Garde, o monte (6 cartas viradas no meio da mesa) entra na sua mão e você mesmo escolhe 6 cartas pra devolver — nunca Reis ou Bouts, só cartas comuns (Trunfo comum só se faltar carta comum).
-• No fim, o Tomador some os pontos que capturou: precisa de 56 pts com 0 Bouts, 51 com 1, 41 com 2 ou 36 com 3 pra vencer a rodada.
-• Depois da licitação, o Tomador escolhe: declarar Poignée (mostra os trunfos, ganha pontos extras se tiver 10+) e/ou anunciar Chelem (apostar que vence as 18 vazas — rende mais se anunciado, mas pune se falhar). Petit au bout (vencer a última vaza com Le Petit) é automático.
-• Ranqueado: sua colocação entre 4 jogadores define LP e MMR.
-• Primeira vez? Joga o TUTORIAL — uma mão guiada com dicas em cada regra nova."""
+	var text := """• O baralho tem 78 cartas: 4 naipes, 21 Trunfos e O Louco.
+• Uma vaza é uma jogada de 4 cartas, uma de cada jogador. Quem jogou a mais forte leva as 4 e os pontos delas.
+• Você tem que jogar o naipe da primeira carta. Se não tiver, tem que jogar um Trunfo. O Trunfo ganha de qualquer naipe.
+• Bouts são as 3 cartas mais valiosas: Trunfo 1, Trunfo 21 e O Louco. O Louco nunca ganha a vaza, mas quem o joga fica com ele.
+• Antes de jogar, cada um passa ou dá um lance (Petite, Garde, Garde Sans ou Garde Contre). O lance mais alto joga sozinho contra os outros 3: é o Tomador. O lance não custa nada.
+• O monte são 6 cartas viradas no meio da mesa. Com Petite ou Garde, o Tomador pega o monte e devolve 6 cartas da mão.
+• O Tomador precisa somar 56 pontos sem Bout, 51 com 1 Bout, 41 com 2 ou 36 com 3. Se conseguir, ganha pontos dos outros. Se não, paga.
+• Bônus do Tomador: mostrar 10 ou mais trunfos (Poignée) e ganhar as 18 vazas (Chelem). Quem ganha a última vaza com o Trunfo 1 leva +10.
+• Ranqueado: sua colocação entre 4 jogadores define seus pontos de liga.
+• Primeira vez? Jogue o TUTORIAL: uma mão guiada com dicas em cada regra nova."""
 	var l := UIKit.label(text, 15, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(420, 0)
