@@ -33,6 +33,20 @@ const STRENGTH_GARDE := 27.5
 const STRENGTH_GARDE_SANS := 31.0
 const STRENGTH_GARDE_CONTRE := 35.0
 
+## Contrato que a mão sugere (os mesmos limiares dos bots, sem sorteio): -1 = passar.
+static func recommended_contract(hand: Array) -> int:
+	var strength := hand_strength(hand)
+	if strength >= STRENGTH_GARDE_CONTRE:
+		return Scoring.Contract.GARDE_CONTRE
+	if strength >= STRENGTH_GARDE_SANS:
+		return Scoring.Contract.GARDE_SANS
+	if strength >= STRENGTH_GARDE:
+		return Scoring.Contract.GARDE
+	if strength >= STRENGTH_PETITE:
+		return Scoring.Contract.PETITE
+	return -1
+
+
 ## Decide o lance do bot na licitação. `options` = contratos disponíveis agora
 ## (Scoring.Contract, já filtrados pra maiores que o lance atual). `forced` = true
 ## quando o bot é obrigado a dar algum lance (último ativo, ninguém arrematou ainda).

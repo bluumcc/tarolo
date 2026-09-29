@@ -45,15 +45,8 @@ const CHELEM_UNANNOUNCED_BONUS := 200.0
 const PETIT_AU_BOUT_BONUS := 10.0
 
 
-## Alívio de meta pro jogador quando ele é o Tomador (só Vanilla comum; o Ranqueado e o
-## tutorial ficam com a regra de mesa). Numa simulação, um Tomador de mão média fechava só
-## ~22% das rodadas contra 3 defensores; com -15 sobe pra ~47%. Quem liga é a cena do jogo.
-const TAKER_RELIEF := 15.0
-static var target_relief := 0.0
-
-
 static func target_for_bouts(bouts: int) -> float:
-	return maxf(TARGET_BY_BOUTS[clampi(bouts, 0, 3)] - target_relief, 1.0)
+	return TARGET_BY_BOUTS[clampi(bouts, 0, 3)]
 
 
 ## Maior bônus de Poignée que `trump_count` trunfos na mão inicial alcança (0 se nenhum).

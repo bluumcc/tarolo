@@ -7,6 +7,7 @@ var value := 0.0
 var max_value := 1.0
 var fill_color := Color("#E2463B")
 var track_color := Color("#2a1715")
+var marks: Array = []   # valores onde desenhar um traço (ex.: limiares de contrato)
 var _tween: Tween
 var _fill_sb := StyleBoxFlat.new()
 var _track_sb := StyleBoxFlat.new()
@@ -48,3 +49,6 @@ func _draw() -> void:
 	if fw > 2.0:
 		draw_style_box(_fill_sb, Rect2(0, 0, fw, size.y))
 		draw_rect(Rect2(3, 3, maxf(fw - 6.0, 0.0), size.y * 0.28), Color(1, 1, 1, 0.18))
+	for m in marks:
+		var x := size.x * clampf(float(m) / max_value, 0.0, 1.0)
+		draw_line(Vector2(x, 0), Vector2(x, size.y), Color(1, 1, 1, 0.6), 2.0)

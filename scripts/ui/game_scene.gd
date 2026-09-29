@@ -59,6 +59,11 @@ var bid_states: Array = []
 var bid_buttons: Dictionary = {} # -1 = passar, 0..3 = contrato
 var bid_msg: Label
 var bid_waiting := false
+var bid_base_text: Dictionary = {}
+var hint_bar: MeterBar
+var hint_strength: Label
+var hint_suggest: Label
+var hint_counts: Label
 
 var my_portrait: Portrait
 var hand_container: Control
@@ -98,7 +103,6 @@ func _ready() -> void:
 	await _run_bidding()
 	if not is_inside_tree():
 		return
-	Scoring.target_relief = Scoring.TAKER_RELIEF if _human_taker_relief() else 0.0
 	_set_phase(false)
 	_update_taker_badge()
 	_refresh_hud()
@@ -119,15 +123,6 @@ func _ready() -> void:
 
 
 # ------------------------------------------------------------------ UI
-
-## Você é o Tomador num Vanilla comum: a meta cai (ver Scoring.TAKER_RELIEF).
-func _human_taker_relief() -> bool:
-	return engine.taker == 0 and GameState.mode == GameState.Mode.CLASSIC and not tutorial
-
-
-func _exit_tree() -> void:
-	Scoring.target_relief = 0.0
-
 
 func _build_ui() -> void:
 	add_child(UIKit.background())
@@ -344,7 +339,7 @@ func _build_bid_panel() -> void:
 	bid_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root_box.add_child(bid_panel)
 	bid_panel.add_child(UIKit.label("QUEM JOGA SOZINHO?", 30, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	var sub := UIKit.label("Cada um fala uma vez, em ordem. O lance mais alto vira o Tomador e enfrenta os outros três.", 15, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	var sub := UIKit.label("O lance mais alto vira o Tomador e enfrenta os outros três.", 15, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bid_panel.add_child(sub)
 	bid_rows.resize(engine.num_players)
@@ -353,16 +348,16 @@ func _build_bid_panel() -> void:
 	bid_texts.resize(engine.num_players)
 	bid_states.resize(engine.num_players)
 	for p in range(engine.num_players):
-		var row := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.PURPLE, 8)
+		var row := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.PURPLE, 4)
 		var h := HBoxContainer.new()
 		h.add_theme_constant_override("separation", 12)
 		row.add_child(h)
-		h.add_child(Portrait.new().setup(p, UIKit.GOLD if p == 0 else Color(0, 0, 0, 0), 58.0))
+		h.add_child(Portrait.new().setup(p, UIKit.GOLD if p == 0 else Color(0, 0, 0, 0), 44.0))
 		var col := VBoxContainer.new()
 		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		col.add_theme_constant_override("separation", 0)
 		h.add_child(col)
-		col.add_child(UIKit.label("Você" if p == 0 else str(config["names"][p]), 22, UIKit.INK))
+		col.add_child(UIKit.label("Você" if p == 0 else str(config["names"][p]), 20, UIKit.INK))
 		col.add_child(UIKit.label("%dº a falar" % (p + 1), 12, UIKit.MUTED))
 		var bub_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.PURPLE_DEEP, 6)
 		bub_box.custom_minimum_size = Vector2(190, 0)
@@ -389,10 +384,97 @@ func _build_bid_panel() -> void:
 		b.pressed.connect(_on_bid_pressed.bind(c))
 		ladder.add_child(b)
 		bid_buttons[c] = b
+		bid_base_text[c] = b.text
 	bid_msg = UIKit.label("", 15, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	bid_msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bid_panel.add_child(bid_msg)
+	_build_hand_hint()
 	_bid_reset()
+
+
+## Dica da licitação: quão forte é a sua mão e qual contrato ela sugere, com os limiares
+## de cada contrato marcados na barra. Sugestão, não regra: o lance é decisão sua.
+func _build_hand_hint() -> void:
+	var box := UIKit.panel(Color(0.10, 0.08, 0.14, 0.9), UIKit.GOLD.darkened(0.4), 8)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 4)
+	box.add_child(v)
+	var top := HBoxContainer.new()
+	v.add_child(top)
+	hint_strength = UIKit.label("", 16, UIKit.INK)
+	hint_strength.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(hint_strength)
+	hint_suggest = UIKit.label("", 16, UIKit.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
+	top.add_child(hint_suggest)
+	hint_bar = MeterBar.new()
+	hint_bar.custom_minimum_size = Vector2(0, 14)
+	hint_bar.set_colors(UIKit.GOLD, Color("#2b2413"))
+	hint_bar.marks = [BotAI.STRENGTH_PETITE, BotAI.STRENGTH_GARDE, BotAI.STRENGTH_GARDE_SANS, BotAI.STRENGTH_GARDE_CONTRE]
+	v.add_child(hint_bar)
+	var bottom := HBoxContainer.new()
+	v.add_child(bottom)
+	hint_counts = UIKit.label("", 13, UIKit.MUTED)
+	hint_counts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bottom.add_child(hint_counts)
+	var what := UIKit.button("O QUE É BOUT?", UIKit.GOLD, 13)
+	what.custom_minimum_size = Vector2(0, 34)
+	what.pressed.connect(_open_bout_help)
+	bottom.add_child(what)
+	bid_panel.add_child(box)
+
+
+func _refresh_hand_hint() -> void:
+	var hand: Array = engine.hands[0]
+	var strength := BotAI.hand_strength(hand)
+	var bouts := 0
+	var trunfos := 0
+	var reis := 0
+	for c in hand:
+		var card: CardData = c
+		if card.is_bout():
+			bouts += 1
+		if card.is_trunfo():
+			trunfos += 1
+		if not card.is_trunfo() and not card.is_louco() and card.rank == 14:
+			reis += 1
+	hint_strength.text = "SUA MÃO · força %s" % UIKit.fmt_dec(strength, 1)
+	hint_bar.set_values(strength, 42.0, false)
+	hint_counts.text = "Bouts %d/3 · Trunfos %d · Reis %d · cada traço = um contrato" % [bouts, trunfos, reis]
+	_update_suggestion([])
+
+
+## Sugestão de lance: o contrato que a força da mão pede; se ele já foi superado (ou a
+## mão é fraca), passar. `opts` = contratos ainda disponíveis (vazio = só mostrar a sugestão).
+func _update_suggestion(opts: Array) -> void:
+	var rec := BotAI.recommended_contract(engine.hands[0])
+	if not opts.is_empty() and rec != -1 and not opts.has(rec):
+		rec = -1
+	hint_suggest.text = "sugestão: %s" % ("PASSAR" if rec == -1 else str(Scoring.CONTRACT_NAMES[rec]).to_upper())
+	for c in range(4):
+		var b: Button = bid_buttons[c]
+		b.text = bid_base_text[c] + ("   ★" if c == rec else "")
+
+
+func _open_bout_help() -> void:
+	var v := UIKit.modal(overlay_layer, "O QUE É BOUT?")
+	var text := """Bout (lê-se "bu") é o nome das 3 cartas mais valiosas do jogo:
+• Le Petit: o Trunfo 1
+• Le Monde: o Trunfo 21
+• O Louco
+
+Cada Bout vale 4,5 pontos, o mesmo que um Rei. E mais: os Bouts que o Tomador captura baixam a meta dele. Com 0 Bouts ele precisa de 56 pontos, com 1 precisa de 51, com 2 de 41 e com 3 de 36.
+
+Por isso, Bout na mão é um bom motivo pra licitar mais alto.
+
+Cuidados:
+• O Petit é fraco: qualquer trunfo maior o vence, então proteja-o.
+• O Louco nunca vence uma vaza, mas quem o joga guarda os pontos dele.
+• Bouts nunca podem ir pro descarte."""
+	var l := UIKit.label(text, 14, UIKit.INK)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size = Vector2(340, 0)
+	v.add_child(l)
+	UIKit.close_button(overlay_layer, v)
 
 
 ## Seu rodapé: retrato, pontos e, na sua vez, a dica de como jogar (tocar, tocar de novo).
@@ -428,6 +510,8 @@ func _build_my_footer() -> void:
 ## Licitação (true) x duelo (false): quem está visível em cada fase.
 func _set_phase(bidding: bool) -> void:
 	bid_panel.visible = bidding
+	trick_label.visible = not bidding
+	status_label.visible = not bidding
 	seat_strip.visible = not bidding
 	arena.visible = not bidding
 	var duel := not bidding and engine.taker != -1
@@ -689,12 +773,13 @@ func _bid_reset() -> void:
 		bid_texts[p] = ""
 		bid_states[p] = "idle"
 		_set_bubble(p, "aguardando", "idle")
-		(bid_rows[p] as PanelContainer).add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, UIKit.PURPLE, 2, 10, 8))
+		(bid_rows[p] as PanelContainer).add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, UIKit.PURPLE, 2, 10, 4))
 	for k in bid_buttons:
 		(bid_buttons[k] as Button).disabled = true
 		(bid_buttons[k] as Button).modulate = Color.WHITE
 	bid_msg.text = ""
 	bid_waiting = false
+	_refresh_hand_hint()
 
 
 func _set_bubble(p: int, text: String, kind: String) -> void:
@@ -720,7 +805,7 @@ func _set_bubble(p: int, text: String, kind: String) -> void:
 
 func _bid_set_turn(p: int) -> void:
 	for q in range(engine.num_players):
-		(bid_rows[q] as PanelContainer).add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, UIKit.GOLD if q == p else UIKit.PURPLE, 3 if q == p else 2, 10, 8))
+		(bid_rows[q] as PanelContainer).add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, UIKit.GOLD if q == p else UIKit.PURPLE, 3 if q == p else 2, 10, 4))
 	if bid_states[p] == "idle":
 		_set_bubble(p, "SUA VEZ" if p == 0 else "pensando…", "wait")
 
@@ -738,6 +823,7 @@ func _on_bid_pressed(choice: int) -> void:
 ## quando é obrigatório assumir um contrato). O lance atual fica marcado em vermelho.
 func _enable_bid_ladder(opts: Array, forced: bool) -> void:
 	bid_waiting = true
+	_update_suggestion(opts)
 	(bid_buttons[-1] as Button).disabled = forced
 	for c in range(4):
 		var b: Button = bid_buttons[c]
@@ -796,7 +882,7 @@ func _show_intro() -> void:
 	v.add_child(bar_row)
 	var rule_text := ""
 	if mine:
-		rule_text = "Você precisa de %s pontos (a meta cai com cada Bout que você tiver)%s. Encha a barra: se bater, cada um dos outros 3 te paga ×%d." % [UIKit.fmt_dec(n["target"], 1), " e tem bônus de Tomador: meta %d menor" % int(Scoring.target_relief) if Scoring.target_relief > 0.0 else "", int(Scoring.CONTRACT_MULT[engine.contract])]
+		rule_text = "Você precisa de %s pontos (a meta cai com cada Bout que você tiver). Encha a barra: se bater, cada um dos outros 3 te paga ×%d." % [UIKit.fmt_dec(n["target"], 1), int(Scoring.CONTRACT_MULT[engine.contract])]
 	else:
 		rule_text = "Precisa de %s pontos. A barra começa vazia e enche a cada vaza dele. Se a Defesa não deixar encher, o contrato cai e cada um da Defesa ganha ×%d." % [UIKit.fmt_dec(n["target"], 1), int(Scoring.CONTRACT_MULT[engine.contract])]
 	var rl := UIKit.label(rule_text, 16, Color("#d6cbbb"), HORIZONTAL_ALIGNMENT_CENTER)
@@ -910,7 +996,7 @@ func _announce_bid(player: int, choice: int) -> void:
 func _wait_human_bid() -> int:
 	var opts := engine.bid_options(0)
 	var forced := engine.is_bidding_forced(0)
-	status_label.text = "Sua vez de licitar. Olhe sua mão antes de decidir."
+	status_label.text = ""
 	_enable_bid_ladder(opts, forced)
 	var choice: int = await human_bid_chosen
 	return choice
@@ -1547,7 +1633,6 @@ DESCARTE (só Petite/Garde)
 
 META
 • O Tomador soma os pontos que capturou. Precisa bater: 56 pts com 0 Bouts, 51 com 1, 41 com 2, 36 com 3.
-• Bônus de Tomador: no Vanilla comum (fora do Ranqueado e do tutorial), quando é você o Tomador, a meta é 15 pontos menor.
 
 BÔNUS (o Tomador escolhe se arrisca)
 • Poignée: com 10+ trunfos, pode declarar — mostra suas cartas de trunfo, mas ganha pontos extras se a rodada fechar.
