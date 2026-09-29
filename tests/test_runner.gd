@@ -451,6 +451,30 @@ func _test_chaos() -> void:
 	e7.modifier = ChaosModifiers.Modifier.NAIPE_MALDITO
 	e7.weak_suit = CardData.Suit.COPAS
 	check(e7.card_value(c(CardData.Suit.COPAS, 14)) == -1.0, "Naipe Maldito: carta do naipe vale -1")
+	# Bots cientes dos modificadores
+	var eb := ChaosEngine.new()
+	eb.setup_match({"seed": 1})
+	var brng := RandomNumberGenerator.new()
+	brng.seed = 7
+	eb.modifier = ChaosModifiers.Modifier.VAZA_MALDITA
+	eb.modifier_trick = 3
+	eb.trick_number = 3
+	eb.current = 3
+	eb.plays = [
+		{"player": 0, "card": c(CardData.Suit.PAUS, 9)},
+		{"player": 1, "card": c(CardData.Suit.PAUS, 2)},
+		{"player": 2, "card": c(CardData.Suit.PAUS, 3)},
+	]
+	eb.hands[3] = [c(CardData.Suit.PAUS, 12), c(CardData.Suit.PAUS, 6)]
+	var pick := ChaosBot.choose(eb, 3, BotAI.Difficulty.HARD, brng)
+	check(pick.rank == 6 or pick.rank == 12, "bot joga carta legal na Vaza Maldita")
+	eb.hands[3] = [c(CardData.Suit.PAUS, 12), c(CardData.Suit.PAUS, 1)]
+	pick = ChaosBot.choose(eb, 3, BotAI.Difficulty.HARD, brng)
+	check(not eb.would_win(pick, 3) and pick.rank == 1, "Vaza Maldita: bot foge de vencer")
+	eb.modifier = ChaosModifiers.Modifier.VAZA_INVERTIDA
+	eb.hands[3] = [c(CardData.Suit.PAUS, 12), c(CardData.Suit.PAUS, 1)]
+	pick = ChaosBot.choose(eb, 3, BotAI.Difficulty.HARD, brng)
+	check(pick.rank == 1 and eb.would_win(pick, 3), "Vaza Invertida: bot vence com a menor carta")
 	e7.modifier = ChaosModifiers.Modifier.PEQUENAS_IMPORTAM
 	check(e7.card_value(c(CardData.Suit.PAUS, 3)) == 1.0, "Cartas Pequenas Importam: 0,5 vira 1,0")
 	e7.modifier = ChaosModifiers.Modifier.NAIPE_FORTE

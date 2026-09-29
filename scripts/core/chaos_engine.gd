@@ -224,16 +224,29 @@ func is_final_round() -> bool:
 
 
 ## Vaza Invertida: vence a MENOR carta do naipe líder (Trunfo que corta não vale nada).
-func _lowest_index() -> int:
-	var ls := TrickRules.lead_suit(plays)
+func _lowest_index(trick: Array = []) -> int:
+	if trick.is_empty():
+		trick = plays
+	var ls := TrickRules.lead_suit(trick)
 	var best := -1
-	for i in range(plays.size()):
-		var c: CardData = plays[i]["card"]
+	for i in range(trick.size()):
+		var c: CardData = trick[i]["card"]
 		if c.is_louco() or c.suit != ls:
 			continue
-		if best == -1 or c.rank < (plays[best]["card"] as CardData).rank:
+		if best == -1 or c.rank < (trick[best]["card"] as CardData).rank:
 			best = i
-	return best if best != -1 else TrickRules.winning_index(plays, louco_can_win())
+	return best if best != -1 else TrickRules.winning_index(trick, louco_can_win())
+
+
+## Se `card`, jogada por `player` agora, venceria a vaza como está (considera Vaza Invertida
+## / Mundo ao Contrário). Usado pelos bots.
+func would_win(card: CardData, player: int) -> bool:
+	var ev := active_modifier()
+	if ev != ChaosModifiers.Modifier.MUNDO_CONTRARIO and ev != ChaosModifiers.Modifier.VAZA_INVERTIDA:
+		return TrickRules.would_win(card, player, plays, louco_can_win())
+	var trick := plays.duplicate()
+	trick.append({"player": player, "card": card})
+	return int(trick[_lowest_index(trick)]["player"]) == player
 
 
 func _resolve_trick() -> Dictionary:

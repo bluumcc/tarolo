@@ -641,7 +641,7 @@ func _run_round() -> void:
 			await _wait(0.9 if p == 0 else bot_rng.randf_range(0.9, 1.5))
 			if not is_inside_tree():
 				return
-			card = BotAI.choose(engine.hands[p], engine.plays, p, engine.num_players, int(config["difficulty"][p]), bot_rng, engine.louco_can_win())
+			card = ChaosBot.choose(engine, p, int(config["difficulty"][p]), bot_rng)
 		if card == null or not is_inside_tree():
 			return
 		var from := _source_position(p, card)
