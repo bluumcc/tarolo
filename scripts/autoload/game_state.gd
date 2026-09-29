@@ -24,9 +24,26 @@ var last_summary: Dictionary = {}
 
 
 func _ready() -> void:
+	_install_symbol_font()
 	apply_settings()
 	get_tree().root.size_changed.connect(_update_content_scale)
 	_update_content_scale()
+
+
+## O navegador do celular não tem fonte com ♥ ♦ ♠ ♣ ✦ ✶ ♛ (o PC usa a fonte do sistema e
+## esconde o problema): a DejaVu Sans vai junto do jogo como reserva da fonte padrão.
+func _install_symbol_font() -> void:
+	var sym := load("res://assets/fonts/DejaVuSans.ttf") as Font
+	var base: Font = ThemeDB.fallback_font
+	var dt := ThemeDB.get_default_theme()
+	if dt != null and dt.default_font != null:
+		base = dt.default_font
+	if base == null or sym == null:
+		return
+	var list: Array[Font] = [sym]
+	base.fallbacks = list
+	if OS.get_environment("TAROLO_NO_SYSFONT") == "1" and base is FontFile:
+		(base as FontFile).allow_system_fallback = false
 
 
 ## Resolução base 1280x720 no paisagem (PC) e 720x1280 no retrato (smartphone),

@@ -152,6 +152,12 @@ func _gui_input(event: InputEvent) -> void:
 			_moved = true
 
 
+## Chamado pela rolagem da mão quando o arrasto começa: esse toque vira rolagem, não jogada.
+func cancel_press() -> void:
+	_pressing = false
+	_moved = true
+
+
 func _release() -> void:
 	if not _pressing:
 		return

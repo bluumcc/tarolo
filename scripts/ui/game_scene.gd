@@ -160,16 +160,14 @@ func _build_ui() -> void:
 	# Mão — cartas sempre no tamanho real (nunca encolhidas pra caber); quando não cabem
 	# todas na tela (mão cheia do Vanilla, até 18 cartas), a mão rola de lado. Duas
 	# variantes (Configurações): fileira reta, ou leque em arco.
-	var hand_scroll := ScrollContainer.new()
+	var hand_scroll := HandScroller.new()
 	hand_scroll.custom_minimum_size = Vector2(0, CardView.SIZE.y + CardView.MAX_LIFT + 16)
-	hand_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	hand_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	root_box.add_child(hand_scroll)
 	hand_scroll.resized.connect(_layout_hand)  # tamanho real só fica pronto depois do 1º sort — nunca confiar em call_deferred sozinho
 	hand_container = Control.new()
 	hand_container.name = "HandContainer"
 	hand_container.mouse_filter = Control.MOUSE_FILTER_PASS
-	hand_scroll.add_child(hand_container)
+	hand_scroll.set_content(hand_container)
 
 	_build_my_footer()
 
@@ -494,7 +492,7 @@ func _layout_hand() -> void:
 	var avail_h := CardView.SIZE.y + CardView.MAX_LIFT
 	var mode := str(GameState.settings().get("hand_layout", "row"))
 	var content_w := HandLayout.apply(cards, avail_w, avail_h, mode, CardView.SIZE)
-	hand_container.custom_minimum_size = Vector2(content_w, avail_h)
+	(parent as HandScroller).set_content_size(Vector2(content_w, avail_h))
 
 
 func _rebuild_hand() -> void:
@@ -1254,6 +1252,7 @@ func _on_card_tapped(view: CardView) -> void:
 		(c as CardView).set_selected(c == view)
 	selected_view = view
 	play_btn.disabled = false
+	(hand_container.get_parent() as HandScroller).reveal(view.position.x, CardView.SIZE.x)
 	Sfx.play("tick")
 
 
