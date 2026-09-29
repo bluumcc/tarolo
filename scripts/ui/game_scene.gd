@@ -30,7 +30,12 @@ var hud_tricks: Array = []       # Label — vazas vencidas
 var hud_cards: Array = []        # Label — contagem de cartas na mão (só bots)
 var seat_avatars: Array = []     # painel de cada assento: destaca de quem é a vez e serve de origem das cartas
 var seat_portraits: Array = []   # Portrait de cada assento
-var seat_strip: HBoxContainer    # os 3 outros jogadores
+var seat_strip: BoxContainer
+var main_area: BoxContainer     # coluna lateral + centro (lado a lado no PC, empilhados no celular)
+var side_col: VBoxContainer
+var center_col: VBoxContainer
+var bidding_now := true
+var bid_grid: GridContainer    # os 3 outros jogadores
 var turn_pulse_token := 0        # invalida pulsos de destaque antigos quando a vez muda
 
 var boss_panel: PanelContainer   # o Atacante como "chefe": retrato, contrato, vida
@@ -164,7 +169,7 @@ func _build_ui() -> void:
 	add_child(margin)
 
 	root_box = VBoxContainer.new()
-	root_box.add_theme_constant_override("separation", 10)
+	root_box.add_theme_constant_override("separation", 6)
 	margin.add_child(root_box)
 
 	for arr in [hud_badges, hud_titles, hud_points, hud_tricks, hud_cards, seat_avatars, seat_portraits]:
@@ -180,25 +185,38 @@ func _build_ui() -> void:
 		tut_box.add_child(tutorial_label)
 		root_box.add_child(tut_box)
 
+	main_area = BoxContainer.new()
+	main_area.vertical = true
+	main_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_area.add_theme_constant_override("separation", 20)
+	root_box.add_child(main_area)
+	side_col = VBoxContainer.new()
+	side_col.add_theme_constant_override("separation", 6)
+	main_area.add_child(side_col)
+	center_col = VBoxContainer.new()
+	center_col.add_theme_constant_override("separation", 10)
+	center_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center_col.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_area.add_child(center_col)
 	_build_boss_panel()
 	ticks = TrickTicks.new()
 	ticks.visible = false
-	root_box.add_child(ticks)
+	side_col.add_child(ticks)
 	_build_seat_strip()
 	_build_arena()
 	_build_bid_panel()
 
 	trick_label = UIKit.label("", 22, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	root_box.add_child(trick_label)
+	center_col.add_child(trick_label)
 	status_label = UIKit.label("", 25, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	root_box.add_child(status_label)
+	center_col.add_child(status_label)
 
 	# Mão — cartas sempre no tamanho real (nunca encolhidas pra caber); quando não cabem
 	# todas na tela (mão cheia do Vanilla, até 18 cartas), a mão rola de lado. Duas
 	# variantes (Configurações): fileira reta, ou leque em arco.
 	var hand_scroll := HandScroller.new()
-	hand_scroll.custom_minimum_size = Vector2(0, CardView.SIZE.y + CardView.MAX_LIFT + 16)
+	hand_scroll.custom_minimum_size = Vector2(0, CardView.SIZE.y + CardView.MAX_LIFT + 6)
 	root_box.add_child(hand_scroll)
 	hand_scroll.resized.connect(_layout_hand)  # tamanho real só fica pronto depois do 1º sort — nunca confiar em call_deferred sozinho
 	hand_container = Control.new()
@@ -225,6 +243,7 @@ func _build_ui() -> void:
 	add_child(overlay_layer)
 
 	_layout_table.call_deferred()
+	_apply_orientation.call_deferred()
 
 
 func _build_topbar() -> void:
@@ -255,7 +274,7 @@ func _build_boss_panel() -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 14)
 	boss_panel.add_child(row)
-	boss_portrait = Portrait.new().setup(3, UIKit.BOSS, 104.0)
+	boss_portrait = Portrait.new().setup(3, UIKit.BOSS, 84.0)
 	row.add_child(boss_portrait)
 	var col := VBoxContainer.new()
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -282,21 +301,21 @@ func _build_boss_panel() -> void:
 	boss_meta = UIKit.label("", 19, Color("#f0c7c2"))
 	boss_meta.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(boss_meta)
-	root_box.add_child(boss_panel)
+	side_col.add_child(boss_panel)
 
 
 func _build_seat_strip() -> void:
-	seat_strip = HBoxContainer.new()
+	seat_strip = BoxContainer.new()
 	seat_strip.add_theme_constant_override("separation", 8)
 	seat_strip.visible = false
-	root_box.add_child(seat_strip)
+	side_col.add_child(seat_strip)
 	for p in range(1, engine.num_players):
 		var badge := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MUTED, 8)
 		badge.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		badge.add_child(row)
-		var por := Portrait.new().setup(p, Color(0, 0, 0, 0), 62.0)
+		var por := Portrait.new().setup(p, Color(0, 0, 0, 0), 50.0)
 		row.add_child(por)
 		var col := VBoxContainer.new()
 		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -329,13 +348,13 @@ func _build_seat_strip() -> void:
 func _build_arena() -> void:
 	arena = Control.new()
 	arena.name = "Arena"
-	arena.custom_minimum_size = Vector2(0, 430)
+	arena.custom_minimum_size = Vector2(0, 340)
 	arena.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	arena.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	arena.visible = false
 	arena.draw.connect(_draw_arena)
 	arena.resized.connect(_layout_table)
-	root_box.add_child(arena)
+	center_col.add_child(arena)
 	var pot_box := VBoxContainer.new()
 	pot_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pot_box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -367,7 +386,7 @@ func _build_bid_panel() -> void:
 	bid_panel = VBoxContainer.new()
 	bid_panel.add_theme_constant_override("separation", 12)
 	bid_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root_box.add_child(bid_panel)
+	center_col.add_child(bid_panel)
 	bid_panel.add_child(UIKit.label("QUEM JOGA SOZINHO?", 38, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	var sub := UIKit.label("Quem dá o lance mais alto joga sozinho contra os outros três.", 21, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -378,6 +397,7 @@ func _build_bid_panel() -> void:
 	bid_texts.resize(engine.num_players)
 	bid_states.resize(engine.num_players)
 	var grid := GridContainer.new()
+	bid_grid = grid
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 10)
 	grid.add_theme_constant_override("v_separation", 10)
@@ -515,11 +535,11 @@ Cuidados:
 
 ## Seu rodapé: retrato, pontos e, na sua vez, a dica de como jogar (tocar, tocar de novo).
 func _build_my_footer() -> void:
-	var my_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 10)
+	var my_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 8)
 	var my_row := HBoxContainer.new()
 	my_row.add_theme_constant_override("separation", 14)
 	my_box.add_child(my_row)
-	my_portrait = Portrait.new().setup(0, UIKit.GOLD, 84.0)
+	my_portrait = Portrait.new().setup(0, UIKit.GOLD, 60.0)
 	my_row.add_child(my_portrait)
 	var my_left := VBoxContainer.new()
 	my_left.add_theme_constant_override("separation", 0)
@@ -527,7 +547,7 @@ func _build_my_footer() -> void:
 	my_row.add_child(my_left)
 	var my_title := UIKit.label(str(config["names"][0]).to_upper(), 18, UIKit.MUTED)
 	my_left.add_child(my_title)
-	var my_pts := UIKit.label("0,0 pts", 38, UIKit.INK)
+	var my_pts := UIKit.label("0,0 pts", 32, UIKit.INK)
 	my_left.add_child(my_pts)
 	var my_tr := UIKit.label("0 vazas", 16, UIKit.MUTED)
 	my_left.add_child(my_tr)
@@ -545,6 +565,9 @@ func _build_my_footer() -> void:
 
 ## Licitação (true) x duelo (false): quem está visível em cada fase.
 func _set_phase(bidding: bool) -> void:
+	bidding_now = bidding
+	if main_area != null:
+		_apply_orientation()
 	if is_inside_tree() and root_box.modulate.a > 0.5:
 		root_box.modulate.a = 0.0
 		create_tween().tween_property(root_box, "modulate:a", 1.0, GameState.anim(0.35))
@@ -559,12 +582,42 @@ func _set_phase(bidding: bool) -> void:
 	ticks.visible = duel
 
 
+## Tela larga (PC): coluna do chefe/placar à esquerda e a mesa ao centro. Tela vertical
+## (celular): tudo empilhado, como sempre foi.
+func _is_wide() -> bool:
+	var sz := get_viewport_rect().size
+	return sz.x > sz.y
+
+
+func _apply_orientation() -> void:
+	if main_area == null:
+		return
+	var wide := _is_wide()
+	main_area.vertical = not wide
+	side_col.custom_minimum_size.x = 620.0 if wide else 0.0
+	side_col.visible = not (wide and bidding_now)
+	seat_strip.vertical = wide
+	arena.custom_minimum_size.y = 300.0 if wide else 340.0
+	for k in bid_buttons:
+		(bid_buttons[k] as Button).custom_minimum_size.y = 46.0 if wide else 60.0
+	bid_panel.add_theme_constant_override("separation", 8 if wide else 12)
+	bid_panel.custom_minimum_size.x = 1000.0 if wide else 0.0
+	bid_grid.columns = 4 if wide else 2
+	bid_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER if wide else Control.SIZE_FILL
+	_layout_table()
+
+
 func _on_resize() -> void:
+	_apply_orientation()
 	_layout_table()
 	_layout_hand()
 
 
 ## Centro (no espaço da arena) da carta de cada assento: você embaixo, oeste, norte, leste.
+func _side_offset() -> float:
+	return clampf(arena.size.x * 0.3, 170.0, 380.0)
+
+
 func _slot_center(player: int) -> Vector2:
 	var s := arena.size
 	var c := s / 2.0
@@ -573,10 +626,10 @@ func _slot_center(player: int) -> Vector2:
 		0:
 			return Vector2(c.x, s.y - half.y - 4.0)
 		1:
-			return Vector2(c.x - 170.0, c.y)
+			return Vector2(c.x - _side_offset(), c.y)
 		2:
 			return Vector2(c.x, half.y + 4.0)
-	return Vector2(c.x + 170.0, c.y)
+	return Vector2(c.x + _side_offset(), c.y)
 
 
 func _slot_pos(player: int) -> Vector2:
@@ -660,6 +713,7 @@ func _current_turn_player() -> int:
 
 
 func _refresh_hud() -> void:
+	trick_label.visible = trick_label.text != "" and not bidding_now
 	var trick_wins := []
 	for p in range(engine.num_players):
 		trick_wins.append(0)
@@ -738,9 +792,9 @@ func _refresh_boss(animate: bool = false) -> void:
 	if missing <= 0.0:
 		boss_meta.text = "Meta batida! O contrato está garantido." if not mine else "Meta batida!"
 	elif mine:
-		boss_meta.text = "Faltam %s pts. Os outros 3 jogam pra segurar a sua barra." % UIKit.fmt_dec(missing, 1)
+		boss_meta.text = "Faltam %s pts pra sua meta." % UIKit.fmt_dec(missing, 1)
 	else:
-		boss_meta.text = "Faltam %s pts pro chefe bater a meta. Segure a barra: não deixe encher." % UIKit.fmt_dec(missing, 1)
+		boss_meta.text = "Faltam %s pts. Segure a barra!" % UIKit.fmt_dec(missing, 1)
 
 
 ## Destaca com borda dourada + pulso o assento de quem tem a vez agora (bots só — o

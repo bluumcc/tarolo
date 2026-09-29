@@ -63,12 +63,12 @@ func _install_symbol_font() -> void:
 		(base as FontFile).allow_system_fallback = false
 
 
-## Resolução base 1280x720 no paisagem (PC) e 720x1280 no retrato (smartphone),
+## Resolução base 1920x1200 no paisagem (PC) e 720x1280 no retrato (smartphone),
 ## para a UI não encolher pela metade em telas verticais.
 func _update_content_scale() -> void:
 	var win := get_tree().root.size
 	var portrait := win.y > win.x
-	get_tree().root.content_scale_size = Vector2i(720, 1280) if portrait else Vector2i(1280, 720)
+	get_tree().root.content_scale_size = Vector2i(720, 1280) if portrait else Vector2i(1920, 1200)
 
 
 # ------------------------------------------------------------------ settings

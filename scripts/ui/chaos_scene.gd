@@ -398,7 +398,7 @@ func _update_turn_highlight(turn_player: int) -> void:
 		var accent := UIKit.GOLD if active else UIKit.MUTED
 		if p == engine.folego_player:
 			accent = UIKit.OK if not active else UIKit.GOLD
-		avatar.add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE, accent, 4 if active else 2, 30, 0))
+		avatar.add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, accent, 4 if active else 2, 10, 14))
 		if not active:
 			avatar.scale = Vector2.ONE
 	if turn_player > 0:
