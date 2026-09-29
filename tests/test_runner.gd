@@ -409,13 +409,14 @@ func _test_chaos() -> void:
 	var eb2 := ChaosEngine.new()
 	eb2.setup_match({"seed": 3})
 	eb2.set_bet(0, 0)
-	eb2.set_bet(1, 2)
+	eb2.set_bet(1, 1)
 	eb2.history = []
 	for k in range(3):
 		eb2.history.append({"winner": 0})
 	var settled := eb2._settle_bets()
-	check(bool(settled[0]["hit"]) and float(settled[0]["delta"]) == 4.0, "Aposta SEGURO (2+) acertada rende +4")
-	check(not bool(settled[1]["hit"]) and float(settled[1]["delta"]) == -3.0, "Aposta LENDA errada custa -3")
+	check(bool(settled[0]["hit"]) and float(settled[0]["delta"]) == 10.0, "Aposta SEGURO (2+) acertada rende +10 fichas")
+	check(not bool(settled[1]["hit"]) and float(settled[1]["delta"]) == -20.0, "Aposta OUSADO errada custa a aposta (20 fichas)")
+	check(is_equal_approx(eb2.bet_chips[0], 10.0) and is_equal_approx(eb2.bet_chips[1], -20.0), "saldo de fichas das apostas acumula")
 	check(int(settled[2]["bet"]) == -1, "sem aposta não muda nada")
 
 	# Modificadores de vaza única e combos.

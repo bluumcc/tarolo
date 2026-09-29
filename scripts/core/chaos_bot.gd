@@ -106,6 +106,8 @@ static func choose_bet(hand: Array, difficulty: int, rng: RandomNumberGenerator)
 		expected += rng.randf_range(-0.7, 0.7)
 	if expected >= 5.0:
 		return 2
+	if expected < 1.6 and rng.randf() < 0.5:
+		return -1
 	if expected >= 3.2:
 		return 1
 	return 0

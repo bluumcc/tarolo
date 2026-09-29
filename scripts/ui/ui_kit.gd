@@ -177,11 +177,55 @@ static func overlay() -> ColorRect:
 	return o
 
 
-static func centered(child: Control) -> CenterContainer:
+## Centraliza um popup na tela. Rola quando o conteúdo passa da altura (celular) e, em
+## retrato, amplia os textos e botões do popup (BOOST) — no celular 720 px virtuais viram
+## ~390 pt e o tamanho de desktop fica pequeno.
+static func centered(child: Control) -> Control:
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	var c := CenterContainer.new()
-	c.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	c.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	c.add_child(child)
-	return c
+	scroll.add_child(c)
+	boost_later(child)
+	return scroll
+
+
+const BOOST := 1.3
+
+## Amplia (uma única vez) fontes e botões de uma árvore, só em tela retrato.
+static func boost(node: Node) -> void:
+	if node == null or not is_instance_valid(node) or not node.is_inside_tree():
+		return
+	var vp := node.get_viewport().get_visible_rect().size
+	if vp.y <= vp.x:
+		return
+	_boost_rec(node)
+
+
+static func boost_later(node: Node) -> void:
+	node.ready.connect(func(): boost.call_deferred(node), CONNECT_ONE_SHOT)
+
+
+static func _boost_rec(n: Node) -> void:
+	if n.has_meta("boosted"):
+		return
+	if n is Label:
+		var l := n as Label
+		var sz := l.get_theme_font_size("font_size")
+		l.add_theme_font_size_override("font_size", int(round(sz * BOOST)))
+		if l.has_theme_constant_override("outline_size"):
+			l.add_theme_constant_override("outline_size", int(round(l.get_theme_constant("outline_size") * BOOST)))
+		n.set_meta("boosted", true)
+	elif n is Button:
+		var b := n as Button
+		b.add_theme_font_size_override("font_size", int(round(b.get_theme_font_size("font_size") * 1.2)))
+		b.custom_minimum_size.y = maxf(b.custom_minimum_size.y, 100.0)
+		n.set_meta("boosted", true)
+	for ch in n.get_children():
+		_boost_rec(ch)
 
 
 ## Formato numérico PT-BR: 1.234.567
@@ -227,6 +271,7 @@ static func modal(overlay_layer: Control, title: String, width: float = 660.0) -
 	center.add_child(box_p)
 	scroll.add_child(center)
 	ov.add_child(scroll)
+	boost.call_deferred(box_p)
 	return v
 
 

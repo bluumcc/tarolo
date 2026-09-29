@@ -314,7 +314,7 @@ func _apply_orientation() -> void:
 	side_col.visible = false  # a regra da rodada já fica na faixa de avisos, em repouso
 	modifier_expanded = wide
 	_refresh_hud()
-	table_center.custom_minimum_size.y = 500 if wide else 500
+	table_center.custom_minimum_size.y = 240 if wide else 500
 	_layout_table()
 
 
@@ -472,7 +472,11 @@ func _refresh_hud() -> void:
 		var lead_accent := UIKit.GOLD if p == engine.folego_player else UIKit.MUTED
 		var item_icon: String = ChaosItems.ICONS.get(engine.player_items[p], "") if p < engine.player_items.size() and not engine.power_used[p] else ""
 		var prefix := ("♨ " if p == engine.folego_player else "") + (item_icon + " " if item_icon != "" else "")
-		(hud_titles[p] as Label).text = "%s%s" % [prefix, str(config["names"][p]).to_upper()]
+		var bet_tag := ""
+		if p < engine.bets.size() and int(engine.bets[p]) >= 0:
+			var bo: Dictionary = ChaosEngine.BET_OPTIONS[int(engine.bets[p])]
+			bet_tag = "  ◎%d·%d+" % [int(bo["stake"]), int(bo["need"])]
+		(hud_titles[p] as Label).text = "%s%s%s" % [prefix, str(config["names"][p]).to_upper(), bet_tag]
 		(hud_titles[p] as Label).add_theme_color_override("font_color", lead_accent)
 		if p > 0:
 			(hud_cards[p] as Label).text = "%d cartas" % (engine.hands[p] as Array).size()
@@ -484,6 +488,17 @@ func _refresh_hud() -> void:
 	wager_label.text = "◎ %d fichas\nPote %d" % [int(profile["fichas"]), int(engine.pot)]
 	_update_turn_highlight(turn_player)
 	_refresh_power_button()
+
+
+## Devolve a aposta + ganho ao jogador quando ele acertou (a aposta já saiu do saldo ao apostar).
+func _settle_bet_chips() -> void:
+	var bd: Dictionary = (engine.round_result.get("bets", []) as Array)[0]
+	if not GameState.autoplay and int(bd["bet"]) >= 0 and bool(bd["hit"]):
+		var opt: Dictionary = ChaosEngine.BET_OPTIONS[int(bd["bet"])]
+		var profile := SaveManager.section("profile")
+		profile["fichas"] = int(profile["fichas"]) + int(opt["stake"]) + int(opt["win"])
+		SaveManager.save_game()
+	_refresh_hud()
 
 
 func _refresh_power_button() -> void:
@@ -711,6 +726,7 @@ func _run_round() -> void:
 			await _resolve_trick(res["result"])
 	if not is_inside_tree():
 		return
+	_settle_bet_chips()
 	await _show_round_summary()
 	if not is_inside_tree():
 		return
@@ -748,12 +764,20 @@ func _pre_round() -> void:
 	var hand: Array = engine.hands[0]
 	var trunfos := hand.filter(func(c: CardData) -> bool: return c.is_trunfo() and not c.is_louco()).size()
 	var kings := hand.filter(func(c: CardData) -> bool: return c.rank == 14 and not c.is_trunfo()).size()
+	var fichas := int(SaveManager.section("profile")["fichas"])
 	var bopts: Array = []
 	for b in ChaosEngine.BET_OPTIONS:
-		bopts.append({"label": "%s · %d+ vazas · +%d" % [b["name"], int(b["need"]), int(b["bonus"])], "desc": "", "color": UIKit.GOLD})
-	var bet := await _modal_choice("FAÇA SUA APOSTA", "Sua mão: %d Trunfos e %d Reis. Errou a aposta: −%d pts." % [trunfos, kings, int(ChaosEngine.BET_MISS)], bopts)
+		var can: bool = fichas >= int(b["stake"])
+		bopts.append({"label": "◎ %d · %s · %d+ vazas" % [int(b["stake"]), b["name"], int(b["need"])], "desc": "Fez %d ou mais vazas? Ganha ◎ %d. Não fez? Perde os ◎ %d." % [int(b["need"]), int(b["win"]), int(b["stake"])], "color": UIKit.GOLD, "disabled": not can})
+	bopts.append({"label": "NÃO APOSTAR", "desc": "", "color": UIKit.MUTED})
+	var bet := await _modal_choice("APOSTE FICHAS!", "Como no poker: aposte fichas em quantas vazas você vai vencer NESSA rodada. Sua mão: %d Trunfos e %d Reis. Você tem ◎ %d." % [trunfos, kings, fichas], bopts)
 	if not is_inside_tree():
 		return
+	if bet >= ChaosEngine.BET_OPTIONS.size():
+		bet = -1
+	if bet >= 0:
+		SaveManager.section("profile")["fichas"] = fichas - int(ChaosEngine.BET_OPTIONS[bet]["stake"])
+		SaveManager.save_game()
 	engine.set_bet(0, bet)
 	_refresh_hud()
 
@@ -777,6 +801,7 @@ func _modal_choice(title: String, sub: String, opts: Array, cancel := false) -> 
 	for i in range(opts.size()):
 		var o: Dictionary = opts[i]
 		var btn := UIKit.button(str(o["label"]), o.get("color", UIKit.OK))
+		btn.disabled = bool(o.get("disabled", false))
 		btn.pressed.connect(func(): item_chosen.emit(i))
 		v.add_child(btn)
 		if str(o.get("desc", "")) != "":
@@ -1089,14 +1114,14 @@ func _show_round_summary() -> void:
 	var bets: Array = r.get("bets", [])
 	var won: Array = r.get("tricks_won", [])
 	v.add_child(HSeparator.new())
-	v.add_child(UIKit.label("APOSTAS", 34, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("APOSTAS EM FICHAS", 34, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	for p in range(engine.num_players):
 		var bd: Dictionary = bets[p]
 		if int(bd["bet"]) < 0:
 			continue
 		var opt: Dictionary = ChaosEngine.BET_OPTIONS[int(bd["bet"])]
 		var ok := bool(bd["hit"])
-		var bl := "%s  %s (%d+)  fez %d  %s %s" % [str(config["names"][p]).to_upper(), opt["name"], int(opt["need"]), int(won[p]), "✓" if ok else "✕", ("+" if ok else "") + UIKit.fmt_dec(float(bd["delta"]), 0)]
+		var bl := "%s  %s (%d+)  fez %d  %s %s" % [str(config["names"][p]).to_upper(), opt["name"], int(opt["need"]), int(won[p]), "✓" if ok else "✕", ("+◎ " if ok else "−◎ ") + UIKit.fmt_dec(absf(float(bd["delta"])), 0)]
 		v.add_child(UIKit.label(bl, 30, UIKit.OK if ok else UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
 	var btn_text := "VER RESULTADO FINAL" if int(r["round"]) >= ChaosEngine.ROUNDS - 1 else "PRÓXIMA RODADA"
 	var btn := UIKit.button(btn_text)
@@ -1145,6 +1170,9 @@ func _show_results(summary: Dictionary) -> void:
 		var line := "%d. %s%s — %s pts" % [i + 1, "♛ " if i == 0 else "", str(config["names"][p]).to_upper(), UIKit.fmt_dec(float(totals[p]), 1)]
 		v.add_child(UIKit.label(line, 34, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
+	var chips_net := int(engine.bet_chips[0])
+	if chips_net != 0:
+		v.add_child(UIKit.label("◎ Apostas: %s%d fichas" % ["+" if chips_net > 0 else "−", absi(chips_net)], 32, UIKit.OK if chips_net > 0 else UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
 	if not best_trick.is_empty():
 		v.add_child(UIKit.label("★ Sua melhor vaza: +%s pts (rodada %d)" % [UIKit.fmt_dec(float(best_trick["points"]), 1), int(best_trick["round"])], 30, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	for line in summary["lines"]:
@@ -1209,7 +1237,7 @@ func _tip(key: String, title: String, text: String) -> void:
 func _intro_slides() -> void:
 	var slides := [
 		{"icon": "♠ ♥ ◆ ♣", "title": "GANHE VAZAS", "text": "São 5 rodadas de 8 cartas. Em cada vaza todo mundo joga 1 carta: vence a maior do naipe (Trunfo corta). Quem vence leva as cartas e os pontos delas. No fim, o maior placar leva o pote de fichas."},
-		{"icon": "✦ ⚡ ★", "title": "3 DECISÕES POR RODADA", "text": "Toda rodada sorteia UM modificador que muda as regras (às vezes só numa vaza surpresa). Você escolhe seu PODER (roubar Trunfo, espiar ou arriscar) e faz sua APOSTA de quantas vazas vai vencer."},
+		{"icon": "✦ ⚡ ★", "title": "3 DECISÕES POR RODADA", "text": "Toda rodada sorteia UM modificador que muda as regras (às vezes só numa vaza surpresa). Você escolhe seu PODER (roubar Trunfo, espiar ou arriscar) e pode APOSTAR FICHAS em quantas vazas vai vencer, como no poker: acertou ganha, errou perde."},
 		{"icon": "♨ ≋ ⚑", "title": "VIRE O JOGO", "text": "3 vazas seguidas = Mão Quente ×1,5. Quem está em último ganha Fôlego ×1,5. A última rodada vale ×2. Você tem 10 segundos por jogada. Bora!"},
 	]
 	modal_open = true
@@ -1279,8 +1307,8 @@ PODER (1 por rodada)
 • ◎ ESPIAR — vê a mão inteira de um rival.
 • ⚡ ARRISCAR — na vaza em que usar: vencer = ×2 nos pontos, perder = −2.
 
-APOSTA (1 por rodada)
-• Escolha quantas vazas promete vencer: SEGURO 2+ (+4), OUSADO 4+ (+9) ou LENDA 6+ (+18). Errou: −3. Os bots apostam também.
+APOSTA DE FICHAS (como no poker)
+• Antes de cada rodada você pode apostar fichas em quantas vazas vai vencer: SEGURO (2+ vazas, aposta ◎10, ganha ◎10), OUSADO (4+, aposta ◎20, ganha ◎50) ou LENDA (6+, aposta ◎30, ganha ◎150). Errou, perde a aposta. Pode também NÃO APOSTAR. Os bots apostam também (aparece ao lado do nome deles).
 
 COMBOS (aparecem no aviso acima da mesa)
 • MÃO QUENTE: 3 vazas seguidas na rodada — pontos ×1,5.

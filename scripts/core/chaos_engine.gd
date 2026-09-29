@@ -14,13 +14,13 @@ const ROUNDS := 5
 const FOLEGO_MULT := 1.5   # bônus de pontos pra quem tá em último ANTES da rodada começar
 const ARRISCAR_MULT := 2.0  # poder Arriscar: vaza vencida vale ×2
 const ARRISCAR_LOSS := 2.0  # ...e se perder, −2
-# Aposta da rodada: vazas que você promete vencer → bônus se acertar; errou, perde BET_MISS.
+# Aposta em fichas (estilo poker): antes da rodada você aposta `stake` fichas que fará
+# `need`+ vazas. Acertou: ganha `win` fichas (e recebe a aposta de volta). Errou: perde a aposta.
 const BET_OPTIONS := [
-	{"need": 2, "bonus": 4.0, "name": "SEGURO"},
-	{"need": 4, "bonus": 9.0, "name": "OUSADO"},
-	{"need": 6, "bonus": 18.0, "name": "LENDA"},
+	{"need": 2, "stake": 10, "win": 10, "name": "SEGURO"},
+	{"need": 4, "stake": 20, "win": 50, "name": "OUSADO"},
+	{"need": 6, "stake": 30, "win": 150, "name": "LENDA"},
 ]
-const BET_MISS := 3.0
 const BUY_IN := 100.0
 const GOLD_MULT := 3.0      # Vaza Dourada
 const FINAL_MULT := 2.0     # todos os pontos da última rodada
@@ -58,6 +58,7 @@ var player_items: Array = []  # item ativo de cada jogador nessa rodada (ChaosIt
 var power_used: Array = []    # se o jogador já usou o poder dessa rodada
 var arriscar_on: Array = []   # Arriscar armado pra vaza atual
 var bets: Array = []          # índice em BET_OPTIONS de cada jogador (-1 = sem aposta)
+var bet_chips: Array = []     # saldo de fichas das apostas na partida, por jogador
 var leader := -1
 var current := -1
 var trick_number := 0
@@ -79,6 +80,9 @@ func setup_match(config: Dictionary) -> void:
 	for p in range(num_players):
 		totals.append(0.0)
 	round_index = 0
+	bet_chips = []
+	for p in range(num_players):
+		bet_chips.append(0.0)
 	match_result = {}
 	modifier_sequence = ChaosModifiers.ALL.duplicate()
 	Deck.shuffle(modifier_sequence, rng)
@@ -392,7 +396,7 @@ func _tricks_won() -> Array:
 	return won
 
 
-## Acerta as apostas da rodada: bônus por acertar, penalidade por errar.
+## Acerta as apostas em fichas ao fim da rodada. `delta` = ganho líquido (+win ou -stake).
 func _settle_bets() -> Array:
 	var won := _tricks_won()
 	var out: Array = []
@@ -403,9 +407,8 @@ func _settle_bets() -> Array:
 			continue
 		var opt: Dictionary = BET_OPTIONS[b]
 		var hit: bool = int(won[p]) >= int(opt["need"])
-		var delta: float = float(opt["bonus"]) if hit else -BET_MISS
-		totals[p] += delta
-		round_points[p] += delta
+		var delta: float = float(opt["win"]) if hit else -float(opt["stake"])
+		bet_chips[p] += delta
 		out.append({"bet": b, "hit": hit, "delta": delta})
 	return out
 

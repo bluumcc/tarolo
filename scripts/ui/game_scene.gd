@@ -1286,6 +1286,7 @@ func _ask_yes_no(title: String, body: String) -> bool:
 		human_yesno_chosen.emit(true))
 	row.add_child(yes_btn)
 	popup_layer.add_child(panel)
+	UIKit.boost.call_deferred(panel)
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
 	panel.position.y = 130
 	no_btn.grab_focus.call_deferred()
