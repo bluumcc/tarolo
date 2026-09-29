@@ -95,6 +95,13 @@ func _build_ui() -> void:
 	root.add_theme_constant_override("separation", 8)
 	margin.add_child(root)
 
+	hud_badges.resize(engine.num_players)
+	hud_titles.resize(engine.num_players)
+	hud_totals.resize(engine.num_players)
+	hud_round_pts.resize(engine.num_players)
+	hud_cards.resize(engine.num_players)
+	seat_avatars.resize(engine.num_players)
+
 	# Barra de topo — título + ações, uma linha só, sempre no mesmo lugar (como o topo
 	# de qualquer app) -------------------------------------------------
 	var topbar := HBoxContainer.new()
@@ -114,50 +121,33 @@ func _build_ui() -> void:
 	menu_btn.pressed.connect(_open_pause)
 	topbar.add_child(menu_btn)
 
-	# Placar dos jogadores — um cartão por jogador com avatar, pontos e vaza atual;
-	# quebra linha sozinho em telas estreitas (HFlowContainer) em vez de espalhar
-	# avatares soltos pela tela como numa mesa física. ------------------
-	var hud := HFlowContainer.new()
-	hud.add_theme_constant_override("h_separation", 8)
-	hud.add_theme_constant_override("v_separation", 8)
+	# Placar dos outros 3 jogadores — uma fileira só, esticando até preencher a largura
+	# toda. Sem avatar/círculo: só nome e pontos já bastam pra reconhecer quem é quem
+	# numa mesa de 4 — o círculo com inicial só ocupava espaço sem ajudar em nada.
+	var hud := HBoxContainer.new()
+	hud.add_theme_constant_override("separation", 8)
 	root.add_child(hud)
-	for p in range(engine.num_players):
-		# O card em si é um botão — toque pra abrir/fechar o detalhe (pontos da rodada,
-		# cartas na mão, item ativo). Por padrão só mostra o essencial: quem é, quanto tem.
+	for p in range(1, engine.num_players):
+		# O card em si reage a toque — abre/fecha o detalhe (pontos da rodada, cartas
+		# na mão). Por padrão só mostra o essencial: quem é, quanto tem.
 		var badge := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MUTED, 10)
 		badge.mouse_filter = Control.MOUSE_FILTER_STOP
-		badge.custom_minimum_size = Vector2(190, 0)
+		badge.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var outer := VBoxContainer.new()
 		outer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		outer.add_theme_constant_override("separation", 4)
+		outer.add_theme_constant_override("separation", 2)
 		badge.add_child(outer)
 
-		var row := HBoxContainer.new()
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_theme_constant_override("separation", 10)
-		outer.add_child(row)
-		var avatar := PanelContainer.new()
-		avatar.custom_minimum_size = Vector2(52, 52)
-		avatar.pivot_offset = Vector2(26, 26)
-		avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		avatar.add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE, UIKit.MUTED, 2, 26, 0))
-		var av_label := UIKit.label(str(config["names"][p]).substr(0, 1).to_upper(), 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-		av_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		av_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		avatar.add_child(av_label)
-		row.add_child(avatar)
-		seat_avatars.append(avatar)
-		var v := VBoxContainer.new()
-		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		v.add_theme_constant_override("separation", 1)
-		v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(v)
+		var top_row := HBoxContainer.new()
+		top_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		outer.add_child(top_row)
 		var title_label := UIKit.label(str(config["names"][p]).to_upper(), 13, UIKit.MUTED)
-		v.add_child(title_label)
-		var total := UIKit.label("0,0 pts", 22, UIKit.INK)
-		v.add_child(total)
-		var chevron := UIKit.label("▸ detalhe", 10, UIKit.MUTED)
-		row.add_child(chevron)
+		title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		top_row.add_child(title_label)
+		var chevron := UIKit.label("▸", 12, UIKit.MUTED)
+		top_row.add_child(chevron)
+		var total := UIKit.label("0,0 pts", 20, UIKit.INK)
+		outer.add_child(total)
 
 		var detail := VBoxContainer.new()
 		detail.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -166,28 +156,27 @@ func _build_ui() -> void:
 		outer.add_child(detail)
 		var rp := UIKit.label("+0,0 na rodada", 12, UIKit.MUTED)
 		detail.add_child(rp)
-		var cards_label: Label
-		if p > 0:
-			cards_label = UIKit.label("", 12, UIKit.MUTED)
-			detail.add_child(cards_label)
+		var cards_label := UIKit.label("", 12, UIKit.MUTED)
+		detail.add_child(cards_label)
 
 		badge.gui_input.connect(func(event: InputEvent):
 			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 				Sfx.play("tick")
 				detail.visible = not detail.visible
-				chevron.text = "▾ detalhe" if detail.visible else "▸ detalhe")
+				chevron.text = "▾" if detail.visible else "▸")
 
 		hud.add_child(badge)
-		hud_badges.append(badge)
-		hud_titles.append(title_label)
-		hud_totals.append(total)
-		hud_round_pts.append(rp)
-		hud_cards.append(cards_label)
+		hud_badges[p] = badge
+		hud_titles[p] = title_label
+		hud_totals[p] = total
+		hud_round_pts[p] = rp
+		hud_cards[p] = cards_label
+		seat_avatars[p] = badge
 
-	# Barra do modificador — compacta por padrão (nome só); a explicação completa já
-	# apareceu no banner de início de rodada, então aqui só repete em texto curto, com
-	# toque pra reabrir o texto inteiro se precisar consultar de novo.
-	var mod_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.OK, 10)
+	# Banner do modificador — fundo preenchido pra se destacar como um aviso de verdade,
+	# não só mais um cartão igual aos outros. Compacto por padrão (nome só); a explicação
+	# completa já apareceu no banner de início de rodada — toque reabre se precisar.
+	var mod_box := UIKit.panel(UIKit.OK.darkened(0.75), UIKit.OK, 10)
 	mod_box.mouse_filter = Control.MOUSE_FILTER_STOP
 	modifier_label = UIKit.label("", 14, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
 	modifier_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -200,10 +189,12 @@ func _build_ui() -> void:
 		_refresh_hud())
 	root.add_child(mod_box)
 
-	var wager_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 8)
-	wager_label = UIKit.label("", 13, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	wager_box.add_child(wager_label)
-	root.add_child(wager_box)
+	# Espaçador — empurra a mesa (vaza atual), a mão e meu rodapé pra baixo, como um
+	# bloco só, junto do polegar — em vez de deixar um vão vazio entre o placar e a mesa.
+	var vspacer := Control.new()
+	vspacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vspacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(vspacer)
 
 	# Mesa de jogo — só a vaza atual, uma faixa compacta e fixa (não uma mesa oval
 	# espalhada): cada carta jogada aparece numa posição fixa, em ordem de assento,
@@ -222,13 +213,6 @@ func _build_ui() -> void:
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root.add_child(status_label)
 
-	# Empurra a mão pro rodapé — zona do polegar, jeito de app — em vez de deixar tudo
-	# flutuando no topo com um vão vazio embaixo em telas altas (celular).
-	var vspacer := Control.new()
-	vspacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vspacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(vspacer)
-
 	# Mão — cartas sempre no tamanho real (nunca encolhidas pra caber); quando não cabem
 	# todas na tela, a mão rola de lado (arrasto/swipe), igual qualquer app de cartas. ---
 	var hand_scroll := ScrollContainer.new()
@@ -244,6 +228,38 @@ func _build_ui() -> void:
 	# vira espaço LIVRE ACIMA da carta, senão o arrasto pra jogar corta na borda de cima.
 	hand_container.size_flags_vertical = Control.SIZE_SHRINK_END
 	hand_scroll.add_child(hand_container)
+
+	# Meu rodapé — minhas informações (pontos, fichas, pote), embaixo da minha mão, onde
+	# o olho já está depois de escolher a carta — em vez de competir lá em cima com o
+	# placar dos outros 3.
+	var my_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 12)
+	var my_row := HBoxContainer.new()
+	my_row.add_theme_constant_override("separation", 16)
+	my_box.add_child(my_row)
+	var my_left := VBoxContainer.new()
+	my_left.add_theme_constant_override("separation", 1)
+	my_left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	my_row.add_child(my_left)
+	var my_title := UIKit.label(str(config["names"][0]).to_upper(), 13, UIKit.MUTED)
+	my_left.add_child(my_title)
+	var my_total := UIKit.label("0,0 pts", 26, UIKit.INK)
+	my_left.add_child(my_total)
+	var my_rp := UIKit.label("+0,0 na rodada", 13, UIKit.MUTED)
+	my_left.add_child(my_rp)
+	var my_right := VBoxContainer.new()
+	my_right.add_theme_constant_override("separation", 1)
+	my_right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	my_right.alignment = BoxContainer.ALIGNMENT_CENTER
+	my_row.add_child(my_right)
+	wager_label = UIKit.label("", 13, UIKit.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
+	wager_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	my_right.add_child(wager_label)
+	root.add_child(my_box)
+	hud_badges[0] = my_box
+	hud_titles[0] = my_title
+	hud_totals[0] = my_total
+	hud_round_pts[0] = my_rp
+	seat_avatars[0] = my_box
 
 	popup_layer = Control.new()
 	popup_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
