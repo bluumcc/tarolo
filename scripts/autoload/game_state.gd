@@ -140,14 +140,30 @@ func player_name() -> String:
 	return str(SaveManager.section("profile")["name"])
 
 
-## Configuração da partida pra ChaosScene / ChaosEngine — todo mundo joga pra si, sem
-## Atacante/Defesa, então não precisa de dificuldade especial pro assento do jogador.
-## Já cobra o buy-in das fichas do jogador (config["entered"] = false se não tinha saldo).
+## Mesas do Caos: blind, com buy-in de 20 blinds (a stack com que você senta).
+const CHAOS_TABLES := [
+	{"name": "Iniciante", "blind": 10},
+	{"name": "Regular", "blind": 25},
+	{"name": "Alta", "blind": 100},
+]
+var chaos_table := 0
+
+
+func chaos_buy_in(table: int = -1) -> int:
+	var t: Dictionary = CHAOS_TABLES[clampi(chaos_table if table < 0 else table, 0, CHAOS_TABLES.size() - 1)]
+	return int(t["blind"]) * ChaosEngine.BUY_IN_BLINDS
+
+
+## Configuração da mesa pra ChaosScene / ChaosEngine — todo mundo joga pra si. Já cobra o
+## buy-in das fichas do jogador (config["entered"] = false se não tinha saldo); ele volta
+## como stack final quando você sai da mesa.
 func chaos_config() -> Dictionary:
 	var names := BOT_NAMES.duplicate()
 	names.shuffle()
 	var profile := SaveManager.section("profile")
-	var buy_in := ChaosEngine.BUY_IN
+	var t: Dictionary = CHAOS_TABLES[clampi(chaos_table, 0, CHAOS_TABLES.size() - 1)]
+	var blind := int(t["blind"])
+	var buy_in := chaos_buy_in()
 	var entered := int(profile["fichas"]) >= buy_in
 	if entered:
 		profile["fichas"] = int(profile["fichas"]) - buy_in
@@ -155,40 +171,45 @@ func chaos_config() -> Dictionary:
 	return {
 		"players": 4,
 		"names": [player_name(), names[0], names[1], names[2]],
-		"difficulty": [BotAI.Difficulty.NORMAL, BotAI.Difficulty.NORMAL, BotAI.Difficulty.NORMAL, BotAI.Difficulty.NORMAL],
+		"difficulty": [BotAI.Difficulty.NORMAL, BotAI.Difficulty.NORMAL, BotAI.Difficulty.HARD, BotAI.Difficulty.NORMAL],
+		"blind": blind,
 		"buy_in": buy_in,
+		"table_name": str(t["name"]),
+		"levels": 3 if autoplay else 0,
 		"entered": entered,
 	}
 
 
-## Fecha uma partida de Caos e devolve um resumo pra tela de resultado. Dá Fragmentos
-## conforme a colocação e paga a fatia do pote correspondente em fichas (o buy-in já
-## saiu do bolso na entrada, via chaos_config). Não mexe em LP/elo — isso é só do
-## Ranqueado (Vanilla).
-## result: { standings: Array, totals: Array, payout: float, buy_in: float }
+## Fecha uma sessão de mesa Caos (você saiu, quebrou ou a partida de teste acabou): devolve
+## a stack final às fichas do perfil e dá Fragmentos se jogou pelo menos um nível.
+## result: { standings, stacks, payout (sua stack), buy_in, hands }
 func report_chaos_match(result: Dictionary) -> Dictionary:
 	var standings: Array = result["standings"]
 	var placement := standings.find(0)
 	var profile := SaveManager.section("profile")
-	profile["matches"] = int(profile["matches"]) + 1
-	var won := placement == 0
-	if won:
-		profile["wins"] = int(profile["wins"]) + 1
-	var frag_by_place := [15, 10, 6, 3]
-	var frag: int = frag_by_place[clampi(placement, 0, 3)]
-	profile["fragments"] = int(profile["fragments"]) + frag
 	var payout := int(round(float(result.get("payout", 0.0))))
 	var buy_in := int(round(float(result.get("buy_in", 0.0))))
+	var hands := int(result.get("hands", 0))
+	var net := payout - buy_in
+	var won := net > 0
+	var frag := 0
+	if hands >= ChaosEngine.HAND_SIZE:
+		profile["matches"] = int(profile["matches"]) + 1
+		if won:
+			profile["wins"] = int(profile["wins"]) + 1
+		var frag_by_place := [15, 10, 6, 3]
+		frag = frag_by_place[clampi(placement, 0, 3)]
+		profile["fragments"] = int(profile["fragments"]) + frag
 	profile["fichas"] = int(profile["fichas"]) + payout
 	SaveManager.save_game()
-	var net := payout - buy_in
+	var lines: Array = []
+	if frag > 0:
+		lines.append("+%d Fragmentos" % frag)
+	lines.append("%s%d fichas nessa mesa (stack final %d)" % ["+" if net >= 0 else "", net, payout])
 	var summary := {
 		"placement": placement,
 		"won": won,
-		"lines": [
-			"%s%d Fragmentos" % ["+" if frag >= 0 else "", frag],
-			"%s%d fichas nessa mesa (pote pagou %d)" % ["+" if net >= 0 else "", net, payout],
-		],
+		"lines": lines,
 		"payout": payout,
 		"net_fichas": net,
 	}

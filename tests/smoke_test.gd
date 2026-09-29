@@ -55,7 +55,7 @@ func _play_chaos() -> Dictionary:
 	var g: Node = CHAOS.instantiate()
 	add_child(g)
 	var summary: Dictionary = await g.match_finished
-	check(g.engine.round_index >= ChaosEngine.ROUNDS - 1 and g.engine.is_round_over(), "partida de Caos terminou (%d/%d rodadas)" % [g.engine.round_index + 1, ChaosEngine.ROUNDS])
+	check(g.engine.hand_no >= ChaosEngine.HAND_SIZE, "mesa de Caos rodou pelo menos um nível (%d rodadas de aposta)" % g.engine.hand_no)
 	check(not g.engine.match_result.is_empty(), "match_result preenchido no fim")
 	await get_tree().process_frame
 	g.queue_free()

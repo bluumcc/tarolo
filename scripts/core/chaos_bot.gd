@@ -1,7 +1,7 @@
 class_name ChaosBot
 extends RefCounted
-## IA dos bots do Caos: como a do BotAI, mas ciente do modificador da rodada (inversão,
-## Rodada Maldita, Naipe Maldito, rodadas de aposta alta, Assalto ao Líder).
+## IA dos bots da Mesa Caos: escolhem a carta (ciente do modificador) e decidem as apostas
+## (passar, aumentar, pagar, desistir) pela força da mão, com blefe nos níveis difíceis.
 
 
 static func choose(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> CardData:
@@ -18,34 +18,15 @@ static func choose(engine: ChaosEngine, player: int, difficulty: int, rng: Rando
 	var mods := ChaosModifiers.Modifier
 	# Quer perder a rodada? (Rodada Maldita, ou Assalto ao Líder sendo ele o líder não muda nada.)
 	var want_lose := ev == mods.VAZA_MALDITA
-	# Palpite exato: no alvo, não ganha mais; faltando tudo que resta, vai pra cima.
-	var bet_lose := false
-	var bet_push := false
-	var predict: int = engine.bet_predict[player]
-	if predict >= 0:
-		var won := engine.tricks_won_by(player)
-		if won >= predict:
-			bet_lose = true
-		elif engine.tricks_left() <= predict - won:
-			bet_push = true
 	# Aposta alta: vale gastar a carta mais forte pra garantir.
 	var high_stakes := ev in [mods.VAZA_DOURADA, mods.ULTIMA_TRIPLO, mods.PRIMEIRA_DOBRO, mods.SAQUE] \
 		or (ev == mods.ASSALTO_LIDER and player == engine._highest_player()) \
-		or engine.is_final_round() or bet_push
+		or engine.pot > float(engine.blind) * 8.0
 
-	var is_last := engine.plays.size() == engine.num_players - 1
+	var is_last := engine.plays.size() == engine.active_count() - 1
 	var winners: Array = legal.filter(func(c: CardData) -> bool: return engine.would_win(c, player))
 	var losers: Array = legal.filter(func(c: CardData) -> bool: return not engine.would_win(c, player))
 
-	if bet_lose and not want_lose and not losers.is_empty():
-		# Já cumpriu o palpite: joga a carta forte que não vence (larga o risco de ganhar depois).
-		var shed: Array = losers.filter(func(c: CardData) -> bool: return not c.is_bout())
-		if shed.is_empty():
-			shed = losers
-		shed.sort_custom(func(a: CardData, b: CardData) -> bool: return a.rank > b.rank)
-		return shed[0]
-	if bet_lose and not want_lose and losers.is_empty():
-		return _cheapest(engine, winners, player)
 	if want_lose:
 		if not losers.is_empty():
 			return _cheapest(engine, losers, player)
@@ -60,6 +41,16 @@ static func choose(engine: ChaosEngine, player: int, difficulty: int, rng: Rando
 		if is_last or (not high_stakes and not inverted and pool.size() > 1 and _trick_value(engine) < 1.0):
 			return pool[0]
 		return pool[0] if inverted else pool[pool.size() - 1]
+
+	if engine.plays.is_empty() and not inverted and engine.pot > float(engine.blind) * float(engine.active_count()) * 1.2:
+		# Rodada aumentada: abre com a carta mais forte pra defender o pote.
+		var power: Array = legal.filter(func(c: CardData) -> bool: return not c.is_louco() and engine.card_value(c, player) >= 0.0)
+		if not power.is_empty():
+			power.sort_custom(func(a: CardData, b: CardData) -> bool:
+				if a.is_trunfo() != b.is_trunfo():
+					return a.is_trunfo()
+				return a.rank > b.rank)
+			return power[0]
 
 	if engine.plays.is_empty():
 		var lead_pool: Array = legal.filter(func(c: CardData) -> bool: return not c.is_louco() and not c.is_bout() and engine.card_value(c, player) >= 0.0)
@@ -99,94 +90,92 @@ static func _cheapest(engine: ChaosEngine, cards: Array, player: int) -> CardDat
 	return pool[0]
 
 
-## Poder que o bot leva pra nível: Espiar não ajuda quem já decide por regra, então só
-## Roubar Trunfo ou Arriscar.
-static func choose_power(rng: RandomNumberGenerator) -> int:
-	return ChaosItems.Item.TROCA if rng.randf() < 0.5 else ChaosItems.Item.ARRISCAR
-
-
-## Palpite do bot: estima quantas rodadas a mão rende (Trunfos altos e Reis) e crava o
-## número. Devolve {predict, stake} ou {} se ficar de fora. Bots fáceis erram mais.
-static func choose_bet(hand: Array, difficulty: int, rng: RandomNumberGenerator) -> Dictionary:
-	var expected := 0.0
-	for c in hand:
+## Força da mão pra essa rodada, de 0 a 1 (mistura as duas melhores cartas: o naipe que abre
+## a rodada pode obrigar a jogar uma carta menor).
+static func hand_strength(engine: ChaosEngine, player: int) -> float:
+	var ev := engine.active_modifier()
+	var inverted := ev == ChaosModifiers.Modifier.MUNDO_CONTRARIO or ev == ChaosModifiers.Modifier.VAZA_INVERTIDA
+	var powers: Array = []
+	for c in engine.hands[player]:
 		var card: CardData = c
+		var pw := 0.0
 		if card.is_louco():
-			continue
-		if card.is_trunfo():
-			expected += 0.8 if card.rank >= 14 else (0.5 if card.rank >= 8 else 0.2)
+			pw = 0.85 if engine.louco_can_win() else 0.05
+			if inverted:
+				pw = 0.05
+		elif inverted:
+			pw = 0.1 if card.is_trunfo() else 1.0 - float(card.rank) / 14.0 * 0.85
+		elif card.is_trunfo():
+			pw = 0.5 + 0.5 * float(card.rank) / 21.0
 		elif card.rank == 14:
-			expected += 0.6
+			pw = 0.55
 		elif card.rank == 13:
-			expected += 0.3
-	if difficulty == BotAI.Difficulty.EASY:
-		expected += rng.randf_range(-1.5, 1.5)
-	elif difficulty == BotAI.Difficulty.NORMAL:
-		expected += rng.randf_range(-0.7, 0.7)
-	var predict := clampi(roundi(expected), 0, 7)
-	if difficulty == BotAI.Difficulty.EASY and rng.randf() < 0.35:
-		return {}
-	var stake: int = ChaosEngine.STAKES[0]
-	if difficulty == BotAI.Difficulty.HARD:
-		# Mais confiança quando a mão é decisiva (muito forte ou muito fraca).
-		if predict >= 4 or predict == 0:
-			stake = ChaosEngine.STAKES[2]
-		elif predict >= 2:
-			stake = ChaosEngine.STAKES[1]
-	elif difficulty == BotAI.Difficulty.NORMAL:
-		stake = ChaosEngine.STAKES[1] if predict >= 3 else ChaosEngine.STAKES[0]
-	return {"predict": predict, "stake": stake}
+			pw = 0.4
+		elif card.rank == 12:
+			pw = 0.3
+		elif card.rank == 11:
+			pw = 0.25
+		else:
+			pw = float(card.rank) / 14.0 * 0.2
+		powers.append(pw)
+	if powers.is_empty():
+		return 0.0
+	powers.sort()
+	powers.reverse()
+	var second: float = powers[1] if powers.size() > 1 else powers[0]
+	return 0.6 * float(powers[0]) + 0.4 * second
 
 
-## Se o bot deve DOBRAR agora (na vez dele).
-static func maybe_double(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> bool:
-	if difficulty == BotAI.Difficulty.EASY or not engine.can_double(player):
-		return false
-	var predict: int = engine.bet_predict[player]
-	var won := engine.tricks_won_by(player)
-	var chance := 0.0
-	if won == predict:
-		# Já cumpriu: dobra se ainda tem carta que não ganha (dá pra perder de propósito).
-		var legal: Array = engine.legal_for(player)
-		var can_lose := legal.any(func(c: CardData) -> bool: return not engine.would_win(c, player))
-		chance = 0.55 if can_lose else 0.0
-	elif predict - won == 1 and engine.tricks_left() >= 2:
-		var strong := (engine.hands[player] as Array).any(func(c: CardData) -> bool: return c.is_trunfo() and c.rank >= 15)
-		chance = 0.5 if strong else 0.0
+## Chance estimada de levar a rodada (0 a 1).
+static func win_chance(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> float:
+	var s := hand_strength(engine, player)
+	var noise := 0.22 if difficulty == BotAI.Difficulty.EASY else (0.1 if difficulty == BotAI.Difficulty.NORMAL else 0.04)
+	s += rng.randf_range(-noise, noise)
+	var p := 0.05 + 0.75 * s * s
+	# Menos rivais na rodada = mais chance.
+	p *= 1.0 + 0.3 * float(engine.num_players - engine.active_count())
+	return clampf(p, 0.02, 0.95)
+
+
+## Decisão de aposta do bot: {action, to, bluff}. `bluff` = aumentou sem mão.
+static func bet_decision(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> Dictionary:
+	var opt := engine.bet_options(player)
+	var pwin := win_chance(engine, player, difficulty, rng)
+	var bluff_rate := 0.0
+	var raise_rate := 0.35
+	var call_margin := 1.0
 	if difficulty == BotAI.Difficulty.NORMAL:
-		chance *= 0.6
-	return rng.randf() < chance
-
-
-## Se o bot deve usar o poder agora (antes de jogar a carta). Retorna {} ou
-## {"item": Item, "target": int}.
-static func maybe_power(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> Dictionary:
-	if not engine.can_use_power(player):
-		return {}
-	var item: int = engine.player_items[player]
-	if item == ChaosItems.Item.TROCA:
-		if engine.trick_number > 3 or (difficulty == BotAI.Difficulty.EASY and rng.randf() < 0.5):
-			return {}
-		var target := -1
-		var best := 0
-		for q in range(engine.num_players):
-			if q == player:
-				continue
-			var n := (engine.hands[q] as Array).filter(func(c: CardData) -> bool: return c.is_trunfo() and not c.is_louco()).size()
-			if n > best:
-				best = n
-				target = q
-		if target == -1:
-			return {}
-		return {"item": item, "target": target}
-	if item == ChaosItems.Item.ARRISCAR:
-		var legal: Array = engine.legal_for(player)
-		var can_win := legal.any(func(c: CardData) -> bool: return engine.would_win(c, player))
-		var last := engine.plays.size() == engine.num_players - 1
-		if can_win and (last or engine.trick_number >= HAND_LAST):
-			if engine.active_modifier() != ChaosModifiers.Modifier.VAZA_MALDITA:
-				return {"item": item, "target": -1}
-	return {}
-
-
-const HAND_LAST := 6
+		bluff_rate = 0.06
+		raise_rate = 0.55
+		call_margin = 1.1
+	elif difficulty == BotAI.Difficulty.HARD:
+		bluff_rate = 0.14
+		raise_rate = 0.7
+		call_margin = 1.2
+	var strong := pwin >= 0.5
+	var bluffing := not strong and rng.randf() < bluff_rate
+	if bluffing and not opt["can_raise"]:
+		bluffing = false
+	var want_raise: bool = bool(opt["can_raise"]) and (bluffing or (strong and rng.randf() < raise_rate))
+	if want_raise:
+		var blind := float(engine.blind)
+		var steps := 1
+		if pwin >= 0.75 or bluffing:
+			steps = rng.randi_range(2, 4)
+		elif pwin >= 0.5:
+			steps = rng.randi_range(1, 2)
+		var to := float(engine.bet_level) + blind * float(steps)
+		to = clampf(to, float(opt["min_to"]), float(opt["max_to"]))
+		if pwin >= 0.9 and rng.randf() < 0.25:
+			to = float(opt["max_to"])
+		# Sem stack pra sustentar o blefe: não vai.
+		if bluffing and to > float(engine.stacks[player]) * 0.5 + float(engine.contrib[player]):
+			to = float(opt["min_to"])
+		return {"action": "raise", "to": to, "bluff": bluffing and not strong}
+	if opt["can_check"]:
+		return {"action": "check", "to": 0.0, "bluff": false}
+	var call_amt: float = opt["call"]
+	var odds := call_amt / (float(opt["pot"]) + call_amt)
+	if pwin > odds * call_margin or (bluffing and rng.randf() < 0.5):
+		return {"action": "call", "to": 0.0, "bluff": false}
+	return {"action": "fold", "to": 0.0, "bluff": false}

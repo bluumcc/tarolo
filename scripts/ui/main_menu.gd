@@ -47,7 +47,7 @@ func _ready() -> void:
 
 	var rk := GameState.ranked()
 	var tier := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
-	var chaos := Widgets.mode_card("MODO CAOS", "Rodadas relâmpago, plot twists e combos. Fichas na mesa!", UIKit.DANGER, 176 if get_viewport_rect().size.y > get_viewport_rect().size.x else 150, "⚡", _open_chaos_confirm, 46)
+	var chaos := Widgets.mode_card("MODO CAOS", "Poker de rodadas: aposte, blefe e leve o pote. Com modificadores e combos!", UIKit.DANGER, 176 if get_viewport_rect().size.y > get_viewport_rect().size.x else 150, "⚡", _open_chaos_confirm, 46)
 	col.add_child(chaos)
 	var wide := get_viewport_rect().size.x > get_viewport_rect().size.y
 	var grid := GridContainer.new()
@@ -365,20 +365,18 @@ func _reopen_cosmetics() -> void:
 func _open_chaos_confirm() -> void:
 	var v := _modal("MESA CAOS")
 	var profile := SaveManager.section("profile")
-	var buy_in := int(ChaosEngine.BUY_IN)
 	var fichas := int(profile["fichas"])
-	v.add_child(UIKit.label("Buy-in: %d fichas" % buy_in, 22, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("Você tem %d fichas" % fichas, 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-	var pot_text := "Pote da mesa (4 jogadores): %d fichas. 1º leva 50%% · 2º 30%% · 3º 15%% · 4º 5%%" % (buy_in * 4)
-	var pot_l := UIKit.label(pot_text, 16, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	pot_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	pot_l.custom_minimum_size = Vector2(620, 0)
-	v.add_child(pot_l)
-	if fichas < buy_in:
-		v.add_child(UIKit.label("Fichas insuficientes pra entrar.", 18, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
-		var loan := UIKit.button("EMPRÉSTIMO DA CASA (%d fichas)" % buy_in, UIKit.GOLD)
+	v.add_child(UIKit.label("Você tem %d fichas" % fichas, 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	var info := UIKit.label("Escolha a mesa. Você senta com uma stack de 20 blinds, aposta a cada rodada (passar, aumentar, pagar ou desistir) e leva de volta a stack quando sair.", 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.custom_minimum_size = Vector2(620, 0)
+	v.add_child(info)
+	var cheapest := GameState.chaos_buy_in(0)
+	if fichas < cheapest:
+		v.add_child(UIKit.label("Fichas insuficientes pra entrar.", 22, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+		var loan := UIKit.button("EMPRÉSTIMO DA CASA (%d fichas)" % cheapest, UIKit.GOLD)
 		loan.pressed.connect(func():
-			profile["fichas"] = buy_in
+			profile["fichas"] = cheapest
 			SaveManager.save_game()
 			_refresh_fragments()
 			overlay_layer.get_child(overlay_layer.get_child_count() - 1).queue_free()
@@ -386,9 +384,15 @@ func _open_chaos_confirm() -> void:
 		v.add_child(loan)
 		_close_button(v)
 		return
-	var enter := UIKit.button("ENTRAR NA MESA", UIKit.DANGER)
-	enter.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn"))
-	v.add_child(enter)
+	for i in range(GameState.CHAOS_TABLES.size()):
+		var t: Dictionary = GameState.CHAOS_TABLES[i]
+		var cost := GameState.chaos_buy_in(i)
+		var b := UIKit.button("%s · blind ◎%d · entrada ◎%d" % [str(t["name"]).to_upper(), int(t["blind"]), cost], UIKit.DANGER if i == 0 else UIKit.PURPLE, 26)
+		b.disabled = fichas < cost
+		b.pressed.connect(func():
+			GameState.chaos_table = i
+			get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn"))
+		v.add_child(b)
 	_close_button(v)
 
 

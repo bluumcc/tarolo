@@ -1,94 +1,90 @@
 class_name ChaosEngine
 extends RefCounted
-## Estado puro de uma partida de Tarot Caos: vários níveis curtos (8 cartas, sem
-## licitação nem talão — todo mundo joga pra si), cada uma com um modificador sorteado
-## e um bônus de "Fôlego" pra quem estiver por baixo, garantindo chance de virada até
-## o fim. Vence quem somar mais pontos no total dos níveis.
+## Estado puro da Mesa Caos: um "poker de rodadas". Cada nível distribui 8 cartas e sorteia
+## um modificador. Cada rodada (4 cartas) é uma mão de aposta: todos pagam o blind (ante),
+## falam na ordem do botão (passar, aumentar, pagar ou desistir) e só quem ficou joga carta.
+## Quem leva a rodada leva o pote, mais um prêmio da banca pelas cartas, modificadores e
+## combos. O placar é a stack de fichas de cada um. A mesa não tem fim: cada nível novo
+## redistribui as cartas e sorteia outro modificador.
 
 signal trick_resolved(result: Dictionary)
 signal round_finished(result: Dictionary)
 signal match_finished(result: Dictionary)
 
 const HAND_SIZE := 8
-const ROUNDS := 5
-const FOLEGO_MULT := 1.5   # bônus de pontos pra quem tá em último ANTES do nível começar
-const ARRISCAR_MULT := 2.0  # poder Arriscar: rodada vencida vale ×2
-const ARRISCAR_LOSS := 2.0  # ...e se perder, −2
-# Aposta em fichas (estilo poker): antes do nível você crava quantas rodadas vai ganhar
-# (palpite exato) e quanto aposta. Todas as apostas vão pro pote do nível; quem acerta o
-# número exato divide o pote pelo peso (aposta × dificuldade × combos). Errou por 1 recebe
-# metade da aposta de volta; errou por mais perde tudo. Sem vencedor, o pote acumula.
-const STAKES := [10, 25, 50]
-const DOUBLE_FROM_TRICK := 3        # DOBRAR liberado a partir da 4ª rodada (índice 3)
-const NEAR_REFUND := 0.5            # errou por 1: devolve metade da aposta
-const COMBO_WEIGHT := 0.25          # cada combo feito no nível: +25% no peso
-const COMBO_WEIGHT_MAX := 1.0       # ...até +100% (peso ×2)
-const BUY_IN := 100.0
-const GOLD_MULT := 3.0      # Rodada Dourada
-const FINAL_MULT := 2.0     # todos os pontos do último nível
-const KING_CUT_BONUS := 3.0 # Corte de Rei
-const BREAK_BONUS := 2.0    # Cortado: quebrar a sequência de 2+ vitórias de alguém
-const SAQUE_AMOUNT := 2.0   # pontos roubados de cada rival no Saque
-const ASSALTO_AMOUNT := 4.0 # pontos roubados do líder no Assalto ao Líder
-const CURSE_PENALTY := 3.0  # pontos perdidos por quem vence a Rodada Maldita
-const FORTE_MULT := 1.5     # Naipe Forte
-const VAZA_PLUS := 1.0      # bônus fixo de Cada Rodada Vale +1
+const ROUNDS := 5            # níveis de uma partida com fim (config "levels"); 0 = mesa sem fim
+const BLIND := 10
+const BUY_IN_BLINDS := 20    # stack de entrada = 20 blinds
+const MAX_RAISES := 2        # aumentos por rodada
+const PRIZE_PER_POINT := 0.25  # cada ponto das cartas vale 0,25 blind, pago pela banca
+const GOLD_MULT := 3.0       # Rodada Dourada
+const KING_CUT_BONUS := 3.0  # Corte de Rei (pontos)
+const BREAK_BONUS := 2.0     # Cortado: quebrar a sequência de 2+ vitórias de alguém
+const SAQUE_AMOUNT := 2.0    # pontos roubados de cada rival no Saque
+const ASSALTO_AMOUNT := 4.0  # pontos roubados de quem tem a maior stack
+const CURSE_PENALTY := 3.0   # pontos que quem vence a Rodada Maldita paga à banca
+const FORTE_MULT := 1.5      # Naipe Forte
+const VAZA_PLUS := 1.0       # bônus fixo de Cada Rodada Vale +1
 const NAIPE_CURSED_VALUE := -1.0  # valor de cada carta do Naipe Maldito
-const PAYOUT_SHARES := [0.5, 0.3, 0.15, 0.05]  # fatia do pote por colocação (1º a 4º)
 
 var num_players := 4
 var rng := RandomNumberGenerator.new()
 
-var totals: Array = []        # pontos acumulados no total da partida
-var round_index := 0
-var modifier_sequence: Array = []  # ordem embaralhada dos modificadores, sem repetir na partida
+var blind := BLIND
+var buy_in := BLIND * BUY_IN_BLINDS
+var levels := 0               # 0 = sem fim
+var stacks: Array = []        # fichas de cada jogador na mesa
+var level_start_stacks: Array = []
+var round_index := 0          # nível atual (0-based)
+var modifier_sequence: Array = []
 var modifier := -1
 var weak_suit := -1
-var modifier_trick := -1      # rodada (0..7) onde o modificador de escopo RODADA vale; -1 = nível inteiro
-var streak: Array = []        # vitórias seguidas de cada jogador, dentro do nível
+var modifier_trick := -1
+var streak: Array = []
 var last_winner := -1
-var folego_player := -1       # quem recebe o bônus de virada nesse nível (-1 = ninguém)
-var buy_in := BUY_IN
+var combo_count: Array = []
+var hand_no := 0              # rodadas de aposta jogadas na mesa (roda o botão)
+var button := 0               # "dealer": fala por último
+
+# Aposta da rodada atual.
 var pot := 0.0
+var contrib: Array = []       # quanto cada um pôs nessa rodada
+var folded: Array = []        # desistiu dessa rodada (não joga carta)
+var bet_level := 0.0          # valor que todos precisam igualar
+var raises := 0
+var to_act: Array = []        # fila de quem ainda precisa falar
+var bet_log: Array = []       # [{player, action, to, amount}]
+var betting := false
 
 var hands: Array = []
 var plays: Array = []
 var captured: Array = []
-var round_points: Array = []  # pontos ganhos só nesse nível, por jogador
-var player_items: Array = []  # item ativo de cada jogador nesse nível (ChaosItems.Item)
-var power_used: Array = []    # se o jogador já usou o poder desse nível
-var arriscar_on: Array = []   # Arriscar armado pra rodada atual
-var bet_predict: Array = []   # palpite de cada jogador: nº de rodadas que vai ganhar (-1 = sem aposta)
-var bet_stake: Array = []     # fichas apostadas no nível (dobram se doubled)
-var bet_doubled: Array = []   # já usou DOBRAR nesse nível
-var bet_carry := 0.0          # pote acumulado dos níveis em que ninguém acertou
-var bet_chips: Array = []     # saldo líquido de fichas das apostas na partida, por jogador
-var combo_count: Array = []   # combos feitos no nível (contam pro peso do palpite)
 var leader := -1
 var current := -1
 var trick_number := 0
 var history: Array = []
 var round_result: Dictionary = {}
 var match_result: Dictionary = {}
+var session_stats: Array = []   # por jogador: {pots, bluffs, folds}
 
 
-## config: { players, seed, buy_in }
+## config: { players, seed, blind, buy_in, levels, stacks }
 func setup_match(config: Dictionary) -> void:
 	num_players = int(config.get("players", 4))
-	buy_in = float(config.get("buy_in", BUY_IN))
-	pot = buy_in * num_players
+	blind = int(config.get("blind", BLIND))
+	buy_in = int(config.get("buy_in", blind * BUY_IN_BLINDS))
+	levels = int(config.get("levels", 0))
 	if config.has("seed"):
 		rng.seed = int(config["seed"])
 	else:
 		rng.randomize()
-	totals = []
+	stacks = []
+	session_stats = []
 	for p in range(num_players):
-		totals.append(0.0)
+		stacks.append(float((config.get("stacks", []) as Array)[p]) if (config.get("stacks", []) as Array).size() > p else float(buy_in))
+		session_stats.append({"pots": 0, "bluffs": 0, "folds": 0})
 	round_index = 0
-	bet_carry = 0.0
-	bet_chips = []
-	for p in range(num_players):
-		bet_chips.append(0.0)
+	hand_no = 0
 	match_result = {}
 	modifier_sequence = ChaosModifiers.ALL.duplicate()
 	Deck.shuffle(modifier_sequence, rng)
@@ -100,27 +96,16 @@ func _setup_round() -> void:
 	var dealt := Deck.deal(deck, num_players, HAND_SIZE)
 	hands = dealt["hands"]
 	captured = []
-	round_points = []
-	player_items = []
-	power_used = []
-	arriscar_on = []
-	bet_predict = []
-	bet_stake = []
-	bet_doubled = []
 	combo_count = []
 	streak = []
 	last_winner = -1
+	level_start_stacks = stacks.duplicate()
 	for p in range(num_players):
 		streak.append(0)
 		captured.append([])
-		round_points.append(0.0)
-		player_items.append(ChaosItems.Item.NONE)
-		power_used.append(false)
-		arriscar_on.append(false)
-		bet_predict.append(-1)
-		bet_stake.append(0.0)
-		bet_doubled.append(false)
 		combo_count.append(0)
+	if round_index > 0 and round_index % modifier_sequence.size() == 0:
+		Deck.shuffle(modifier_sequence, rng)
 	modifier = modifier_sequence[round_index % modifier_sequence.size()]
 	weak_suit = -1
 	modifier_trick = -1
@@ -134,56 +119,41 @@ func _setup_round() -> void:
 	if ChaosModifiers.has_suit(modifier):
 		var suits := [CardData.Suit.OUROS, CardData.Suit.PAUS, CardData.Suit.COPAS, CardData.Suit.ESPADAS]
 		weak_suit = suits[rng.randi_range(0, suits.size() - 1)]
-	folego_player = _lowest_player() if round_index > 0 else -1
 	leader = round_index % num_players
 	current = leader
 	trick_number = 0
 	plays = []
 	history = []
 	round_result = {}
-
-
-## Define o item escolhido por um jogador pro nível atual — chamado pela UI depois que
-## humano/bots decidem, logo após advance_round() preparar o nível novo.
-func set_item(player: int, item: int) -> void:
-	player_items[player] = item
-
-
-func payout_for(placement: int) -> float:
-	return pot * PAYOUT_SHARES[clampi(placement, 0, PAYOUT_SHARES.size() - 1)]
-
-
-func _lowest_player() -> int:
-	var lowest := 0
-	for p in range(1, num_players):
-		if totals[p] < totals[lowest]:
-			lowest = p
-	return lowest
+	pot = 0.0
+	betting = false
+	contrib = []
+	folded = []
+	for p in range(num_players):
+		contrib.append(0.0)
+		folded.append(false)
 
 
 func _highest_player() -> int:
 	var highest := 0
 	for p in range(1, num_players):
-		if totals[p] > totals[highest]:
+		if stacks[p] > stacks[highest]:
 			highest = p
 	return highest
 
 
-## Verdadeiro no modificador "O Louco Vence" — usado pela UI/bots pra saber se O Louco
-## deve ser tratado como um Trunfo fraco nas regras de rodada desse nível.
+## Verdadeiro no modificador "O Louco Vence".
 func louco_can_win() -> bool:
 	return modifier == ChaosModifiers.Modifier.LOUCO_VENCE
 
 
-## Modificador que vale na rodada que está sendo jogada agora (-1 se nenhum): os de nível
-## inteira valem sempre; os de rodada só na rodada sorteada.
+## Modificador que vale na rodada que está sendo jogada agora (-1 se nenhum).
 func active_modifier() -> int:
 	if ChaosModifiers.scope_of(modifier) == ChaosModifiers.Scope.ROUND or trick_number == modifier_trick:
 		return modifier
 	return -1
 
 
-## Verdadeiro se `mod` está valendo na rodada atual.
 func is_active(mod: int) -> bool:
 	return active_modifier() == mod
 
@@ -197,27 +167,202 @@ func is_round_over() -> bool:
 
 
 func is_match_over() -> bool:
-	return round_index >= ROUNDS - 1 and is_round_over()
+	return levels > 0 and round_index >= levels - 1 and is_round_over()
 
+
+func is_final_round() -> bool:
+	return levels > 0 and round_index >= levels - 1
+
+
+# ------------------------------------------------------------------ aposta
+
+func active_players() -> Array:
+	var out: Array = []
+	for p in range(num_players):
+		if not folded[p]:
+			out.append(p)
+	return out
+
+
+func active_count() -> int:
+	return active_players().size()
+
+
+## Bots sem fichas pro blind saem e um novo jogador senta com o buy-in. Devolve os assentos trocados.
+func refill_bots() -> Array:
+	var swapped: Array = []
+	for p in range(1, num_players):
+		if stacks[p] < blind:
+			stacks[p] = float(buy_in)
+			level_start_stacks[p] = float(buy_in)
+			streak[p] = 0
+			swapped.append(p)
+	return swapped
+
+
+## Abre a rodada de apostas: gira o botão, cobra o blind de todos (quem tem menos que o
+## blind precisa ter sido trocado/recomprado antes) e monta a fila de fala.
+func begin_trick() -> void:
+	pot = 0.0
+	raises = 0
+	bet_log = []
+	hand_no += 1
+	button = hand_no % num_players
+	for p in range(num_players):
+		folded[p] = false
+		var ante := minf(float(blind), stacks[p])
+		contrib[p] = ante
+		stacks[p] -= ante
+		pot += ante
+	bet_level = float(blind)
+	to_act = []
+	for i in range(1, num_players + 1):
+		to_act.append((button + i) % num_players)
+	betting = true
+
+
+func bet_actor() -> int:
+	return int(to_act[0]) if betting and not to_act.is_empty() else -1
+
+
+## Máximo que todo mundo ainda na rodada consegue cobrir (sem potes paralelos).
+func bet_cap() -> float:
+	var cap := INF
+	for p in range(num_players):
+		if not folded[p]:
+			cap = minf(cap, stacks[p] + contrib[p])
+	return cap
+
+
+func to_call(player: int) -> float:
+	return maxf(bet_level - contrib[player], 0.0)
+
+
+## Opções de quem está falando: {can_check, call, can_raise, min_to, max_to, pot}.
+func bet_options(player: int) -> Dictionary:
+	var cap := bet_cap()
+	var call_amt := to_call(player)
+	var can_raise := raises < MAX_RAISES and cap > bet_level
+	return {
+		"can_check": call_amt <= 0.0,
+		"call": call_amt,
+		"can_raise": can_raise,
+		"min_to": minf(bet_level + float(blind), cap),
+		"max_to": cap,
+		"pot": pot,
+	}
+
+
+## Fala do jogador: action = "check" | "call" | "raise" | "fold". `to` = valor total da
+## aposta dele na rodada quando aumenta. Devolve {ok, action, to, amount, done}.
+func bet_act(player: int, action: String, to := 0.0) -> Dictionary:
+	if not betting or bet_actor() != player:
+		return {"ok": false, "error": "fora de turno"}
+	var opt := bet_options(player)
+	var amount := 0.0
+	match action:
+		"fold":
+			if opt["can_check"]:
+				# Desistir sem precisar não faz sentido: vira passar.
+				action = "check"
+			else:
+				folded[player] = true
+				session_stats[player]["folds"] += 1
+		"check":
+			if not opt["can_check"]:
+				return {"ok": false, "error": "precisa pagar"}
+		"call":
+			if opt["can_check"]:
+				action = "check"
+			else:
+				amount = float(opt["call"])
+				stacks[player] -= amount
+				contrib[player] += amount
+				pot += amount
+		"raise":
+			if not opt["can_raise"]:
+				return {"ok": false, "error": "sem aumento"}
+			var target := clampf(to, float(opt["min_to"]), float(opt["max_to"]))
+			amount = target - contrib[player]
+			stacks[player] -= amount
+			contrib[player] = target
+			pot += amount
+			bet_level = target
+			raises += 1
+			to = target
+		_:
+			return {"ok": false, "error": "ação inválida"}
+	to_act.pop_front()
+	if action == "raise":
+		# Todo mundo ainda na rodada (menos quem aumentou) precisa responder.
+		to_act = []
+		for i in range(1, num_players):
+			var q := (player + i) % num_players
+			if not folded[q]:
+				to_act.append(q)
+	if active_count() <= 1:
+		to_act = []
+	bet_log.append({"player": player, "action": action, "to": bet_level, "amount": amount})
+	var done := to_act.is_empty()
+	if done:
+		betting = false
+		_start_trick_play()
+	return {"ok": true, "action": action, "to": bet_level, "amount": amount, "done": done}
+
+
+## Depois da aposta: define quem abre as cartas (o vencedor anterior; se ele desistiu, o próximo).
+func _start_trick_play() -> void:
+	plays = []
+	if active_count() <= 1:
+		return
+	var l := leader
+	while folded[l]:
+		l = (l + 1) % num_players
+	current = l
+
+
+## Sobrou só um na rodada: ele leva o pote sem jogar carta.
+func walkover_player() -> int:
+	if betting or active_count() != 1:
+		return -1
+	return int(active_players()[0])
+
+
+func resolve_walkover() -> Dictionary:
+	var winner := walkover_player()
+	if winner == -1:
+		return {}
+	session_stats[winner]["bluffs"] += 1
+	var result := {
+		"winner": winner, "winning_index": -1, "plays": [], "points": 0.0, "base_points": 0.0,
+		"mult": 1.0, "prize": 0.0, "pot": pot, "combos": [], "streak": 0, "streak_mult": 1.0,
+		"bonus": 0.0, "saque_amount": 0.0, "assalto_amount": 0.0, "walkover": true,
+		"trick_number": trick_number, "modifier": active_modifier(),
+	}
+	return _finish_trick(result, winner)
+
+
+# ------------------------------------------------------------------ cartas
 
 func play(player: int, card: CardData) -> Dictionary:
-	if player != current or is_round_over():
+	if betting or player != current or is_round_over() or folded[player]:
 		return {"ok": false, "error": "fora de turno"}
 	var hand: Array = hands[player]
 	if not TrickRules.is_legal(card, hand, plays):
 		return {"ok": false, "error": "jogada ilegal"}
 	hand.erase(card)
 	plays.append({"player": player, "card": card})
-	if plays.size() < num_players:
-		current = (current + 1) % num_players
+	if plays.size() < active_count():
+		var n := (current + 1) % num_players
+		while folded[n]:
+			n = (n + 1) % num_players
+		current = n
 		return {"ok": true, "trick_complete": false}
 	return {"ok": true, "trick_complete": true, "result": _resolve_trick()}
 
 
-## Valor de uma carta já considerando o modificador ativo e, se um jogador for passado,
-## o item pessoal dele (não considera Fôlego/item de nível — esses se aplicam à rodada
-## inteira, não carta a carta).
-func card_value(c: CardData, player: int = -1) -> float:
+## Valor de uma carta já considerando o modificador ativo.
+func card_value(c: CardData, _player: int = -1) -> float:
 	var v := c.points()
 	match modifier:
 		ChaosModifiers.Modifier.TRUNFO_DOBRO:
@@ -241,10 +386,6 @@ func card_value(c: CardData, player: int = -1) -> float:
 	return v
 
 
-func is_final_round() -> bool:
-	return round_index >= ROUNDS - 1
-
-
 ## Rodada Invertida: vence a MENOR carta do naipe líder (Trunfo que corta não vale nada).
 func _lowest_index(trick: Array = []) -> int:
 	if trick.is_empty():
@@ -260,8 +401,7 @@ func _lowest_index(trick: Array = []) -> int:
 	return best if best != -1 else TrickRules.winning_index(trick, louco_can_win())
 
 
-## Se `card`, jogada por `player` agora, venceria a rodada como está (considera Rodada Invertida
-## / Mundo ao Contrário). Usado pelos bots.
+## Se `card`, jogada por `player` agora, venceria a rodada como está.
 func would_win(card: CardData, player: int) -> bool:
 	var ev := active_modifier()
 	if ev != ChaosModifiers.Modifier.MUNDO_CONTRARIO and ev != ChaosModifiers.Modifier.VAZA_INVERTIDA:
@@ -269,6 +409,11 @@ func would_win(card: CardData, player: int) -> bool:
 	var trick := plays.duplicate()
 	trick.append({"player": player, "card": card})
 	return int(trick[_lowest_index(trick)]["player"]) == player
+
+
+## Pontos das cartas viram fichas da banca: 1 ponto = PRIZE_PER_POINT blinds.
+func chips_of(points: float) -> float:
+	return roundf(points * PRIZE_PER_POINT * float(blind))
 
 
 func _resolve_trick() -> Dictionary:
@@ -288,9 +433,6 @@ func _resolve_trick() -> Dictionary:
 		mult *= 3.0
 	if ev == ChaosModifiers.Modifier.VAZA_DOURADA:
 		mult *= GOLD_MULT
-	if is_final_round():
-		mult *= FINAL_MULT
-	# Combos: sequência, quebra de sequência e corte de Rei.
 	var combos: Array = []
 	var bonus := 0.0
 	if ev == ChaosModifiers.Modifier.VAZA_MAIS_UM:
@@ -325,94 +467,79 @@ func _resolve_trick() -> Dictionary:
 				bonus += KING_CUT_BONUS
 				combos.append("CORTE_REI")
 				break
-	last_winner = winner
 	combo_count[winner] += combos.size()
-	var folego_applied := winner == folego_player
-	if folego_applied:
-		mult *= FOLEGO_MULT
-	if arriscar_on[winner]:
-		mult *= ARRISCAR_MULT
 	var points := base_points * mult + bonus
+	var prize := chips_of(points)
 	var saque_amount := 0.0
 	var assalto_amount := 0.0
 	if ev == ChaosModifiers.Modifier.ASSALTO_LIDER:
-		var lead_p := _highest_player()
-		if lead_p != winner:
-			assalto_amount = minf(ASSALTO_AMOUNT, totals[lead_p])
-			totals[lead_p] -= assalto_amount
-			round_points[lead_p] -= assalto_amount
+		var rich := _highest_player()
+		if rich != winner:
+			assalto_amount = minf(chips_of(ASSALTO_AMOUNT), stacks[rich])
+			stacks[rich] -= assalto_amount
 	if ev == ChaosModifiers.Modifier.SAQUE:
-		for q in range(num_players):
+		for pl in plays:
+			var q: int = pl["player"]
 			if q == winner:
 				continue
-			var take := minf(SAQUE_AMOUNT, totals[q])
-			totals[q] -= take
-			round_points[q] -= take
+			var take := minf(chips_of(SAQUE_AMOUNT), stacks[q])
+			stacks[q] -= take
 			saque_amount += take
-	var arriscar_loss := 0.0
-	for q in range(num_players):
-		if q != winner and arriscar_on[q]:
-			arriscar_loss += ARRISCAR_LOSS
-			totals[q] -= ARRISCAR_LOSS
-			round_points[q] -= ARRISCAR_LOSS
-	var arriscar_winner: bool = arriscar_on[winner]
-	var arriscar_losers: Array = []
-	for q in range(num_players):
-		if q != winner and arriscar_on[q]:
-			arriscar_losers.append(q)
-		arriscar_on[q] = false
-	var trick_result := {
-		"winner": winner,
-		"winning_index": idx,
-		"plays": plays.duplicate(),
-		"points": points,
-		"base_points": base_points,
-		"mult": mult,
-		"folego_applied": folego_applied,
-		"arriscar_winner": arriscar_winner,
-		"arriscar_losers": arriscar_losers,
-		"trick_number": trick_number,
-		"modifier": ev,
-		"combos": combos,
-		"streak": int(streak[winner]),
-		"streak_mult": streak_mult,
-		"bonus": bonus,
-		"saque_amount": saque_amount,
-		"assalto_amount": assalto_amount,
-		"final": is_final_round(),
+	# Prêmio negativo (Rodada Maldita) sai da stack do vencedor, no máximo o que ele tem.
+	prize = maxf(prize, -(stacks[winner] + pot))
+	var result := {
+		"winner": winner, "winning_index": idx, "plays": plays.duplicate(), "points": points,
+		"base_points": base_points, "mult": mult, "prize": prize, "pot": pot, "combos": combos,
+		"streak": int(streak[winner]), "streak_mult": streak_mult, "bonus": bonus,
+		"saque_amount": saque_amount, "assalto_amount": assalto_amount, "walkover": false,
+		"trick_number": trick_number, "modifier": ev,
 	}
-	history.append(trick_result)
-	round_points[winner] += points + saque_amount + assalto_amount
-	totals[winner] += points + saque_amount + assalto_amount
+	return _finish_trick(result, winner)
+
+
+## Paga o pote (e o prêmio da banca) ao vencedor, fecha a rodada e, no fim do nível, o resultado.
+func _finish_trick(result: Dictionary, winner: int) -> Dictionary:
+	if bool(result.get("walkover", false)):
+		var prev_streak: int = streak[last_winner] if last_winner != -1 else 0
+		for q in range(num_players):
+			streak[q] = streak[q] + 1 if q == winner else 0
+		result["streak"] = int(streak[winner])
+		result["broke"] = last_winner != -1 and last_winner != winner and prev_streak >= 2
+	last_winner = winner
+	stacks[winner] += pot + float(result["prize"]) + float(result["saque_amount"]) + float(result["assalto_amount"])
+	session_stats[winner]["pots"] += 1
+	result["stacks"] = stacks.duplicate()
+	result["gain"] = pot + float(result["prize"]) + float(result["saque_amount"]) + float(result["assalto_amount"]) - contrib[winner]
+	pot = 0.0
+	history.append(result)
 	plays = []
 	trick_number += 1
 	leader = winner
 	current = winner
-	trick_resolved.emit(trick_result)
+	trick_resolved.emit(result)
 	if is_round_over():
-		var bet_results := _settle_bets()
+		var deltas: Array = []
+		for p in range(num_players):
+			deltas.append(stacks[p] - level_start_stacks[p])
 		round_result = {
-			"bets": bet_results["items"],
-			"pot_info": bet_results,
-			"tricks_won": _tricks_won(),
-			"round": round_index,
-			"modifier": modifier,
-			"weak_suit": weak_suit,
-			"modifier_trick": modifier_trick,
-			"folego_player": folego_player,
-			"round_points": round_points.duplicate(),
-			"totals": totals.duplicate(),
+			"round": round_index, "modifier": modifier, "weak_suit": weak_suit,
+			"modifier_trick": modifier_trick, "stacks": stacks.duplicate(), "deltas": deltas,
+			"tricks_won": tricks_won(),
 		}
 		round_finished.emit(round_result)
-		if round_index >= ROUNDS - 1:
-			var order := range(num_players)
-			order.sort_custom(func(a: int, b: int) -> bool: return totals[a] > totals[b])
-			match_result = {"totals": totals.duplicate(), "standings": order}
+		if is_match_over():
+			match_result = make_standings()
 			match_finished.emit(match_result)
-	return trick_result
+	return result
 
 
-func _tricks_won() -> Array:
+func make_standings() -> Dictionary:
+	var order := range(num_players)
+	order.sort_custom(func(a: int, b: int) -> bool: return stacks[a] > stacks[b])
+	return {"stacks": stacks.duplicate(), "standings": order}
+
+
+func tricks_won() -> Array:
 	var won: Array = []
 	for p in range(num_players):
 		won.append(0)
@@ -421,216 +548,21 @@ func _tricks_won() -> Array:
 	return won
 
 
-## Dificuldade do palpite: prever muitas rodadas paga mais.
-static func difficulty_of(predict: int) -> float:
-	if predict <= 2:
-		return 1.0
-	if predict <= 4:
-		return 1.5
-	return 2.0
-
-
 func tricks_left() -> int:
 	return HAND_SIZE - trick_number
 
 
 func tricks_won_by(player: int) -> int:
-	return int(_tricks_won()[player])
+	return int(tricks_won()[player])
 
 
-## Pote do nível agora: acumulado dos níveis anteriores + todas as apostas.
-func bet_pot() -> float:
-	var total := bet_carry
-	for p in range(num_players):
-		if int(bet_predict[p]) >= 0:
-			total += float(bet_stake[p])
-	return total
-
-
-## Menor erro ainda possível no palpite (0 = ainda dá pra acertar exato).
-func bet_min_error(player: int) -> int:
-	var predict: int = bet_predict[player]
-	var won := tricks_won_by(player)
-	if won > predict:
-		return won - predict
-	if won + tricks_left() < predict:
-		return predict - (won + tricks_left())
-	return 0
-
-
-## Situação ao vivo do palpite: "none", "on" (no alvo), "chase" (falta ganhar mais),
-## "near" (só dá pra errar por 1) ou "bust" (estourou).
-func bet_status(player: int) -> String:
-	if int(bet_predict[player]) < 0:
-		return "none"
-	var err := bet_min_error(player)
-	if err >= 2:
-		return "bust"
-	if err == 1:
-		return "near"
-	return "on" if tricks_won_by(player) == int(bet_predict[player]) else "chase"
-
-
-## Peso de um jogador na divisão do pote se acertar.
-func bet_weight(player: int) -> float:
-	var combo_bonus := minf(COMBO_WEIGHT * float(combo_count[player]), COMBO_WEIGHT_MAX)
-	return float(bet_stake[player]) * difficulty_of(int(bet_predict[player])) * (1.0 + combo_bonus)
-
-
-func set_bet(player: int, predict: int, stake: int = 0) -> void:
-	if predict < 0 or stake <= 0:
-		bet_predict[player] = -1
-		bet_stake[player] = 0.0
-		return
-	bet_predict[player] = clampi(predict, 0, HAND_SIZE)
-	bet_stake[player] = float(stake)
-	bet_doubled[player] = false
-
-
-func can_double(player: int) -> bool:
-	return int(bet_predict[player]) >= 0 and not bet_doubled[player] \
-		and trick_number >= DOUBLE_FROM_TRICK and not is_round_over() and bet_min_error(player) == 0
-
-
-## Dobra a aposta (e o peso). Devolve as fichas extras que entraram no pote (0 = não deu).
-func double_bet(player: int) -> float:
-	if not can_double(player):
-		return 0.0
-	var extra: float = bet_stake[player]
-	bet_stake[player] = extra * 2.0
-	bet_doubled[player] = true
-	return extra
-
-
-## Acerta o pote ao fim do nível. Cada item: {predict, won, stake, doubled, err, hit,
-## refund, share, delta, weight, combos}; `delta` = ganho líquido de fichas (share + refund − stake).
-func _settle_bets() -> Dictionary:
-	var won := _tricks_won()
-	var carry_in := bet_carry
-	var total_pot := bet_pot()
-	var out: Array = []
-	var refunds_total := 0.0
-	var hitters: Array = []
-	var weight_sum := 0.0
-	var best_err := 99
-	for p in range(num_players):
-		var predict: int = bet_predict[p]
-		if predict < 0:
-			out.append({"predict": -1, "won": int(won[p]), "stake": 0.0, "doubled": false, "err": 0, "hit": false, "refund": 0.0, "share": 0.0, "delta": 0.0, "weight": 0.0, "combos": int(combo_count[p])})
-			continue
-		var err := absi(int(won[p]) - predict)
-		var stake: float = bet_stake[p]
-		var refund := 0.0
-		var weight := 0.0
-		if err == 0:
-			hitters.append(p)
-			weight = bet_weight(p)
-			weight_sum += weight
-		elif err == 1:
-			refund = roundf(stake * NEAR_REFUND)
-			refunds_total += refund
-		best_err = mini(best_err, err)
-		out.append({"predict": predict, "won": int(won[p]), "stake": stake, "doubled": bool(bet_doubled[p]), "err": err, "hit": err == 0, "refund": refund, "share": 0.0, "delta": 0.0, "weight": weight, "combos": int(combo_count[p])})
-	var pool := total_pot - refunds_total
-	var carry_out := 0.0
-	var consolation := false
-	if pool > 0.0:
-		var takers := hitters
-		if takers.is_empty() and is_final_round():
-			# Último nível sem acerto: o pote vai pros que chegaram mais perto.
-			consolation = true
-			for p in range(num_players):
-				if int(bet_predict[p]) >= 0 and int(out[p]["err"]) == best_err:
-					takers.append(p)
-					out[p]["weight"] = float(bet_stake[p])
-					weight_sum += float(bet_stake[p])
-		if takers.is_empty():
-			carry_out = pool
-		else:
-			var paid := 0.0
-			var top: int = takers[0]
-			for p in takers:
-				var sh := floorf(pool * float(out[p]["weight"]) / weight_sum)
-				out[p]["share"] = sh
-				paid += sh
-				if float(out[p]["weight"]) > float(out[top]["weight"]):
-					top = p
-			out[top]["share"] = float(out[top]["share"]) + (pool - paid)
-	for p in range(num_players):
-		var o: Dictionary = out[p]
-		if int(o["predict"]) < 0:
-			continue
-		o["delta"] = float(o["share"]) + float(o["refund"]) - float(o["stake"])
-		bet_chips[p] += float(o["delta"])
-	bet_carry = carry_out
-	return {"items": out, "pot": total_pot, "carry_in": carry_in, "carry_out": carry_out, "jackpot": carry_out > 0.0, "consolation": consolation, "hitters": hitters}
-
-
-## ---- Poderes ---------------------------------------------------------------
-
-func can_use_power(player: int) -> bool:
-	return player_items[player] != ChaosItems.Item.NONE and not power_used[player] \
-		and current == player and not is_round_over()
-
-
-## Roubar Trunfo: entrega a carta mais fraca e leva o melhor Trunfo do alvo (ou a melhor
-## carta dele se não tiver Trunfo). Retorna {"given", "taken"}.
-func use_troca(player: int, target: int) -> Dictionary:
-	if not can_use_power(player) or player_items[player] != ChaosItems.Item.TROCA or target == player:
-		return {}
-	var mine: Array = hands[player]
-	var theirs: Array = hands[target]
-	var given: CardData = mine[0]
-	for c in mine:
-		if _swap_worth(c) < _swap_worth(given):
-			given = c
-	var taken: CardData = theirs[0]
-	for c in theirs:
-		if _swap_worth(c) > _swap_worth(taken):
-			taken = c
-	mine.erase(given)
-	theirs.erase(taken)
-	mine.append(taken)
-	theirs.append(given)
-	power_used[player] = true
-	return {"given": given, "taken": taken}
-
-
-func _swap_worth(c: CardData) -> float:
-	if c.is_louco():
-		return 5.0
-	return float(c.rank) + (100.0 if c.is_trunfo() else 0.0) + (50.0 if c.is_bout() else 0.0)
-
-
-func use_espiada(player: int, target: int) -> Array:
-	if not can_use_power(player) or player_items[player] != ChaosItems.Item.ESPIADA or target == player:
-		return []
-	power_used[player] = true
-	return (hands[target] as Array).duplicate()
-
-
-func use_arriscar(player: int) -> bool:
-	if not can_use_power(player) or player_items[player] != ChaosItems.Item.ARRISCAR:
-		return false
-	power_used[player] = true
-	arriscar_on[player] = true
-	return true
-
-
-## Chamado pela UI depois de mostrar o resumo do nível, pra sortear/preparar a próxima.
+## Chamado pela UI depois do resumo do nível: distribui o próximo (a mesa não acaba).
 func advance_round() -> void:
 	round_index += 1
-	if round_index < ROUNDS:
+	if levels == 0 or round_index < levels:
 		_setup_round()
 
 
-func points_of(player: int) -> float:
-	var total := 0.0
-	for c in captured[player]:
-		total += card_value(c, player)
-	return total
-
-
 func placement_of(player: int) -> int:
-	var order: Array = match_result.get("standings", range(num_players))
+	var order: Array = make_standings()["standings"]
 	return order.find(player)

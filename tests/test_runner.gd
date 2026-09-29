@@ -262,11 +262,10 @@ func _test_bonuses() -> void:
 
 
 func _test_chaos() -> void:
-	# card_value: efeito de cada modificador de pontos.
 	var e := ChaosEngine.new()
 	e.setup_match({"seed": 11})
 	check((e.hands[0] as Array).size() == ChaosEngine.HAND_SIZE, "Caos: 8 cartas por jogador")
-	check(e.folego_player == -1, "primeira rodada não tem Fôlego (ninguém ficou pra trás ainda)")
+	check(e.blind == 10 and int(e.stacks[0]) == 200, "mesa padrão: blind 10 e stack de 20 blinds")
 
 	e.modifier = ChaosModifiers.Modifier.TRUNFO_DOBRO
 	check(e.card_value(c(4, 5)) == 1.0, "Trunfo em Dobro: 0,5 vira 1,0")
@@ -293,186 +292,138 @@ func _test_chaos() -> void:
 	var louco_vs_trunfo := louco_plays + [{"player": 0, "card": c(4, 3)}]
 	check(TrickRules.winning_index(louco_vs_trunfo, true) == 4, "O Louco perde pra um Trunfo de verdade mesmo com o modificador ativo")
 
-	# Uma rodada completa (8 vazas) jogando sempre a primeira carta legal — só valida que
-	# o motor fecha a rodada sozinho e preenche round_result corretamente.
-	var e2 := ChaosEngine.new()
-	e2.setup_match({"seed": 21})
+	# ---- Aposta estilo poker
+	var p1 := ChaosEngine.new()
+	p1.setup_match({"seed": 3})
+	p1.begin_trick()
+	check(is_equal_approx(p1.pot, 40.0) and is_equal_approx(p1.stacks[0], 190.0), "blind de todos vai pro pote")
+	check(p1.button == 1 and p1.bet_actor() == 2, "o botão gira e fala primeiro quem vem depois dele")
+	var o0 := p1.bet_options(2)
+	check(bool(o0["can_check"]) and is_equal_approx(float(o0["min_to"]), 20.0) and is_equal_approx(float(o0["max_to"]), 200.0), "primeiro a falar pode passar; aumento mínimo = 1 blind; máximo = menor stack")
+	var r1 := p1.bet_act(2, "raise", 30.0)
+	check(r1["ok"] and is_equal_approx(p1.pot, 60.0) and p1.to_act.size() == 3, "aumentar põe fichas e todo mundo precisa responder")
+	check(not p1.bet_act(3, "raise", 10.0)["ok"] == false, "aumento abaixo do mínimo é corrigido pro mínimo")
+	check(is_equal_approx(p1.bet_level, 40.0), "aumento mínimo sobre 30 é 40")
+	var r3 := p1.bet_act(0, "check")
+	check(not r3["ok"], "não dá pra passar com aposta aberta")
+	p1.bet_act(0, "fold")
+	check(p1.folded[0], "desistir tira da rodada")
+	check(not p1.bet_act(1, "raise", 60.0)["ok"], "só 2 aumentos por rodada")
+	p1.bet_act(1, "call")
+	p1.bet_act(2, "call")
+	check(not p1.betting and p1.active_count() == 3, "rodada de apostas fecha quando todo mundo igualou ou desistiu")
+	check(is_equal_approx(p1.stacks[2], 160.0) and is_equal_approx(p1.pot, 130.0), "quem pagou põe o mesmo valor (40 cada; 10 do que desistiu)")
+	check(p1.current != 0, "quem desistiu não joga carta")
+	var played := 0
+	while played < 3:
+		var pp := p1.current
+		var res := p1.play(pp, (p1.legal_for(pp) as Array)[0])
+		check(res["ok"], "jogada legal aceita com 3 na rodada")
+		played += 1
+		if res["trick_complete"]:
+			var rr: Dictionary = res["result"]
+			check(is_equal_approx(float(rr["pot"]), 130.0), "resultado informa o pote")
+			check(p1.stacks[int(rr["winner"])] >= 130.0 and float(rr["gain"]) > 0.0 - 200.0, "vencedor leva o pote")
+	check(p1.hands[0].size() == 8, "quem desistiu fica com todas as cartas")
+	# Todo mundo desiste: o último leva o pote sem jogar.
+	var p2 := ChaosEngine.new()
+	p2.setup_match({"seed": 4})
+	p2.begin_trick()
+	p2.bet_act(2, "raise", 20.0)
+	p2.bet_act(3, "fold")
+	p2.bet_act(0, "fold")
+	p2.bet_act(1, "fold")
+	check(p2.walkover_player() == 2, "sobrou um: ele leva o pote")
+	var wo := p2.resolve_walkover()
+	check(bool(wo["walkover"]) and is_equal_approx(p2.stacks[2], 200.0 - 20.0 + 50.0), "blefe vence: leva o pote sem jogar carta")
+	check(p2.trick_number == 1 and p2.session_stats[2]["bluffs"] == 1, "rodada conta e o blefe é registrado")
+	# All-in limitado pela menor stack.
+	var p3 := ChaosEngine.new()
+	p3.setup_match({"seed": 5, "stacks": [200, 200, 60, 200]})
+	p3.begin_trick()
+	check(is_equal_approx(p3.bet_cap(), 60.0), "aumento máximo é a menor stack em jogo (sem potes paralelos)")
+	# Bot sem fichas pro blind é trocado.
+	p3.stacks[3] = 4.0
+	check(p3.refill_bots() == [3] and is_equal_approx(p3.stacks[3], 200.0), "bot quebrado sai e um novo senta com o buy-in")
+	# Prêmio da banca e mesa sem fim.
+	check(is_equal_approx(p3.chips_of(4.0), 10.0), "1 ponto de carta = 1/4 do blind (4 pts = ◎10)")
+	var p4 := ChaosEngine.new()
+	p4.setup_match({"seed": 21, "levels": 0})
+	var trick_count := 0
+	var rng4 := RandomNumberGenerator.new()
+	rng4.seed = 5
 	var guard := 0
-	while not e2.is_round_over() and guard < 200:
-		var p := e2.current
-		var legal: Array = e2.legal_for(p)
-		e2.play(p, legal[0])
+	while trick_count < 24 and guard < 5000:
 		guard += 1
-	check(e2.is_round_over(), "8 jogadas por jogador fecham a rodada (8 vazas)")
-	check(not e2.round_result.is_empty(), "round_finished preenche round_result")
-	check(int(e2.round_result["round"]) == 0, "primeira rodada tem índice 0")
-	var sum_round_pts := 0.0
-	for pts in (e2.round_result["round_points"] as Array):
-		sum_round_pts += float(pts)
-	var sum_totals := 0.0
-	for t in e2.totals:
-		sum_totals += float(t)
-	check(is_equal_approx(sum_round_pts, sum_totals), "depois da 1ª rodada, pontos da rodada e total da partida batem")
+		if p4.is_round_over():
+			p4.advance_round()
+		p4.refill_bots()
+		p4.stacks[0] = maxf(p4.stacks[0], 200.0)
+		p4.begin_trick()
+		while p4.betting:
+			var actor := p4.bet_actor()
+			var d := ChaosBot.bet_decision(p4, actor, BotAI.Difficulty.HARD, rng4)
+			var br := p4.bet_act(actor, str(d["action"]), float(d.get("to", 0.0)))
+			check(br["ok"], "decisão do bot é sempre uma ação válida")
+			if not br["ok"]:
+				p4.bet_act(actor, "fold")
+		if p4.walkover_player() != -1:
+			p4.resolve_walkover()
+		else:
+			while true:
+				var pl := p4.current
+				var rs := p4.play(pl, ChaosBot.choose(p4, pl, BotAI.Difficulty.HARD, rng4))
+				if rs["trick_complete"]:
+					break
+		trick_count += 1
+	check(p4.round_index >= 2, "mesa segue em novos níveis sem fim (%d níveis)" % (p4.round_index + 1))
+	check(not p4.is_match_over(), "mesa livre nunca acaba sozinha")
+	for st in p4.stacks:
+		check(float(st) >= 0.0, "ninguém fica com stack negativa")
+	var pl2 := ChaosEngine.new()
+	pl2.setup_match({"seed": 8, "levels": 2})
+	pl2.round_index = 1
+	pl2.trick_number = ChaosEngine.HAND_SIZE
+	check(pl2.is_match_over() and pl2.is_final_round(), "partida com fim acaba no último nível")
+	# Bot: força da mão e decisões.
+	var pb := ChaosEngine.new()
+	pb.setup_match({"seed": 6})
+	pb.hands[3] = [c(CardData.Suit.TRUNFO, 21), c(CardData.Suit.TRUNFO, 20), c(CardData.Suit.PAUS, 14), c(CardData.Suit.COPAS, 14)]
+	pb.hands[2] = [c(CardData.Suit.PAUS, 2), c(CardData.Suit.PAUS, 3), c(CardData.Suit.COPAS, 4), c(CardData.Suit.OUROS, 5)]
+	check(ChaosBot.hand_strength(pb, 3) > ChaosBot.hand_strength(pb, 2) + 0.4, "mão com Trunfos altos e Reis é bem mais forte")
+	pb.modifier = ChaosModifiers.Modifier.MUNDO_CONTRARIO
+	pb.modifier_trick = -1
+	check(ChaosBot.hand_strength(pb, 2) > ChaosBot.hand_strength(pb, 3), "no Mundo ao Contrário, cartas baixas são fortes")
+	pb.modifier = ChaosModifiers.Modifier.TRUNFO_DOBRO
+	pb.begin_trick()
+	var pbr := RandomNumberGenerator.new()
+	pbr.seed = 3
+	var raises := 0
+	for i in range(30):
+		var dd := ChaosBot.bet_decision(pb, 2, BotAI.Difficulty.HARD, pbr)
+		if dd["action"] == "raise":
+			raises += 1
+	var raises_strong := 0
+	for i in range(30):
+		if ChaosBot.bet_decision(pb, 3, BotAI.Difficulty.HARD, pbr)["action"] == "raise":
+			raises_strong += 1
+	check(raises_strong > raises, "bot aumenta mais com mão forte que com mão fraca (%d > %d)" % [raises_strong, raises])
+	pb.bet_act(pb.bet_actor(), "raise", 60.0)
+	var facing := ChaosBot.bet_decision(pb, pb.bet_actor(), BotAI.Difficulty.NORMAL, pbr)
+	check(facing["action"] in ["call", "fold", "raise"], "diante de aumento o bot paga, aumenta ou desiste (não passa)")
 
-	e2.advance_round()
-	check(e2.round_index == 1, "advance_round avança o índice da rodada")
-	check((e2.hands[0] as Array).size() == ChaosEngine.HAND_SIZE, "rodada nova também dá 8 cartas")
-
-	# Fôlego: quem estava em último antes da 2ª rodada recebe o bônus dessa vez.
-	var expected_folego := 0
-	for p in range(1, 4):
-		if e2.totals[p] < e2.totals[expected_folego]:
-			expected_folego = p
-	check(e2.folego_player == expected_folego, "Fôlego mira em quem está em último no total acumulado")
-
-	# Partida completa (5 rodadas) até o fim, jogando sempre a primeira carta legal.
-	var e3 := ChaosEngine.new()
-	e3.setup_match({"seed": 99})
-	var rounds_played := 0
-	var safety := 0
-	while rounds_played < ChaosEngine.ROUNDS and safety < 1000:
-		var p := e3.current
-		var legal: Array = e3.legal_for(p)
-		e3.play(p, legal[0])
-		safety += 1
-		if e3.is_round_over():
-			rounds_played += 1
-			if rounds_played < ChaosEngine.ROUNDS:
-				e3.advance_round()
-	check(rounds_played == ChaosEngine.ROUNDS, "partida de Caos tem %d rodadas" % ChaosEngine.ROUNDS)
-	check(not e3.match_result.is_empty(), "match_finished preenche match_result no fim da última rodada")
-	var standings: Array = e3.match_result["standings"]
-	check(standings.size() == 4, "pódio final tem os 4 jogadores")
-	var totals: Array = e3.match_result["totals"]
-	for i in range(standings.size() - 1):
-		check(float(totals[standings[i]]) >= float(totals[standings[i + 1]]), "pódio ordenado do maior pro menor total")
-
-	# Modificadores não repetem dentro da mesma partida (só 5 rodadas pra 6 modificadores).
-	var e4 := ChaosEngine.new()
-	e4.setup_match({"seed": 42})
-	var seen_mods := {}
-	for r in range(ChaosEngine.ROUNDS):
-		check(not seen_mods.has(e4.modifier), "modificador da rodada %d não repetiu na partida" % (r + 1))
-		seen_mods[e4.modifier] = true
-		if r < ChaosEngine.ROUNDS - 1:
-			e4.advance_round()
-
-	# Pote/buy-in: pago integralmente pelas 4 fatias de colocação.
-	var e5 := ChaosEngine.new()
-	e5.setup_match({"seed": 7, "buy_in": 100})
-	check(e5.pot == 400.0, "pote = buy-in x jogadores (100 x 4 = 400)")
-	var paid := 0.0
-	for pl in range(4):
-		paid += e5.payout_for(pl)
-	check(is_equal_approx(paid, e5.pot), "a soma dos pagamentos por colocação esgota o pote")
-	check(e5.payout_for(0) > e5.payout_for(1) and e5.payout_for(1) > e5.payout_for(2) and e5.payout_for(2) > e5.payout_for(3), "pagamento cai a cada colocação pior")
-
-	# Poderes e aposta da rodada.
-	var e6 := ChaosEngine.new()
-	e6.setup_match({"seed": 5})
-	e6.modifier = ChaosModifiers.Modifier.TRUNFO_DOBRO
-	e6.modifier_trick = -1
-	e6.current = 0
-	e6.player_items[0] = ChaosItems.Item.TROCA
-	e6.hands[0] = [c(CardData.Suit.PAUS, 2), c(CardData.Suit.PAUS, 14)]
-	e6.hands[1] = [c(CardData.Suit.TRUNFO, 15), c(CardData.Suit.COPAS, 3)]
-	var swap := e6.use_troca(0, 1)
-	check(swap["given"].rank == 2 and swap["taken"].rank == 15, "Roubar Trunfo: entrega a pior carta e leva o melhor Trunfo")
-	check((e6.hands[1] as Array).size() == 2 and e6.use_troca(0, 1).is_empty(), "poder só pode ser usado uma vez")
-	e6.player_items[0] = ChaosItems.Item.ESPIADA
-	e6.power_used[0] = false
-	check(e6.use_espiada(0, 2).size() == 8, "Espiar mostra a mão inteira do rival")
-	e6.player_items[0] = ChaosItems.Item.ARRISCAR
-	e6.power_used[0] = false
-	check(e6.use_arriscar(0) and e6.arriscar_on[0], "Arriscar arma pra vaza atual")
-	e6.totals = [0.0, 0.0, 0.0, 0.0]
-	e6.round_points = [0.0, 0.0, 0.0, 0.0]
-	e6.plays = [
-		{"player": 1, "card": c(CardData.Suit.PAUS, 3)},
-		{"player": 2, "card": c(CardData.Suit.PAUS, 5)},
-		{"player": 3, "card": c(CardData.Suit.PAUS, 7)},
-		{"player": 0, "card": c(CardData.Suit.PAUS, 10)},
-	]
-	e6.trick_number = 1
-	var risk := e6._resolve_trick()
-	check(bool(risk["arriscar_winner"]) and is_equal_approx(float(risk["mult"]), ChaosEngine.ARRISCAR_MULT), "Arriscar vencido dobra os pontos")
-	e6.arriscar_on[1] = true
-	e6.plays = [
-		{"player": 1, "card": c(CardData.Suit.PAUS, 3)},
-		{"player": 2, "card": c(CardData.Suit.PAUS, 5)},
-		{"player": 3, "card": c(CardData.Suit.PAUS, 7)},
-		{"player": 0, "card": c(CardData.Suit.PAUS, 10)},
-	]
-	e6.totals[1] = 10.0
-	e6._resolve_trick()
-	check(e6.totals[1] == 8.0, "Arriscar perdido custa 2 pontos")
-	# Palpite exato + pote.
-	var eb2 := ChaosEngine.new()
-	eb2.setup_match({"seed": 3})
-	eb2.set_bet(0, 2, 10)
-	eb2.set_bet(1, 4, 25)
-	eb2.set_bet(2, 0, 50)
-	check(is_equal_approx(eb2.bet_pot(), 85.0), "pote soma todas as apostas")
-	eb2.history = [{"winner": 0}, {"winner": 0}, {"winner": 1}, {"winner": 1}, {"winner": 1}]
-	eb2.trick_number = 5
-	check(eb2.bet_status(0) == "on" and eb2.bet_status(1) == "chase", "status ao vivo: no alvo / ainda dá")
-	var settled := eb2._settle_bets()
-	var items: Array = settled["items"]
-	check(bool(items[0]["hit"]) and bool(items[2]["hit"]) and not bool(items[1]["hit"]), "acertou o número exato divide o pote")
-	check(is_equal_approx(float(items[1]["refund"]), 13.0), "errou por 1 recebe metade da aposta de volta")
-	check(is_equal_approx(float(items[0]["share"]) + float(items[2]["share"]), 72.0), "pote (menos reembolsos) é pago por inteiro")
-	check(float(items[2]["share"]) > float(items[0]["share"]), "peso maior (aposta maior) leva mais do pote")
-	check(int(items[3]["predict"]) == -1 and is_equal_approx(float(items[3]["delta"]), 0.0), "sem aposta não muda nada")
-	check(is_equal_approx(eb2.bet_chips[1], -12.0), "saldo líquido de fichas acumula")
-	# Jackpot acumulado quando ninguém acerta.
-	var eb3 := ChaosEngine.new()
-	eb3.setup_match({"seed": 4})
-	eb3.set_bet(0, 5, 25)
-	eb3.set_bet(1, 6, 25)
-	eb3.history = [{"winner": 2}, {"winner": 3}]
-	var jack := eb3._settle_bets()
-	check(bool(jack["jackpot"]) and is_equal_approx(eb3.bet_carry, 50.0), "ninguém acertou: pote acumula pro próximo nível")
-	eb3.advance_round()
-	check(is_equal_approx(eb3.bet_pot(), 50.0), "pote acumulado sobrevive ao próximo nível")
-	# Dobrar.
-	var eb4 := ChaosEngine.new()
-	eb4.setup_match({"seed": 5})
-	eb4.set_bet(0, 1, 25)
-	check(not eb4.can_double(0), "dobrar só a partir da 4ª rodada")
-	eb4.trick_number = 4
-	eb4.history = [{"winner": 0}, {"winner": 1}, {"winner": 2}, {"winner": 3}]
-	check(eb4.can_double(0) and is_equal_approx(eb4.double_bet(0), 25.0) and is_equal_approx(eb4.bet_stake[0], 50.0), "dobrar dobra a aposta")
-	check(not eb4.can_double(0), "dobrar só uma vez por nível")
 	# Combos de mesa e sequência.
 	check("CHUVA_TRUNFOS" in ChaosCombos.detect([{"card": c(CardData.Suit.TRUNFO, 3)}, {"card": c(CardData.Suit.TRUNFO, 9)}, {"card": c(CardData.Suit.TRUNFO, 15)}, {"card": c(CardData.Suit.PAUS, 2)}]), "3 Trunfos na mesa = Chuva de Trunfos")
 	check("REALEZA" in ChaosCombos.detect([{"card": c(CardData.Suit.PAUS, 11)}, {"card": c(CardData.Suit.PAUS, 13)}, {"card": c(CardData.Suit.PAUS, 14)}, {"card": c(CardData.Suit.PAUS, 2)}]), "3 figuras na mesa = Realeza")
 	check("ESCADA" in ChaosCombos.detect([{"card": c(CardData.Suit.PAUS, 7)}, {"card": c(CardData.Suit.PAUS, 8)}, {"card": c(CardData.Suit.PAUS, 9)}, {"card": c(CardData.Suit.COPAS, 2)}]), "3 cartas seguidas do mesmo naipe = Escada")
 	check(ChaosCombos.detect([{"card": c(CardData.Suit.PAUS, 7)}, {"card": c(CardData.Suit.COPAS, 8)}, {"card": c(CardData.Suit.PAUS, 10)}, {"card": c(CardData.Suit.PAUS, 2)}]).is_empty(), "sem combo quando não há sequência, figuras ou Trunfos")
 	check(is_equal_approx(ChaosCombos.streak_mult(1), 1.0) and is_equal_approx(ChaosCombos.streak_mult(2), 1.25) and is_equal_approx(ChaosCombos.streak_mult(3), 1.5) and is_equal_approx(ChaosCombos.streak_mult(9), 2.0), "vitórias seguidas sobem o multiplicador até ×2")
-	# Bot: palpite e leitura do alvo.
-	var bpick := ChaosBot.choose_bet([c(CardData.Suit.TRUNFO, 21), c(CardData.Suit.TRUNFO, 20), c(CardData.Suit.PAUS, 14), c(CardData.Suit.COPAS, 14), c(CardData.Suit.TRUNFO, 15), c(CardData.Suit.PAUS, 2), c(CardData.Suit.PAUS, 3), c(CardData.Suit.COPAS, 4)], BotAI.Difficulty.HARD, RandomNumberGenerator.new())
-	check(int(bpick["predict"]) >= 3, "bot prevê muitas rodadas com mão forte")
-	var eb5 := ChaosEngine.new()
-	eb5.setup_match({"seed": 6})
-	eb5.set_bet(3, 1, 10)
-	eb5.history = [{"winner": 3}]
-	eb5.trick_number = 1
-	eb5.current = 3
-	eb5.plays = [
-		{"player": 0, "card": c(CardData.Suit.PAUS, 4)},
-		{"player": 1, "card": c(CardData.Suit.PAUS, 2)},
-		{"player": 2, "card": c(CardData.Suit.PAUS, 3)},
-	]
-	eb5.hands[3] = [c(CardData.Suit.PAUS, 12), c(CardData.Suit.PAUS, 1)]
-	var tpick := ChaosBot.choose(eb5, 3, BotAI.Difficulty.HARD, RandomNumberGenerator.new())
-	check(not eb5.would_win(tpick, 3), "bot que já cumpriu o palpite evita ganhar mais")
 
 	# Modificadores de vaza única e combos.
 	var e7 := ChaosEngine.new()
 	e7.setup_match({"seed": 9})
 	e7.modifier = ChaosModifiers.Modifier.VAZA_INVERTIDA
 	e7.modifier_trick = 3
-	e7.folego_player = -1
 	e7.round_index = 0
 	e7.trick_number = 3
 	e7.plays = [
@@ -590,8 +541,6 @@ func _test_chaos() -> void:
 		if r < ChaosEngine.ROUNDS - 1:
 			e8.advance_round()
 	check(seen_trick + seen_round == ChaosEngine.ROUNDS, "toda rodada sorteia exatamente um modificador")
-	e7.round_index = ChaosEngine.ROUNDS - 1
-	check(e7.is_final_round(), "última rodada é a rodada final (pontos ×2)")
 
 
 ## Bots estratégicos: só fazem jogadas legais em qualquer nível e, na defesa, seguram muito
