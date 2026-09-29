@@ -7,6 +7,7 @@ extends Control
 
 signal human_card_chosen(card: CardData)
 signal item_chosen(item: int)
+signal slides_done
 signal match_finished(summary: Dictionary)
 
 const CARD_SCENE := preload("res://scenes/Card.tscn")
@@ -76,6 +77,12 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_on_resize)
 	_refresh_hud()
 	_rebuild_hand()
+	if not GameState.autoplay and not bool(SaveManager.section("tips").get("chaos_intro", false)):
+		await _intro_slides()
+		SaveManager.section("tips")["chaos_intro"] = true
+		SaveManager.save_game()
+		if not is_inside_tree():
+			return
 	await _announce_round()
 	if not is_inside_tree():
 		return
@@ -865,6 +872,10 @@ func _wait(seconds: float) -> void:
 
 func _wait_human() -> CardData:
 	human_turn = true
+	if not engine.power_used[0] and engine.player_items[0] != ChaosItems.Item.NONE and engine.trick_number >= 1:
+		await _tip("power", "SEU PODER", "Toque no botão verde no rodapé pra usar seu poder (%s). Vale uma vez por rodada, só na sua vez." % str(ChaosItems.NAMES[engine.player_items[0]]))
+	else:
+		await _tip("turn", "SUA VEZ!", "Toque numa carta pra selecioná-la (ela sobe) e toque de novo pra jogar. Você tem 10 segundos por jogada.")
 	var ls := TrickRules.lead_suit(engine.plays)
 	if ls == -1:
 		status_label.text = "Sua vez — abra a vaza com qualquer carta"
@@ -1184,6 +1195,72 @@ func _show_zoom(view: CardView) -> void:
 			ov.queue_free())
 
 
+## Dica de uso único (salva no perfil): aparece na primeira vez que a situação acontece.
+func _tip(key: String, title: String, text: String) -> void:
+	var tips := SaveManager.section("tips")
+	if GameState.autoplay or bool(tips.get(key, false)):
+		return
+	tips[key] = true
+	SaveManager.save_game()
+	await _modal_choice(title, text, [{"label": "ENTENDI", "desc": "", "color": UIKit.OK}])
+
+
+## Tutorial de 3 telas: mostrado na primeira partida e sempre que tocar em "?".
+func _intro_slides() -> void:
+	var slides := [
+		{"icon": "♠ ♥ ◆ ♣", "title": "GANHE VAZAS", "text": "São 5 rodadas de 8 cartas. Em cada vaza todo mundo joga 1 carta: vence a maior do naipe (Trunfo corta). Quem vence leva as cartas e os pontos delas. No fim, o maior placar leva o pote de fichas."},
+		{"icon": "✦ ⚡ ★", "title": "3 DECISÕES POR RODADA", "text": "Toda rodada sorteia UM modificador que muda as regras (às vezes só numa vaza surpresa). Você escolhe seu PODER (roubar Trunfo, espiar ou arriscar) e faz sua APOSTA de quantas vazas vai vencer."},
+		{"icon": "♨ ≋ ⚑", "title": "VIRE O JOGO", "text": "3 vazas seguidas = Mão Quente ×1,5. Quem está em último ganha Fôlego ×1,5. A última rodada vale ×2. Você tem 10 segundos por jogada. Bora!"},
+	]
+	modal_open = true
+	var ov := UIKit.overlay()
+	overlay_layer.add_child(ov)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 24)
+	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 40.0, 620.0), 0)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 14)
+	box.add_child(v)
+	var icon_l := UIKit.label("", 52, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	var title_l := UIKit.label("", 34, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	var text_l := UIKit.label("", 24, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	text_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text_l.custom_minimum_size = Vector2(0, 220)
+	var dots := HBoxContainer.new()
+	dots.alignment = BoxContainer.ALIGNMENT_CENTER
+	dots.add_theme_constant_override("separation", 10)
+	var next := UIKit.button("PRÓXIMO", UIKit.OK)
+	var skip := UIKit.button("PULAR", UIKit.MUTED)
+	for n in [icon_l, title_l, text_l, dots, next, skip]:
+		v.add_child(n)
+	ov.add_child(UIKit.centered(box))
+	var state := {"i": 0}
+	var render := func():
+		var sl: Dictionary = slides[state["i"]]
+		icon_l.text = sl["icon"]
+		title_l.text = sl["title"]
+		text_l.text = sl["text"]
+		for c in dots.get_children():
+			c.queue_free()
+		for k in range(slides.size()):
+			dots.add_child(UIKit.label("●" if k == state["i"] else "○", 28, UIKit.GOLD if k == state["i"] else UIKit.MUTED))
+		next.text = "VAMOS JOGAR!" if state["i"] == slides.size() - 1 else "PRÓXIMO"
+		skip.visible = state["i"] < slides.size() - 1
+		FX.pop(title_l, 1.2)
+	render.call()
+	next.pressed.connect(func():
+		Sfx.play("tick")
+		if state["i"] >= slides.size() - 1:
+			slides_done.emit()
+		else:
+			state["i"] += 1
+			render.call())
+	skip.pressed.connect(func(): slides_done.emit())
+	await slides_done
+	modal_open = false
+	if is_inside_tree():
+		ov.queue_free()
+
+
 func _open_help() -> void:
 	var v := UIKit.modal(overlay_layer, "COMO FUNCIONA O CAOS")
 	var text := """RODADAS
@@ -1228,6 +1305,9 @@ CARTAS
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(520, 0)
 	v.add_child(l)
+	var tut := UIKit.button("VER TUTORIAL (3 TELAS)", UIKit.OK)
+	tut.pressed.connect(func(): _intro_slides())
+	v.add_child(tut)
 	UIKit.close_button(overlay_layer, v)
 
 
