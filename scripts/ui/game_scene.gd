@@ -1555,6 +1555,8 @@ func _finish_match() -> void:
 		"deltas": r["deltas"],
 	}
 	var summary := GameState.report_match(result)
+	if GameState.mode == GameState.Mode.CLASSIC and not tutorial:
+		GameState.table_add(r["deltas"])
 	Sfx.play("win" if summary["won"] else "lose")
 	status_label.text = ""
 	_show_results(summary, r)
@@ -1610,6 +1612,14 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 	v.add_child(HSeparator.new())
 	for line in summary["lines"]:
 		v.add_child(UIKit.label(str(line), 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	if not GameState.table.is_empty() and GameState.mode == GameState.Mode.CLASSIC and not tutorial:
+		v.add_child(HSeparator.new())
+		v.add_child(UIKit.label("PLACAR DA MESA · %d mão(s)" % int(GameState.table["hands"]), 18, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+		var order: Array = range(engine.num_players)
+		order.sort_custom(func(a: int, b: int) -> bool: return float(GameState.table["totals"][a]) > float(GameState.table["totals"][b]))
+		for p in order:
+			var tot := int(GameState.table["totals"][p])
+			v.add_child(UIKit.label("%s  %s%d" % [str(config["names"][p]).to_upper(), "+" if tot >= 0 else "", tot], 20, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	if tutorial:
 		v.add_child(HSeparator.new())
 		var tut_close := UIKit.label("Tutorial concluído! Isso não afeta suas Fragmentos nem seu elo — quando quiser, jogue de verdade no Vanilla ou Ranqueado.", 16, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
@@ -1625,11 +1635,13 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 		btn = UIKit.button("MENU PRINCIPAL")
 		btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
 	else:
-		var again := UIKit.button("NOVA RODADA")
+		var again := UIKit.button("PRÓXIMA MÃO")
 		again.pressed.connect(func(): get_tree().reload_current_scene())
 		v.add_child(again)
-		btn = UIKit.button("MENU PRINCIPAL", UIKit.MUTED)
-		btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
+		btn = UIKit.button("LEVANTAR DA MESA", UIKit.MUTED)
+		btn.pressed.connect(func():
+			GameState.leave_table()
+			get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
 	v.add_child(btn)
 	ov.add_child(UIKit.centered(box))
 	box.scale = Vector2(0.85, 0.85)

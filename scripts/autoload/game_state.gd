@@ -21,6 +21,23 @@ func start_tutorial() -> void:
 
 var ranked_lobby: Array = []   # [{name, mmr}] adversários encontrados no matchmaking
 var last_summary: Dictionary = {}
+## Mesa contínua do Vanilla: os mesmos jogadores ficam sentados e o placar acumula, mão
+## após mão, até alguém levantar. {names, totals, hands}
+var table: Dictionary = {}
+
+
+func leave_table() -> void:
+	table = {}
+
+
+## Soma os pontos da mão ao placar da mesa (só Vanilla, fora do tutorial).
+func table_add(deltas: Array) -> void:
+	if table.is_empty():
+		return
+	for i in range(deltas.size()):
+		table["totals"][i] = float(table["totals"][i]) + float(deltas[i])
+	table["hands"] = int(table["hands"]) + 1
+
 
 
 func _ready() -> void:
@@ -195,6 +212,11 @@ func match_config() -> Dictionary:
 		"difficulty": [BotAI.Difficulty.HARD, bots_difficulty(), bots_difficulty(), bots_difficulty()],
 		"tutorial": tutorial,
 	}
+	if mode == Mode.CLASSIC and not tutorial:
+		if table.is_empty():
+			table = {"names": cfg["names"].duplicate(), "totals": [0.0, 0.0, 0.0, 0.0], "hands": 0}
+		else:
+			cfg["names"] = table["names"].duplicate()
 	if mode == Mode.RANKED:
 		var diff := Ranked.bot_difficulty_for_mmr(int(ranked()["mmr"]))
 		cfg["difficulty"] = [BotAI.Difficulty.HARD, diff, diff, diff]

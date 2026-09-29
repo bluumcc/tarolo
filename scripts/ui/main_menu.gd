@@ -40,6 +40,7 @@ func _ready() -> void:
 	var classic := UIKit.button("MODO VANILLA", UIKit.GOLD, 28)
 	classic.pressed.connect(func():
 		GameState.mode = GameState.Mode.CLASSIC
+		GameState.leave_table()
 		get_tree().change_scene_to_file("res://scenes/GameScene.tscn"))
 	col.add_child(classic)
 	col.add_child(_caption("Tarot clássico: baralho de 78 cartas, trunfo e O Louco."))
