@@ -413,7 +413,10 @@ func _apply_modifier_badge(cv: CardView, card: CardData, player: int = 0) -> voi
 		return
 	var boosted := eff > base
 	cv.points_label.text = "%s %s pts" % ["▲" if boosted else "▼", UIKit.fmt_dec(eff, 1)]
-	cv.points_label.add_theme_color_override("font_color", UIKit.OK if boosted else UIKit.DANGER)
+	var dark_face := card.is_trunfo() or card.is_louco()
+	var good := UIKit.OK if dark_face else Color("#1E8A5C")
+	var bad := UIKit.DANGER if dark_face else Color("#D42A3C")
+	cv.points_label.add_theme_color_override("font_color", good if boosted else bad)
 
 
 func _current_turn_player() -> int:

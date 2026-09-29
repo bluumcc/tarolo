@@ -80,7 +80,7 @@ func _refresh() -> void:
 		points_label.text = ""
 		bout_label.text = ""
 		return
-	var color: Color = UIKit.SUIT_COLORS[data.suit]
+	var color := _ink_color()
 	_refresh_border()
 	rank_label.text = data.rank_label()
 	rank_label.add_theme_color_override("font_color", color)
@@ -90,16 +90,32 @@ func _refresh() -> void:
 	center_label.add_theme_color_override("font_color", color)
 	name_label.text = data.display_name() if (data.is_louco() or (data.is_trunfo() and data.is_bout())) else ""
 	points_label.text = "%s pts" % UIKit.fmt_dec(data.points(), 1)
-	points_label.add_theme_color_override("font_color", UIKit.MUTED)
+	points_label.add_theme_color_override("font_color", UIKit.MUTED if _dark_face() else Color("#5B5670"))
 	bout_label.text = "BOUT" if data.is_bout() else ""
-	bout_label.add_theme_color_override("font_color", UIKit.GOLD)
+	bout_label.add_theme_color_override("font_color", UIKit.GOLD if _dark_face() else Color("#B8860B"))
+
+
+## Trunfos e O Louco têm a face escura roxa; as demais cartas são brancas com tinta
+## vermelha (Ouros, Copas) ou preta (Paus, Espadas).
+func _dark_face() -> bool:
+	return data.is_trunfo() or data.is_louco()
+
+
+func _ink_color() -> Color:
+	if data.is_trunfo():
+		return UIKit.SUIT_COLORS[CardData.Suit.TRUNFO]
+	if data.is_louco():
+		return UIKit.SUIT_COLORS[CardData.Suit.LOUCO]
+	if data.suit == CardData.Suit.OUROS or data.suit == CardData.Suit.COPAS:
+		return Color("#D42A3C")
+	return Color("#14121F")
 
 
 func _refresh_border() -> void:
 	if data == null or not face_up:
 		return
-	var border := Color("#4A4290")
-	var bg := Color("#1A1544")
+	var border := Color("#B9B4D6")
+	var bg := Color("#FAF8FF")
 	if data.is_louco():
 		border = UIKit.SUIT_COLORS[CardData.Suit.LOUCO]
 		bg = Color("#241a33")
@@ -107,7 +123,7 @@ func _refresh_border() -> void:
 		border = UIKit.SUIT_COLORS[CardData.Suit.TRUNFO]
 		bg = Color("#221436")
 	if data.is_bout():
-		border = UIKit.GOLD
+		border = UIKit.GOLD if _dark_face() else Color("#D9A21B")
 	if selected:
 		border = UIKit.GOLD
 	var sb := UIKit.box(bg, border, 4 if selected else 2, 6, 6)
