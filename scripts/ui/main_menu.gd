@@ -349,10 +349,10 @@ func _open_rules() -> void:
 • Uma vaza é uma jogada de 4 cartas, uma de cada jogador. Quem jogou a mais forte leva as 4 e os pontos delas.
 • Você tem que jogar o naipe da primeira carta. Se não tiver, tem que jogar um Trunfo. O Trunfo ganha de qualquer naipe.
 • Bouts são as 3 cartas mais valiosas: Trunfo 1, Trunfo 21 e O Louco. O Louco nunca ganha a vaza, mas quem o joga fica com ele.
-• Antes de jogar, cada um passa ou dá um lance (Petite, Garde, Garde Sans ou Garde Contre). O lance mais alto joga sozinho contra os outros 3: é o Tomador. O lance não custa nada.
-• O monte são 6 cartas viradas no meio da mesa. Com Petite ou Garde, o Tomador pega o monte e devolve 6 cartas da mão.
-• O Tomador precisa somar 56 pontos sem Bout, 51 com 1 Bout, 41 com 2 ou 36 com 3. Se conseguir, ganha pontos dos outros. Se não, paga.
-• Bônus do Tomador: mostrar 10 ou mais trunfos (Poignée) e ganhar as 18 vazas (Chelem). Quem ganha a última vaza com o Trunfo 1 leva +10.
+• Antes de jogar, cada um passa ou dá um lance (Petite, Garde, Garde Sans ou Garde Contre). O lance mais alto joga sozinho contra os outros 3: é o Atacante. O lance não custa nada.
+• O monte são 6 cartas viradas no meio da mesa. Com Petite ou Garde, o Atacante pega o monte e devolve 6 cartas da mão.
+• O Atacante precisa somar 56 pontos sem Bout, 51 com 1 Bout, 41 com 2 ou 36 com 3. Se conseguir, ganha pontos dos outros. Se não, paga.
+• Bônus do Atacante: mostrar 10 ou mais trunfos (Poignée) e ganhar as 18 vazas (Chelem). Quem ganha a última vaza com o Trunfo 1 leva +10.
 • Ranqueado: sua colocação entre 4 jogadores define seus pontos de liga.
 • Primeira vez? Jogue o TUTORIAL: uma mão guiada com dicas em cada regra nova."""
 	var l := UIKit.label(text, 19, UIKit.INK)

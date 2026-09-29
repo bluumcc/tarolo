@@ -1,7 +1,7 @@
 class_name TrickTicks
 extends Control
 ## Linha com uma marca por vaza da rodada, pintada pela cor de quem levou: vermelho pro
-## Ataque (Tomador), azul pra Defesa. A vaza atual fica branca.
+## Ataque (Atacante), azul pra Defesa. A vaza atual fica branca.
 
 var total := 18
 var winners: Array = []   # 1 = Ataque levou, 0 = Defesa levou

@@ -1,12 +1,12 @@
 class_name Scoring
 extends RefCounted
-## Pontuação oficial do Jeu de Tarot: o "tomador" precisa somar, nas cartas que capturou
+## Pontuação oficial do Jeu de Tarot: o "atacante" precisa somar, nas cartas que capturou
 ## (vazas vencidas + talão), um total de pontos que depende de quantos Bouts ele tem.
 
 ## Soma dos pontos de todas as 78 cartas (56 de naipe + 21 trunfos + O Louco).
 const TOTAL_POINTS := 91.0
 
-## Quanto mais Bouts o tomador guarda, menos pontos precisa pra bater a meta.
+## Quanto mais Bouts o atacante guarda, menos pontos precisa pra bater a meta.
 const TARGET_BY_BOUTS := {0: 56.0, 1: 51.0, 2: 41.0, 3: 36.0}
 
 ## Contratos de licitação e seus multiplicadores, do mais leve ao mais arriscado.
@@ -27,13 +27,13 @@ const CONTRACT_HINTS := [
 ## pra menos) da meta — e só depois é multiplicado pelo contrato.
 const BASE_SCORE := 25.0
 
-## Poignée: bônus por segurar muitos trunfos na mão inicial. É uma escolha do tomador —
+## Poignée: bônus por segurar muitos trunfos na mão inicial. É uma escolha do atacante —
 ## declarar mostra as cartas de trunfo pros outros (dá informação), então só entra se
 ## `poignee_declared` estiver marcado. Valores oficiais de mesa com 4 jogadores; soma-se
 ## ao placar já multiplicado, não entra na conta da meta.
 const POIGNEE_THRESHOLDS := [[15, 40.0], [13, 30.0], [10, 20.0]]  # [trunfos mínimos, bônus]
 
-## Chelem: o tomador vence as 18 vazas sozinho. Também é uma escolha: anunciar antes de
+## Chelem: o atacante vence as 18 vazas sozinho. Também é uma escolha: anunciar antes de
 ## jogar vale mais se conseguir, mas pune se falhar; não anunciar é mais seguro (só rende
 ## se acontecer, sem risco).
 const CHELEM_ANNOUNCED_BONUS := 400.0
@@ -41,7 +41,7 @@ const CHELEM_ANNOUNCED_FAIL_PENALTY := 200.0
 const CHELEM_UNANNOUNCED_BONUS := 200.0
 
 ## Petit au bout: quem vence a última vaza com Le Petit dentro leva 10 pontos extras —
-## a favor do tomador se for ele, da defesa se for outro jogador.
+## a favor do atacante se for ele, da defesa se for outro jogador.
 const PETIT_AU_BOUT_BONUS := 10.0
 
 
@@ -57,10 +57,10 @@ static func poignee_bonus(trump_count: int) -> float:
 	return 0.0
 
 
-## `taker_points` = soma de `CardData.points()` de tudo que o tomador capturou
+## `taker_points` = soma de `CardData.points()` de tudo que o atacante capturou
 ## (vazas vencidas + talão). `bouts` = quantos dos 3 Bouts estão nesse total.
 ## `bonuses` (opcional) = { poignee, chelem, petit_au_bout }, já com o sinal certo
-## (positivo a favor do tomador, negativo a favor da defesa) — somados depois do
+## (positivo a favor do atacante, negativo a favor da defesa) — somados depois do
 ## multiplicador do contrato, como no jogo real.
 static func resolve(taker_points: float, bouts: int, contract: int = Contract.PETITE, bonuses: Dictionary = {}) -> Dictionary:
 	var target := target_for_bouts(bouts)
@@ -84,7 +84,7 @@ static func resolve(taker_points: float, bouts: int, contract: int = Contract.PE
 	}
 
 
-## Delta de pontos pra cada assento: o tomador ganha/perde `score` de cada um dos outros
+## Delta de pontos pra cada assento: o atacante ganha/perde `score` de cada um dos outros
 ## 3 (ou perde/ganha, se o contrato falhou — o sinal já vem certo de `resolve`).
 static func distribute(score: float, taker: int, players: int = 4) -> Array:
 	var deltas: Array = []

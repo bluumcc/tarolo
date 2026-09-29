@@ -33,7 +33,7 @@ var seat_portraits: Array = []   # Portrait de cada assento
 var seat_strip: HBoxContainer    # os 3 outros jogadores
 var turn_pulse_token := 0        # invalida pulsos de destaque antigos quando a vez muda
 
-var boss_panel: PanelContainer   # o Tomador como "chefe": retrato, contrato, vida
+var boss_panel: PanelContainer   # o Atacante como "chefe": retrato, contrato, vida
 var boss_portrait: Portrait
 var boss_name: Label
 var boss_chip: Label
@@ -50,7 +50,7 @@ var pot_label: Label
 var pot_sub: Label
 var table_views: Array = []
 
-var bid_panel: VBoxContainer     # tela da licitação (some quando o Tomador é definido)
+var bid_panel: VBoxContainer     # tela da licitação (some quando o Atacante é definido)
 var bid_rows: Array = []
 var bid_bubbles: Array = []      # Label de cada assento
 var bid_bubble_boxes: Array = []
@@ -74,6 +74,7 @@ var has_throw_from := false
 var status_label: Label
 var trick_label: Label           # resultado transitório da última vaza
 var info_label: Label
+var last_banner_done := false
 var popup_layer: Control
 var overlay_layer: Control
 
@@ -96,6 +97,7 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_on_resize)
 	_refresh_hud()
 	_rebuild_hand()
+	_banner.call_deferred("LICITAÇÃO", UIKit.GOLD)
 	if tutorial:
 		await _tutorial_modal("BEM-VINDO AO TUTORIAL", "Essa mão foi montada pra você aprender as regras principais. Antes de cada decisão nova tem uma explicação curta. Não tem pressa: a tela só avança quando você toca em ENTENDI.\n\nOlhe sua mão (embaixo da tela) e continue.")
 		if not is_inside_tree():
@@ -107,6 +109,8 @@ func _ready() -> void:
 	_update_taker_badge()
 	_refresh_hud()
 	await _show_intro()
+	if is_inside_tree():
+		_banner("DUELO!", UIKit.BOSS)
 	if not is_inside_tree():
 		return
 	await _run_discard()
@@ -123,6 +127,32 @@ func _ready() -> void:
 
 
 # ------------------------------------------------------------------ UI
+
+## Faixa que cruza a tela e some sozinha (não trava o jogo): marca a mudança de fase.
+func _banner(text: String, color: Color) -> void:
+	if GameState.autoplay or not is_inside_tree():
+		return
+	var strip := ColorRect.new()
+	strip.color = Color(0.04, 0.03, 0.06, 0.88)
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	popup_layer.add_child(strip)
+	strip.size = Vector2(popup_layer.size.x, 120)
+	strip.position = Vector2(0, popup_layer.size.y * 0.38)
+	var l := UIKit.label(text, 52, color, HORIZONTAL_ALIGNMENT_CENTER)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	strip.add_child(l)
+	l.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	strip.modulate.a = 0.0
+	strip.scale = Vector2(1.0, 0.4)
+	strip.pivot_offset = strip.size / 2.0
+	var tw := create_tween()
+	tw.tween_property(strip, "modulate:a", 1.0, GameState.anim(0.18))
+	tw.parallel().tween_property(strip, "scale", Vector2.ONE, GameState.anim(0.18))
+	tw.tween_interval(GameState.anim(0.7))
+	tw.tween_property(strip, "modulate:a", 0.0, GameState.anim(0.25))
+	tw.tween_callback(strip.queue_free)
+
 
 func _build_ui() -> void:
 	add_child(UIKit.background())
@@ -216,9 +246,9 @@ func _build_topbar() -> void:
 	topbar.add_child(menu_btn)
 
 
-## O Tomador vira o "chefe" da rodada: quem joga sozinho contra os outros 3. A barra é a
+## O Atacante vira o "chefe" da rodada: quem joga sozinho contra os outros 3. A barra é a
 ## vida dele — os pontos que a Defesa ainda precisa somar pra derrubar o contrato. Se o
-## Tomador é você, a mesma barra vira o progresso da sua meta.
+## Atacante é você, a mesma barra vira o progresso da sua meta.
 func _build_boss_panel() -> void:
 	boss_panel = UIKit.panel(Color(0.20, 0.07, 0.08, 0.9), UIKit.BOSS, 12)
 	boss_panel.visible = false
@@ -468,7 +498,7 @@ func _open_bout_help() -> void:
 • Le Monde: o Trunfo 21
 • O Louco
 
-Cada Bout vale 4,5 pontos, o mesmo que um Rei. E mais: os Bouts que o Tomador captura baixam a meta dele. Com 0 Bouts ele precisa de 56 pontos, com 1 precisa de 51, com 2 de 41 e com 3 de 36.
+Cada Bout vale 4,5 pontos, o mesmo que um Rei. E mais: os Bouts que o Atacante captura baixam a meta dele. Com 0 Bouts ele precisa de 56 pontos, com 1 precisa de 51, com 2 de 41 e com 3 de 36.
 
 Por isso, Bout na mão é um bom motivo pra licitar mais alto.
 
@@ -666,9 +696,9 @@ func _refresh_hud() -> void:
 			_refresh_boss(true)
 
 
-## Números do duelo: a barra do chefe começa vazia e enche com os pontos que o Tomador
+## Números do duelo: a barra do chefe começa vazia e enche com os pontos que o Atacante
 ## captura, até a meta dele (que cai a cada Bout que ele pega). A Defesa joga pra segurar
-## a barra. Se o Tomador é você, é a mesma barra: a sua meta.
+## a barra. Se o Atacante é você, é a mesma barra: a sua meta.
 func _boss_numbers() -> Dictionary:
 	var t := engine.taker
 	var bouts_now := 0
@@ -763,7 +793,7 @@ func _speech_bubble(player: int, text: String) -> void:
 	tw.tween_callback(box.queue_free)
 
 
-## Depois da licitação: o Tomador ganha o destaque de chefe (borda vermelha no assento,
+## Depois da licitação: o Atacante ganha o destaque de chefe (borda vermelha no assento,
 ## nome vermelho na arena, retrato no painel do topo).
 func _update_taker_badge() -> void:
 	for p in range(engine.num_players):
@@ -872,7 +902,7 @@ func _show_intro() -> void:
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_theme_constant_override("separation", 10)
 	v.custom_minimum_size = Vector2(560, 0)
-	v.add_child(UIKit.label("VOCÊ É O TOMADOR" if mine else "O CHEFE DA RODADA", 19, UIKit.GOLD if mine else UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("VOCÊ É O ATACANTE" if mine else "O CHEFE DA RODADA", 19, UIKit.GOLD if mine else UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	var hero_box := CenterContainer.new()
 	hero_box.add_child(Portrait.new().setup(t, UIKit.GOLD if mine else UIKit.BOSS, 220.0))
 	v.add_child(hero_box)
@@ -932,7 +962,7 @@ func _show_intro() -> void:
 
 func _run_bidding() -> void:
 	if tutorial:
-		await _tutorial_modal("COMO FUNCIONA A LICITAÇÃO", "Toda rodada começa com a licitação: cada jogador, em ordem, diz se quer jogar sozinho contra os outros 3.\n\nQuem joga sozinho é o TOMADOR (o ataque). Os outros 3 formam a DEFESA.\n\nNa sua vez, você PASSA ou dá um LANCE mais alto que o anterior. O lance não custa nada: é só dizer que você confia na sua mão.\n\nO lance mais alto vira o Tomador. Cada contrato tem uma explicação curta do risco dele.")
+		await _tutorial_modal("COMO FUNCIONA A LICITAÇÃO", "Toda rodada começa com a licitação: cada jogador, em ordem, diz se quer jogar sozinho contra os outros 3.\n\nQuem joga sozinho é o ATACANTE (o ataque). Os outros 3 formam a DEFESA.\n\nNa sua vez, você PASSA ou dá um LANCE mais alto que o anterior. O lance não custa nada: é só dizer que você confia na sua mão.\n\nO lance mais alto vira o Atacante. Cada contrato tem uma explicação curta do risco dele.")
 		if not is_inside_tree():
 			return
 	while true:
@@ -979,13 +1009,13 @@ func _run_bidding() -> void:
 			_bid_reset()
 			continue
 		break
-	status_label.text = "%s é o Tomador! Contrato: %s" % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract]]
+	status_label.text = "%s é o Atacante! Contrato: %s" % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract]]
 	trick_label.text = ""
 	if tutorial:
 		if engine.taker == 0:
-			await _tutorial_modal("VOCÊ É O ATAQUE (TOMADOR)", "Você deu o maior lance: %s. %s\n\nAgora você joga sozinho contra os outros 3 (a Defesa). No fim, somam-se os pontos das cartas que você ganhou nas vazas (e do monte, dependendo do contrato). Se chegar na meta, você ganha pontos dos outros 3. Se não chegar, você paga." % [Scoring.CONTRACT_NAMES[engine.contract], Scoring.CONTRACT_HINTS[engine.contract]])
+			await _tutorial_modal("VOCÊ É O ATAQUE (ATACANTE)", "Você deu o maior lance: %s. %s\n\nAgora você joga sozinho contra os outros 3 (a Defesa). No fim, somam-se os pontos das cartas que você ganhou nas vazas (e do monte, dependendo do contrato). Se chegar na meta, você ganha pontos dos outros 3. Se não chegar, você paga." % [Scoring.CONTRACT_NAMES[engine.contract], Scoring.CONTRACT_HINTS[engine.contract]])
 		else:
-			await _tutorial_modal("VOCÊ É DA DEFESA", "%s deu o maior lance (%s) e é o TOMADOR: joga sozinho contra os outros 3, incluindo você.\n\nVocê e mais 2 jogadores são a DEFESA. Os pontos que vocês ganharem nas vazas ajudam a impedir %s de chegar na meta. Se ele não chegar, a Defesa ganha pontos. Se chegar, a Defesa paga." % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract], config["names"][engine.taker]])
+			await _tutorial_modal("VOCÊ É DA DEFESA", "%s deu o maior lance (%s) e é o ATACANTE: joga sozinho contra os outros 3, incluindo você.\n\nVocê e mais 2 jogadores são a DEFESA. Os pontos que vocês ganharem nas vazas ajudam a impedir %s de chegar na meta. Se ele não chegar, a Defesa ganha pontos. Se chegar, a Defesa paga." % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract], config["names"][engine.taker]])
 		if not is_inside_tree():
 			return
 	else:
@@ -1018,9 +1048,9 @@ func _wait_human_bid() -> int:
 
 # ------------------------------------------------------------------ descarte (écart)
 
-## Petite/Garde: o tomador escolhe (de verdade) quais 6 cartas devolve pro talão —
+## Petite/Garde: o atacante escolhe (de verdade) quais 6 cartas devolve pro talão —
 ## nunca automático. Garde Sans/Garde Contre nem passam por aqui (`awaiting_discard`
-## fica falso pra esses contratos, já que o talão nem entra na mão do tomador).
+## fica falso pra esses contratos, já que o talão nem entra na mão do atacante).
 func _run_discard() -> void:
 	if not engine.awaiting_discard:
 		return
@@ -1044,7 +1074,7 @@ func _run_discard() -> void:
 
 
 ## Explica o talão pros casos que não passam pela tela de descarte: quando um bot é o
-## Tomador (ele decide sozinho, sem mostrar tela), ou quando o contrato é Garde Sans/
+## Atacante (ele decide sozinho, sem mostrar tela), ou quando o contrato é Garde Sans/
 ## Garde Contre (o talão nem chega a entrar na mão de ninguém pra escolher).
 func _run_talao_reveal() -> void:
 	if not tutorial or engine.taker == -1:
@@ -1052,9 +1082,9 @@ func _run_talao_reveal() -> void:
 	match engine.contract:
 		Scoring.Contract.PETITE, Scoring.Contract.GARDE:
 			if engine.taker != 0:
-				await _tutorial_modal("O MONTE (ESCOLHA DO BOT)", "%s é o Tomador, então pegou o monte (6 cartas), olhou e devolveu 6 da mão dele. Você não vê essa escolha." % config["names"][engine.taker])
+				await _tutorial_modal("O MONTE (ESCOLHA DO BOT)", "%s é o Atacante, então pegou o monte (6 cartas), olhou e devolveu 6 da mão dele. Você não vê essa escolha." % config["names"][engine.taker])
 		Scoring.Contract.GARDE_SANS:
-			await _tutorial_modal("O MONTE (GARDE SANS)", "Com Garde Sans, %s não pegou o monte nem viu as 6 cartas. Mesmo assim, os pontos delas contam pro Tomador: %s." % [config["names"][engine.taker], _describe_cards(engine.chien)])
+			await _tutorial_modal("O MONTE (GARDE SANS)", "Com Garde Sans, %s não pegou o monte nem viu as 6 cartas. Mesmo assim, os pontos delas contam pro Atacante: %s." % [config["names"][engine.taker], _describe_cards(engine.chien)])
 		Scoring.Contract.GARDE_CONTRE:
 			await _tutorial_modal("O MONTE (GARDE CONTRE)", "Com Garde Contre, %s não pegou o monte nem viu as 6 cartas. Dessa vez os pontos delas vão pra Defesa: %s." % [config["names"][engine.taker], _describe_cards(engine.chien)])
 
@@ -1125,7 +1155,7 @@ func _wait_human_discard() -> Array:
 
 # ------------------------------------------------------------------ declarações (Poignée / Chelem)
 
-## Depois da licitação, o Tomador escolhe se declara Poignée (se elegível) e se anuncia
+## Depois da licitação, o Atacante escolhe se declara Poignée (se elegível) e se anuncia
 ## Chelem — as duas são apostas estratégicas dele, não bônus automáticos.
 func _run_declarations() -> void:
 	if engine.taker == -1:
@@ -1213,6 +1243,9 @@ func _run_round() -> void:
 			return
 		var p := engine.current
 		_refresh_hud()
+		if engine.plays.is_empty() and engine.trick_number == engine.total_tricks - 1 and not last_banner_done:
+			last_banner_done = true
+			_banner("ÚLTIMA VAZA", UIKit.GOLD)
 		var card: CardData
 		if p == 0 and not GameState.autoplay:
 			card = await _wait_human()
@@ -1480,7 +1513,7 @@ func _boss_scores(winner: int) -> void:
 	tw.tween_property(boss_portrait, "scale", Vector2.ONE, GameState.anim(0.2))
 
 
-## Número que sobe da mesa: "+X". Quando é o Tomador que leva a vaza, ele voa até o painel
+## Número que sobe da mesa: "+X". Quando é o Atacante que leva a vaza, ele voa até o painel
 ## do chefe (é a barra dele que enche); quando é a Defesa, sobe na própria mesa.
 func _float_points(winner: int, points: float) -> void:
 	var to_boss := winner == engine.taker
@@ -1563,7 +1596,7 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 		bonus_lines.append("✦ Chelem avisado e não cumprido: %s errou (%d)" % [str(config["names"][r["taker"]]), int(chelem)])
 	var petit: float = float(bonuses.get("petit_au_bout", 0.0))
 	if petit > 0.0:
-		bonus_lines.append("✦ Petit na última vaza: ponto pro Tomador (+%d)" % int(petit))
+		bonus_lines.append("✦ Petit na última vaza: ponto pro Atacante (+%d)" % int(petit))
 	elif petit < 0.0:
 		bonus_lines.append("✦ Petit na última vaza: ponto pra Defesa (%d)" % int(petit))
 	if not bonus_lines.is_empty():
@@ -1651,20 +1684,20 @@ OS BOUTS
 • O Louco nunca ganha a vaza. Quem o joga fica com ele (só na última vaza ele vai pra quem ganhar).
 
 LICITAÇÃO: QUEM JOGA SOZINHO
-• Cada um passa ou dá um lance. O lance mais alto vira o Tomador: ele joga sozinho contra os outros 3 (a Defesa).
+• Cada um passa ou dá um lance. O lance mais alto vira o Atacante: ele joga sozinho contra os outros 3 (a Defesa).
 • Do mais leve ao mais arriscado: Petite ×1, Garde ×2, Garde Sans ×4, Garde Contre ×6. O número é quanto você ganha ou perde.
 • O lance não custa nada. É só dizer que você confia na sua mão.
 
 O MONTE
 • São 6 cartas viradas no meio da mesa.
-• Petite e Garde: o Tomador pega o monte, olha e devolve 6 cartas da mão (nunca Reis nem Bouts).
+• Petite e Garde: o Atacante pega o monte, olha e devolve 6 cartas da mão (nunca Reis nem Bouts).
 • Garde Sans: não pega; os pontos do monte contam pra ele. Garde Contre: não pega; os pontos vão pra Defesa.
 
 COMO SE GANHA
-• O Tomador precisa somar estes pontos com as cartas que ganhar: 56 sem Bout, 51 com 1 Bout, 41 com 2, 36 com 3.
+• O Atacante precisa somar estes pontos com as cartas que ganhar: 56 sem Bout, 51 com 1 Bout, 41 com 2, 36 com 3.
 • Se conseguir, ganha pontos dos outros 3. Se não, paga.
 
-BÔNUS (só o Tomador escolhe)
+BÔNUS (só o Atacante escolhe)
 • Poignée: com 10 ou mais trunfos, ele pode mostrá-los pra ganhar pontos extras.
 • Chelem: ganhar as 18 vazas. Se avisar antes e conseguir: +400. Se avisar e falhar: -200. Sem avisar, se acontecer: +200.
 • Petit na última vaza: quem ganhar a última vaza com o Trunfo 1 nela leva +10."""

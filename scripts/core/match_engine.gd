@@ -1,7 +1,7 @@
 class_name MatchEngine
 extends RefCounted
 ## Estado puro de uma rodada de Tarot Vanilla (sem UI): licitação, talão, vazas e a
-## pontuação final do tomador contra a defesa.
+## pontuação final do atacante contra a defesa.
 
 signal trick_resolved(result: Dictionary)
 signal round_finished()
@@ -28,10 +28,10 @@ var highest_bid := -1
 var highest_bidder := -1
 var bidding_done := false
 var bidding_void := false      # todos passaram (mão anulada — chamador deve refazer o setup)
-var taker_trump_count := 0     # trunfos na mão do tomador já com o talão resolvido (Poignée)
-var poignee_declared := false  # escolha do tomador: mostrar os trunfos pra valer o bônus
-var chelem_announced := false  # escolha do tomador: apostar alto em vencer as 18 vazas
-var awaiting_discard := false  # Petite/Garde: esperando o tomador escolher o descarte (écart)
+var taker_trump_count := 0     # trunfos na mão do atacante já com o talão resolvido (Poignée)
+var poignee_declared := false  # escolha do atacante: mostrar os trunfos pra valer o bônus
+var chelem_announced := false  # escolha do atacante: apostar alto em vencer as 18 vazas
+var awaiting_discard := false  # Petite/Garde: esperando o atacante escolher o descarte (écart)
 var louco_owed := {}           # dono do Louco -> vencedor a quem ainda deve uma carta de 0,5
 
 
@@ -191,11 +191,11 @@ func _advance_bidding() -> void:
 			return
 
 
-## Aplica as regras do contrato vencedor sobre o talão. Petite/Garde: o tomador vê o
+## Aplica as regras do contrato vencedor sobre o talão. Petite/Garde: o atacante vê o
 ## talão, incorpora na mão e escolhe (ele mesmo, não o jogo) 6 cartas pra descartar de
 ## volta — as vazas só começam depois disso (ver `awaiting_discard`/`legal_discards`/
-## `discard`). Garde Sans: o tomador não vê o talão, mas ele conta pra ele mesmo assim.
-## Garde Contre: o tomador não vê o talão, e ele NÃO conta pra ele (fica com a defesa).
+## `discard`). Garde Sans: o atacante não vê o talão, mas ele conta pra ele mesmo assim.
+## Garde Contre: o atacante não vê o talão, e ele NÃO conta pra ele (fica com a defesa).
 func _finalize_taker() -> void:
 	match contract:
 		Scoring.Contract.PETITE, Scoring.Contract.GARDE:
@@ -206,7 +206,7 @@ func _finalize_taker() -> void:
 		Scoring.Contract.GARDE_SANS:
 			captured[taker].append_array(chien)
 		Scoring.Contract.GARDE_CONTRE:
-			pass  # talão não entra na jogada nem pontua pro tomador
+			pass  # talão não entra na jogada nem pontua pro atacante
 	_start_tricks()
 
 
@@ -231,7 +231,7 @@ func legal_discards(hand: Array) -> Array:
 	return safe + extra
 
 
-## Aplica o descarte escolhido pelo tomador (humano ou bot) e libera o início das vazas.
+## Aplica o descarte escolhido pelo atacante (humano ou bot) e libera o início das vazas.
 func discard(cards: Array) -> Dictionary:
 	if not awaiting_discard or cards.size() != Deck.CHIEN_SIZE:
 		return {"ok": false, "error": "descarte inválido"}
@@ -248,7 +248,7 @@ func discard(cards: Array) -> Dictionary:
 	return {"ok": true}
 
 
-## Verdadeiro se o tomador tem trunfos suficientes pra ter direito de declarar Poignée
+## Verdadeiro se o atacante tem trunfos suficientes pra ter direito de declarar Poignée
 ## (a escolha de mostrar a mão pra valer o bônus é dele — ver `declare_poignee`).
 func poignee_eligible() -> bool:
 	return taker_trump_count >= 10
@@ -354,7 +354,7 @@ func _finish() -> Dictionary:
 		taker_points += card.points()
 		if card.is_bout():
 			bouts += 1
-	# Garde Sans/Contre: o talão nunca entrou na mão do tomador (não é jogado em vaza
+	# Garde Sans/Contre: o talão nunca entrou na mão do atacante (não é jogado em vaza
 	# nenhuma), então ele só entra na conta final aqui — não nos dois casos acima.
 	var bonuses := _round_bonuses()
 	var r := Scoring.resolve(taker_points, bouts, contract, bonuses)
@@ -365,7 +365,7 @@ func _finish() -> Dictionary:
 	return r
 
 
-## Poignée e Chelem só valem se o tomador escolheu declarar/anunciar (ver `declare_poignee`
+## Poignée e Chelem só valem se o atacante escolheu declarar/anunciar (ver `declare_poignee`
 ## e `announce_chelem`) — são apostas estratégicas dele, não bônus automáticos. Petit au
 ## bout é o único automático: depende só de como a última vaza terminou, ninguém declara.
 func _round_bonuses() -> Dictionary:

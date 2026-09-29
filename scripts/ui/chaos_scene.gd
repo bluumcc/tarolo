@@ -1,6 +1,6 @@
 extends Control
 ## ChaosScene.tscn — mesa do modo Caos: 5 rodadas curtas de 8 cartas, todo mundo joga
-## pra si (sem Tomador/Defesa), com um modificador novo a cada rodada e um bônus de
+## pra si (sem Atacante/Defesa), com um modificador novo a cada rodada e um bônus de
 ## Fôlego pra quem estiver por baixo no total. Layout pensado pra celular (retrato):
 ## uma pilha vertical — status dos jogadores no topo, área de jogo compacta no meio,
 ## sua mão embaixo — em vez de uma mesa oval espalhada, que só faz sentido em paisagem.

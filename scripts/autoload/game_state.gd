@@ -122,7 +122,7 @@ func player_name() -> String:
 
 
 ## Configuração da partida pra ChaosScene / ChaosEngine — todo mundo joga pra si, sem
-## Tomador/Defesa, então não precisa de dificuldade especial pro assento do jogador.
+## Atacante/Defesa, então não precisa de dificuldade especial pro assento do jogador.
 ## Já cobra o buy-in das fichas do jogador (config["entered"] = false se não tinha saldo).
 func chaos_config() -> Dictionary:
 	var names := BOT_NAMES.duplicate()
@@ -210,7 +210,7 @@ func report_match(result: Dictionary) -> Dictionary:
 	if tutorial:
 		tutorial = false
 		var was_taker_t: bool = int(result.get("taker", -1)) == 0
-		var role_t := "Tomador" if was_taker_t else "Defesa"
+		var role_t := "Atacante" if was_taker_t else "Defesa"
 		var outcome_t := "bateu a meta" if bool(result.get("success", false)) else "não bateu a meta"
 		return {
 			"mode": mode,
@@ -228,7 +228,7 @@ func report_match(result: Dictionary) -> Dictionary:
 	var summary := {"mode": mode, "placement": placement, "won": won, "lines": [], "next": "menu"}
 
 	var was_taker: bool = int(result.get("taker", -1)) == 0
-	var role := "Tomador" if was_taker else "Defesa"
+	var role := "Atacante" if was_taker else "Defesa"
 	var outcome := "bateu a meta" if bool(result.get("success", false)) else "não bateu a meta"
 	summary["lines"].append("%s · %s" % [role, outcome] if was_taker else role)
 	summary["lines"].append("%s%d pontos" % ["+" if int(result["deltas"][0]) >= 0 else "", int(result["deltas"][0])])

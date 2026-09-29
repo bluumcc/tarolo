@@ -137,7 +137,7 @@ func _test_bidding() -> void:
 	rng.seed = 3
 	var e := MatchEngine.new()
 	e.setup({"seed": 3})
-	check(e.taker == -1 and not e.bidding_done, "licitação começa sem tomador definido")
+	check(e.taker == -1 and not e.bidding_done, "licitação começa sem atacante definido")
 
 	# 3 passam, o 4º é obrigado a dar um lance (não pode passar sendo o único restante).
 	check(e.place_bid(0, -1)["ok"], "jogador 0 passa")
@@ -146,15 +146,15 @@ func _test_bidding() -> void:
 	check(e.is_bidding_forced(3), "último jogador ativo é obrigado a dar lance")
 	check(not e.place_bid(3, -1)["ok"], "não pode passar quando é obrigado a licitar")
 	check(e.place_bid(3, Scoring.Contract.PETITE)["ok"], "jogador 3 assume com Petite")
-	check(e.bidding_done and e.taker == 3 and e.contract == Scoring.Contract.PETITE, "jogador 3 vira tomador")
-	check(e.awaiting_discard and (e.hands[3] as Array).size() == 24, "Petite: talão entra na mão (24 cartas) e espera o tomador escolher o descarte")
+	check(e.bidding_done and e.taker == 3 and e.contract == Scoring.Contract.PETITE, "jogador 3 vira atacante")
+	check(e.awaiting_discard and (e.hands[3] as Array).size() == 24, "Petite: talão entra na mão (24 cartas) e espera o atacante escolher o descarte")
 	var legal3 := e.legal_discards(e.hands[3])
 	check(not (legal3 as Array).any(func(c: CardData) -> bool: return c.is_bout()), "Bout nunca pode ir pro descarte")
 	check(not (legal3 as Array).any(func(c: CardData) -> bool: return c.rank == 14), "Rei nunca pode ir pro descarte")
 	var bad_discard := (e.hands[3] as Array).filter(func(c: CardData) -> bool: return c.is_bout())
 	if bad_discard.size() >= 1:
 		check(not e.discard(bad_discard.slice(0, 1) + legal3.slice(0, 5))["ok"], "descarte com Bout é rejeitado")
-	check(e.discard(legal3.slice(0, Deck.CHIEN_SIZE))["ok"], "tomador escolhe o próprio descarte")
+	check(e.discard(legal3.slice(0, Deck.CHIEN_SIZE))["ok"], "atacante escolhe o próprio descarte")
 	check((e.hands[3] as Array).size() == 18, "depois do descarte, mão volta pra 18 cartas")
 	check(e.total_tricks == 18, "18 vazas no Vanilla")
 	check(not e.awaiting_discard, "descarte resolvido libera o início das vazas")
@@ -170,14 +170,14 @@ func _test_bidding() -> void:
 	check(not e2.bidding_done, "jogador 0 ainda não passou: licitação continua com ele")
 	e2.place_bid(0, -1)  # 0 desiste de cobrir o Garde Sans
 	check(e2.bidding_done and e2.taker == 1 and e2.contract == Scoring.Contract.GARDE_SANS, "quem arrematou por último vence a licitação")
-	check((e2.hands[1] as Array).size() == 18, "Garde Sans: tomador não incorpora o talão na mão")
+	check((e2.hands[1] as Array).size() == 18, "Garde Sans: atacante não incorpora o talão na mão")
 	var chien_pts := 0.0
 	for c in e2.chien:
 		chien_pts += (c as CardData).points()
 	var captured_pts := 0.0
 	for c in e2.captured[1]:
 		captured_pts += (c as CardData).points()
-	check(is_equal_approx(captured_pts, chien_pts), "Garde Sans: talão inteiro já conta pro tomador antes de qualquer vaza")
+	check(is_equal_approx(captured_pts, chien_pts), "Garde Sans: talão inteiro já conta pro atacante antes de qualquer vaza")
 
 	var e3 := MatchEngine.new()
 	e3.setup({"seed": 5})
@@ -185,7 +185,7 @@ func _test_bidding() -> void:
 	e3.place_bid(1, -1)
 	e3.place_bid(2, -1)
 	e3.place_bid(3, -1)
-	check((e3.hands[0] as Array).size() == 18 and e3.captured[0].is_empty(), "Garde Contre: talão não entra em lugar nenhum pro tomador")
+	check((e3.hands[0] as Array).size() == 18 and e3.captured[0].is_empty(), "Garde Contre: talão não entra em lugar nenhum pro atacante")
 	check(e3.bid_options(0).is_empty(), "ninguém pode superar Garde Contre")
 
 
@@ -212,17 +212,17 @@ func _test_bonuses() -> void:
 	check(r["score"] > 230.0, "placar final inclui o resultado do contrato mais os bônus")
 
 	var r2 := Scoring.resolve(60.0, 1, Scoring.Contract.GARDE, {"petit_au_bout": -10.0})
-	check(r2["bonus_total"] == -10.0, "petit au bout a favor da defesa entra negativo pro tomador")
+	check(r2["bonus_total"] == -10.0, "petit au bout a favor da defesa entra negativo pro atacante")
 
 	# Detecção via MatchEngine: monta um estado final manualmente (sem rodar a partida
 	# inteira) e confere se _round_bonuses() lê tudo certo — Poignée/Chelem só contam
-	# se o tomador escolheu declarar/anunciar (ver `declare_poignee`/`announce_chelem`).
+	# se o atacante escolheu declarar/anunciar (ver `declare_poignee`/`announce_chelem`).
 	var e := MatchEngine.new()
 	e.setup({"seed": 42, "players": 4})
 	e.num_players = 4
 	e.taker = 0
 	e.taker_trump_count = 13
-	e.captured = [[], [], [], []]  # ninguém além do tomador capturou nada -> chelem
+	e.captured = [[], [], [], []]  # ninguém além do atacante capturou nada -> chelem
 	e.captured[0].append(c(4, 5))
 	var petit := c(4, CardData.PETIT)
 	e.history = [{
@@ -232,7 +232,7 @@ func _test_bonuses() -> void:
 	var bonuses_undeclared: Dictionary = e._round_bonuses()
 	check(bonuses_undeclared["poignee"] == 0.0, "Poignée não declarado não soma bônus")
 	check(bonuses_undeclared["chelem"] == 200.0, "Chelem não anunciado ainda dá +200 sem risco quando vence todas por acaso")
-	check(bonuses_undeclared["petit_au_bout"] == 10.0, "Petit au bout a favor do tomador é sempre automático")
+	check(bonuses_undeclared["petit_au_bout"] == 10.0, "Petit au bout a favor do atacante é sempre automático")
 
 	e.declare_poignee(true)
 	e.announce_chelem(true)
@@ -242,7 +242,7 @@ func _test_bonuses() -> void:
 
 	e.captured[1].append(c(0, 2))  # agora outro jogador venceu alguma vaza -> Chelem falha
 	var bonuses_failed: Dictionary = e._round_bonuses()
-	check(bonuses_failed["chelem"] == -200.0, "Chelem anunciado e não cumprido pune o tomador (-200)")
+	check(bonuses_failed["chelem"] == -200.0, "Chelem anunciado e não cumprido pune o atacante (-200)")
 
 	e.taker = 1  # agora o Petit foi vencido por outro jogador na última vaza
 	e.history = [{
@@ -250,7 +250,7 @@ func _test_bonuses() -> void:
 		"plays": [{"player": 0, "card": petit}, {"player": 1, "card": c(0, 3)}, {"player": 2, "card": c(1, 4)}, {"player": 3, "card": c(2, 6)}],
 	}]
 	var bonuses2: Dictionary = e._round_bonuses()
-	check(bonuses2["petit_au_bout"] == -10.0, "Petit au bout vira pra defesa quando quem vence a última vaza não é o tomador")
+	check(bonuses2["petit_au_bout"] == -10.0, "Petit au bout vira pra defesa quando quem vence a última vaza não é o atacante")
 
 	var cut := [
 		{"player": 0, "card": c(2, 14)},
@@ -399,7 +399,7 @@ func _test_chaos() -> void:
 
 
 ## Bots estratégicos: só fazem jogadas legais em qualquer nível e, na defesa, seguram muito
-## mais o Tomador do que o bot simples (mesmas mãos, mesma semente).
+## mais o Atacante do que o bot simples (mesmas mãos, mesma semente).
 func _test_bot_strategy() -> void:
 	var results := {}
 	for def_level in [-1, BotAI.Difficulty.NORMAL, BotAI.Difficulty.HARD]:
@@ -436,7 +436,7 @@ func _test_bot_strategy() -> void:
 				ok += 1
 		results[def_level] = ok
 		check(illegal == 0, "bot estratégico (nível %d) só joga cartas legais" % def_level)
-	check(int(results[BotAI.Difficulty.HARD]) < int(results[-1]), "defesa Difícil segura o Tomador mais que a simples (%d < %d)" % [results[BotAI.Difficulty.HARD], results[-1]])
+	check(int(results[BotAI.Difficulty.HARD]) < int(results[-1]), "defesa Difícil segura o Atacante mais que a simples (%d < %d)" % [results[BotAI.Difficulty.HARD], results[-1]])
 	check(int(results[BotAI.Difficulty.NORMAL]) < int(results[-1]), "defesa Normal também segura mais que a simples (%d < %d)" % [results[BotAI.Difficulty.NORMAL], results[-1]])
 
 

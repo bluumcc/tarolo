@@ -1,7 +1,7 @@
 class_name MeterBar
 extends Control
-## Barra de meta do Tomador: começa vazia e enche com os pontos que ele captura. A Defesa
-## joga pra segurar a barra; o Tomador joga pra enchê-la. O valor sobe animado.
+## Barra de meta do Atacante: começa vazia e enche com os pontos que ele captura. A Defesa
+## joga pra segurar a barra; o Atacante joga pra enchê-la. O valor sobe animado.
 
 var value := 0.0
 var max_value := 1.0

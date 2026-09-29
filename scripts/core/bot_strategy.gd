@@ -1,18 +1,18 @@
 class_name BotStrategy
 extends RefCounted
 ## Jogo estratégico dos bots no Vanilla. Só usa o que um jogador de verdade sabe: a própria
-## mão, o que já foi jogado (nas vazas e na mesa), quem é o Tomador e o contrato — nunca a
+## mão, o que já foi jogado (nas vazas e na mesa), quem é o Atacante e o contrato — nunca a
 ## mão dos outros.
 ##
 ## Ideias que aplica (de mesa de tarot):
 ## - Defesa se ajuda: quando a vaza vai ficar com a Defesa, "alimenta" ela com a carta de
-##   mais pontos (até Bouts); quando o Tomador ainda vai jogar, segura as cartas boas.
-## - Ninguém corta o próprio parceiro; só toma a vaza do Tomador se compensa (trunfo caro
+##   mais pontos (até Bouts); quando o Atacante ainda vai jogar, segura as cartas boas.
+## - Ninguém corta o próprio parceiro; só toma a vaza do Atacante se compensa (trunfo caro
 ##   só por vaza com pontos).
 ## - O Louco fica com quem o joga (paga uma carta de 0,5 ao vencedor), então é jogado antes
 ##   da última vaza, quando não dá pra vencer: assim não se perde na última.
 ## - O Petit é guardado pro fim (Petit au bout).
-## - O Tomador puxa os trunfos dos outros com os seus altos e segura os Bouts.
+## - O Atacante puxa os trunfos dos outros com os seus altos e segura os Bouts.
 ## - Nível Difícil conta as cartas que já saíram: joga as cartas "mestras" (que ninguém
 ##   mais pode bater), abre por um naipe curto pra poder cortar depois, e sabe quando a
 ##   carta do parceiro já é segura.
@@ -53,7 +53,7 @@ static func _seen_cards(e: MatchEngine, player: int) -> Dictionary:
 			seen[_key(entry["card"])] = true
 	for entry in e.plays:
 		seen[_key(entry["card"])] = true
-	# o Tomador que pegou o talão conhece o próprio descarte; sem talão (Sans/Contre), não
+	# o Atacante que pegou o talão conhece o próprio descarte; sem talão (Sans/Contre), não
 	if player == e.taker and (e.contract == Scoring.Contract.PETITE or e.contract == Scoring.Contract.GARDE):
 		for c in e.captured[player]:
 			seen[_key(c)] = true
@@ -101,7 +101,7 @@ static func _lead(e: MatchEngine, p: int, legal: Array, seen: Dictionary, deep: 
 			if card.rank == CardData.PETIT and hand.size() > 1:
 				s = -100.0                       # guarda o Petit pro fim
 			elif draw_mode:
-				s = 10.0 + float(card.rank) * 0.3   # o Tomador puxa os trunfos, dos altos pra baixo
+				s = 10.0 + float(card.rank) * 0.3   # o Atacante puxa os trunfos, dos altos pra baixo
 			elif trump_heavy:
 				s = 3.0 + float(card.rank) * 0.1
 			else:
@@ -174,7 +174,7 @@ static func _follow(e: MatchEngine, p: int, legal: Array, seen: Dictionary, deep
 				cheap = real if not real.is_empty() else louco
 			cheap.sort_custom(_by_value_low)
 			return cheap[0]
-		# o Tomador está levando (ou a vaza está aberta pra ele): vale tomar?
+		# o Atacante está levando (ou a vaza está aberta pra ele): vale tomar?
 		if not wins.is_empty():
 			wins.sort_custom(func(a: CardData, b: CardData) -> bool: return a.rank < b.rank)
 			var cheapest: CardData = wins[0]
@@ -189,7 +189,7 @@ static func _follow(e: MatchEngine, p: int, legal: Array, seen: Dictionary, deep
 		dump.sort_custom(_by_value_low)
 		return dump[0]
 
-	# ---- Tomador
+	# ---- Atacante
 	if not wins.is_empty():
 		var non_bout: Array = wins.filter(func(c: CardData) -> bool: return not c.is_bout())
 		if last:
@@ -215,9 +215,9 @@ static func _follow(e: MatchEngine, p: int, legal: Array, seen: Dictionary, deep
 	return dump_t[0]
 
 
-# ------------------------------------------------------------------ descarte do Tomador
+# ------------------------------------------------------------------ descarte do Atacante
 
-## Devolve 6 cartas ao monte do jeito que um bom Tomador faria: esvazia naipes curtos (pra
+## Devolve 6 cartas ao monte do jeito que um bom Atacante faria: esvazia naipes curtos (pra
 ## poder cortar com trunfo depois) e leva pra casa, em segurança, os pontos de damas e
 ## cavaleiros soltos em naipe curto. Nunca descarta as cartas que seguram um naipe longo.
 static func choose_discard(hand: Array, legal: Array, n: int) -> Array:
