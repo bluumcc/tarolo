@@ -527,7 +527,7 @@ func _refresh_hud() -> void:
 		trick_wins[int(t["winner"])] += 1
 	var turn_player := _current_turn_player()
 	for p in range(engine.num_players):
-		(hud_points[p] as Label).text = "%s pts" % UIKit.fmt_pts(engine.points_of(p))
+		(hud_points[p] as Label).text = "%s pts" % UIKit.fmt_dec(engine.points_of(p), 1)
 		(hud_tricks[p] as Label).text = "%d vazas" % trick_wins[p]
 		var turn := p == turn_player
 		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 1) if turn else Color(0.8, 0.78, 0.86, 1)
@@ -542,7 +542,7 @@ func _refresh_hud() -> void:
 	var pot := 0.0
 	for entry in engine.plays:
 		pot += ((entry as Dictionary)["card"] as CardData).points()
-	pot_label.text = UIKit.fmt_pts(pot) if not engine.plays.is_empty() else ""
+	pot_label.text = UIKit.fmt_dec(pot, 1) if not engine.plays.is_empty() else ""
 	pot_sub.text = "EM JOGO" if not engine.plays.is_empty() else ""
 	if engine.taker == -1:
 		info_label.text = "%s  ·  Licitação" % mode_name.to_upper()
@@ -589,14 +589,14 @@ func _refresh_boss(animate: bool = false) -> void:
 	boss_bar.set_colors(UIKit.GOLD if mine else UIKit.BOSS, Color("#2b2413") if mine else Color("#2a1715"))
 	boss_bar.set_values(minf(n["current"], n["target"]), n["target"], animate)
 	boss_bar_label.text = "Sua meta" if mine else "Meta do chefe"
-	boss_bar_value.text = "%s / %s pts" % [UIKit.fmt_pts(n["current"]), UIKit.fmt_pts(n["target"])]
+	boss_bar_value.text = "%s / %s pts" % [UIKit.fmt_dec(n["current"], 1), UIKit.fmt_dec(n["target"], 1)]
 	var missing: float = maxf(0.0, n["target"] - n["current"])
 	if missing <= 0.0:
 		boss_meta.text = "Meta batida! O contrato está garantido." if not mine else "Meta batida!"
 	elif mine:
-		boss_meta.text = "Faltam %s pts. Os outros 3 jogam pra segurar a sua barra." % UIKit.fmt_pts(missing)
+		boss_meta.text = "Faltam %s pts. Os outros 3 jogam pra segurar a sua barra." % UIKit.fmt_dec(missing, 1)
 	else:
-		boss_meta.text = "Faltam %s pts pro chefe bater a meta. Segure a barra: não deixe encher." % UIKit.fmt_pts(missing)
+		boss_meta.text = "Faltam %s pts pro chefe bater a meta. Segure a barra: não deixe encher." % UIKit.fmt_dec(missing, 1)
 
 
 ## Destaca com borda dourada + pulso o assento de quem tem a vez agora (bots só — o
@@ -776,13 +776,13 @@ func _show_intro() -> void:
 	var bl := UIKit.label("Sua meta" if mine else "Meta do chefe", 14, UIKit.MUTED)
 	bl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar_row.add_child(bl)
-	bar_row.add_child(UIKit.label("0,0 / %s pts" % UIKit.fmt_pts(n["target"]), 18, UIKit.INK))
+	bar_row.add_child(UIKit.label("0,0 / %s pts" % UIKit.fmt_dec(n["target"], 1), 18, UIKit.INK))
 	v.add_child(bar_row)
 	var rule_text := ""
 	if mine:
-		rule_text = "Você precisa de %s pontos (a meta cai com cada Bout que você tiver). Encha a barra: se bater, cada um dos outros 3 te paga ×%d." % [UIKit.fmt_pts(n["target"]), int(Scoring.CONTRACT_MULT[engine.contract])]
+		rule_text = "Você precisa de %s pontos (a meta cai com cada Bout que você tiver). Encha a barra: se bater, cada um dos outros 3 te paga ×%d." % [UIKit.fmt_dec(n["target"], 1), int(Scoring.CONTRACT_MULT[engine.contract])]
 	else:
-		rule_text = "Precisa de %s pontos. A barra começa vazia e enche a cada vaza dele. Se a Defesa não deixar encher, o contrato cai e cada um da Defesa ganha ×%d." % [UIKit.fmt_pts(n["target"]), int(Scoring.CONTRACT_MULT[engine.contract])]
+		rule_text = "Precisa de %s pontos. A barra começa vazia e enche a cada vaza dele. Se a Defesa não deixar encher, o contrato cai e cada um da Defesa ganha ×%d." % [UIKit.fmt_dec(n["target"], 1), int(Scoring.CONTRACT_MULT[engine.contract])]
 	var rl := UIKit.label(rule_text, 16, Color("#d6cbbb"), HORIZONTAL_ALIGNMENT_CENTER)
 	rl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(rl)
@@ -1287,7 +1287,7 @@ func _resolve_trick(result: Dictionary) -> void:
 		pulse.tween_property(win_view, "scale", Vector2(ARENA_SCALE, ARENA_SCALE) * 1.18, GameState.anim(0.12))
 		pulse.tween_property(win_view, "scale", Vector2(ARENA_SCALE, ARENA_SCALE) * 1.08, GameState.anim(0.12))
 
-	trick_label.text = "%s venceu a vaza · +%s pts" % [str(config["names"][winner]).to_upper(), UIKit.fmt_pts(points)]
+	trick_label.text = "%s venceu a vaza · +%s pts" % [str(config["names"][winner]).to_upper(), UIKit.fmt_dec(points, 1)]
 	Sfx.play("chip")
 
 	if tutorial and engine.is_round_over():
@@ -1338,7 +1338,7 @@ func _boss_scores(winner: int) -> void:
 ## do chefe (é a barra dele que enche); quando é a Defesa, sobe na própria mesa.
 func _float_points(winner: int, points: float) -> void:
 	var to_boss := winner == engine.taker
-	var l := UIKit.label("+%s" % UIKit.fmt_pts(points), 56, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var l := UIKit.label("+%s" % UIKit.fmt_dec(points, 1), 56, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	var outline := UIKit.DEF
 	if to_boss:
 		outline = UIKit.GOLD.darkened(0.3) if winner == 0 else UIKit.BOSS
@@ -1399,10 +1399,10 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 	v.add_child(UIKit.label("%s · %s · %s / %s pts (%s%s)" % [
 		str(config["names"][r["taker"]]),
 		Scoring.CONTRACT_NAMES[r["contract"]],
-		UIKit.fmt_pts(r["taker_points"]),
-		UIKit.fmt_pts(r["target"]),
+		UIKit.fmt_dec(r["taker_points"], 1),
+		UIKit.fmt_dec(r["target"], 1),
 		"+" if r["margin"] >= 0.0 else "",
-		UIKit.fmt_pts(r["margin"]),
+		UIKit.fmt_dec(r["margin"], 1),
 	], 14, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	var bonuses: Dictionary = r.get("bonuses", {})
 	var bonus_lines: Array = []
@@ -1510,7 +1510,7 @@ DESCARTE (só Petite/Garde)
 • Nunca pode descartar Reis ou Bouts — só cartas comuns (e Trunfo comum, se faltar carta comum).
 
 META
-• O Tomador soma os pontos que capturou. Precisa bater: 560 pts com 0 Bouts, 510 com 1, 410 com 2, 360 com 3.
+• O Tomador soma os pontos que capturou. Precisa bater: 56 pts com 0 Bouts, 51 com 1, 41 com 2, 36 com 3.
 
 BÔNUS (o Tomador escolhe se arrisca)
 • Poignée: com 10+ trunfos, pode declarar — mostra suas cartas de trunfo, mas ganha pontos extras se a rodada fechar.

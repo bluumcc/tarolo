@@ -89,7 +89,7 @@ func _refresh() -> void:
 	center_label.text = data.suit_symbol()
 	center_label.add_theme_color_override("font_color", color)
 	name_label.text = data.display_name() if (data.is_louco() or (data.is_trunfo() and data.is_bout())) else ""
-	points_label.text = "%s pts" % UIKit.fmt_pts(data.points())
+	points_label.text = "%s pts" % UIKit.fmt_dec(data.points(), 1)
 	points_label.add_theme_color_override("font_color", UIKit.MUTED)
 	bout_label.text = "BOUT" if data.is_bout() else ""
 	bout_label.add_theme_color_override("font_color", UIKit.GOLD)
@@ -184,7 +184,7 @@ func describe() -> String:
 	if data == null:
 		return ""
 	var lines: Array = [data.display_name()]
-	lines.append("%s pontos" % UIKit.fmt_pts(data.points()))
+	lines.append("%s pontos" % UIKit.fmt_dec(data.points(), 1))
 	if data.is_bout():
 		lines.append("Bout — uma das 3 cartas mais valiosas do jogo.")
 	elif data.is_trunfo():

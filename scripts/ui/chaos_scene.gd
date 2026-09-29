@@ -347,7 +347,7 @@ func _apply_modifier_badge(cv: CardView, card: CardData, player: int = 0) -> voi
 	if is_equal_approx(eff, base):
 		return
 	var boosted := eff > base
-	cv.points_label.text = "%s %s pts" % ["▲" if boosted else "▼", UIKit.fmt_pts(eff)]
+	cv.points_label.text = "%s %s pts" % ["▲" if boosted else "▼", UIKit.fmt_dec(eff, 1)]
 	cv.points_label.add_theme_color_override("font_color", UIKit.OK if boosted else UIKit.DANGER)
 
 
@@ -360,9 +360,9 @@ func _current_turn_player() -> int:
 func _refresh_hud() -> void:
 	var turn_player := _current_turn_player()
 	for p in range(engine.num_players):
-		(hud_totals[p] as Label).text = "%s pts" % UIKit.fmt_pts(engine.totals[p])
+		(hud_totals[p] as Label).text = "%s pts" % UIKit.fmt_dec(engine.totals[p], 1)
 		var rp: float = engine.round_points[p] if p < engine.round_points.size() else 0.0
-		(hud_round_pts[p] as Label).text = "+%s na rodada" % UIKit.fmt_pts(rp)
+		(hud_round_pts[p] as Label).text = "+%s na rodada" % UIKit.fmt_dec(rp, 1)
 		var turn := p == turn_player
 		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 1) if turn else Color(0.78, 0.76, 0.85, 1)
 		var lead_accent := UIKit.GOLD if p == engine.folego_player else UIKit.MUTED
@@ -649,12 +649,12 @@ func _resolve_trick(result: Dictionary) -> void:
 	var extra := ""
 	if float(result.get("mult", 1.0)) > 1.0:
 		extra = " (x%s!)" % UIKit.fmt_dec(float(result["mult"]), 1)
-	trick_label.text = "%s venceu a vaza · +%s pts%s" % [str(config["names"][winner]).to_upper(), UIKit.fmt_pts(points), extra]
+	trick_label.text = "%s venceu a vaza · +%s pts%s" % [str(config["names"][winner]).to_upper(), UIKit.fmt_dec(points, 1), extra]
 	Sfx.play("chip")
 	_float_points(winner, points, bool(result.get("folego_applied", false)))
 	if bool(result.get("roubo_applied", false)):
 		var target: int = result["roubo_target"]
-		_speech_bubble(winner, "🗡 roubou %s pts de %s!" % [UIKit.fmt_pts(float(result["roubo_amount"])), str(config["names"][target]).to_upper()])
+		_speech_bubble(winner, "🗡 roubou %s pts de %s!" % [UIKit.fmt_dec(float(result["roubo_amount"]), 1), str(config["names"][target]).to_upper()])
 	await _wait(0.7)
 	if not is_inside_tree():
 		return
@@ -674,7 +674,7 @@ func _resolve_trick(result: Dictionary) -> void:
 
 
 func _float_points(winner: int, points: float, folego: bool) -> void:
-	var text := "+%s pts" % UIKit.fmt_pts(points)
+	var text := "+%s pts" % UIKit.fmt_dec(points, 1)
 	if folego:
 		text += " 🔥"
 	var l := UIKit.label(text, 30, UIKit.GOLD if winner == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
@@ -715,7 +715,7 @@ func _show_round_summary() -> void:
 	order.sort_custom(func(a: int, b: int) -> bool: return float(totals[a]) > float(totals[b]))
 	for p in order:
 		var gained: float = (r["round_points"] as Array)[p]
-		var line := "%s%s  %s pts  (+%s)" % ["👑 " if p == order[0] else "", str(config["names"][p]).to_upper(), UIKit.fmt_pts(float(totals[p])), UIKit.fmt_pts(gained)]
+		var line := "%s%s  %s pts  (+%s)" % ["👑 " if p == order[0] else "", str(config["names"][p]).to_upper(), UIKit.fmt_dec(float(totals[p]), 1), UIKit.fmt_dec(gained, 1)]
 		v.add_child(UIKit.label(line, 16, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	var btn_text := "VER RESULTADO FINAL" if int(r["round"]) >= ChaosEngine.ROUNDS - 1 else "PRÓXIMA RODADA"
 	var btn := UIKit.button(btn_text)
@@ -761,7 +761,7 @@ func _show_results(summary: Dictionary) -> void:
 	var totals: Array = engine.match_result["totals"]
 	for i in range(order.size()):
 		var p: int = order[i]
-		var line := "%d. %s%s — %s pts" % [i + 1, "👑 " if i == 0 else "", str(config["names"][p]).to_upper(), UIKit.fmt_pts(float(totals[p]))]
+		var line := "%d. %s%s — %s pts" % [i + 1, "👑 " if i == 0 else "", str(config["names"][p]).to_upper(), UIKit.fmt_dec(float(totals[p]), 1)]
 		v.add_child(UIKit.label(line, 18, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	for line in summary["lines"]:

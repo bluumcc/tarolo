@@ -137,16 +137,6 @@ static func fmt_int(n: int) -> String:
 	return ("-" if neg else "") + s + out
 
 
-## Pontos de carta na tela: uma casa a mais (16,5 vira 165), sem vírgula no dia a dia.
-## O motor continua contando em décimos; só o que aparece muda. Valores fracionários
-## (Caos, com multiplicadores) mostram uma casa só quando não são inteiros.
-static func fmt_pts(x: float) -> String:
-	var v := x * 10.0
-	if absf(v - roundf(v)) < 0.05:
-		return fmt_int(int(roundf(v)))
-	return fmt_dec(v, 1)
-
-
 ## Formato decimal PT-BR: 1.234,5
 static func fmt_dec(x: float, decimals: int = 1) -> String:
 	var whole := int(floor(absf(x)))
