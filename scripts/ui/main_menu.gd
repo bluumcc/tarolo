@@ -53,7 +53,7 @@ func _ready() -> void:
 			GameState.mode = GameState.Mode.CLASSIC
 			GameState.leave_table()
 			get_tree().change_scene_to_file("res://scenes/GameScene.tscn"), 34),
-		Widgets.mode_card("RANQUEADO", "Temporada %d · %s · %d LP" % [int(rk["season"]), tier["label"], int(tier["lp"])], Color(Ranked.TIER_COLORS[tier["tier"]]).darkened(0.1), h, "🏆", func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn"), 34),
+		Widgets.mode_card("RANQUEADO", "Temporada %d · %s · %d LP" % [int(rk["season"]), tier["label"], int(tier["lp"])], Color(Ranked.TIER_COLORS[tier["tier"]]).darkened(0.1), h, "⚔", func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn"), 34),
 		Widgets.mode_card("TUTORIAL", "Primeira vez? Uma mão guiada, com dicas.", UIKit.OK.darkened(0.15), h, "?", func():
 			GameState.start_tutorial()
 			get_tree().change_scene_to_file("res://scenes/GameScene.tscn"), 34),
@@ -68,7 +68,7 @@ func _ready() -> void:
 		{"icon": "?", "label": "Como jogar", "cb": _open_rules},
 		{"icon": "⚡", "label": "CAOS", "cb": _open_chaos_confirm, "center": true},
 		{"icon": "⚙", "label": "Ajustes", "cb": _open_settings},
-		{"icon": "🏆", "label": "Ranking", "cb": func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn")},
+		{"icon": "♚", "label": "Ranking", "cb": func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn")},
 	])
 	nav.custom_minimum_size = Vector2(0, Widgets.NAV_H)
 	page.add_child(nav)

@@ -56,7 +56,7 @@ func _install_symbol_font() -> void:
 	if sym == null or display == null or dt == null:
 		return
 	# Fonte padrão do jogo: Lilita One (arredondada, grossa, estilo arcade). A DejaVu Sans
-	# fica de reserva pros símbolos (♥ ♦ ♠ ♣ ✦ ✶ 🔥) que a Lilita não tem — o navegador do
+	# fica de reserva pros símbolos (♥ ♦ ♠ ♣ ✦ ✶ ♨) que a Lilita não tem — o navegador do
 	# celular não tem fonte de sistema com eles.
 	var list: Array[Font] = [sym]
 	display.fallbacks = list

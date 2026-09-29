@@ -12,7 +12,7 @@ signal match_finished(summary: Dictionary)
 const CARD_SCENE := preload("res://scenes/Card.tscn")
 
 ## As cartas da mão têm o tamanho cheio; as da mesa ficam menores pra caber 4 lado a lado.
-const TABLE_SCALE := 0.54
+const TABLE_SCALE := 0.70
 const SEAT_COLORS := [Color("#F0C879"), Color("#7FD1AE"), Color("#FF7A9C"), Color("#8FA0FF")]
 const TURN_SECONDS := 10.0   # tempo pra jogar; estourou, joga a carta mais fraca
 
@@ -195,7 +195,7 @@ func _build_ui() -> void:
 	# Mesa de jogo — só a vaza atual, cada carta numa vaga fixa por assento.
 	table_center = Panel.new()
 	table_center.name = "TableCenter"
-	table_center.custom_minimum_size = Vector2(0, 400)
+	table_center.custom_minimum_size = Vector2(0, 500)
 	table_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	table_center.add_theme_stylebox_override("panel", UIKit.box(Color(0.10, 0.08, 0.30, 0.85), Color("#5B4FC9"), 3, 200, 0))
 	table_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -296,7 +296,7 @@ func _apply_orientation() -> void:
 	side_col.visible = false  # a regra da rodada já fica na faixa de avisos, em repouso
 	modifier_expanded = wide
 	_refresh_hud()
-	table_center.custom_minimum_size.y = 420 if wide else 400
+	table_center.custom_minimum_size.y = 500 if wide else 500
 	_layout_table()
 
 
@@ -344,9 +344,9 @@ func _seat_pos(p: int) -> Vector2:
 	var seat: Control = seat_nodes[p]
 	var w := 130.0
 	match p:
-		1: return Vector2(10.0, sz.y * 0.5 - 20.0)
-		2: return Vector2((sz.x - w) / 2.0, 6.0)
-		_: return Vector2(sz.x - w - 10.0, sz.y * 0.5 - 20.0)
+		1: return Vector2(36.0, sz.y * 0.22)
+		2: return Vector2((sz.x - w) / 2.0, 22.0)
+		_: return Vector2(sz.x - w - 36.0, sz.y * 0.22)
 
 
 ## Reposiciona as cartas já em jogo quando a mesa muda de tamanho (ex.: virar o celular).
@@ -367,9 +367,9 @@ func _layout_table() -> void:
 func _slot_pos(player: int) -> Vector2:
 	var n := maxi(engine.num_players, 1)
 	var card_w := CardView.SIZE.x * TABLE_SCALE
-	var slot_w := card_w + 14.0
+	var slot_w := card_w + 8.0
 	var start := (table_center.size.x - slot_w * n) / 2.0 + 7.0 - (CardView.SIZE.x - card_w) / 2.0
-	var y := table_center.size.y * 0.60 - CardView.SIZE.y / 2.0
+	var y := table_center.size.y * 0.72 - CardView.SIZE.y / 2.0
 	return Vector2(start + slot_w * player, y)
 
 
@@ -453,7 +453,7 @@ func _refresh_hud() -> void:
 		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 1) if turn else Color(0.78, 0.76, 0.85, 1)
 		var lead_accent := UIKit.GOLD if p == engine.folego_player else UIKit.MUTED
 		var item_icon: String = ChaosItems.ICONS.get(engine.player_items[p], "") if p < engine.player_items.size() else ""
-		var prefix := ("🔥 " if p == engine.folego_player else "") + (item_icon + " " if item_icon != "" else "")
+		var prefix := ("♨ " if p == engine.folego_player else "") + (item_icon + " " if item_icon != "" else "")
 		(hud_titles[p] as Label).text = "%s%s" % [prefix, str(config["names"][p]).to_upper()]
 		(hud_titles[p] as Label).add_theme_color_override("font_color", lead_accent)
 		if p > 0:
@@ -463,7 +463,7 @@ func _refresh_hud() -> void:
 	var mod_name := "✦ %s" % ChaosModifiers.label(engine.modifier, engine.weak_suit)
 	modifier_label.text = "%s — %s" % [mod_name, ChaosModifiers.DESCRIPTIONS[engine.modifier]] if modifier_expanded else "%s" % mod_name
 	var profile := SaveManager.section("profile")
-	wager_label.text = "🪙 Suas fichas: %d   ·   Pote da mesa: %d (buy-in %d)" % [int(profile["fichas"]), int(engine.pot), int(engine.buy_in)]
+	wager_label.text = "◎ Suas fichas: %d   ·   Pote da mesa: %d (buy-in %d)" % [int(profile["fichas"]), int(engine.pot), int(engine.buy_in)]
 	_update_turn_highlight(turn_player)
 
 
@@ -509,7 +509,7 @@ func _announce_round() -> void:
 	if final:
 		lines.append({"head": "RODADA FINAL", "title": "PONTOS EM DOBRO", "text": "Tudo que você marcar nessa rodada vale ×2. Ninguém está fora até a última vaza.", "color": UIKit.GOLD})
 	if engine.folego_player != -1:
-		lines.append({"head": "FÔLEGO", "title": "🔥 %s" % str(config["names"][engine.folego_player]).to_upper(), "text": "Está em último e ganha ×%s nos pontos dessa rodada." % UIKit.fmt_dec(ChaosEngine.FOLEGO_MULT, 1), "color": UIKit.GOLD})
+		lines.append({"head": "FÔLEGO", "title": "♨ %s" % str(config["names"][engine.folego_player]).to_upper(), "text": "Está em último e ganha ×%s nos pontos dessa rodada." % UIKit.fmt_dec(ChaosEngine.FOLEGO_MULT, 1), "color": UIKit.GOLD})
 	lines.append({"head": "SURPRESA", "title": "? NA VAZA %d" % (ChaosEngine.EVENT_TRICK + 1), "text": "Algo vai mudar as regras da vaza 4. Você só descobre quando chegar lá.", "color": UIKit.DANGER})
 	await _transition(kicker, lines, 3.4 if not first_round_done else 3.0)
 	first_round_done = true
@@ -816,7 +816,7 @@ func _resolve_trick(result: Dictionary) -> void:
 	if int(result.get("event", 0)) == ChaosEvents.Event.DOURADA:
 		notes.append("vaza dourada ×3")
 	if bool(result.get("folego_applied", false)):
-		notes.append("fôlego 🔥")
+		notes.append("fôlego ♨")
 	var sub := "Pontos da vaza: %s" % UIKit.fmt_dec(float(result["base_points"]), 1)
 	if float(result.get("mult", 1.0)) > 1.0:
 		sub += " ×%s" % UIKit.fmt_dec(float(result["mult"]), 2)
@@ -835,9 +835,9 @@ func _resolve_trick(result: Dictionary) -> void:
 	for id in result.get("combos", []):
 		extras.append([str(ChaosEvents.COMBO_NAMES[id]) + "!", "%s — %s" % [wname, ChaosEvents.COMBO_DESCRIPTIONS[id]], UIKit.OK])
 	if bool(result.get("roubo_applied", false)):
-		extras.append(["🗡 ROUBO DE VAZA!", "%s roubou %s pts de %s" % [wname, UIKit.fmt_dec(float(result["roubo_amount"]), 1), str(config["names"][int(result["roubo_target"])]).to_upper()], UIKit.DANGER])
+		extras.append(["⚔ ROUBO DE VAZA!", "%s roubou %s pts de %s" % [wname, UIKit.fmt_dec(float(result["roubo_amount"]), 1), str(config["names"][int(result["roubo_target"])]).to_upper()], UIKit.DANGER])
 	if float(result.get("saque_amount", 0.0)) > 0.0:
-		extras.append(["🗡 SAQUE!", "%s levou %s pts dos rivais" % [wname, UIKit.fmt_dec(float(result["saque_amount"]), 1)], UIKit.DANGER])
+		extras.append(["⚔ SAQUE!", "%s levou %s pts dos rivais" % [wname, UIKit.fmt_dec(float(result["saque_amount"]), 1)], UIKit.DANGER])
 	for e in extras:
 		_banner(e[0], e[1], e[2])
 		Sfx.play("win")
@@ -881,7 +881,7 @@ func _show_round_summary() -> void:
 	order.sort_custom(func(a: int, b: int) -> bool: return float(totals[a]) > float(totals[b]))
 	for p in order:
 		var gained: float = (r["round_points"] as Array)[p]
-		var line := "%s%s  %s pts  (+%s)" % ["👑 " if p == order[0] else "", str(config["names"][p]).to_upper(), UIKit.fmt_dec(float(totals[p]), 1), UIKit.fmt_dec(gained, 1)]
+		var line := "%s%s  %s pts  (+%s)" % ["♛ " if p == order[0] else "", str(config["names"][p]).to_upper(), UIKit.fmt_dec(float(totals[p]), 1), UIKit.fmt_dec(gained, 1)]
 		v.add_child(UIKit.label(line, 20, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	var btn_text := "VER RESULTADO FINAL" if int(r["round"]) >= ChaosEngine.ROUNDS - 1 else "PRÓXIMA RODADA"
 	var btn := UIKit.button(btn_text)
@@ -927,7 +927,7 @@ func _show_results(summary: Dictionary) -> void:
 	var totals: Array = engine.match_result["totals"]
 	for i in range(order.size()):
 		var p: int = order[i]
-		var line := "%d. %s%s — %s pts" % [i + 1, "👑 " if i == 0 else "", str(config["names"][p]).to_upper(), UIKit.fmt_dec(float(totals[p]), 1)]
+		var line := "%d. %s%s — %s pts" % [i + 1, "♛ " if i == 0 else "", str(config["names"][p]).to_upper(), UIKit.fmt_dec(float(totals[p]), 1)]
 		v.add_child(UIKit.label(line, 22, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	for line in summary["lines"]:

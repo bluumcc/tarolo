@@ -19,8 +19,8 @@ var human_turn := false
 var finished := false
 var paused := false
 
-const ARENA_SCALE := 0.62
-const BID_SHORT := ["pega o monte (6 cartas) e devolve 6", "igual à Petite, mas vale o dobro", "não pega o monte; ele conta pra você", "não pega o monte; ele conta pra Defesa"]
+const ARENA_SCALE := 0.66
+const BID_SHORT := ["pega o monte", "vale o dobro", "monte conta pra você", "monte conta pra Defesa"]
 
 var root_box: VBoxContainer
 var hud_badges: Array = []       # painel de cada assento (0 = meu rodapé)
@@ -326,8 +326,8 @@ func _build_seat_strip() -> void:
 		col.add_child(title_label)
 		var pts := UIKit.label("0,0 pts", 28, UIKit.INK)
 		col.add_child(pts)
-		var sub := HBoxContainer.new()
-		sub.add_theme_constant_override("separation", 8)
+		var sub := VBoxContainer.new()
+		sub.add_theme_constant_override("separation", 0)
 		col.add_child(sub)
 		var tr := UIKit.label("0 vazas", 15, UIKit.MUTED)
 		sub.add_child(tr)
@@ -348,7 +348,7 @@ func _build_seat_strip() -> void:
 func _build_arena() -> void:
 	arena = Control.new()
 	arena.name = "Arena"
-	arena.custom_minimum_size = Vector2(0, 340)
+	arena.custom_minimum_size = Vector2(0, 380)
 	arena.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	arena.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	arena.visible = false
@@ -370,6 +370,7 @@ func _build_arena() -> void:
 	for p in range(engine.num_players):
 		var tag := UIKit.label(str(config["names"][p]).to_upper(), 20, UIKit.INK)
 		arena.add_child(tag)
+		tag.visible = false
 		arena_tags[p] = tag
 
 
@@ -461,6 +462,7 @@ func _build_hand_hint() -> void:
 	hint_strength.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(hint_strength)
 	hint_suggest = UIKit.label("", 20, UIKit.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
+	hint_suggest.autowrap_mode = TextServer.AUTOWRAP_OFF
 	top.add_child(hint_suggest)
 	hint_bar = MeterBar.new()
 	hint_bar.custom_minimum_size = Vector2(0, 14)
@@ -470,10 +472,12 @@ func _build_hand_hint() -> void:
 	var bottom := HBoxContainer.new()
 	v.add_child(bottom)
 	hint_counts = UIKit.label("", 16, UIKit.MUTED)
+	hint_counts.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint_counts.custom_minimum_size = Vector2(120, 0)
 	hint_counts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bottom.add_child(hint_counts)
 	var what := UIKit.button("O QUE É BOUT?", UIKit.GOLD, 16)
-	what.custom_minimum_size = Vector2(0, 34)
+	what.custom_minimum_size = Vector2(0, 56)
 	what.pressed.connect(_open_bout_help)
 	bottom.add_child(what)
 	bid_panel.add_child(box)
@@ -495,7 +499,7 @@ func _refresh_hand_hint() -> void:
 			reis += 1
 	hint_strength.text = "SUA MÃO · força %s" % UIKit.fmt_dec(strength, 1)
 	hint_bar.set_values(strength, 42.0, false)
-	hint_counts.text = "Bouts %d/3 · Trunfos %d · Reis %d · cada traço = um contrato" % [bouts, trunfos, reis]
+	hint_counts.text = "Bouts %d/3 · Trunfos %d · Reis %d" % [bouts, trunfos, reis]
 	_update_suggestion([])
 
 
@@ -597,7 +601,7 @@ func _apply_orientation() -> void:
 	side_col.custom_minimum_size.x = 620.0 if wide else 0.0
 	side_col.visible = not (wide and bidding_now)
 	seat_strip.vertical = wide
-	arena.custom_minimum_size.y = 300.0 if wide else 340.0
+	arena.custom_minimum_size.y = 340.0 if wide else 380.0
 	for k in bid_buttons:
 		(bid_buttons[k] as Button).custom_minimum_size.y = 46.0 if wide else 60.0
 	bid_panel.add_theme_constant_override("separation", 8 if wide else 12)
@@ -726,7 +730,7 @@ func _refresh_hud() -> void:
 		var turn := p == turn_player
 		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 1) if turn else Color(0.8, 0.78, 0.86, 1)
 		if p > 0:
-			(hud_cards[p] as Label).text = "· %d cartas" % (engine.hands[p] as Array).size()
+			(hud_cards[p] as Label).text = "%d cartas" % (engine.hands[p] as Array).size()
 	_update_turn_highlight(turn_player)
 	var mode_name: String = GameState.MODE_NAMES[GameState.mode]
 	var extra := ""
@@ -1354,7 +1358,7 @@ func _wait(seconds: float) -> void:
 func _tutorial_hint(text: String) -> void:
 	if not tutorial or tutorial_label == null:
 		return
-	tutorial_label.text = "💡 " + text
+	tutorial_label.text = "✦ " + text
 
 
 ## Dica de uso único (não repete depois de mostrada nesta partida).

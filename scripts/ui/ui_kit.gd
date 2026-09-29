@@ -3,8 +3,8 @@ extends RefCounted
 ## Paleta Dark Brutalist e fábrica de estilos/nós Control reutilizados pelas cenas.
 
 ## Tamanhos mínimos de texto (padrão de mercado pra 720 de largura): nada menor que isso.
-const MIN_FONT := 18
-const MIN_BUTTON_FONT := 24
+const MIN_FONT := 22
+const MIN_BUTTON_FONT := 26
 
 const NIGHT := Color("#150E45")
 const PURPLE := Color("#3A2A9C")
@@ -59,7 +59,9 @@ static func box(bg: Color, border: Color = BLACK, border_w: int = 3, radius: int
 ## Texto com contorno escuro (só a partir de 24 px) — é o que dá o ar "arcade" e garante
 ## contraste em cima de qualquer fundo.
 static func label(text: String, size: int = 22, color: Color = INK, align: int = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
-	size = maxi(size, MIN_FONT)
+	# Textos pequenos ganham +2 px além do mínimo: no celular real (tela ~390 pt) 720 px
+	# virtuais viram quase metade, e 18–20 px ficava ilegível.
+	size = maxi(size + (2 if size < 28 else 0), MIN_FONT)
 	var l := Label.new()
 	l.text = text
 	l.horizontal_alignment = align

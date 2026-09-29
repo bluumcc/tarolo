@@ -19,10 +19,10 @@ const NAMES := {
 
 const ICONS := {
 	Item.NONE: "",
-	Item.ESCUDO_NAIPE: "🛡",
+	Item.ESCUDO_NAIPE: "◈",
 	Item.TRUNFO_AFIADO: "⚔",
-	Item.FOLEGO_PESSOAL: "💨",
-	Item.ROUBO_VAZA: "🗡",
+	Item.FOLEGO_PESSOAL: "≋",
+	Item.ROUBO_VAZA: "⚔",
 }
 
 const DESCRIPTIONS := {

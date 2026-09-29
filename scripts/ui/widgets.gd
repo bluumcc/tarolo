@@ -56,7 +56,7 @@ static func top_bar(name_text: String, level_text: String, chips: String, frags:
 	who.add_child(UIKit.label(name_text, 28, UIKit.INK))
 	who.add_child(UIKit.label(level_text, 20, UIKit.GOLD))
 	row.add_child(who)
-	var a := stat_pill("🪙", chips, UIKit.GOLD)
+	var a := stat_pill("◎", chips, UIKit.GOLD)
 	a.name = "ChipsPill"
 	row.add_child(a)
 	var b := stat_pill("◆", frags, UIKit.CHIPS)

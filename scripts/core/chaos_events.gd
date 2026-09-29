@@ -16,7 +16,7 @@ const NAMES := {
 const ICONS := {
 	Event.DOURADA: "★",
 	Event.INVERTIDA: "⇅",
-	Event.SAQUE: "🗡",
+	Event.SAQUE: "⚔",
 }
 
 const DESCRIPTIONS := {
