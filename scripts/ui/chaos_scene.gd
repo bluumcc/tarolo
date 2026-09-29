@@ -13,6 +13,7 @@ const CARD_SCENE := preload("res://scenes/Card.tscn")
 
 ## As cartas da mão têm o tamanho cheio; as da mesa ficam menores pra caber 4 lado a lado.
 const TABLE_SCALE := 0.62
+const TURN_SECONDS := 10.0   # tempo pra jogar; estourou, joga a carta mais fraca
 
 var engine := ChaosEngine.new()
 var config: Dictionary = {}
@@ -34,7 +35,15 @@ var selected_view: CardView
 var throw_from := Vector2.ZERO
 var has_throw_from := false
 var status_label: Label
-var trick_label: Label
+var banner_box: PanelContainer
+var banner_title: Label
+var banner_sub: Label
+var turn_bar: ProgressBar
+var turn_left := 0.0
+var main_area: BoxContainer
+var side_col: VBoxContainer
+var opp_hud: BoxContainer
+var first_round_done := false
 var info_label: Label
 var modifier_label: Label
 var modifier_expanded := false
@@ -98,7 +107,7 @@ func _build_ui() -> void:
 	add_child(margin)
 
 	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 8)
+	root.add_theme_constant_override("separation", 14)
 	margin.add_child(root)
 
 	hud_badges.resize(engine.num_players)
@@ -127,12 +136,25 @@ func _build_ui() -> void:
 	menu_btn.pressed.connect(_open_pause)
 	topbar.add_child(menu_btn)
 
-	# Placar dos outros 3 jogadores — uma fileira só, esticando até preencher a largura
-	# toda. Sem avatar/círculo: só nome e pontos já bastam pra reconhecer quem é quem
-	# numa mesa de 4 — o círculo com inicial só ocupava espaço sem ajudar em nada.
-	var hud := HBoxContainer.new()
-	hud.add_theme_constant_override("separation", 8)
-	root.add_child(hud)
+	# Corpo: em tela larga vira duas colunas (placar à esquerda, mesa à direita); no
+	# celular empilha. Cada bloco tem espaço próprio — nada flutua por cima de outro.
+	main_area = BoxContainer.new()
+	main_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	main_area.add_theme_constant_override("separation", 20)
+	root.add_child(main_area)
+	side_col = VBoxContainer.new()
+	side_col.add_theme_constant_override("separation", 12)
+	main_area.add_child(side_col)
+	var center_col := VBoxContainer.new()
+	center_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center_col.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	center_col.add_theme_constant_override("separation", 12)
+	main_area.add_child(center_col)
+
+	# Placar dos outros 3 jogadores. Toque abre/fecha o detalhe.
+	opp_hud = BoxContainer.new()
+	opp_hud.add_theme_constant_override("separation", 10)
+	side_col.add_child(opp_hud)
 	for p in range(1, engine.num_players):
 		# O card em si reage a toque — abre/fecha o detalhe (pontos da rodada, cartas
 		# na mão). Por padrão só mostra o essencial: quem é, quanto tem.
@@ -171,7 +193,7 @@ func _build_ui() -> void:
 				detail.visible = not detail.visible
 				chevron.text = "▾" if detail.visible else "▸")
 
-		hud.add_child(badge)
+		opp_hud.add_child(badge)
 		hud_badges[p] = badge
 		hud_titles[p] = title_label
 		hud_totals[p] = total
@@ -179,9 +201,8 @@ func _build_ui() -> void:
 		hud_cards[p] = cards_label
 		seat_avatars[p] = badge
 
-	# Banner do modificador — fundo preenchido pra se destacar como um aviso de verdade,
-	# não só mais um cartão igual aos outros. Compacto por padrão (nome só); a explicação
-	# completa já apareceu no banner de início de rodada — toque reabre se precisar.
+
+	# Regra da rodada — aviso fixo, sempre visível.
 	var mod_box := UIKit.panel(UIKit.OK.darkened(0.75), UIKit.OK, 10)
 	mod_box.mouse_filter = Control.MOUSE_FILTER_STOP
 	modifier_label = UIKit.label("", 18, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
@@ -193,38 +214,56 @@ func _build_ui() -> void:
 		Sfx.play("tick")
 		modifier_expanded = not modifier_expanded
 		_refresh_hud())
-	root.add_child(mod_box)
+	side_col.add_child(mod_box)
 
-	# Espaçador — empurra a mesa (vaza atual), a mão e meu rodapé pra baixo, como um
-	# bloco só, junto do polegar — em vez de deixar um vão vazio entre o placar e a mesa.
-	var vspacer := Control.new()
-	vspacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vspacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(vspacer)
 
-	# Mesa de jogo — só a vaza atual, uma faixa compacta e fixa (não uma mesa oval
-	# espalhada): cada carta jogada aparece numa posição fixa, em ordem de assento,
-	# igual qualquer jogo de cartas mobile mostra "o que já foi jogado". -----------
+	# Faixa de avisos — espaço RESERVADO (nunca cobre carta nem placar): resultado da
+	# vaza, combos, evento surpresa. Uma mensagem por vez, sempre no mesmo lugar.
+	banner_box = UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MUTED, 12)
+	banner_box.custom_minimum_size = Vector2(0, 92)
+	var bv := VBoxContainer.new()
+	bv.alignment = BoxContainer.ALIGNMENT_CENTER
+	bv.add_theme_constant_override("separation", 2)
+	banner_box.add_child(bv)
+	banner_title = UIKit.label("", 26, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	banner_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	bv.add_child(banner_title)
+	banner_sub = UIKit.label("", 17, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	banner_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	bv.add_child(banner_sub)
+	center_col.add_child(banner_box)
+
+	# Mesa de jogo — só a vaza atual, cada carta numa vaga fixa por assento.
 	table_center = Panel.new()
 	table_center.name = "TableCenter"
-	table_center.custom_minimum_size = Vector2(0, 220)
+	table_center.custom_minimum_size = Vector2(0, 260)
+	table_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	table_center.add_theme_stylebox_override("panel", UIKit.box(Color(0.06, 0.05, 0.12, 0.65), UIKit.PURPLE, 3, 24, 0))
 	table_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(table_center)
+	center_col.add_child(table_center)
 
-	trick_label = UIKit.label("", 20, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	root.add_child(trick_label)
-
-	status_label = UIKit.label("", 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	status_label = UIKit.label("", 21, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	root.add_child(status_label)
+	status_label.custom_minimum_size = Vector2(0, 56)
+	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	center_col.add_child(status_label)
 
+	# Relógio da jogada: barra que esvazia — some fora da sua vez.
+	turn_bar = ProgressBar.new()
+	turn_bar.show_percentage = false
+	turn_bar.min_value = 0.0
+	turn_bar.max_value = TURN_SECONDS
+	turn_bar.custom_minimum_size = Vector2(0, 14)
+	turn_bar.modulate.a = 0.0
+	turn_bar.add_theme_stylebox_override("background", UIKit.box(UIKit.PURPLE_DEEP, UIKit.PURPLE, 2, 7, 0))
+	turn_bar.add_theme_stylebox_override("fill", UIKit.box(UIKit.GOLD, UIKit.GOLD, 0, 7, 0))
+	center_col.add_child(turn_bar)
 
 	# Mão — cartas sempre no tamanho real (nunca encolhidas pra caber); quando não cabem
 	# todas na tela, a mão rola de lado (arrasto/swipe), igual qualquer app de cartas.
 	# Duas variantes (Configurações): fileira reta, ou leque de baralho em arco. --------
 	var hand_scroll := HandScroller.new()
-	hand_scroll.custom_minimum_size = Vector2(0, CardView.SIZE.y + CardView.MAX_LIFT + 16)
+	hand_scroll.custom_minimum_size = Vector2(0, CardView.SIZE.y + CardView.MAX_LIFT + 6)
 	root.add_child(hand_scroll)
 	hand_scroll.resized.connect(_layout_hand)  # tamanho real só fica pronto depois do 1º sort — nunca confiar em call_deferred sozinho
 	hand_container = Control.new()
@@ -280,10 +319,27 @@ func _build_ui() -> void:
 	overlay_layer.z_index = 30
 	add_child(overlay_layer)
 
+	_apply_orientation()
 	_layout_table.call_deferred()
 
 
+func _is_wide() -> bool:
+	var sz := get_viewport_rect().size
+	return sz.x > sz.y
+
+
+func _apply_orientation() -> void:
+	var wide := _is_wide()
+	main_area.vertical = not wide
+	side_col.custom_minimum_size.x = 560 if wide else 0
+	opp_hud.vertical = wide
+	table_center.custom_minimum_size.y = 300 if wide else 250
+	for p in range(1, engine.num_players):
+		(hud_badges[p] as Control).size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+
 func _on_resize() -> void:
+	_apply_orientation()
 	_layout_table()
 	_layout_hand()
 
@@ -416,71 +472,110 @@ func _pulse_avatar(avatar: PanelContainer, token: int) -> void:
 			return
 
 
-func _speech_bubble(player: int, text: String) -> void:
-	if not is_inside_tree():
-		return
-	var avatar: Control = seat_avatars[player]
-	var anchor_pos: Vector2 = avatar.global_position - popup_layer.global_position + avatar.size / 2.0
-	var l := UIKit.label(text, 16, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	var box := PanelContainer.new()
-	box.add_theme_stylebox_override("panel", UIKit.box(Color(0.03, 0.03, 0.07, 0.92), UIKit.GOLD, 2, 8, 8))
-	box.add_child(l)
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	popup_layer.add_child(box)
-	await get_tree().process_frame
-	box.position = anchor_pos - Vector2(box.size.x / 2.0, box.size.y + 40.0)
-	box.modulate.a = 0.0
-	var tw := create_tween()
-	tw.tween_property(box, "modulate:a", 1.0, GameState.anim(0.12))
-	tw.tween_interval(GameState.anim(1.0))
-	tw.tween_property(box, "modulate:a", 0.0, GameState.anim(0.3))
-	tw.tween_callback(box.queue_free)
-
-
 # ------------------------------------------------------------------ rodadas / modificador
 
-## Banner rápido no início de cada rodada — não bloqueia (o modo é pra ser ágil), mas o
-## modificador continua visível na barra de info durante toda a rodada pra consulta.
+## Tela de transição de início de rodada: ocupa a tela inteira, explica a regra da
+## rodada e o que muda, e avança sozinha (ou ao tocar). Nada de jogo por trás.
 func _announce_round() -> void:
-	var title := "RODADA %d/%d" % [engine.round_index + 1, ChaosEngine.ROUNDS]
-	var mod_text := ChaosModifiers.label(engine.modifier, engine.weak_suit)
-	var body := "Modificador: %s\n%s" % [mod_text, str(ChaosModifiers.TIPS[engine.modifier])]
-	if engine.folego_player != -1:
-		body += "\n🔥 Fôlego pra %s (pontos ×%s nessa rodada)" % [str(config["names"][engine.folego_player]), UIKit.fmt_dec(ChaosEngine.FOLEGO_MULT, 1)]
-	_show_round_banner(title, body)
 	_refresh_hud()
 	_rebuild_hand()
-	await _wait(1.6)
+	var final := engine.is_final_round()
+	var kicker := "RODADA FINAL" if final else "RODADA %d DE %d" % [engine.round_index + 1, ChaosEngine.ROUNDS]
+	var lines: Array = []
+	lines.append({"head": "REGRA DA RODADA", "title": "✦ %s" % ChaosModifiers.label(engine.modifier, engine.weak_suit), "text": "%s\n%s" % [ChaosModifiers.DESCRIPTIONS[engine.modifier], ChaosModifiers.TIPS[engine.modifier]], "color": UIKit.OK})
+	if final:
+		lines.append({"head": "RODADA FINAL", "title": "PONTOS EM DOBRO", "text": "Tudo que você marcar nessa rodada vale ×2. Ninguém está fora até a última vaza.", "color": UIKit.GOLD})
+	if engine.folego_player != -1:
+		lines.append({"head": "FÔLEGO", "title": "🔥 %s" % str(config["names"][engine.folego_player]).to_upper(), "text": "Está em último e ganha ×%s nos pontos dessa rodada." % UIKit.fmt_dec(ChaosEngine.FOLEGO_MULT, 1), "color": UIKit.GOLD})
+	lines.append({"head": "SURPRESA", "title": "? NA VAZA %d" % (ChaosEngine.EVENT_TRICK + 1), "text": "Algo vai mudar as regras da vaza 4. Você só descobre quando chegar lá.", "color": UIKit.DANGER})
+	await _transition(kicker, lines, 3.4 if not first_round_done else 3.0)
+	first_round_done = true
 
 
-func _show_round_banner(title: String, body: String) -> void:
-	var panel := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 16)
-	panel.name = "RoundBanner"
+## Tela cheia de transição. `blocks`: [{head, title, text, color}]. Fecha ao tocar ou
+## depois de `hold` segundos. No autoplay (testes) só espera um instante.
+func _transition(kicker: String, blocks: Array, hold: float) -> void:
+	if GameState.autoplay or not is_inside_tree():
+		await _wait(0.05)
+		return
+	var ov := ColorRect.new()
+	ov.color = Color(0.03, 0.02, 0.07, 0.97)
+	ov.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ov.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay_layer.add_child(ov)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 6)
-	panel.add_child(v)
-	v.add_child(UIKit.label(title, 28, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	var body_label := UIKit.label(body, 18, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body_label.custom_minimum_size = Vector2(360, 0)
-	v.add_child(body_label)
-	popup_layer.add_child(panel)
-	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	panel.position.y = 232
-	panel.modulate.a = 0.0
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_theme_constant_override("separation", 18)
+	var width := minf(get_viewport_rect().size.x - 80.0, 680.0)
+	v.custom_minimum_size = Vector2(width, 0)
+	v.add_child(UIKit.label(kicker, 46, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	for b in blocks:
+		var card := UIKit.panel(UIKit.PURPLE_DEEP, b["color"], 18)
+		var cv := VBoxContainer.new()
+		cv.add_theme_constant_override("separation", 4)
+		card.add_child(cv)
+		cv.add_child(UIKit.label(b["head"], 16, b["color"], HORIZONTAL_ALIGNMENT_CENTER))
+		cv.add_child(UIKit.label(b["title"], 30, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+		var t := UIKit.label(b["text"], 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		cv.add_child(t)
+		v.add_child(card)
+	v.add_child(UIKit.label("toque para continuar", 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	ov.add_child(UIKit.centered(v))
+	ov.modulate.a = 0.0
+	create_tween().tween_property(ov, "modulate:a", 1.0, GameState.anim(0.18))
+	Sfx.play("chip")
+	var done := {"v": false}
+	ov.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed:
+			done["v"] = true)
+	var waited := 0.0
+	while not done["v"] and waited < GameState.anim(hold) and is_inside_tree():
+		await get_tree().create_timer(0.05).timeout
+		if not paused:
+			waited += 0.05
+	if not is_inside_tree():
+		return
 	var tw := create_tween()
-	tw.tween_property(panel, "modulate:a", 1.0, GameState.anim(0.15))
-	tw.tween_interval(GameState.anim(1.2))
-	tw.tween_property(panel, "modulate:a", 0.0, GameState.anim(0.3))
-	tw.tween_callback(panel.queue_free)
+	tw.tween_property(ov, "modulate:a", 0.0, GameState.anim(0.18))
+	await tw.finished
+	ov.queue_free()
+
+
+## Mensagem na faixa reservada acima da mesa (nunca cobre nada). `color` pinta a borda.
+func _banner(title: String, sub: String, color: Color) -> void:
+	banner_title.text = title
+	banner_title.add_theme_color_override("font_color", color)
+	banner_sub.text = sub
+	banner_box.add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, color, 3, 4, 12))
+	banner_box.modulate.a = 0.0
+	create_tween().tween_property(banner_box, "modulate:a", 1.0, GameState.anim(0.12))
+
+
+func _banner_clear() -> void:
+	banner_title.text = ""
+	banner_sub.text = ""
+	banner_box.add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, UIKit.MUTED, 3, 4, 12))
 
 
 # ------------------------------------------------------------------ loop de turnos
+
+## Vaza 4: revela o evento surpresa numa tela cheia e deixa um aviso fixo durante a vaza.
+func _reveal_event() -> void:
+	var ev := engine.event
+	await _transition("PLOT TWIST!", [{"head": "VAZA %d" % (ChaosEngine.EVENT_TRICK + 1), "title": "%s %s" % [ChaosEvents.ICONS[ev], ChaosEvents.NAMES[ev]], "text": ChaosEvents.DESCRIPTIONS[ev], "color": ChaosEvents.COLORS[ev]}], 2.6)
+	if is_inside_tree():
+		_banner("%s %s" % [ChaosEvents.ICONS[ev], ChaosEvents.NAMES[ev]], ChaosEvents.DESCRIPTIONS[ev], ChaosEvents.COLORS[ev])
+
 
 func _run_round() -> void:
 	while not engine.is_round_over():
 		if not is_inside_tree():
 			return
+		if engine.plays.is_empty() and engine.trick_number == ChaosEngine.EVENT_TRICK:
+			await _reveal_event()
+			if not is_inside_tree():
+				return
 		var p := engine.current
 		_refresh_hud()
 		var card: CardData
@@ -575,15 +670,39 @@ func _wait_human() -> CardData:
 	human_turn = true
 	var ls := TrickRules.lead_suit(engine.plays)
 	if ls == -1:
-		status_label.text = "Sua vez — abra a vaza"
+		status_label.text = "Sua vez — abra a vaza com qualquer carta"
 	elif ls == CardData.Suit.TRUNFO:
-		status_label.text = "Sua vez — precisa cobrir com Trunfo maior, se tiver"
+		status_label.text = "Sua vez — cubra com um Trunfo maior, se tiver"
 	else:
 		status_label.text = "Sua vez — siga %s (ou corte com Trunfo, ou jogue O Louco)" % CardData.SUIT_NAMES[ls]
+	turn_left = TURN_SECONDS
+	turn_bar.modulate.a = 1.0
 	_rebuild_hand()
 	var card: CardData = await human_card_chosen
 	human_turn = false
+	turn_bar.modulate.a = 0.0
+	status_label.text = ""
 	return card
+
+
+func _process(delta: float) -> void:
+	if not human_turn or paused or finished or turn_bar == null:
+		return
+	turn_left -= delta
+	turn_bar.value = maxf(turn_left, 0.0)
+	var urgent := turn_left <= 3.0
+	turn_bar.add_theme_stylebox_override("fill", UIKit.box(UIKit.DANGER if urgent else UIKit.GOLD, UIKit.GOLD, 0, 7, 0))
+	if turn_left <= 0.0:
+		var legal := engine.legal_for(0)
+		if legal.is_empty():
+			return
+		var weakest: CardData = legal[0]
+		for c in legal:
+			if (c as CardData).points() < weakest.points():
+				weakest = c
+		human_turn = false
+		_banner("TEMPO ESGOTADO", "Jogamos sua carta mais fraca por você.", UIKit.DANGER)
+		human_card_chosen.emit(weakest)
 
 
 func _on_card_tapped(view: CardView) -> void:
@@ -668,18 +787,37 @@ func _resolve_trick(result: Dictionary) -> void:
 		pulse.tween_property(win_view, "scale", Vector2(TABLE_SCALE, TABLE_SCALE) * 1.18, GameState.anim(0.12))
 		pulse.tween_property(win_view, "scale", Vector2(TABLE_SCALE, TABLE_SCALE) * 1.08, GameState.anim(0.12))
 
-	var extra := ""
+	var wname := str(config["names"][winner]).to_upper()
+	var notes: Array = []
+	if bool(result.get("final", false)):
+		notes.append("rodada final ×2")
+	if int(result.get("event", 0)) == ChaosEvents.Event.DOURADA:
+		notes.append("vaza dourada ×3")
+	if bool(result.get("folego_applied", false)):
+		notes.append("fôlego 🔥")
+	var sub := "Pontos da vaza: %s" % UIKit.fmt_dec(float(result["base_points"]), 1)
 	if float(result.get("mult", 1.0)) > 1.0:
-		extra = " (x%s!)" % UIKit.fmt_dec(float(result["mult"]), 1)
-	trick_label.text = "%s venceu a vaza · +%s pts%s" % [str(config["names"][winner]).to_upper(), UIKit.fmt_dec(points, 1), extra]
+		sub += " ×%s" % UIKit.fmt_dec(float(result["mult"]), 2)
+	if not notes.is_empty():
+		sub += "  (%s)" % ", ".join(notes)
+	_banner("%s venceu · +%s pts" % [wname, UIKit.fmt_dec(points, 1)], sub, UIKit.GOLD if winner == 0 else UIKit.INK)
 	Sfx.play("chip")
-	_float_points(winner, points, bool(result.get("folego_applied", false)))
-	if bool(result.get("roubo_applied", false)):
-		var target: int = result["roubo_target"]
-		_speech_bubble(winner, "🗡 roubou %s pts de %s!" % [UIKit.fmt_dec(float(result["roubo_amount"]), 1), str(config["names"][target]).to_upper()])
-	await _wait(0.7)
+	await _wait(1.0)
 	if not is_inside_tree():
 		return
+	var extras: Array = []
+	for id in result.get("combos", []):
+		extras.append([str(ChaosEvents.COMBO_NAMES[id]) + "!", "%s — %s" % [wname, ChaosEvents.COMBO_DESCRIPTIONS[id]], UIKit.OK])
+	if bool(result.get("roubo_applied", false)):
+		extras.append(["🗡 ROUBO DE VAZA!", "%s roubou %s pts de %s" % [wname, UIKit.fmt_dec(float(result["roubo_amount"]), 1), str(config["names"][int(result["roubo_target"])]).to_upper()], UIKit.DANGER])
+	if float(result.get("saque_amount", 0.0)) > 0.0:
+		extras.append(["🗡 SAQUE!", "%s levou %s pts dos rivais" % [wname, UIKit.fmt_dec(float(result["saque_amount"]), 1)], UIKit.DANGER])
+	for e in extras:
+		_banner(e[0], e[1], e[2])
+		Sfx.play("win")
+		await _wait(1.3)
+		if not is_inside_tree():
+			return
 
 	var target := _slot_pos(winner) + (_slot_pos(winner) - table_center.size / 2.0 + CardView.SIZE / 2.0) * 0.8
 	var tw := create_tween().set_parallel(true)
@@ -691,28 +829,8 @@ func _resolve_trick(result: Dictionary) -> void:
 	for v in table_views:
 		(v["view"] as CardView).queue_free()
 	table_views.clear()
-	trick_label.text = ""
+	_banner_clear()
 	_refresh_hud()
-
-
-func _float_points(winner: int, points: float, folego: bool) -> void:
-	var text := "+%s pts" % UIKit.fmt_dec(points, 1)
-	if folego:
-		text += " 🔥"
-	var l := UIKit.label(text, 38, UIKit.GOLD if winner == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	var box := PanelContainer.new()
-	box.add_theme_stylebox_override("panel", UIKit.box(Color(0.03, 0.03, 0.07, 0.85), UIKit.GOLD if winner == 0 else UIKit.PURPLE, 2, 4, 10))
-	box.add_child(l)
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	popup_layer.add_child(box)
-	box.size = Vector2(160, 50)
-	box.global_position = table_center.global_position + table_center.size / 2.0 - box.size / 2.0
-	box.modulate.a = 0.0
-	var tw := create_tween()
-	tw.tween_property(box, "modulate:a", 1.0, GameState.anim(0.12))
-	tw.parallel().tween_property(box, "position:y", box.position.y - 30.0, GameState.anim(0.75)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(box, "modulate:a", 0.0, GameState.anim(0.25))
-	tw.tween_callback(box.queue_free)
 
 
 # ------------------------------------------------------------------ resumo de rodada / fim
@@ -846,6 +964,20 @@ MODIFICADOR
 
 ITENS
 • A partir da Rodada 2, antes de cada rodada você escolhe 1 de 2 itens sorteados — uma vantagem ativa só sua, só naquela rodada (Escudo, Trunfo Afiado, Fôlego Pessoal ou Roubo de Vaza). Os bots escolhem também.
+
+PLOT TWIST (VAZA 4)
+• Em toda rodada, na vaza 4, acontece um evento surpresa que você só descobre na hora: VAZA DOURADA (pontos ×3), VAZA INVERTIDA (vence a MENOR carta do naipe) ou SAQUE (quem vencer rouba 2 pts de cada rival). A tela avisa antes da vaza começar.
+
+COMBOS (aparecem no aviso acima da mesa)
+• MÃO QUENTE: 3 vazas seguidas na rodada — pontos ×1,5.
+• CORTADO: você quebra a sequência de 2+ vitórias de alguém — +2 pts.
+• CORTE DE REI: você corta um Rei com Trunfo — +3 pts.
+
+RODADA FINAL
+• Todos os pontos da 5ª rodada valem ×2.
+
+RELÓGIO
+• Você tem 10 segundos por jogada (a barra embaixo da mesa esvazia). Estourou, jogamos sua carta mais fraca.
 
 FÔLEGO
 • A partir da 2ª rodada, quem estiver em último no total ganha Fôlego: os pontos que capturar nessa rodada valem x1,5. É a chance de virar o jogo.

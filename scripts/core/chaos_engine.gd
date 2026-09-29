@@ -15,6 +15,13 @@ const FOLEGO_MULT := 1.5   # bônus de pontos pra quem tá em último ANTES da r
 const ITEM_MULT := 1.25    # bônus do item Fôlego Pessoal
 const ITEM_STEAL := 4.0    # pontos roubados pelo item Roubo de Vaza
 const BUY_IN := 100.0
+const EVENT_TRICK := 3      # o evento surpresa acontece na vaza 4 (índice 3) de cada rodada
+const GOLD_MULT := 3.0      # Vaza Dourada
+const FINAL_MULT := 2.0     # todos os pontos da última rodada
+const STREAK_MULT := 1.5    # Mão Quente: 3ª vitória seguida (e seguintes) na rodada
+const KING_CUT_BONUS := 3.0 # Corte de Rei
+const BREAK_BONUS := 2.0    # Cortado: quebrar a sequência de 2+ vitórias de alguém
+const SAQUE_AMOUNT := 2.0   # pontos roubados de cada rival no evento Saque
 const PAYOUT_SHARES := [0.5, 0.3, 0.15, 0.05]  # fatia do pote por colocação (1º a 4º)
 
 var num_players := 4
@@ -25,6 +32,9 @@ var round_index := 0
 var modifier_sequence: Array = []  # ordem embaralhada dos modificadores, sem repetir na partida
 var modifier := -1
 var weak_suit := -1
+var event := ChaosEvents.Event.NONE  # evento surpresa dessa rodada, na vaza EVENT_TRICK
+var streak: Array = []        # vitórias seguidas de cada jogador, dentro da rodada
+var last_winner := -1
 var folego_player := -1       # quem recebe o bônus de virada nessa rodada (-1 = ninguém)
 var buy_in := BUY_IN
 var pot := 0.0
@@ -70,7 +80,11 @@ func _setup_round() -> void:
 	round_points = []
 	player_items = []
 	roubo_used = []
+	streak = []
+	last_winner = -1
+	event = ChaosEvents.ALL[rng.randi_range(0, ChaosEvents.ALL.size() - 1)]
 	for p in range(num_players):
+		streak.append(0)
 		captured.append([])
 		round_points.append(0.0)
 		player_items.append(ChaosItems.Item.NONE)
@@ -171,8 +185,31 @@ func card_value(c: CardData, player: int = -1) -> float:
 	return v
 
 
+## Evento surpresa ativo na vaza que está sendo jogada agora (NONE nas demais).
+func event_now() -> int:
+	return event if trick_number == EVENT_TRICK else ChaosEvents.Event.NONE
+
+
+func is_final_round() -> bool:
+	return round_index >= ROUNDS - 1
+
+
+## Vaza Invertida: vence a MENOR carta do naipe líder (Trunfo que corta não vale nada).
+func _lowest_index() -> int:
+	var ls := TrickRules.lead_suit(plays)
+	var best := -1
+	for i in range(plays.size()):
+		var c: CardData = plays[i]["card"]
+		if c.is_louco() or c.suit != ls:
+			continue
+		if best == -1 or c.rank < (plays[best]["card"] as CardData).rank:
+			best = i
+	return best if best != -1 else TrickRules.winning_index(plays, louco_can_win())
+
+
 func _resolve_trick() -> Dictionary:
-	var idx := TrickRules.winning_index(plays, louco_can_win())
+	var ev := event_now()
+	var idx := _lowest_index() if ev == ChaosEvents.Event.INVERTIDA else TrickRules.winning_index(plays, louco_can_win())
 	var winner: int = plays[idx]["player"]
 	var cards: Array = plays.map(func(p): return p["card"])
 	captured[winner].append_array(cards)
@@ -184,13 +221,49 @@ func _resolve_trick() -> Dictionary:
 		mult *= 2.0
 	if modifier == ChaosModifiers.Modifier.ULTIMA_TRIPLO and trick_number == HAND_SIZE - 1:
 		mult *= 3.0
+	if ev == ChaosEvents.Event.DOURADA:
+		mult *= GOLD_MULT
+	if is_final_round():
+		mult *= FINAL_MULT
+	# Combos: sequência, quebra de sequência e corte de Rei.
+	var combos: Array = []
+	var bonus := 0.0
+	var prev_streak: int = streak[last_winner] if last_winner != -1 else 0
+	var broke := last_winner != -1 and last_winner != winner and prev_streak >= 2
+	for q in range(num_players):
+		streak[q] = streak[q] + 1 if q == winner else 0
+	if streak[winner] >= 3:
+		mult *= STREAK_MULT
+		combos.append("MAO_QUENTE")
+	if broke:
+		bonus += BREAK_BONUS
+		combos.append("CORTADO")
+	var wcard: CardData = plays[idx]["card"]
+	var lead := TrickRules.lead_suit(plays)
+	if wcard.is_trunfo() and lead != CardData.Suit.TRUNFO and lead != -1:
+		for pl in plays:
+			var pc: CardData = pl["card"]
+			if pc.suit == lead and pc.rank == 14:
+				bonus += KING_CUT_BONUS
+				combos.append("CORTE_REI")
+				break
+	last_winner = winner
 	var folego_applied := winner == folego_player
 	if folego_applied:
 		mult *= FOLEGO_MULT
 	var item_folego: bool = winner < player_items.size() and player_items[winner] == ChaosItems.Item.FOLEGO_PESSOAL
 	if item_folego:
 		mult *= ITEM_MULT
-	var points := base_points * mult
+	var points := base_points * mult + bonus
+	var saque_amount := 0.0
+	if ev == ChaosEvents.Event.SAQUE:
+		for q in range(num_players):
+			if q == winner:
+				continue
+			var take := minf(SAQUE_AMOUNT, totals[q])
+			totals[q] -= take
+			round_points[q] -= take
+			saque_amount += take
 	var roubo_applied := false
 	var roubo_amount := 0.0
 	var roubo_target := -1
@@ -216,10 +289,15 @@ func _resolve_trick() -> Dictionary:
 		"roubo_amount": roubo_amount,
 		"roubo_target": roubo_target,
 		"trick_number": trick_number,
+		"event": ev,
+		"combos": combos,
+		"bonus": bonus,
+		"saque_amount": saque_amount,
+		"final": is_final_round(),
 	}
 	history.append(trick_result)
-	round_points[winner] += points + roubo_amount
-	totals[winner] += points + roubo_amount
+	round_points[winner] += points + roubo_amount + saque_amount
+	totals[winner] += points + roubo_amount + saque_amount
 	plays = []
 	trick_number += 1
 	leader = winner

@@ -397,6 +397,51 @@ func _test_chaos() -> void:
 	check(int(steal_result["roubo_target"]) == 1, "Roubo de Vaza mira em quem está em 1º lugar no total")
 	check(e6.totals[1] == 16.0, "alvo do roubo perde os pontos roubados")
 
+	# Eventos surpresa e combos.
+	var e7 := ChaosEngine.new()
+	e7.setup_match({"seed": 9})
+	e7.modifier = -1
+	e7.folego_player = -1
+	e7.round_index = 0
+	e7.trick_number = ChaosEngine.EVENT_TRICK
+	e7.event = ChaosEvents.Event.INVERTIDA
+	e7.plays = [
+		{"player": 0, "card": c(CardData.Suit.PAUS, 9)},
+		{"player": 1, "card": c(CardData.Suit.PAUS, 2)},
+		{"player": 2, "card": c(CardData.Suit.PAUS, 12)},
+		{"player": 3, "card": c(CardData.Suit.PAUS, 6)},
+	]
+	var inv := e7._resolve_trick()
+	check(int(inv["winner"]) == 1, "Vaza Invertida: a MENOR carta do naipe vence")
+	e7.trick_number = ChaosEngine.EVENT_TRICK
+	e7.event = ChaosEvents.Event.DOURADA
+	e7.plays = [
+		{"player": 0, "card": c(CardData.Suit.PAUS, 9)},
+		{"player": 1, "card": c(CardData.Suit.PAUS, 2)},
+		{"player": 2, "card": c(CardData.Suit.PAUS, 12)},
+		{"player": 3, "card": c(CardData.Suit.PAUS, 6)},
+	]
+	e7.current = 0
+	e7.last_winner = 0
+	e7.streak = [2, 0, 0, 0]
+	var gold := e7._resolve_trick()
+	check(is_equal_approx(float(gold["mult"]), ChaosEngine.GOLD_MULT), "Vaza Dourada multiplica os pontos por 3")
+	check("CORTADO" in gold["combos"], "vencer depois de alguém ter 2+ vitórias seguidas é CORTADO")
+	e7.event = ChaosEvents.Event.NONE
+	e7.trick_number = 0
+	e7.last_winner = 0
+	e7.streak = [2, 0, 0, 0]
+	e7.plays = [
+		{"player": 0, "card": c(CardData.Suit.PAUS, 14)},
+		{"player": 1, "card": c(CardData.Suit.PAUS, 2)},
+		{"player": 2, "card": c(CardData.Suit.PAUS, 3)},
+		{"player": 3, "card": c(CardData.Suit.PAUS, 6)},
+	]
+	var hot := e7._resolve_trick()
+	check("MAO_QUENTE" in hot["combos"], "3ª vitória seguida é MÃO QUENTE")
+	e7.round_index = ChaosEngine.ROUNDS - 1
+	check(e7.is_final_round(), "última rodada é a rodada final (pontos ×2)")
+
 
 ## Bots estratégicos: só fazem jogadas legais em qualquer nível e, na defesa, seguram muito
 ## mais o Atacante do que o bot simples (mesmas mãos, mesma semente).
