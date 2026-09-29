@@ -607,6 +607,7 @@ func _transition(kicker: String, blocks: Array, hold: float) -> void:
 	var width := minf(get_viewport_rect().size.x - 80.0, 680.0)
 	v.custom_minimum_size = Vector2(width, 0)
 	v.add_child(UIKit.label(kicker, 46, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	var spins: Array = []  # [título, texto] dos blocos com caça-níquel: o texto só aparece quando ele trava
 	for b in blocks:
 		var card := UIKit.panel(UIKit.PURPLE_DEEP, b["color"], 18)
 		var cv := VBoxContainer.new()
@@ -615,19 +616,25 @@ func _transition(kicker: String, blocks: Array, hold: float) -> void:
 		cv.add_child(UIKit.label(b["head"], 28, b["color"], HORIZONTAL_ALIGNMENT_CENTER))
 		var title_lbl := UIKit.label(b["title"], 40, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 		cv.add_child(title_lbl)
-		if b.get("spin", false):
-			_spin_label(title_lbl, str(b["title"]))
 		var t := UIKit.label(b["text"], 32, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 		t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		cv.add_child(t)
+		if b.get("spin", false):
+			t.modulate.a = 0.0
+			spins.append([title_lbl, t, str(b["title"])])
 		v.add_child(card)
 	var go := UIKit.button("ENTENDI, CONTINUAR")
 	v.add_child(go)
+	if not spins.is_empty():
+		go.disabled = true
+		go.modulate.a = 0.0
 	ov.add_child(UIKit.centered(v))
 	go.grab_focus.call_deferred()
 	ov.modulate.a = 0.0
 	create_tween().tween_property(ov, "modulate:a", 1.0, GameState.anim(0.18))
 	Sfx.play("chip")
+	for sp in spins:
+		_reveal_after_spin(sp[0], sp[1], sp[2], go)
 	# Só avança quando o jogador aperta o botão — sem tempo limite, dá pra ler com calma.
 	await go.pressed
 	if not is_inside_tree():
@@ -636,6 +643,19 @@ func _transition(kicker: String, blocks: Array, hold: float) -> void:
 	tw.tween_property(ov, "modulate:a", 0.0, GameState.anim(0.18))
 	await tw.finished
 	ov.queue_free()
+
+
+## Roda o caça-níquel e só depois mostra a explicação e libera o botão.
+func _reveal_after_spin(title_lbl: Label, text_lbl: Label, final_text: String, go: Button) -> void:
+	await _spin_label(title_lbl, final_text)
+	if not is_instance_valid(text_lbl):
+		return
+	await get_tree().create_timer(GameState.anim(0.35)).timeout
+	if is_instance_valid(text_lbl):
+		create_tween().tween_property(text_lbl, "modulate:a", 1.0, GameState.anim(0.3))
+	if is_instance_valid(go):
+		go.disabled = false
+		create_tween().tween_property(go, "modulate:a", 1.0, GameState.anim(0.3))
 
 
 ## Caça-níquel do modificador: os nomes giram, desaceleram e travam no sorteado.
