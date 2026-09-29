@@ -51,16 +51,18 @@ func _ready() -> void:
 ## esconde o problema): a DejaVu Sans vai junto do jogo como reserva da fonte padrão.
 func _install_symbol_font() -> void:
 	var sym := load("res://assets/fonts/DejaVuSans.ttf") as Font
-	var base: Font = ThemeDB.fallback_font
+	var display := load("res://assets/fonts/LilitaOne-Regular.ttf") as FontFile
 	var dt := ThemeDB.get_default_theme()
-	if dt != null and dt.default_font != null:
-		base = dt.default_font
-	if base == null or sym == null:
+	if sym == null or display == null or dt == null:
 		return
+	# Fonte padrão do jogo: Lilita One (arredondada, grossa, estilo arcade). A DejaVu Sans
+	# fica de reserva pros símbolos (♥ ♦ ♠ ♣ ✦ ✶ 🔥) que a Lilita não tem — o navegador do
+	# celular não tem fonte de sistema com eles.
 	var list: Array[Font] = [sym]
-	base.fallbacks = list
-	if OS.get_environment("TAROLO_NO_SYSFONT") == "1" and base is FontFile:
-		(base as FontFile).allow_system_fallback = false
+	display.fallbacks = list
+	dt.default_font = display
+	if OS.get_environment("TAROLO_NO_SYSFONT") == "1":
+		display.allow_system_fallback = false
 
 
 ## Resolução base 1920x1200 no paisagem (PC) e 720x1280 no retrato (smartphone),

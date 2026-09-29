@@ -46,6 +46,8 @@ var side_col: VBoxContainer
 var seat_nodes: Array = []
 var first_round_done := false
 var info_label: Label
+var trick_dots: HBoxContainer
+var shown_totals: Array = []
 var modifier_label: Label
 var modifier_expanded := false
 var wager_label: Label
@@ -121,21 +123,26 @@ func _build_ui() -> void:
 	# Barra de topo — título + ações, uma linha só, sempre no mesmo lugar (como o topo
 	# de qualquer app) -------------------------------------------------
 	var topbar := HBoxContainer.new()
-	topbar.add_theme_constant_override("separation", 8)
+	topbar.add_theme_constant_override("separation", 12)
 	root.add_child(topbar)
-	var info_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BLACK, 8)
-	info_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info_label = UIKit.label("", 22, UIKit.INK)
-	info_box.add_child(info_label)
-	topbar.add_child(info_box)
-	var help_btn := UIKit.button("?", UIKit.GOLD, 25)
-	help_btn.custom_minimum_size = Vector2(52, 52)
-	help_btn.pressed.connect(_open_help)
-	topbar.add_child(help_btn)
-	var menu_btn := UIKit.button("☰", UIKit.MUTED, 25)
-	menu_btn.custom_minimum_size = Vector2(52, 52)
+	var menu_btn := Widgets.icon_button("☰")
 	menu_btn.pressed.connect(_open_pause)
 	topbar.add_child(menu_btn)
+	var info_box := UIKit.panel(Color("#1B1258"), UIKit.BLACK, 8)
+	info_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var info_v := VBoxContainer.new()
+	info_v.add_theme_constant_override("separation", 4)
+	info_box.add_child(info_v)
+	info_label = UIKit.label("", 28, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	info_v.add_child(info_label)
+	trick_dots = HBoxContainer.new()
+	trick_dots.alignment = BoxContainer.ALIGNMENT_CENTER
+	trick_dots.add_theme_constant_override("separation", 8)
+	info_v.add_child(trick_dots)
+	topbar.add_child(info_box)
+	var help_btn := Widgets.icon_button("?", UIKit.GOLD.darkened(0.1))
+	help_btn.pressed.connect(_open_help)
+	topbar.add_child(help_btn)
 
 	# Corpo: em tela larga vira duas colunas (placar à esquerda, mesa à direita); no
 	# celular empilha. Cada bloco tem espaço próprio — nada flutua por cima de outro.
@@ -157,7 +164,7 @@ func _build_ui() -> void:
 	# Regra da rodada — aviso fixo, sempre visível.
 	var mod_box := UIKit.panel(UIKit.OK.darkened(0.75), UIKit.OK, 10)
 	mod_box.mouse_filter = Control.MOUSE_FILTER_STOP
-	modifier_label = UIKit.label("", 18, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
+	modifier_label = UIKit.label("", 22, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
 	modifier_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	mod_box.add_child(modifier_label)
 	mod_box.gui_input.connect(func(event: InputEvent):
@@ -207,7 +214,7 @@ func _build_ui() -> void:
 	turn_bar.show_percentage = false
 	turn_bar.min_value = 0.0
 	turn_bar.max_value = TURN_SECONDS
-	turn_bar.custom_minimum_size = Vector2(0, 14)
+	turn_bar.custom_minimum_size = Vector2(0, 22)
 	turn_bar.modulate.a = 0.0
 	turn_bar.add_theme_stylebox_override("background", UIKit.box(UIKit.PURPLE_DEEP, UIKit.PURPLE, 2, 7, 0))
 	turn_bar.add_theme_stylebox_override("fill", UIKit.box(UIKit.GOLD, UIKit.GOLD, 0, 7, 0))
@@ -232,15 +239,16 @@ func _build_ui() -> void:
 	var my_row := HBoxContainer.new()
 	my_row.add_theme_constant_override("separation", 16)
 	my_box.add_child(my_row)
+	my_row.add_child(Portrait.new().setup(0, UIKit.GOLD, 84.0))
 	var my_left := VBoxContainer.new()
 	my_left.add_theme_constant_override("separation", 1)
 	my_left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	my_row.add_child(my_left)
-	var my_title := UIKit.label(str(config["names"][0]).to_upper(), 16, UIKit.MUTED)
+	var my_title := UIKit.label(str(config["names"][0]).to_upper(), 20, UIKit.MUTED)
 	my_left.add_child(my_title)
-	var my_total := UIKit.label("0,0 pts", 32, UIKit.INK)
+	var my_total := UIKit.label("0,0 pts", 40, UIKit.GOLD)
 	my_left.add_child(my_total)
-	var my_rp := UIKit.label("+0,0 na rodada", 16, UIKit.MUTED)
+	var my_rp := UIKit.label("+0,0 na rodada", 20, UIKit.MUTED)
 	my_left.add_child(my_rp)
 	var my_right := VBoxContainer.new()
 	my_right.add_theme_constant_override("separation", 1)
@@ -307,17 +315,18 @@ func _build_seats() -> void:
 		seat.add_theme_constant_override("separation", 2)
 		seat.alignment = BoxContainer.ALIGNMENT_CENTER
 		var ring := PanelContainer.new()
-		ring.custom_minimum_size = Vector2(76, 76)
-		ring.pivot_offset = Vector2(38, 38)
+		ring.custom_minimum_size = Vector2(84, 84)
+		ring.pivot_offset = Vector2(42, 42)
 		ring.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var letter := UIKit.label(str(config["names"][p]).substr(0, 1).to_upper(), 34, SEAT_COLORS[p % SEAT_COLORS.size()], HORIZONTAL_ALIGNMENT_CENTER)
-		letter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		ring.add_child(letter)
+		var face := Portrait.new().setup(p, Color(0, 0, 0, 0), 68.0)
+		face.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		face.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		ring.add_child(face)
 		seat.add_child(ring)
-		var name_l := UIKit.label("", 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		var name_l := UIKit.label("", 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 		seat.add_child(name_l)
-		var pts_l := UIKit.label("0,0 pts", 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+		var pts_l := UIKit.label("0,0 pts", 24, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 		seat.add_child(pts_l)
 		seat.custom_minimum_size = Vector2(130, 0)
 		table_center.add_child(seat)
@@ -428,7 +437,16 @@ func _current_turn_player() -> int:
 func _refresh_hud() -> void:
 	var turn_player := _current_turn_player()
 	for p in range(engine.num_players):
-		(hud_totals[p] as Label).text = "%s pts" % UIKit.fmt_dec(engine.totals[p], 1)
+		var total_lbl := hud_totals[p] as Label
+		var new_total: float = engine.totals[p]
+		while shown_totals.size() <= p:
+			shown_totals.append(0.0)
+		if is_equal_approx(new_total, float(shown_totals[p])):
+			total_lbl.text = "%s pts" % UIKit.fmt_dec(new_total, 1)
+		else:
+			FX.count(total_lbl, float(shown_totals[p]), new_total, func(v: float): return "%s pts" % UIKit.fmt_dec(v, 1))
+			FX.pop(total_lbl, 1.3)
+			shown_totals[p] = new_total
 		var rp: float = engine.round_points[p] if p < engine.round_points.size() else 0.0
 		(hud_round_pts[p] as Label).text = "+%s na rodada" % UIKit.fmt_dec(rp, 1)
 		var turn := p == turn_player
@@ -440,9 +458,10 @@ func _refresh_hud() -> void:
 		(hud_titles[p] as Label).add_theme_color_override("font_color", lead_accent)
 		if p > 0:
 			(hud_cards[p] as Label).text = "%d cartas" % (engine.hands[p] as Array).size()
-	info_label.text = "CAOS · RODADA %d/%d · VAZA %d/%d" % [engine.round_index + 1, ChaosEngine.ROUNDS, mini(engine.trick_number + 1, ChaosEngine.HAND_SIZE), ChaosEngine.HAND_SIZE]
+	info_label.text = "RODADA %d/%d" % [engine.round_index + 1, ChaosEngine.ROUNDS]
+	Widgets.progress_dots(trick_dots, ChaosEngine.HAND_SIZE, engine.trick_number)
 	var mod_name := "✦ %s" % ChaosModifiers.label(engine.modifier, engine.weak_suit)
-	modifier_label.text = "%s — %s" % [mod_name, ChaosModifiers.DESCRIPTIONS[engine.modifier]] if modifier_expanded else "%s  (toque p/ detalhe)" % mod_name
+	modifier_label.text = "%s — %s" % [mod_name, ChaosModifiers.DESCRIPTIONS[engine.modifier]] if modifier_expanded else "%s" % mod_name
 	var profile := SaveManager.section("profile")
 	wager_label.text = "🪙 Suas fichas: %d   ·   Pote da mesa: %d (buy-in %d)" % [int(profile["fichas"]), int(engine.pot), int(engine.buy_in)]
 	_update_turn_highlight(turn_player)
@@ -494,6 +513,7 @@ func _announce_round() -> void:
 	lines.append({"head": "SURPRESA", "title": "? NA VAZA %d" % (ChaosEngine.EVENT_TRICK + 1), "text": "Algo vai mudar as regras da vaza 4. Você só descobre quando chegar lá.", "color": UIKit.DANGER})
 	await _transition(kicker, lines, 3.4 if not first_round_done else 3.0)
 	first_round_done = true
+	_banner_clear()
 
 
 ## Tela cheia de transição. `blocks`: [{head, title, text, color}]. Fecha ao tocar ou
@@ -552,8 +572,11 @@ func _banner(title: String, sub: String, color: Color) -> void:
 
 
 func _banner_clear() -> void:
-	banner_title.text = ""
-	banner_sub.text = ""
+	# Em repouso a faixa lembra a regra da rodada (informação útil no lugar de um vazio).
+	banner_title.text = "✦ %s" % ChaosModifiers.label(engine.modifier, engine.weak_suit)
+	banner_title.add_theme_color_override("font_color", UIKit.OK)
+	banner_sub.text = str(ChaosModifiers.DESCRIPTIONS[engine.modifier])
+	banner_box.modulate.a = 1.0
 	banner_box.add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, UIKit.MUTED, 3, 4, 12))
 
 
@@ -801,6 +824,10 @@ func _resolve_trick(result: Dictionary) -> void:
 		sub += "  (%s)" % ", ".join(notes)
 	_banner("%s venceu · +%s pts" % [wname, UIKit.fmt_dec(points, 1)], sub, UIKit.GOLD if winner == 0 else UIKit.INK)
 	Sfx.play("chip")
+	var punch := clampf(points / 24.0, 0.0, 1.0)
+	if punch > 0.25:
+		FX.shake(main_area, punch)
+	FX.burst(popup_layer, table_center.global_position - popup_layer.global_position + table_center.size / 2.0, UIKit.GOLD if winner == 0 else UIKit.CHIPS, 8 + int(punch * 20))
 	await _wait(1.0)
 	if not is_inside_tree():
 		return

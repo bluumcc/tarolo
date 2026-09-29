@@ -2,7 +2,7 @@ extends Control
 ## MainMenu.tscn — navegação para os modos, Loja de Cosméticos e Configurações.
 
 var overlay_layer: Control
-var fragments_label: Label
+var top_bar: PanelContainer
 
 
 func _ready() -> void:
@@ -10,91 +10,95 @@ func _ready() -> void:
 	add_child(UIKit.background())
 	_spawn_stars()
 
+	# Estrutura da tela: barra superior fixa · conteúdo rolável · navegação inferior fixa.
+	var page := VBoxContainer.new()
+	page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	page.add_theme_constant_override("separation", 0)
+	add_child(page)
+
+	var prof := SaveManager.section("profile")
+	top_bar = Widgets.top_bar(str(prof["name"]), "%d vitórias · %d partidas" % [int(prof["wins"]), int(prof["matches"])], UIKit.fmt_int(int(prof["fichas"])), UIKit.fmt_int(int(prof["fragments"])))
+	top_bar.custom_minimum_size = Vector2(0, Widgets.TOPBAR_H)
+	page.add_child(top_bar)
+
 	var scroll := ScrollContainer.new()
-	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	add_child(scroll)
+	page.add_child(scroll)
 	var center := CenterContainer.new()
 	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.add_child(center)
-
 	var col := VBoxContainer.new()
-	col.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x * 0.9, 640.0), 0)
-	col.add_theme_constant_override("separation", 14)
+	col.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - Widgets.MARGIN * 2.0, 672.0), 0)
+	col.add_theme_constant_override("separation", 18)
 	center.add_child(col)
 
-	var title := UIKit.label("TAROLO", 76, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	col.add_child(title)
-	var sub := UIKit.label("— JOGO DE VAZAS —", 25, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	col.add_child(sub)
-	col.add_child(_spacer(16))
-
-	var tut := UIKit.button("TUTORIAL", UIKit.OK, 28)
-	tut.pressed.connect(func():
-		GameState.start_tutorial()
-		get_tree().change_scene_to_file("res://scenes/GameScene.tscn"))
-	col.add_child(tut)
-	col.add_child(_caption("Primeira vez? Uma mão guiada, com dicas em cada regra nova."))
-
-	var classic := UIKit.button("MODO VANILLA", UIKit.GOLD, 28)
-	classic.pressed.connect(func():
-		GameState.mode = GameState.Mode.CLASSIC
-		GameState.leave_table()
-		get_tree().change_scene_to_file("res://scenes/GameScene.tscn"))
-	col.add_child(classic)
-	col.add_child(_caption("Tarot clássico: baralho de 78 cartas, trunfo e O Louco."))
-
-	var chaos := UIKit.button("MODO CAOS", UIKit.DANGER, 28)
-	chaos.pressed.connect(_open_chaos_confirm)
-	col.add_child(chaos)
-	col.add_child(_caption("5 rodadas relâmpago, item novo por rodada, fichas na mesa, Fôlego pra quem tá por baixo."))
+	# Herói: logo + leque de cartas de enfeite.
+	col.add_child(_hero())
 
 	var rk := GameState.ranked()
 	var tier := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
-	var ranked := UIKit.button("MODO RANQUEADO", Color(Ranked.TIER_COLORS[tier["tier"]]), 28)
-	ranked.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn"))
-	col.add_child(ranked)
-	col.add_child(_caption("Temporada %d · %s · %d LP" % [int(rk["season"]), tier["label"], int(tier["lp"])]))
-
+	var chaos := Widgets.mode_card("MODO CAOS", "Rodadas relâmpago, plot twists e combos. Fichas na mesa!", UIKit.DANGER, 176, "⚡", _open_chaos_confirm, 46)
+	col.add_child(chaos)
+	col.add_child(Widgets.mode_card("MODO VANILLA", "Tarot clássico: 78 cartas, trunfo e O Louco.", UIKit.GOLD.darkened(0.12), 132, "♛", func():
+		GameState.mode = GameState.Mode.CLASSIC
+		GameState.leave_table()
+		get_tree().change_scene_to_file("res://scenes/GameScene.tscn")))
+	col.add_child(Widgets.mode_card("RANQUEADO", "Temporada %d · %s · %d LP" % [int(rk["season"]), tier["label"], int(tier["lp"])], Color(Ranked.TIER_COLORS[tier["tier"]]).darkened(0.1), 132, "🏆", func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn")))
+	col.add_child(Widgets.mode_card("TUTORIAL", "Primeira vez? Uma mão guiada, com dicas.", UIKit.OK.darkened(0.15), 112, "?", func():
+		GameState.start_tutorial()
+		get_tree().change_scene_to_file("res://scenes/GameScene.tscn"), 34))
 	col.add_child(_spacer(8))
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	col.add_child(row)
-	var cosm := UIKit.button("COSMÉTICOS", UIKit.MUTED, 21)
-	cosm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	cosm.pressed.connect(_open_cosmetics)
-	row.add_child(cosm)
-	var sett := UIKit.button("CONFIGURAÇÕES", UIKit.MUTED, 21)
-	sett.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sett.pressed.connect(_open_settings)
-	row.add_child(sett)
-	var rules := UIKit.button("COMO JOGAR", UIKit.MUTED, 21)
-	rules.pressed.connect(_open_rules)
-	col.add_child(rules)
-	if not OS.has_feature("mobile") and not OS.has_feature("web"):
-		var quit := UIKit.button("SAIR", UIKit.DANGER, 21)
-		quit.pressed.connect(func(): get_tree().quit())
-		col.add_child(quit)
 
-	fragments_label = UIKit.label("", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-	col.add_child(fragments_label)
-	_refresh_fragments()
+	var nav := Widgets.bottom_nav([
+		{"icon": "★", "label": "Cosméticos", "cb": _open_cosmetics},
+		{"icon": "?", "label": "Como jogar", "cb": _open_rules},
+		{"icon": "⚡", "label": "CAOS", "cb": _open_chaos_confirm, "center": true},
+		{"icon": "⚙", "label": "Ajustes", "cb": _open_settings},
+		{"icon": "🏆", "label": "Ranking", "cb": func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn")},
+	])
+	nav.custom_minimum_size = Vector2(0, Widgets.NAV_H)
+	page.add_child(nav)
 
 	overlay_layer = Control.new()
 	overlay_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(overlay_layer)
+	chaos.grab_focus.call_deferred()
 
-	classic.grab_focus.call_deferred()
-	title.pivot_offset = Vector2(170, 30)
-	title.modulate.a = 0.0
-	create_tween().tween_property(title, "modulate:a", 1.0, GameState.anim(0.6))
+
+## Logo do jogo com três cartas em leque (as mesmas do jogo, só de enfeite).
+func _hero() -> Control:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 0)
+	var fan := Control.new()
+	fan.custom_minimum_size = Vector2(0, 210)
+	fan.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(fan)
+	var specs := [[CardData.Suit.COPAS, 14, -14.0, -110.0], [CardData.Suit.TRUNFO, 21, 0.0, 0.0], [CardData.Suit.ESPADAS, 12, 14.0, 110.0]]
+	for sp in specs:
+		var cv: CardView = preload("res://scenes/Card.tscn").instantiate()
+		cv.setup(CardData.make(sp[0], sp[1]), true)
+		cv.interactive = false
+		cv.scale = Vector2(0.62, 0.62)
+		cv.rotation_degrees = sp[2]
+		fan.add_child(cv)
+		cv.position = Vector2(336.0 + sp[3] - CardView.SIZE.x / 2.0, 20.0 - abs(sp[2]) * 1.2)
+	var title := UIKit.label("TAROLO", 88, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	title.add_theme_color_override("font_outline_color", Color("#3A1FA0"))
+	title.add_theme_constant_override("outline_size", 14)
+	box.add_child(title)
+	var sub := UIKit.label("JOGO DE VAZAS", 26, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	box.add_child(sub)
+	return box
 
 
 func _refresh_fragments() -> void:
 	var prof := SaveManager.section("profile")
-	fragments_label.text = "%s · %d partidas · %d vitórias · ◆ %s Fragmentos · 🪙 %s Fichas" % [prof["name"], int(prof["matches"]), int(prof["wins"]), UIKit.fmt_int(int(prof["fragments"])), UIKit.fmt_int(int(prof["fichas"]))]
+	if top_bar:
+		Widgets.set_pill_value(top_bar.find_child("ChipsPill", true, false), UIKit.fmt_int(int(prof["fichas"])))
+		Widgets.set_pill_value(top_bar.find_child("FragsPill", true, false), UIKit.fmt_int(int(prof["fragments"])))
 
 
 func _spacer(h: int) -> Control:

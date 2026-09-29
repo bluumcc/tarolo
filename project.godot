@@ -16,6 +16,7 @@ config/icon="res://icon.svg"
 SaveManager="*res://scripts/autoload/save_manager.gd"
 GameState="*res://scripts/autoload/game_state.gd"
 Sfx="*res://scripts/autoload/sfx.gd"
+FX="*res://scripts/autoload/fx.gd"
 
 [display]
 

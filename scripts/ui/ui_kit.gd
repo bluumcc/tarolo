@@ -2,17 +2,17 @@ class_name UIKit
 extends RefCounted
 ## Paleta Dark Brutalist e fábrica de estilos/nós Control reutilizados pelas cenas.
 
-const NIGHT := Color("#0E0A2B")
-const PURPLE := Color("#33267A")
-const PURPLE_DEEP := Color("#1D1547")
-const BLACK := Color("#07070B")
-const INK := Color("#F1EEFF")
-const MUTED := Color("#9C93C9")
-const GOLD := Color("#F0C879")
-const VIOLET := Color("#7C6CFF")  ## destaque principal (botão primário, barras)
-const DANGER := Color("#FF5C7A")
-const OK := Color("#7FD1AE")
-const CHIPS := Color("#5FA8FF")
+const NIGHT := Color("#150E45")
+const PURPLE := Color("#3A2A9C")
+const PURPLE_DEEP := Color("#241A70")
+const BLACK := Color("#0B0626")
+const INK := Color("#FFFFFF")
+const MUTED := Color("#A9A4E0")
+const GOLD := Color("#FFC933")
+const VIOLET := Color("#8B5CFF")  ## destaque principal (botão primário, barras)
+const DANGER := Color("#FF4D6A")
+const OK := Color("#36D97B")
+const CHIPS := Color("#3FA9FF")
 const MULT := Color("#FF5C7A")
 ## Duelo do Vanilla: o Atacante é o "chefe" (vermelho), a Defesa é o time contra ele (azul).
 const BOSS := Color("#E2463B")
@@ -31,59 +31,89 @@ const CARD_BACKS := {
 }
 
 
+## Painel "chapado" estilo Brawl/Clash: contorno escuro grosso e uma base mais espessa,
+## que dá volume sem precisar de arte. `border` colorido vira o contorno de destaque.
 static func box(bg: Color, border: Color = BLACK, border_w: int = 3, radius: int = 4, pad: int = 12) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
-	# Visual "vidro": borda preta vira um filete claro translúcido, cantos bem arredondados.
 	if border == BLACK:
-		sb.border_color = Color(1, 1, 1, 0.10)
-		border_w = mini(border_w, 2)
+		sb.border_color = Color("#0B0626")
+		sb.set_border_width_all(3)
+		sb.border_width_bottom = 6
 	else:
 		sb.border_color = border
-		border_w = mini(border_w, 3)
-	sb.set_border_width_all(border_w)
+		sb.set_border_width_all(mini(border_w, 4))
 	sb.set_corner_radius_all(maxi(radius, 18))
-	sb.set_content_margin_all(pad)
+	sb.content_margin_left = pad
+	sb.content_margin_right = pad
+	sb.content_margin_top = pad
+	sb.content_margin_bottom = pad + (3 if border == BLACK else 0)
 	sb.anti_aliasing = true
 	return sb
 
 
+## Texto com contorno escuro (só a partir de 24 px) — é o que dá o ar "arcade" e garante
+## contraste em cima de qualquer fundo.
 static func label(text: String, size: int = 22, color: Color = INK, align: int = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.horizontal_alignment = align
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
+	if size >= 24:
+		l.add_theme_constant_override("outline_size", maxi(size / 8, 3))
+		l.add_theme_color_override("font_outline_color", Color("#0B0626"))
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
 
 
-static func button(text: String, accent: Color = GOLD, size: int = 25) -> Button:
+## Face de botão 3D: cor viva, contorno escuro e base grossa; ao apertar, "afunda".
+static func chunky(face: Color, pressed: bool = false) -> StyleBoxFlat:
+	var edge := face.darkened(0.55)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = face
+	sb.border_color = edge
+	sb.set_border_width_all(4)
+	sb.border_width_bottom = 4 if pressed else 12
+	sb.set_corner_radius_all(26)
+	sb.content_margin_left = 20
+	sb.content_margin_right = 20
+	sb.content_margin_top = 18 if pressed else 12
+	sb.content_margin_bottom = 12 if pressed else 18
+	sb.anti_aliasing = true
+	sb.shadow_color = Color(0, 0, 0, 0.0 if pressed else 0.25)
+	sb.shadow_size = 0 if pressed else 6
+	sb.shadow_offset = Vector2(0, 4)
+	return sb
+
+
+static func button(text: String, accent: Color = GOLD, size: int = 30) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_ALL
-	b.custom_minimum_size = Vector2(0, 68)
+	b.custom_minimum_size = Vector2(0, 84)
 	b.add_theme_font_size_override("font_size", size)
-	b.add_theme_color_override("font_color", INK)
-	b.add_theme_color_override("font_hover_color", BLACK)
-	b.add_theme_color_override("font_pressed_color", BLACK)
-	b.add_theme_color_override("font_focus_color", INK)
+	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		b.add_theme_color_override(c, INK)
 	b.add_theme_color_override("font_disabled_color", MUTED)
-	b.add_theme_stylebox_override("normal", pill(accent.darkened(0.62), accent))
-	b.add_theme_stylebox_override("hover", pill(accent, accent))
-	b.add_theme_stylebox_override("pressed", pill(accent.darkened(0.2), INK))
-	b.add_theme_stylebox_override("focus", pill(Color(0, 0, 0, 0), INK))
-	b.add_theme_stylebox_override("disabled", pill(PURPLE_DEEP, MUTED.darkened(0.4)))
+	b.add_theme_constant_override("outline_size", 5)
+	b.add_theme_color_override("font_outline_color", accent.darkened(0.6))
+	var face := accent if accent != MUTED else Color("#6B6BC4")
+	b.add_theme_stylebox_override("normal", chunky(face))
+	b.add_theme_stylebox_override("hover", chunky(face.lightened(0.12)))
+	b.add_theme_stylebox_override("pressed", chunky(face.darkened(0.08), true))
+	b.add_theme_stylebox_override("focus", chunky(face.lightened(0.12)))
+	b.add_theme_stylebox_override("disabled", chunky(Color("#3A3570")))
 	b.pressed.connect(func(): sfx("tick"))
 	return b
 
 
-## Botão em pílula (cantos totalmente arredondados), como nos apps de cartas modernos.
+## Botão em pílula (mantido pra chips e botões pequenos).
 static func pill(bg: Color, border: Color) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
 	sb.border_color = border
-	sb.set_border_width_all(2)
+	sb.set_border_width_all(3)
 	sb.set_corner_radius_all(40)
 	sb.set_content_margin_all(16)
 	sb.anti_aliasing = true

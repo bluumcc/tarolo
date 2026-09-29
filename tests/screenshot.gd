@@ -22,6 +22,11 @@ func _ready() -> void:
 	if args.has("bid"):
 		await get_tree().create_timer(0.6).timeout
 		inst.human_bid_chosen.emit(int(args["bid"]))
+	if args.has("press"):
+		await get_tree().create_timer(0.8).timeout
+		for b in inst.find_children("*", "Button", true, false):
+			if (b as Button).text.contains(str(args["press"])):
+				(b as Button).pressed.emit()
 	await get_tree().create_timer(float(args.get("wait", "1.0"))).timeout
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(str(args.get("out", "/tmp/shot.png")))
