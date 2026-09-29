@@ -55,6 +55,7 @@ var raises := 0
 var to_act: Array = []        # fila de quem ainda precisa falar
 var bet_log: Array = []       # [{player, action, to, amount}]
 var betting := false
+var last_discard: Dictionary = {}   # {player, card} do último descarte por desistência
 
 var hands: Array = []
 var plays: Array = []
@@ -268,6 +269,7 @@ func bet_act(player: int, action: String, to := 0.0) -> Dictionary:
 			else:
 				folded[player] = true
 				session_stats[player]["folds"] += 1
+				_discard_weakest(player)
 		"check":
 			if not opt["can_check"]:
 				return {"ok": false, "error": "precisa pagar"}
@@ -310,6 +312,26 @@ func bet_act(player: int, action: String, to := 0.0) -> Dictionary:
 	return {"ok": true, "action": action, "to": bet_level, "amount": amount, "done": done}
 
 
+## Quem desiste descarta a carta mais fraca (virada): as mãos continuam do mesmo tamanho.
+func _discard_weakest(player: int) -> CardData:
+	var hand: Array = hands[player]
+	if hand.is_empty():
+		return null
+	var worst: CardData = hand[0]
+	for c in hand:
+		if _card_worth(c) < _card_worth(worst):
+			worst = c
+	hand.erase(worst)
+	last_discard = {"player": player, "card": worst}
+	return worst
+
+
+func _card_worth(c: CardData) -> float:
+	if c.is_louco():
+		return 60.0 if louco_can_win() else 5.0
+	return float(c.rank) + (100.0 if c.is_trunfo() else 0.0) + (50.0 if c.is_bout() else 0.0)
+
+
 ## Depois da aposta: define quem abre as cartas (o vencedor anterior; se ele desistiu, o próximo).
 func _start_trick_play() -> void:
 	plays = []
@@ -333,7 +355,10 @@ func resolve_walkover() -> Dictionary:
 	if winner == -1:
 		return {}
 	session_stats[winner]["bluffs"] += 1
+	# Ninguém jogou carta: o vencedor também descarta a mais fraca pra todas as mãos ficarem iguais.
+	var dropped := _discard_weakest(winner)
 	var result := {
+		"discarded": dropped,
 		"winner": winner, "winning_index": -1, "plays": [], "points": 0.0, "base_points": 0.0,
 		"mult": 1.0, "prize": 0.0, "pot": pot, "combos": [], "streak": 0, "streak_mult": 1.0,
 		"bonus": 0.0, "saque_amount": 0.0, "assalto_amount": 0.0, "walkover": true,

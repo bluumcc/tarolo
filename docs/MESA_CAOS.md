@@ -12,7 +12,7 @@ Vocabulário: **Partida → Nível → Rodada → Vez**. Um nível são 8 rodada
 1. Todos pagam o blind (ante). O botão (D) gira a cada rodada e fala por último.
 2. Na vez: **Passar** (sem aposta aberta), **Aumentar** (mínimo +1 blind, até o all-in; limitado à menor stack em jogo, então não há potes paralelos), **Pagar** ou **Desistir**.
 3. Até 2 aumentos por rodada.
-4. Só quem ficou joga carta. Quem desistiu guarda a carta.
+4. Só quem ficou joga carta. Quem desistiu descarta a carta mais fraca, virada, e as mãos continuam do mesmo tamanho.
 5. Quem vence a rodada leva o pote. Se todos desistem, o último leva sem jogar (blefe vencido).
 6. Quem vence abre a próxima rodada de cartas.
 

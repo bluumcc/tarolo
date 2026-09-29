@@ -937,7 +937,7 @@ APOSTAS EM CADA RODADA
 • Na sua vez: PASSAR (se ninguém aumentou), AUMENTAR (no mínimo mais 1 blind, até o all-in), PAGAR (igualar) ou DESISTIR (perde o que pôs e não joga carta).
 • Cada rodada permite até 2 aumentos. Todo mundo que aumentou ou pagou põe o mesmo valor.
 • Só quem ficou joga carta. Quem vence leva o pote. Se todo mundo desistir, o último leva o pote sem jogar: o blefe funcionou.
-• Quem desistiu guarda a carta pra próxima rodada.
+• Quem desistiu descarta a carta mais fraca, virada, então todas as mãos continuam do mesmo tamanho.
 • Sua mão: o painel mostra se ela está fraca, média, boa ou forte pra essa rodada. Um Trunfo alto ou um Rei costumam vencer.
 
 MODIFICADOR DO NÍVEL
@@ -1288,7 +1288,7 @@ func _betting_phase() -> void:
 		_refresh_hud()
 		var act: Dictionary
 		if p == 0 and not GameState.autoplay:
-			await _tip("bet", "SUA VEZ DE APOSTAR", "Todo mundo já pagou o blind. Você pode PASSAR, AUMENTAR, PAGAR ou DESISTIR. Só quem fica na rodada joga carta, e quem vence leva o pote.")
+			await _tip("bet", "SUA VEZ DE APOSTAR", "Todo mundo já pagou o blind. Você pode PASSAR, AUMENTAR, PAGAR ou DESISTIR. Só quem fica na rodada joga carta, e quem vence leva o pote. Quem desiste descarta a carta mais fraca, virada.")
 			act = await _human_bet()
 			if not is_inside_tree() or finished:
 				return
@@ -1331,7 +1331,10 @@ func _show_bet_action(p: int, r: Dictionary) -> void:
 		"fold":
 			action_text[p] = "DESISTIU"
 			title = "%s DESISTIU" % pname
-			sub = "Fora da rodada: perde o que pôs."
+			sub = "Fora da rodada: perde o que pôs e descarta a carta mais fraca."
+			if p == 0 and not engine.last_discard.is_empty():
+				sub = "Você perdeu o que pôs e descartou %s, sua carta mais fraca." % (engine.last_discard["card"] as CardData).display_name()
+				_rebuild_hand()
 			col = UIKit.DANGER
 	action_color[p] = col
 	_banner(title, sub, col if col != UIKit.MUTED else UIKit.INK)
@@ -1514,6 +1517,8 @@ func _resolve_walkover(result: Dictionary) -> void:
 	var winner: int = result["winner"]
 	var wname := str(config["names"][winner]).to_upper()
 	_banner("%s LEVOU SEM JOGAR!" % wname, "Todo mundo desistiu. O pote é dele e ninguém viu as cartas.", UIKit.GOLD if winner == 0 else UIKit.INK)
+	if winner == 0:
+		_rebuild_hand()
 	if winner == 0 and float(result.get("gain", 0.0)) > best_gain:
 		best_gain = float(result["gain"])
 	await _collect_pot(winner, float(result["pot"]), float(result.get("gain", 0.0)))

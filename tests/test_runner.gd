@@ -324,7 +324,7 @@ func _test_chaos() -> void:
 			var rr: Dictionary = res["result"]
 			check(is_equal_approx(float(rr["pot"]), 130.0), "resultado informa o pote")
 			check(p1.stacks[int(rr["winner"])] >= 130.0 and float(rr["gain"]) > 0.0 - 200.0, "vencedor leva o pote")
-	check(p1.hands[0].size() == 8, "quem desistiu fica com todas as cartas")
+	check(p1.hands[0].size() == 7 and p1.hands[1].size() == 7 and p1.hands[3].size() == 7, "quem desistiu descarta a mais fraca: todas as mãos ficam do mesmo tamanho")
 	# Todo mundo desiste: o último leva o pote sem jogar.
 	var p2 := ChaosEngine.new()
 	p2.setup_match({"seed": 4})
@@ -336,6 +336,7 @@ func _test_chaos() -> void:
 	check(p2.walkover_player() == 2, "sobrou um: ele leva o pote")
 	var wo := p2.resolve_walkover()
 	check(bool(wo["walkover"]) and is_equal_approx(p2.stacks[2], 200.0 - 20.0 + 50.0), "blefe vence: leva o pote sem jogar carta")
+	check(p2.hands[2].size() == 7 and p2.hands[3].size() == 7, "no blefe vencido o vencedor também descarta, mãos iguais")
 	check(p2.trick_number == 1 and p2.session_stats[2]["bluffs"] == 1, "rodada conta e o blefe é registrado")
 	# All-in limitado pela menor stack.
 	var p3 := ChaosEngine.new()
