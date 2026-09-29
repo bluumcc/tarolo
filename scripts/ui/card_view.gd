@@ -8,9 +8,7 @@ signal play_requested(view: CardView)
 signal zoom_requested(view: CardView)
 
 const SIZE := Vector2(150, 216)
-const DRAG_PLAY_DISTANCE := 70.0
-const MAX_LIFT := 92.0  ## até onde a carta sobe visualmente ao arrastar/selecionar — o
-## contêiner da mão reserva espaço pra esse valor, senão a carta corta na borda de cima.
+const MAX_LIFT := 36.0  ## até onde a carta sobe visualmente ao selecionar/passar o mouse
 const LONG_PRESS := 0.45
 
 var data: CardData
@@ -22,7 +20,7 @@ var interactive := true
 var _pressing := false
 var _press_pos := Vector2.ZERO
 var _press_time := 0.0
-var _dragging := false
+var _moved := false
 var _long_fired := false
 var _lift_tween: Tween
 
@@ -119,6 +117,14 @@ func _refresh_border() -> void:
 
 
 # ------------------------------------------------------------------ input
+#
+# Jogar é sempre por toque: toca pra selecionar, toca de novo (ou usa o botão JOGAR)
+# pra confirmar. Não existe mais arrastar a carta pra jogar — isso competia com o
+# gesto de arrastar a mão inteira pra rolar (o toque na carta "comia" o arrasto antes
+# dele chegar ao ScrollContainer, e a rolagem nunca disparava de verdade). Aqui só
+# medimos se o dedo/mouse SE MOVEU (`_moved`) pra distinguir toque de "só passando",
+# sem tentar interpretar a direção do arrasto — quem faz isso agora é o próprio
+# ScrollContainer, que recebe o mesmo evento (mouse_filter = PASS no Card.tscn).
 
 func _gui_input(event: InputEvent) -> void:
 	if not interactive:
@@ -131,43 +137,32 @@ func _gui_input(event: InputEvent) -> void:
 		elif mb.button_index == MOUSE_BUTTON_LEFT:
 			if mb.pressed:
 				_pressing = true
-				_dragging = false
+				_moved = false
 				_long_fired = false
 				_press_pos = mb.global_position
 				_press_time = 0.0
 				if mb.double_click and playable:
 					play_requested.emit(self)
 			else:
-				_release(mb.global_position)
+				_release()
 			accept_event()
 	elif event is InputEventMouseMotion and _pressing:
 		var delta: Vector2 = (event as InputEventMouseMotion).global_position - _press_pos
-		if delta.length() > 12.0:
-			_dragging = true
-		if _dragging and playable:
-			body.position = Vector2(delta.x * 0.3, clampf(delta.y, -MAX_LIFT, 0.0))
-			body.rotation = clampf(delta.x * 0.002, -0.2, 0.2)
+		if delta.length() > 14.0:
+			_moved = true
 
 
-func _release(pos: Vector2) -> void:
+func _release() -> void:
 	if not _pressing:
 		return
 	_pressing = false
-	var delta := pos - _press_pos
-	if _long_fired:
-		pass
-	elif _dragging:
-		if playable and -delta.y >= DRAG_PLAY_DISTANCE:
-			play_requested.emit(self)
-			return
-	else:
+	if not _long_fired and not _moved:
 		tapped.emit(self)
-	_dragging = false
-	_lift(-26.0 if selected else 0.0)
+	_moved = false
 
 
 func _process(delta: float) -> void:
-	if _pressing and not _dragging and not _long_fired:
+	if _pressing and not _moved and not _long_fired:
 		_press_time += delta
 		if _press_time >= LONG_PRESS:
 			_long_fired = true

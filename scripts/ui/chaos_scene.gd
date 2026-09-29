@@ -26,7 +26,9 @@ var hud_cards: Array = []
 var seat_avatars: Array = []
 var turn_pulse_token := 0
 var table_center: Panel
-var hand_container: HBoxContainer
+var hand_container: Control
+var play_btn: Button
+var selected_view: CardView
 var status_label: Label
 var trick_label: Label
 var info_label: Label
@@ -213,20 +215,27 @@ func _build_ui() -> void:
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root.add_child(status_label)
 
+	# Botão JOGAR — aparece quando uma carta tá selecionada, como alternativa a tocar
+	# nela de novo pra confirmar.
+	play_btn = UIKit.button("JOGAR CARTA", UIKit.GOLD, 16)
+	play_btn.visible = false
+	play_btn.pressed.connect(func():
+		if selected_view != null:
+			_on_card_play(selected_view))
+	root.add_child(play_btn)
+
 	# Mão — cartas sempre no tamanho real (nunca encolhidas pra caber); quando não cabem
-	# todas na tela, a mão rola de lado (arrasto/swipe), igual qualquer app de cartas. ---
+	# todas na tela, a mão rola de lado (arrasto/swipe), igual qualquer app de cartas.
+	# Duas variantes (Configurações): fileira reta, ou leque de baralho em arco. --------
 	var hand_scroll := ScrollContainer.new()
 	hand_scroll.custom_minimum_size = Vector2(0, CardView.SIZE.y + CardView.MAX_LIFT + 16)
 	hand_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	hand_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	root.add_child(hand_scroll)
 	hand_scroll.resized.connect(_layout_hand)  # tamanho real só fica pronto depois do 1º sort — nunca confiar em call_deferred sozinho
-	hand_container = HBoxContainer.new()
+	hand_container = Control.new()
 	hand_container.name = "HandContainer"
-	hand_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	# Fica encostada embaixo (SHRINK_END) e não esticada — a folga extra do hand_scroll
-	# vira espaço LIVRE ACIMA da carta, senão o arrasto pra jogar corta na borda de cima.
-	hand_container.size_flags_vertical = Control.SIZE_SHRINK_END
+	hand_container.mouse_filter = Control.MOUSE_FILTER_PASS
 	hand_scroll.add_child(hand_container)
 
 	# Meu rodapé — minhas informações (pontos, fichas, pote), embaixo da minha mão, onde
@@ -301,31 +310,34 @@ func _slot_pos(player: int) -> Vector2:
 	return Vector2(cx - CardView.SIZE.x / 2.0, (table_center.size.y - CardView.SIZE.y) / 2.0)
 
 
-## As cartas nunca encolhem: com poucas cartas, um espaçamento normal e a mão centralizada;
-## com muitas (mão cheia do Vanilla), sobrepõe em leque até um limite que ainda dá pra
-## reconhecer cada carta — e se mesmo assim não couber, a rolagem horizontal cobre o resto.
+## As cartas nunca encolhem: fileira reta ou leque, escolhido em Configurações — nos dois
+## casos a sobreposição cresce com a mão até um limite que ainda dá pra reconhecer cada
+## carta, e se mesmo assim não couber, a rolagem horizontal cobre o resto.
 func _layout_hand() -> void:
 	if hand_container == null:
 		return
-	var n := hand_container.get_child_count()
-	if n == 0:
+	var cards := hand_container.get_children()
+	if cards.is_empty():
 		return
-	var avail := (hand_container.get_parent() as Control).size.x - 8.0
-	var card_w := CardView.SIZE.x
-	var sep := 10
-	if n > 1:
-		var gaps := n - 1
-		var natural := float(n * card_w) + gaps * sep
-		if natural > avail:
-			var max_overlap := card_w * 0.5
-			sep = maxi(int(-max_overlap), int(floor((avail - n * card_w) / float(gaps))))
-	hand_container.add_theme_constant_override("separation", sep)
+	var parent := hand_container.get_parent() as Control
+	var avail_w := parent.size.x - 8.0
+	# Nunca usar parent.size.y aqui: com rolagem vertical desligada, o ScrollContainer
+	# cresce pra caber o conteúdo — usar o próprio tamanho dele como altura disponível
+	# vira um loop (aumenta a altura, o que aumenta o parent, que aumenta a altura de
+	# novo…) até estourar um limite interno do Godot (~800000px) e empurrar a mão e o
+	# rodapé pra bem fora da tela. A altura útil é sempre a da carta + a folga do lift.
+	var avail_h := CardView.SIZE.y + CardView.MAX_LIFT
+	var mode := str(GameState.settings().get("hand_layout", "row"))
+	var content_w := HandLayout.apply(cards, avail_w, avail_h, mode, CardView.SIZE)
+	hand_container.custom_minimum_size = Vector2(content_w, avail_h)
 
 
 func _rebuild_hand() -> void:
 	for c in hand_container.get_children():
 		hand_container.remove_child(c)
 		c.queue_free()
+	selected_view = null
+	play_btn.visible = false
 	var legal := engine.legal_for(0) if human_turn else []
 	for card in engine.hands[0]:
 		var cv: CardView = CARD_SCENE.instantiate()
@@ -587,6 +599,8 @@ func _on_card_tapped(view: CardView) -> void:
 		return
 	for c in hand_container.get_children():
 		(c as CardView).set_selected(c == view)
+	selected_view = view
+	play_btn.visible = true
 	Sfx.play("tick")
 
 
@@ -594,6 +608,8 @@ func _on_card_play(view: CardView) -> void:
 	if not human_turn or not view.playable:
 		return
 	human_turn = false
+	selected_view = null
+	play_btn.visible = false
 	human_card_chosen.emit(view.data)
 
 

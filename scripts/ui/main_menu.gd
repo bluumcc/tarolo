@@ -173,6 +173,25 @@ func _open_settings() -> void:
 		_refresh_fragments())
 	v.add_child(name_edit)
 	var s := GameState.settings()
+	v.add_child(UIKit.label("Como ver sua mão de cartas", 16))
+	var hand_row := HBoxContainer.new()
+	hand_row.add_theme_constant_override("separation", 10)
+	v.add_child(hand_row)
+	var hand_row_btn := UIKit.button("FILEIRA", UIKit.OK if str(s["hand_layout"]) == "row" else UIKit.MUTED, 15)
+	hand_row_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hand_row_btn.pressed.connect(func():
+		s["hand_layout"] = "row"
+		SaveManager.save_game()
+		_reopen_settings())
+	hand_row.add_child(hand_row_btn)
+	var hand_fan_btn := UIKit.button("LEQUE", UIKit.OK if str(s["hand_layout"]) == "fan" else UIKit.MUTED, 15)
+	hand_fan_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hand_fan_btn.pressed.connect(func():
+		s["hand_layout"] = "fan"
+		SaveManager.save_game()
+		_reopen_settings())
+	hand_row.add_child(hand_fan_btn)
+	v.add_child(_caption("Fileira: cartas em linha reta, rola de lado se não couber tudo. Leque: cartas em arco, como segurar um baralho de verdade."))
 	for entry in [["Música", "music_volume"], ["Efeitos", "sfx_volume"]]:
 		v.add_child(UIKit.label(entry[0], 16))
 		var sl := HSlider.new()
@@ -212,6 +231,12 @@ func _open_settings() -> void:
 		SaveManager.save_game()
 		overlay_layer.get_child(overlay_layer.get_child_count() - 1).queue_free())
 	v.add_child(close)
+
+
+func _reopen_settings() -> void:
+	for c in overlay_layer.get_children():
+		c.queue_free()
+	_open_settings()
 
 
 func _open_cosmetics() -> void:

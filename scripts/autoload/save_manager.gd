@@ -16,7 +16,7 @@ func _ready() -> void:
 func defaults() -> Dictionary:
 	return {
 		"version": SAVE_VERSION,
-		"settings": {"music_volume": 0.8, "sfx_volume": 0.9, "fullscreen": false, "anim_speed": 1.0},
+		"settings": {"music_volume": 0.8, "sfx_volume": 0.9, "fullscreen": false, "anim_speed": 1.0, "hand_layout": "row"},
 		"profile": {"name": "Arcanista", "fragments": 0, "matches": 0, "wins": 0, "fichas": 500},
 		"ranked": {"season": 1, "points": 0, "mmr": Ranked.BASE_MMR, "peak_points": 0, "wins": 0, "losses": 0, "history": []},
 		"cosmetics": {"owned": ["noite"], "equipped": "noite"},

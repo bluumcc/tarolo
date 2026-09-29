@@ -8,7 +8,7 @@ layout_mode = 3
 anchors_preset = 0
 offset_right = 150.0
 offset_bottom = 216.0
-mouse_filter = 0
+mouse_filter = 1
 script = ExtResource("1_card")
 
 [node name="Body" type="PanelContainer" parent="."]

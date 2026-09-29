@@ -13,6 +13,8 @@ func _ready() -> void:
 	var lookup := {"menu": "res://scenes/MainMenu.tscn", "game": "res://scenes/GameScene.tscn", "bid": "res://scenes/GameScene.tscn", "tutorial": "res://scenes/GameScene.tscn", "ranked": "res://scenes/RankedLobby.tscn", "chaos": "res://scenes/ChaosScene.tscn"}  # "tutorial" reusa a mesa, só troca a mão/dicas
 	var path: String = lookup[scene]
 	GameState.autoplay = scene == "game"
+	if args.has("hand_layout"):
+		SaveManager.section("settings")["hand_layout"] = str(args["hand_layout"])
 	if scene == "tutorial":
 		GameState.start_tutorial()
 	add_child(load(path).instantiate())
