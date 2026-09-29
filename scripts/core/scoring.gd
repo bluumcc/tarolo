@@ -3,6 +3,9 @@ extends RefCounted
 ## Pontuação oficial do Jeu de Tarot: o "tomador" precisa somar, nas cartas que capturou
 ## (vazas vencidas + talão), um total de pontos que depende de quantos Bouts ele tem.
 
+## Soma dos pontos de todas as 78 cartas (56 de naipe + 21 trunfos + O Louco).
+const TOTAL_POINTS := 91.0
+
 ## Quanto mais Bouts o tomador guarda, menos pontos precisa pra bater a meta.
 const TARGET_BY_BOUTS := {0: 56.0, 1: 51.0, 2: 41.0, 3: 36.0}
 

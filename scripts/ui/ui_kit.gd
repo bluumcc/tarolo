@@ -13,6 +13,9 @@ const DANGER := Color("#FF5C7A")
 const OK := Color("#7FD1AE")
 const CHIPS := Color("#5FA8FF")
 const MULT := Color("#FF5C7A")
+## Duelo do Vanilla: o Tomador é o "chefe" (vermelho), a Defesa é o time contra ele (azul).
+const BOSS := Color("#E2463B")
+const DEF := Color("#5AA9FF")
 
 # Ouros, Paus, Copas, Espadas, Trunfo, O Louco.
 const SUIT_COLORS := [Color("#E8C170"), Color("#7FD1AE"), Color("#FF5C7A"), Color("#9AA7FF"), Color("#C792EA"), Color("#F2F0F8")]
