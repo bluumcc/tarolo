@@ -5,6 +5,7 @@ extends Node
 
 var failures := 0
 var taps := 0
+var throws := 0
 
 
 func check(cond: bool, msg: String) -> void:
@@ -51,6 +52,11 @@ func _ready() -> void:
 	content.add_child(card)
 	card.position = Vector2(0, 0)
 	card.tapped.connect(func(_v): taps += 1)
+	card.set_playable(true)
+	var layer := Control.new()
+	add_child(layer)
+	scroller.ghost_layer = layer
+	scroller.throw_requested.connect(func(_v, _p): throws += 1)
 	await _frames()
 	check(scroller.max_scroll() == 600.0, "max_scroll = 600 (900 - 300), veio %s" % scroller.max_scroll())
 
@@ -82,6 +88,47 @@ func _ready() -> void:
 	check(scroller.scroll_x == 0.0, "clamp no começo")
 	scroller.reveal(700.0, 150.0)
 	check(scroller.scroll_x + scroller.size.x >= 850.0, "reveal mostra a carta do fim")
+
+
+	# arrasto pra cima além do limite: a carta é jogada e a rolagem não mexe
+	scroller.set_scroll(0.0)
+	await _frames()
+	_mouse(Vector2(100, 150), true)
+	await _frames(1)
+	_move(Vector2(100, 120))
+	await _frames(1)
+	check(layer.get_child_count() == 1, "carta arrastada aparece na camada de cima")
+	_move(Vector2(100, -50))
+	await _frames(1)
+	_mouse(Vector2(100, -50), false)
+	await _frames()
+	check(throws == 1, "arrasto de 200px pra cima joga a carta (throws=%d)" % throws)
+	check(scroller.scroll_x == 0.0, "arrastar a carta pra cima não rola a mão")
+	check(layer.get_child_count() == 0, "a carta fantasma some ao jogar")
+
+	# arrasto curto pra cima: a carta volta pra mão, no mesmo lugar
+	card.visible = true
+	_mouse(Vector2(100, 150), true)
+	await _frames(1)
+	_move(Vector2(100, 120))
+	await _frames(1)
+	_move(Vector2(100, 90))
+	await _frames(1)
+	_mouse(Vector2(100, 90), false)
+	await get_tree().create_timer(0.5).timeout
+	check(throws == 1, "arrasto curto não joga (throws=%d)" % throws)
+	check(card.visible, "a carta volta a aparecer na mão")
+	check(layer.get_child_count() == 0, "a carta fantasma some ao voltar")
+	check(taps == 1, "arrasto curto também não vira toque (taps=%d)" % taps)
+
+	# arrasto pra baixo: nada acontece
+	_mouse(Vector2(100, 100), true)
+	await _frames(1)
+	_move(Vector2(100, 200))
+	await _frames(1)
+	_mouse(Vector2(100, 200), false)
+	await _frames()
+	check(throws == 1 and card.visible and taps == 1, "arrasto pra baixo não faz nada")
 
 	print("HANDSCROLL: %s" % ("OK" if failures == 0 else "%d falhas" % failures))
 	get_tree().quit(1 if failures > 0 else 0)

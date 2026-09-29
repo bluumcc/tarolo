@@ -64,6 +64,8 @@ var my_portrait: Portrait
 var hand_container: Control
 var turn_hint: Label
 var selected_view: CardView
+var throw_from := Vector2.ZERO
+var has_throw_from := false
 var status_label: Label
 var trick_label: Label           # resultado transitório da última vaza
 var info_label: Label
@@ -176,6 +178,10 @@ func _build_ui() -> void:
 	popup_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	popup_layer.z_index = 20
 	add_child(popup_layer)
+
+	var hand_scroller := hand_container.get_parent() as HandScroller
+	hand_scroller.ghost_layer = popup_layer
+	hand_scroller.throw_requested.connect(_on_card_thrown)
 
 	overlay_layer = Control.new()
 	overlay_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -831,7 +837,7 @@ func _run_bidding() -> void:
 				choice = await _wait_human_bid()
 			else:
 				status_label.text = "%s está decidindo..." % config["names"][p] if p != 0 else "Autoplay..."
-				await _wait(0.35 if not tutorial else 0.7)
+				await _wait(bot_rng.randf_range(0.8, 1.4) if not tutorial else 1.0)
 				if not is_inside_tree():
 					return
 				var opts := engine.bid_options(p)
@@ -1101,8 +1107,8 @@ func _run_round() -> void:
 		if p == 0 and not GameState.autoplay:
 			card = await _wait_human()
 		else:
-			status_label.text = "Vez de %s..." % config["names"][p] if p != 0 else "Autoplay..."
-			await _wait(0.45 if p != 0 else 0.25)
+			status_label.text = "%s está pensando…" % config["names"][p] if p != 0 else "Autoplay..."
+			await _wait(_think_time(p))
 			if not is_inside_tree():
 				return
 			card = BotAI.choose(engine.hands[p], engine.plays, p, engine.num_players, int(config["difficulty"][p]), bot_rng)
@@ -1122,6 +1128,14 @@ func _run_round() -> void:
 			await _resolve_trick(res["result"])
 	if is_inside_tree():
 		_finish_match()
+
+
+## Quanto um bot "pensa" antes de jogar: um tempinho variável, pra dar pra acompanhar a
+## mesa (e sentir que tem alguém do outro lado). Você mesmo (autoplay) joga rápido.
+func _think_time(p: int) -> float:
+	if p == 0:
+		return 0.25
+	return bot_rng.randf_range(0.9, 1.5)
 
 
 func _wait(seconds: float) -> void:
@@ -1232,6 +1246,15 @@ func _on_card_tapped(view: CardView) -> void:
 	Sfx.play("tick")
 
 
+## Carta arrastada pra cima e solta além do limite: joga, saindo do ponto onde foi solta.
+func _on_card_thrown(view: CardView, drop_global: Vector2) -> void:
+	if not human_turn or not view.playable:
+		return
+	throw_from = drop_global
+	has_throw_from = true
+	_on_card_play(view)
+
+
 func _on_card_play(view: CardView) -> void:
 	if not human_turn or not view.playable:
 		return
@@ -1243,6 +1266,9 @@ func _on_card_play(view: CardView) -> void:
 
 func _source_position(player: int, card: CardData) -> Vector2:
 	if player == 0:
+		if has_throw_from:
+			has_throw_from = false
+			return throw_from
 		for c in hand_container.get_children():
 			if (c as CardView).data == card:
 				return (c as CardView).body.global_position
@@ -1278,7 +1304,7 @@ func _resolve_trick(result: Dictionary) -> void:
 	for v in table_views:
 		if int(v["player"]) == winner:
 			win_view = v["view"]
-	await _wait(0.2)
+	await _wait(0.5)
 	if not is_inside_tree():
 		return
 	if win_view:
@@ -1304,7 +1330,7 @@ func _resolve_trick(result: Dictionary) -> void:
 	_float_points(winner, points)
 	_boss_scores(winner)
 	_refresh_boss(true)
-	await _wait(0.75)
+	await _wait(1.0)
 	if not is_inside_tree():
 		return
 
@@ -1534,7 +1560,7 @@ func _open_pause() -> void:
 	v.custom_minimum_size = Vector2(320, 0)
 	box.add_child(v)
 	v.add_child(UIKit.label("PAUSA", 32, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar.\nSegure / botão direito = zoom.", 13, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar,\nou arraste-a pra cima e solte na mesa. Segure / botão direito = zoom.", 13, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	paused = true
 	ov.tree_exited.connect(func(): paused = false)
 	var resume := UIKit.button("CONTINUAR")

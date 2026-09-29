@@ -28,6 +28,8 @@ var turn_pulse_token := 0
 var table_center: Panel
 var hand_container: Control
 var selected_view: CardView
+var throw_from := Vector2.ZERO
+var has_throw_from := false
 var status_label: Label
 var trick_label: Label
 var info_label: Label
@@ -265,6 +267,10 @@ func _build_ui() -> void:
 	popup_layer.z_index = 20
 	add_child(popup_layer)
 
+	var hand_scroller := hand_container.get_parent() as HandScroller
+	hand_scroller.ghost_layer = popup_layer
+	hand_scroller.throw_requested.connect(_on_card_thrown)
+
 	overlay_layer = Control.new()
 	overlay_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -477,7 +483,7 @@ func _run_round() -> void:
 		if p == 0 and not GameState.autoplay:
 			card = await _wait_human()
 		else:
-			await _wait(0.3)
+			await _wait(0.9 if p == 0 else bot_rng.randf_range(0.9, 1.5))
 			if not is_inside_tree():
 				return
 			card = BotAI.choose(engine.hands[p], engine.plays, p, engine.num_players, int(config["difficulty"][p]), bot_rng, engine.louco_can_win())
@@ -591,6 +597,15 @@ func _on_card_tapped(view: CardView) -> void:
 	Sfx.play("tick")
 
 
+## Carta arrastada pra cima e solta além do limite: joga, saindo do ponto onde foi solta.
+func _on_card_thrown(view: CardView, drop_global: Vector2) -> void:
+	if not human_turn or not view.playable:
+		return
+	throw_from = drop_global
+	has_throw_from = true
+	_on_card_play(view)
+
+
 func _on_card_play(view: CardView) -> void:
 	if not human_turn or not view.playable:
 		return
@@ -601,6 +616,9 @@ func _on_card_play(view: CardView) -> void:
 
 func _source_position(player: int, card: CardData) -> Vector2:
 	if player == 0:
+		if has_throw_from:
+			has_throw_from = false
+			return throw_from
 		for c in hand_container.get_children():
 			if (c as CardView).data == card:
 				return (c as CardView).body.global_position
@@ -851,7 +869,7 @@ func _open_pause() -> void:
 	v.custom_minimum_size = Vector2(320, 0)
 	box.add_child(v)
 	v.add_child(UIKit.label("PAUSA", 32, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar.\nSegure / botão direito = zoom.", 13, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar,\nou arraste-a pra cima e solte na mesa. Segure / botão direito = zoom.", 13, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	paused = true
 	ov.tree_exited.connect(func(): paused = false)
 	var resume := UIKit.button("CONTINUAR")
