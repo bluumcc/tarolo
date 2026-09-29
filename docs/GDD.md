@@ -4,7 +4,7 @@
 
 > **Status atual (pivô de arquitetura):** o jogo passou a ter dois modos de regras
 > claramente separados, ambos sobre o **baralho real do Jeu de Tarot (78 cartas)**:
-> - **Vanilla** — o jogo de vazas clássico: 4 naipes de 14 cartas, 21 Trunfos, O Louco,
+> - **Vanilla** — o jogo de rodadas clássico: 4 naipes de 14 cartas, 21 Trunfos, O Louco,
 >   obrigação de seguir naipe/cortar/cobrir com Trunfo, Tomador vs Defesa, pontuação por
 >   Bouts (implementado). Cada jogador recebe 18 cartas + talão de 6. **Falta**: licitação
 >   interativa (hoje o Tomador é escolhido automaticamente pela força da mão — isso deixa
@@ -21,7 +21,7 @@
 > protótipo anterior e serão revisadas para refletir o Caos de verdade.
 
 ## 1. Visão Geral
-- **Gênero:** Roguelike Deckbuilder / Card Battler tático de vazas, com sinergias, matemática de combos, gestão de recursos e alta rejogabilidade (Balatro + a competitividade de Hearthstone/LoL).
+- **Gênero:** Roguelike Deckbuilder / Card Battler tático de rodadas, com sinergias, matemática de combos, gestão de recursos e alta rejogabilidade (Balatro + a competitividade de Hearthstone/LoL).
 - **Plataformas:** PC (Steam — Windows/macOS) e Mobile (iOS/Android).
 - **Engine:** Godot 4.x · GDScript.
 - **Visual:** Dark Brutalist / atmosférico: azul-noite, roxo fosco e preto, tipografia de alto contraste, cartas com brilho Foil e Polychrome.
@@ -30,7 +30,7 @@
 ## 2. Modos de Jogo
 | Modo | Descrição | Implementação |
 |---|---|---|
-| **Clássico** | Vazas com regras fechadas, sem Foil/Polychrome nem Curingas. | `GameState.Mode.CLASSIC` |
+| **Clássico** | Rodadas com regras fechadas, sem Foil/Polychrome nem Curingas. | `GameState.Mode.CLASSIC` |
 | **Arcade** | Run roguelike por fases. Cada fase tem um **Chefe** (um Arcano Maior, assento ☠). Superar o Chefe no placar avança a run e rende Ouro para a **Loja Arcana**. Perder encerra a run. | `GameState.Mode.ARCADE`, `Shop.tscn` |
 | **Ranqueado** | Ligas Bronze → Prata → Ouro → Platina → Diamante (divisões IV–I, 100 LP cada) → Mestre → Desafiante. Matchmaking por MMR (Elo), temporadas e histórico. | `Ranked`, `RankedLobby.tscn` |
 
@@ -49,26 +49,26 @@
 - **Foil:** +50 Fichas. **Polychrome:** ×2,0 Mult.
 - **Drop no Arcade:** Padrão ~88%, Foil ~8%, Polychrome ~4%.
 
-### Estrutura da vaza
+### Estrutura da rodada
 1. **Naipe líder:** quem abre define o naipe. Se abrir com um Arcano, o naipe é definido pela primeira carta numérica jogada depois.
 2. **Obrigação de seguir:** quem tem o naipe líder deve jogá-lo (ou um Arcano). Sem ele, joga qualquer carta.
-3. **Resolução:** vence a maior carta do naipe líder. Se houver Arcano na vaza, **o primeiro Arcano jogado vence**.
+3. **Resolução:** vence a maior carta do naipe líder. Se houver Arcano na rodada, **o primeiro Arcano jogado vence**.
 
 ### Decisões de design (fechadas no protótipo)
-- Mesa de 4 jogadores. 56 cartas (52 + 4 Arcanos), 14 por jogador, 14 vazas por partida.
-- Quem abre a primeira vaza é sorteado. Depois, abre quem venceu a vaza anterior.
-- Placar final: soma dos pontos das vazas. Desempate por número de vazas vencidas.
+- Mesa de 4 jogadores. 56 cartas (52 + 4 Arcanos), 14 por jogador, 14 rodadas por partida.
+- Quem abre a primeira rodada é sorteado. Depois, abre quem venceu a rodada anterior.
+- Placar final: soma dos pontos das rodadas. Desempate por número de rodadas vencidas.
 
 ## 5. Pontuação e Sinergias
-Quem vence a vaza pontua **Fichas × Mult** com todas as cartas da mesa:
+Quem vence a rodada pontua **Fichas × Mult** com todas as cartas da mesa:
 - **Fichas:** soma do valor das cartas, mais Foil e Curingas de Fichas.
 - **Mult:** começa em 1. Primeiro somam os bônus `+Mult`, depois entram os multiplicadores `×Mult`.
-- **Monopólio de Naipe:** todas as cartas da vaza do mesmo naipe, ×2,0.
+- **Monopólio de Naipe:** todas as cartas da rodada do mesmo naipe, ×2,0.
 - **Sequência Caótica:** valores consecutivos em qualquer ordem (ex.: 4-5-6-7), ×2,5. Acumula com o Monopólio (×5,0).
 - Arcanos quebram as duas sinergias.
 
 ## 6. Economia e Progressão
-- **Ouro (Arcade):** +1 por vaza vencida. Ao superar o Chefe: bônus de fase (3 + nº da fase) e juros (1 a cada 5 de Ouro, máx. 5).
+- **Ouro (Arcade):** +1 por rodada vencida. Ao superar o Chefe: bônus de fase (3 + nº da fase) e juros (1 a cada 5 de Ouro, máx. 5).
 - **Chefes:** multiplicador de fase ×(1 + 0,2 × (fase − 1)). A IA fica mais forte com as fases (Fácil → Normal → Difícil).
 - **Loja Arcana:** 3 Curingas (máx. 5 equipados; venda por metade do preço), 2 cartas modificadas permanentes na run e reroll com preço crescente (2, 3, 4...).
 - **Curingas:** O Louco, Mesa Cheia, Ás Oculto, Copas Sangrentas, Ganância, Eclipse, Espelho Negro, Monarca, Caos Ordenado, Juros Arcanos, Escada ao Céu, Prisma, A Torre.
@@ -77,7 +77,7 @@ Quem vence a vaza pontua **Fichas × Mult** com todas as cartas da mesa:
 
 ## 7. Estrutura de Cenas (`.tscn`)
 - `MainMenu.tscn`: modos, Loja de Cosméticos, Configurações (volume, velocidade das animações, tela cheia) e Como Jogar.
-- `GameScene.tscn`: mesa polivalente com `TableCenter`, HUD (placar, vazas, colocação, Ouro/fase ou elo), barra de Curingas, `HandContainer`, zoom de carta, pausa e tela de resultado.
+- `GameScene.tscn`: mesa polivalente com `TableCenter`, HUD (placar, rodadas, colocação, Ouro/fase ou elo), barra de Curingas, `HandContainer`, zoom de carta, pausa e tela de resultado.
 - `RankedLobby.tscn`: elo atual, barra de LP, escada de ligas, matchmaking e histórico das últimas 20 partidas.
 - `Shop.tscn`: Loja Arcana entre as fases do Arcade.
 - `Card.tscn`: carta reutilizável com estilos dinâmicos (`StyleBoxFlat`) e brilho por shader (`foil.gdshader` / `holo.gdshader`). Aceita toque para selecionar, arrastar para cima para jogar e segurar ou clicar com o botão direito para dar zoom.
@@ -87,4 +87,4 @@ Quem vence a vaza pontua **Fichas × Mult** com todas as cartas da mesa:
 - Trilha sonora e SFX finais (hoje são sintetizados em `Sfx` como placeholder).
 - Ranqueado online (servidor de matchmaking). Hoje o lobby é simulado com bots escalados por MMR.
 - Export presets (Steam/Android/iOS) e integração Steamworks.
-- Chefes com habilidades próprias (ex.: "A Torre destrói um Curinga ao perder a vaza").
+- Chefes com habilidades próprias (ex.: "A Torre destrói um Curinga ao perder a rodada").

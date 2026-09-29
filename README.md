@@ -1,6 +1,6 @@
 # Tarolo (nome provisório) — Godot 4
 
-Protótipo jogável do GDD em [`docs/GDD.md`](docs/GDD.md): roguelike de vazas com pontuação estilo Balatro, nos modos Clássico, Arcade (Loja Arcana) e Ranqueado (ligas, LP, MMR).
+Protótipo jogável do GDD em [`docs/GDD.md`](docs/GDD.md): roguelike de rodadas com pontuação estilo Balatro, nos modos Clássico, Arcade (Loja Arcana) e Ranqueado (ligas, LP, MMR).
 
 ## Rodar
 1. Instale o **Godot 4.3+** (versão padrão, não precisa da .NET).
