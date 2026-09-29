@@ -1072,8 +1072,8 @@ func _bet_modal(fichas: int, trunfos: int, kings: int, suggested: int) -> Dictio
 	var choose_done := func(result: Dictionary) -> void:
 		st["result"] = result
 		item_chosen.emit(1)
-	var render: Callable
-	render = func():
+	# O Callable fica no dicionário: uma lambda que captura a si mesma pega valor vazio.
+	st["render"] = func():
 		for c in body.get_children():
 			c.queue_free()
 		# Stepper do palpite.
@@ -1087,7 +1087,7 @@ func _bet_modal(fichas: int, trunfos: int, kings: int, suggested: int) -> Dictio
 		minus.disabled = int(st["predict"]) <= 0
 		minus.pressed.connect(func():
 			st["predict"] = int(st["predict"]) - 1
-			render.call())
+			(st["render"] as Callable).call())
 		row.add_child(minus)
 		var num := UIKit.label(str(int(st["predict"])), 88, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 		num.custom_minimum_size = Vector2(110, 0)
@@ -1097,7 +1097,7 @@ func _bet_modal(fichas: int, trunfos: int, kings: int, suggested: int) -> Dictio
 		plus.disabled = int(st["predict"]) >= ChaosEngine.HAND_SIZE
 		plus.pressed.connect(func():
 			st["predict"] = int(st["predict"]) + 1
-			render.call())
+			(st["render"] as Callable).call())
 		row.add_child(plus)
 		var dif := ChaosEngine.difficulty_of(int(st["predict"]))
 		var dif_l := UIKit.label("Dificuldade ×%s — quanto mais rodadas você prevê, mais peso no pote." % UIKit.fmt_dec(dif, 1), 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
@@ -1121,7 +1121,7 @@ func _bet_modal(fichas: int, trunfos: int, kings: int, suggested: int) -> Dictio
 			b.disabled = fichas < amount
 			b.pressed.connect(func():
 				st["stake"] = amount
-				render.call())
+				(st["render"] as Callable).call())
 			srow.add_child(b)
 		var can_bet := fichas >= 10
 		var ok := UIKit.button("APOSTAR ◎%d EM %s" % [int(st["stake"]), _plural(int(st["predict"]), "RODADA", "RODADAS")], UIKit.GOLD)
@@ -1135,7 +1135,7 @@ func _bet_modal(fichas: int, trunfos: int, kings: int, suggested: int) -> Dictio
 			var warn := UIKit.label("Suas fichas acabaram. Toque nas fichas no menu para recarregar.", 22, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER)
 			warn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			body.add_child(warn)
-	render.call()
+	(st["render"] as Callable).call()
 	ov.add_child(UIKit.centered(box))
 	box.scale = Vector2(0.85, 0.85)
 	box.pivot_offset = box.custom_minimum_size / 2.0
