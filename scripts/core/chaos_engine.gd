@@ -1,9 +1,9 @@
 class_name ChaosEngine
 extends RefCounted
-## Estado puro de uma partida de Tarot Caos: várias rodadas curtas (8 cartas, sem
+## Estado puro de uma partida de Tarot Caos: vários níveis curtos (8 cartas, sem
 ## licitação nem talão — todo mundo joga pra si), cada uma com um modificador sorteado
 ## e um bônus de "Fôlego" pra quem estiver por baixo, garantindo chance de virada até
-## o fim. Vence quem somar mais pontos no total das rodadas.
+## o fim. Vence quem somar mais pontos no total dos níveis.
 
 signal trick_resolved(result: Dictionary)
 signal round_finished(result: Dictionary)
@@ -11,27 +11,27 @@ signal match_finished(result: Dictionary)
 
 const HAND_SIZE := 8
 const ROUNDS := 5
-const FOLEGO_MULT := 1.5   # bônus de pontos pra quem tá em último ANTES da rodada começar
-const ARRISCAR_MULT := 2.0  # poder Arriscar: vaza vencida vale ×2
+const FOLEGO_MULT := 1.5   # bônus de pontos pra quem tá em último ANTES do nível começar
+const ARRISCAR_MULT := 2.0  # poder Arriscar: rodada vencida vale ×2
 const ARRISCAR_LOSS := 2.0  # ...e se perder, −2
-# Aposta em fichas (estilo poker): antes da rodada você aposta `stake` fichas que fará
-# `need`+ vazas. Acertou: ganha `win` fichas (e recebe a aposta de volta). Errou: perde a aposta.
+# Aposta em fichas (estilo poker): antes do nível você aposta `stake` fichas que fará
+# `need`+ rodadas. Acertou: ganha `win` fichas (e recebe a aposta de volta). Errou: perde a aposta.
 const BET_OPTIONS := [
 	{"need": 2, "stake": 10, "win": 10, "name": "SEGURO"},
 	{"need": 4, "stake": 20, "win": 50, "name": "OUSADO"},
 	{"need": 6, "stake": 30, "win": 150, "name": "LENDA"},
 ]
 const BUY_IN := 100.0
-const GOLD_MULT := 3.0      # Vaza Dourada
-const FINAL_MULT := 2.0     # todos os pontos da última rodada
-const STREAK_MULT := 1.5    # Mão Quente: 3ª vitória seguida (e seguintes) na rodada
+const GOLD_MULT := 3.0      # Rodada Dourada
+const FINAL_MULT := 2.0     # todos os pontos do último nível
+const STREAK_MULT := 1.5    # Mão Quente: 3ª vitória seguida (e seguintes) no nível
 const KING_CUT_BONUS := 3.0 # Corte de Rei
 const BREAK_BONUS := 2.0    # Cortado: quebrar a sequência de 2+ vitórias de alguém
 const SAQUE_AMOUNT := 2.0   # pontos roubados de cada rival no Saque
 const ASSALTO_AMOUNT := 4.0 # pontos roubados do líder no Assalto ao Líder
-const CURSE_PENALTY := 3.0  # pontos perdidos por quem vence a Vaza Maldita
+const CURSE_PENALTY := 3.0  # pontos perdidos por quem vence a Rodada Maldita
 const FORTE_MULT := 1.5     # Naipe Forte
-const VAZA_PLUS := 1.0      # bônus fixo de Cada Vaza Vale +1
+const VAZA_PLUS := 1.0      # bônus fixo de Cada Rodada Vale +1
 const NAIPE_CURSED_VALUE := -1.0  # valor de cada carta do Naipe Maldito
 const PAYOUT_SHARES := [0.5, 0.3, 0.15, 0.05]  # fatia do pote por colocação (1º a 4º)
 
@@ -43,20 +43,20 @@ var round_index := 0
 var modifier_sequence: Array = []  # ordem embaralhada dos modificadores, sem repetir na partida
 var modifier := -1
 var weak_suit := -1
-var modifier_trick := -1      # vaza (0..7) onde o modificador de escopo VAZA vale; -1 = rodada inteira
-var streak: Array = []        # vitórias seguidas de cada jogador, dentro da rodada
+var modifier_trick := -1      # rodada (0..7) onde o modificador de escopo RODADA vale; -1 = nível inteiro
+var streak: Array = []        # vitórias seguidas de cada jogador, dentro do nível
 var last_winner := -1
-var folego_player := -1       # quem recebe o bônus de virada nessa rodada (-1 = ninguém)
+var folego_player := -1       # quem recebe o bônus de virada nesse nível (-1 = ninguém)
 var buy_in := BUY_IN
 var pot := 0.0
 
 var hands: Array = []
 var plays: Array = []
 var captured: Array = []
-var round_points: Array = []  # pontos ganhos só nessa rodada, por jogador
-var player_items: Array = []  # item ativo de cada jogador nessa rodada (ChaosItems.Item)
-var power_used: Array = []    # se o jogador já usou o poder dessa rodada
-var arriscar_on: Array = []   # Arriscar armado pra vaza atual
+var round_points: Array = []  # pontos ganhos só nesse nível, por jogador
+var player_items: Array = []  # item ativo de cada jogador nesse nível (ChaosItems.Item)
+var power_used: Array = []    # se o jogador já usou o poder desse nível
+var arriscar_on: Array = []   # Arriscar armado pra rodada atual
 var bets: Array = []          # índice em BET_OPTIONS de cada jogador (-1 = sem aposta)
 var bet_chips: Array = []     # saldo de fichas das apostas na partida, por jogador
 var leader := -1
@@ -131,8 +131,8 @@ func _setup_round() -> void:
 	round_result = {}
 
 
-## Define o item escolhido por um jogador pra rodada atual — chamado pela UI depois que
-## humano/bots decidem, logo após advance_round() preparar a rodada nova.
+## Define o item escolhido por um jogador pro nível atual — chamado pela UI depois que
+## humano/bots decidem, logo após advance_round() preparar o nível novo.
 func set_item(player: int, item: int) -> void:
 	player_items[player] = item
 
@@ -158,20 +158,20 @@ func _highest_player() -> int:
 
 
 ## Verdadeiro no modificador "O Louco Vence" — usado pela UI/bots pra saber se O Louco
-## deve ser tratado como um Trunfo fraco nas regras de vaza dessa rodada.
+## deve ser tratado como um Trunfo fraco nas regras de rodada desse nível.
 func louco_can_win() -> bool:
 	return modifier == ChaosModifiers.Modifier.LOUCO_VENCE
 
 
-## Modificador que vale na vaza que está sendo jogada agora (-1 se nenhum): os de rodada
-## inteira valem sempre; os de vaza só na vaza sorteada.
+## Modificador que vale na rodada que está sendo jogada agora (-1 se nenhum): os de nível
+## inteira valem sempre; os de rodada só na rodada sorteada.
 func active_modifier() -> int:
 	if ChaosModifiers.scope_of(modifier) == ChaosModifiers.Scope.ROUND or trick_number == modifier_trick:
 		return modifier
 	return -1
 
 
-## Verdadeiro se `mod` está valendo na vaza atual.
+## Verdadeiro se `mod` está valendo na rodada atual.
 func is_active(mod: int) -> bool:
 	return active_modifier() == mod
 
@@ -203,7 +203,7 @@ func play(player: int, card: CardData) -> Dictionary:
 
 
 ## Valor de uma carta já considerando o modificador ativo e, se um jogador for passado,
-## o item pessoal dele (não considera Fôlego/item de rodada — esses se aplicam à vaza
+## o item pessoal dele (não considera Fôlego/item de nível — esses se aplicam à rodada
 ## inteira, não carta a carta).
 func card_value(c: CardData, player: int = -1) -> float:
 	var v := c.points()
@@ -233,7 +233,7 @@ func is_final_round() -> bool:
 	return round_index >= ROUNDS - 1
 
 
-## Vaza Invertida: vence a MENOR carta do naipe líder (Trunfo que corta não vale nada).
+## Rodada Invertida: vence a MENOR carta do naipe líder (Trunfo que corta não vale nada).
 func _lowest_index(trick: Array = []) -> int:
 	if trick.is_empty():
 		trick = plays
@@ -248,7 +248,7 @@ func _lowest_index(trick: Array = []) -> int:
 	return best if best != -1 else TrickRules.winning_index(trick, louco_can_win())
 
 
-## Se `card`, jogada por `player` agora, venceria a vaza como está (considera Vaza Invertida
+## Se `card`, jogada por `player` agora, venceria a rodada como está (considera Rodada Invertida
 ## / Mundo ao Contrário). Usado pelos bots.
 func would_win(card: CardData, player: int) -> bool:
 	var ev := active_modifier()
@@ -396,7 +396,7 @@ func _tricks_won() -> Array:
 	return won
 
 
-## Acerta as apostas em fichas ao fim da rodada. `delta` = ganho líquido (+win ou -stake).
+## Acerta as apostas em fichas ao fim do nível. `delta` = ganho líquido (+win ou -stake).
 func _settle_bets() -> Array:
 	var won := _tricks_won()
 	var out: Array = []
@@ -468,7 +468,7 @@ func use_arriscar(player: int) -> bool:
 	return true
 
 
-## Chamado pela UI depois de mostrar o resumo da rodada, pra sortear/preparar a próxima.
+## Chamado pela UI depois de mostrar o resumo do nível, pra sortear/preparar a próxima.
 func advance_round() -> void:
 	round_index += 1
 	if round_index < ROUNDS:

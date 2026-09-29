@@ -1,7 +1,7 @@
 class_name ChaosBot
 extends RefCounted
-## IA dos bots do Caos: como a do BotAI, mas ciente do modificador da vaza (inversão,
-## Vaza Maldita, Naipe Maldito, vazas de aposta alta, Assalto ao Líder).
+## IA dos bots do Caos: como a do BotAI, mas ciente do modificador da rodada (inversão,
+## Rodada Maldita, Naipe Maldito, rodadas de aposta alta, Assalto ao Líder).
 
 
 static func choose(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> CardData:
@@ -16,7 +16,7 @@ static func choose(engine: ChaosEngine, player: int, difficulty: int, rng: Rando
 	var ev := engine.active_modifier()
 	var inverted := ev == ChaosModifiers.Modifier.MUNDO_CONTRARIO or ev == ChaosModifiers.Modifier.VAZA_INVERTIDA
 	var mods := ChaosModifiers.Modifier
-	# Quer perder a vaza? (Vaza Maldita, ou Assalto ao Líder sendo ele o líder não muda nada.)
+	# Quer perder a rodada? (Rodada Maldita, ou Assalto ao Líder sendo ele o líder não muda nada.)
 	var want_lose := ev == mods.VAZA_MALDITA
 	# Aposta alta: vale gastar a carta mais forte pra garantir.
 	var high_stakes := ev in [mods.VAZA_DOURADA, mods.ULTIMA_TRIPLO, mods.PRIMEIRA_DOBRO, mods.SAQUE] \
@@ -33,7 +33,7 @@ static func choose(engine: ChaosEngine, player: int, difficulty: int, rng: Rando
 		return _cheapest(engine, winners, player)
 
 	if not engine.plays.is_empty() and not winners.is_empty():
-		# Cartas do naipe maldito somam negativo na própria vaza: evita usá-las pra vencer.
+		# Cartas do naipe maldito somam negativo na própria rodada: evita usá-las pra vencer.
 		var clean: Array = winners.filter(func(c: CardData) -> bool: return engine.card_value(c, player) >= 0.0)
 		var pool: Array = clean if not clean.is_empty() else winners
 		pool.sort_custom(func(a: CardData, b: CardData) -> bool: return a.rank < b.rank)
@@ -80,13 +80,13 @@ static func _cheapest(engine: ChaosEngine, cards: Array, player: int) -> CardDat
 	return pool[0]
 
 
-## Poder que o bot leva pra rodada: Espiar não ajuda quem já decide por regra, então só
+## Poder que o bot leva pra nível: Espiar não ajuda quem já decide por regra, então só
 ## Roubar Trunfo ou Arriscar.
 static func choose_power(rng: RandomNumberGenerator) -> int:
 	return ChaosItems.Item.TROCA if rng.randf() < 0.5 else ChaosItems.Item.ARRISCAR
 
 
-## Aposta do bot: estima quantas vazas a mão rende (Trunfos altos e Reis) e escolhe o
+## Aposta do bot: estima quantas rodadas a mão rende (Trunfos altos e Reis) e escolhe o
 ## degrau que combina. Bots fáceis chutam mais.
 static func choose_bet(hand: Array, difficulty: int, rng: RandomNumberGenerator) -> int:
 	var expected := 0.0

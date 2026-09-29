@@ -116,7 +116,7 @@ static func choose(hand: Array, plays: Array, player: int, num_players: int, dif
 	var real := legal.filter(func(c: CardData) -> bool: return not c.is_louco())
 
 	if plays.is_empty():
-		# Abrindo a vaza: evita gastar Bouts ou Trunfos altos à toa.
+		# Abrindo a rodada: evita gastar Bouts ou Trunfos altos à toa.
 		var safe := real.filter(func(c: CardData) -> bool: return not c.is_trunfo() and not c.is_bout())
 		var pool: Array = safe if not safe.is_empty() else real
 		pool.sort_custom(func(a: CardData, b: CardData) -> bool: return a.rank < b.rank)

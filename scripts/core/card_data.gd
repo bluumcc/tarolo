@@ -9,7 +9,7 @@ const SUIT_NAMES := ["Ouros", "Paus", "Copas", "Espadas", "Trunfo", "O Louco"]
 const SUIT_SYMBOLS := ["♦", "♣", "♥", "♠", "✦", "✶"]
 
 ## Os 3 "Bouts" (cartas de ponta): Le Petit, Le Monde e O Louco. Valem 4,5 pontos cada,
-## igual a um Rei — são as cartas que decidem a pontuação da rodada.
+## igual a um Rei — são as cartas que decidem a pontuação do nível.
 const PETIT := 1
 const MONDE := 21
 
@@ -43,7 +43,7 @@ func is_bout() -> bool:
 
 
 ## Valor de comparação dentro do próprio naipe/trunfo (maior vence). O Louco nunca é
-## comparado por valor — ele nunca vence uma vaza (ver TrickRules.winning_index).
+## comparado por valor — ele nunca vence uma rodada (ver TrickRules.winning_index).
 func value() -> int:
 	return rank
 

@@ -1,7 +1,7 @@
 class_name Scoring
 extends RefCounted
 ## Pontuação oficial do Jeu de Tarot: o "atacante" precisa somar, nas cartas que capturou
-## (vazas vencidas + talão), um total de pontos que depende de quantos Bouts ele tem.
+## (rodadas vencidas + talão), um total de pontos que depende de quantos Bouts ele tem.
 
 ## Soma dos pontos de todas as 78 cartas (56 de naipe + 21 trunfos + O Louco).
 const TOTAL_POINTS := 91.0
@@ -23,7 +23,7 @@ const CONTRACT_HINTS := [
 	"Risco máximo. Você NÃO pega o monte, e os pontos dele vão pra Defesa. Ganha ou perde x6.",
 ]
 
-## Toda rodada dá um piso de 25 pontos de aposta, que se soma à distância (pra mais ou
+## Todo nível dá um piso de 25 pontos de aposta, que se soma à distância (pra mais ou
 ## pra menos) da meta — e só depois é multiplicado pelo contrato.
 const BASE_SCORE := 25.0
 
@@ -33,14 +33,14 @@ const BASE_SCORE := 25.0
 ## ao placar já multiplicado, não entra na conta da meta.
 const POIGNEE_THRESHOLDS := [[15, 40.0], [13, 30.0], [10, 20.0]]  # [trunfos mínimos, bônus]
 
-## Chelem: o atacante vence as 18 vazas sozinho. Também é uma escolha: anunciar antes de
+## Chelem: o atacante vence as 18 rodadas sozinho. Também é uma escolha: anunciar antes de
 ## jogar vale mais se conseguir, mas pune se falhar; não anunciar é mais seguro (só rende
 ## se acontecer, sem risco).
 const CHELEM_ANNOUNCED_BONUS := 400.0
 const CHELEM_ANNOUNCED_FAIL_PENALTY := 200.0
 const CHELEM_UNANNOUNCED_BONUS := 200.0
 
-## Petit au bout: quem vence a última vaza com Le Petit dentro leva 10 pontos extras —
+## Petit au bout: quem vence a última rodada com Le Petit dentro leva 10 pontos extras —
 ## a favor do atacante se for ele, da defesa se for outro jogador.
 const PETIT_AU_BOUT_BONUS := 10.0
 
@@ -58,7 +58,7 @@ static func poignee_bonus(trump_count: int) -> float:
 
 
 ## `taker_points` = soma de `CardData.points()` de tudo que o atacante capturou
-## (vazas vencidas + talão). `bouts` = quantos dos 3 Bouts estão nesse total.
+## (rodadas vencidas + talão). `bouts` = quantos dos 3 Bouts estão nesse total.
 ## `bonuses` (opcional) = { poignee, chelem, petit_au_bout }, já com o sinal certo
 ## (positivo a favor do atacante, negativo a favor da defesa) — somados depois do
 ## multiplicador do contrato, como no jogo real.

@@ -1,6 +1,6 @@
 class_name MatchEngine
 extends RefCounted
-## Estado puro de uma rodada de Tarot Vanilla (sem UI): licitação, talão, vazas e a
+## Estado puro de um nível de Tarot Vanilla (sem UI): licitação, talão, rodadas e a
 ## pontuação final do atacante contra a defesa.
 
 signal trick_resolved(result: Dictionary)
@@ -9,14 +9,14 @@ signal round_finished()
 var num_players := 4
 var hands: Array = []          # Array[Array[CardData]]
 var chien: Array = []          # talão (6 cartas)
-var plays: Array = []          # vaza atual: [{player, card}]
+var plays: Array = []          # rodada atual: [{player, card}]
 var captured: Array = []       # Array[Array[CardData]] capturado por cada jogador
 var leader := -1
 var current := -1
 var trick_number := 0
 var total_tricks := -1
-var history: Array = []        # resultados das vazas
-var result: Dictionary = {}    # preenchido quando a rodada acaba (round_finished)
+var history: Array = []        # resultados das rodadas
+var result: Dictionary = {}    # preenchido quando o nível acaba (round_finished)
 var rng := RandomNumberGenerator.new()
 
 # ------------------------------------------------------------------ licitação
@@ -30,7 +30,7 @@ var bidding_done := false
 var bidding_void := false      # todos passaram (mão anulada — chamador deve refazer o setup)
 var taker_trump_count := 0     # trunfos na mão do atacante já com o talão resolvido (Poignée)
 var poignee_declared := false  # escolha do atacante: mostrar os trunfos pra valer o bônus
-var chelem_announced := false  # escolha do atacante: apostar alto em vencer as 18 vazas
+var chelem_announced := false  # escolha do atacante: apostar alto em vencer as 18 rodadas
 var awaiting_discard := false  # Petite/Garde: esperando o atacante escolher o descarte (écart)
 var louco_owed := {}           # dono do Louco -> vencedor a quem ainda deve uma carta de 0,5
 
@@ -193,7 +193,7 @@ func _advance_bidding() -> void:
 
 ## Aplica as regras do contrato vencedor sobre o talão. Petite/Garde: o atacante vê o
 ## talão, incorpora na mão e escolhe (ele mesmo, não o jogo) 6 cartas pra descartar de
-## volta — as vazas só começam depois disso (ver `awaiting_discard`/`legal_discards`/
+## volta — as rodadas só começam depois disso (ver `awaiting_discard`/`legal_discards`/
 ## `discard`). Garde Sans: o atacante não vê o talão, mas ele conta pra ele mesmo assim.
 ## Garde Contre: o atacante não vê o talão, e ele NÃO conta pra ele (fica com a defesa).
 func _finalize_taker() -> void:
@@ -231,7 +231,7 @@ func legal_discards(hand: Array) -> Array:
 	return safe + extra
 
 
-## Aplica o descarte escolhido pelo atacante (humano ou bot) e libera o início das vazas.
+## Aplica o descarte escolhido pelo atacante (humano ou bot) e libera o início das rodadas.
 func discard(cards: Array) -> Dictionary:
 	if not awaiting_discard or cards.size() != Deck.CHIEN_SIZE:
 		return {"ok": false, "error": "descarte inválido"}
@@ -262,7 +262,7 @@ func announce_chelem(v: bool) -> void:
 	chelem_announced = v
 
 
-# ------------------------------------------------------------------ vazas
+# ------------------------------------------------------------------ rodadas
 
 func legal_for(player: int) -> Array:
 	return TrickRules.legal_cards(hands[player], plays)
@@ -290,7 +290,7 @@ func play(player: int, card: CardData) -> Dictionary:
 func _resolve_trick() -> Dictionary:
 	var idx := TrickRules.winning_index(plays)
 	var winner: int = plays[idx]["player"]
-	# O Louco fica com quem o jogou (só troca de dono na última vaza). Em troca, o dono
+	# O Louco fica com quem o jogou (só troca de dono na última rodada). Em troca, o dono
 	# entrega ao vencedor uma carta de 0,5 ponto das que já capturou.
 	var is_last := trick_number == total_tricks - 1
 	var louco_owner := -1
@@ -331,8 +331,8 @@ func _resolve_trick() -> Dictionary:
 	return trick_result
 
 
-## Troco do Louco: o dono entrega ao vencedor da vaza uma carta de 0,5 ponto (nunca Bout)
-## do que já capturou. Se ainda não tem nenhuma (Louco na 1ª vaza), a dívida fica pra
+## Troco do Louco: o dono entrega ao vencedor da rodada uma carta de 0,5 ponto (nunca Bout)
+## do que já capturou. Se ainda não tem nenhuma (Louco na 1ª rodada), a dívida fica pra
 ## quando tiver.
 func _settle_louco_debts() -> void:
 	for owner in louco_owed.keys():
@@ -354,7 +354,7 @@ func _finish() -> Dictionary:
 		taker_points += card.points()
 		if card.is_bout():
 			bouts += 1
-	# Garde Sans/Contre: o talão nunca entrou na mão do atacante (não é jogado em vaza
+	# Garde Sans/Contre: o talão nunca entrou na mão do atacante (não é jogado em rodada
 	# nenhuma), então ele só entra na conta final aqui — não nos dois casos acima.
 	var bonuses := _round_bonuses()
 	var r := Scoring.resolve(taker_points, bouts, contract, bonuses)
@@ -367,7 +367,7 @@ func _finish() -> Dictionary:
 
 ## Poignée e Chelem só valem se o atacante escolheu declarar/anunciar (ver `declare_poignee`
 ## e `announce_chelem`) — são apostas estratégicas dele, não bônus automáticos. Petit au
-## bout é o único automático: depende só de como a última vaza terminou, ninguém declara.
+## bout é o único automático: depende só de como a última rodada terminou, ninguém declara.
 func _round_bonuses() -> Dictionary:
 	var poignee := Scoring.poignee_bonus(taker_trump_count) if poignee_declared else 0.0
 	var taker_won_all := true
@@ -404,7 +404,7 @@ func points_of(player: int) -> float:
 	return total
 
 
-## Índices dos jogadores do melhor ao pior resultado da rodada (pelo delta de pontos).
+## Índices dos jogadores do melhor ao pior resultado do nível (pelo delta de pontos).
 func standings() -> Array:
 	var deltas: Array = result.get("deltas", [])
 	var order: Array = range(num_players)

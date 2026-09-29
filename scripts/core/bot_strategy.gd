@@ -1,16 +1,16 @@
 class_name BotStrategy
 extends RefCounted
 ## Jogo estratégico dos bots no Vanilla. Só usa o que um jogador de verdade sabe: a própria
-## mão, o que já foi jogado (nas vazas e na mesa), quem é o Atacante e o contrato — nunca a
+## mão, o que já foi jogado (nas rodadas e na mesa), quem é o Atacante e o contrato — nunca a
 ## mão dos outros.
 ##
 ## Ideias que aplica (de mesa de tarot):
-## - Defesa se ajuda: quando a vaza vai ficar com a Defesa, "alimenta" ela com a carta de
+## - Defesa se ajuda: quando a rodada vai ficar com a Defesa, "alimenta" ela com a carta de
 ##   mais pontos (até Bouts); quando o Atacante ainda vai jogar, segura as cartas boas.
-## - Ninguém corta o próprio parceiro; só toma a vaza do Atacante se compensa (trunfo caro
-##   só por vaza com pontos).
+## - Ninguém corta o próprio parceiro; só toma a rodada do Atacante se compensa (trunfo caro
+##   só por rodada com pontos).
 ## - O Louco fica com quem o joga (paga uma carta de 0,5 ao vencedor), então é jogado antes
-##   da última vaza, quando não dá pra vencer: assim não se perde na última.
+##   da última rodada, quando não dá pra vencer: assim não se perde na última.
 ## - O Petit é guardado pro fim (Petit au bout).
 ## - O Atacante puxa os trunfos dos outros com os seus altos e segura os Bouts.
 ## - Nível Difícil conta as cartas que já saíram: joga as cartas "mestras" (que ninguém
@@ -77,7 +77,7 @@ static func _unseen_trumps(seen: Dictionary) -> int:
 	return n
 
 
-# ------------------------------------------------------------------ abrindo a vaza
+# ------------------------------------------------------------------ abrindo a rodada
 
 static func _lead(e: MatchEngine, p: int, legal: Array, seen: Dictionary, deep: bool) -> CardData:
 	var is_taker := p == e.taker
@@ -119,7 +119,7 @@ static func _lead(e: MatchEngine, p: int, legal: Array, seen: Dictionary, deep: 
 	return best
 
 
-# ------------------------------------------------------------------ respondendo à vaza
+# ------------------------------------------------------------------ respondendo à rodada
 
 static func _by_value_low(a: CardData, b: CardData) -> bool:
 	# menos valiosa primeiro: pontos, depois trunfos por último, depois rank
@@ -174,7 +174,7 @@ static func _follow(e: MatchEngine, p: int, legal: Array, seen: Dictionary, deep
 				cheap = real if not real.is_empty() else louco
 			cheap.sort_custom(_by_value_low)
 			return cheap[0]
-		# o Atacante está levando (ou a vaza está aberta pra ele): vale tomar?
+		# o Atacante está levando (ou a rodada está aberta pra ele): vale tomar?
 		if not wins.is_empty():
 			wins.sort_custom(func(a: CardData, b: CardData) -> bool: return a.rank < b.rank)
 			var cheapest: CardData = wins[0]

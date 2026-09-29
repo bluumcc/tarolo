@@ -1,6 +1,6 @@
 class_name TrickRules
 extends RefCounted
-## Regras de vaza do Jeu de Tarot. `plays` é um Array de { "player": int, "card": CardData }
+## Regras de rodada do Jeu de Tarot. `plays` é um Array de { "player": int, "card": CardData }
 ## na ordem jogada.
 ##
 ## - É obrigatório seguir o naipe líder.
@@ -8,7 +8,7 @@ extends RefCounted
 ## - Se alguém já cortou com Trunfo, quem também for cortar deve jogar um Trunfo MAIOR
 ##   que o maior já jogado ("cobrir"), se tiver algum que consiga.
 ## - O Louco pode ser jogado a qualquer momento, ignora naipe e Trunfo, e nunca vence
-##   a vaza (só o dono mantém os pontos da carta).
+##   a rodada (só o dono mantém os pontos da carta).
 
 
 ## Naipe líder: o da primeira carta que não é O Louco. Se só O Louco foi jogado até
@@ -21,7 +21,7 @@ static func lead_suit(plays: Array) -> int:
 	return -1
 
 
-## Maior Trunfo já jogado nesta vaza (0 = nenhum Trunfo na mesa ainda).
+## Maior Trunfo já jogado nesta rodada (0 = nenhum Trunfo na mesa ainda).
 static func highest_trunfo(plays: Array) -> int:
 	var best := 0
 	for p in plays:
@@ -38,7 +38,7 @@ static func legal_cards(hand: Array, plays: Array) -> Array:
 	var ls := lead_suit(plays)
 
 	if ls == -1:
-		return hand.duplicate()  # abrindo a vaza (ou só O Louco na mesa): qualquer carta
+		return hand.duplicate()  # abrindo a rodada (ou só O Louco na mesa): qualquer carta
 
 	var matching := rest.filter(func(c: CardData) -> bool: return c.suit == ls)
 	if not matching.is_empty():
@@ -59,7 +59,7 @@ static func legal_cards(hand: Array, plays: Array) -> Array:
 	return rest + louco  # nem naipe líder nem Trunfo: descarte livre
 
 
-## Dentre os Trunfos disponíveis, os que conseguem cobrir o maior já jogado na vaza.
+## Dentre os Trunfos disponíveis, os que conseguem cobrir o maior já jogado na rodada.
 ## Vazio = nenhum consegue cobrir (aí qualquer Trunfo disponível serve).
 static func _cover_options(trunfos: Array, plays: Array) -> Array:
 	var highest := highest_trunfo(plays)
@@ -104,7 +104,7 @@ static func winning_index(plays: Array, louco_can_win: bool = false) -> int:
 	return best
 
 
-## Se `card` fosse jogada agora pelo `player`, ela venceria a vaza parcial?
+## Se `card` fosse jogada agora pelo `player`, ela venceria a rodada parcial?
 static func would_win(card: CardData, player: int, plays: Array, louco_can_win: bool = false) -> bool:
 	if card.is_louco() and not louco_can_win:
 		return false

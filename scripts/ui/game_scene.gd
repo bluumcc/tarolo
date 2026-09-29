@@ -26,7 +26,7 @@ var root_box: VBoxContainer
 var hud_badges: Array = []       # painel de cada assento (0 = meu rodapé)
 var hud_titles: Array = []       # Label — nome do jogador
 var hud_points: Array = []       # Label — pontos capturados até agora (provisório)
-var hud_tricks: Array = []       # Label — vazas vencidas
+var hud_tricks: Array = []       # Label — rodadas vencidas
 var hud_cards: Array = []        # Label — contagem de cartas na mão (só bots)
 var seat_avatars: Array = []     # painel de cada assento: destaca de quem é a vez e serve de origem das cartas
 var seat_portraits: Array = []   # Portrait de cada assento
@@ -46,10 +46,10 @@ var boss_bar: MeterBar
 var boss_bar_label: Label
 var boss_bar_value: Label
 var boss_meta: Label
-var hold_boss := false           # segura a barra de vida até o "golpe" da vaza aparecer
+var hold_boss := false           # segura a barra de vida até o "golpe" da rodada aparecer
 var ticks: TrickTicks
 
-var arena: Control               # a vaza atual: uma carta por assento, em cruz
+var arena: Control               # a rodada atual: uma carta por assento, em cruz
 var arena_tags: Array = []
 var pot_label: Label
 var pot_sub: Label
@@ -77,7 +77,7 @@ var selected_view: CardView
 var throw_from := Vector2.ZERO
 var has_throw_from := false
 var status_label: Label
-var trick_label: Label           # resultado transitório da última vaza
+var trick_label: Label           # resultado transitório da última rodada
 var info_label: Label
 var last_banner_done := false
 var popup_layer: Control
@@ -265,7 +265,7 @@ func _build_topbar() -> void:
 	topbar.add_child(menu_btn)
 
 
-## O Atacante vira o "chefe" da rodada: quem joga sozinho contra os outros 3. A barra é a
+## O Atacante vira o "chefe" do nível: quem joga sozinho contra os outros 3. A barra é a
 ## vida dele — os pontos que a Defesa ainda precisa somar pra derrubar o contrato. Se o
 ## Atacante é você, a mesma barra vira o progresso da sua meta.
 func _build_boss_panel() -> void:
@@ -329,7 +329,7 @@ func _build_seat_strip() -> void:
 		var sub := VBoxContainer.new()
 		sub.add_theme_constant_override("separation", 0)
 		col.add_child(sub)
-		var tr := UIKit.label("0 vazas", 15, UIKit.MUTED)
+		var tr := UIKit.label("0 rodadas", 15, UIKit.MUTED)
 		sub.add_child(tr)
 		var cards_label := UIKit.label("", 15, UIKit.MUTED)
 		sub.add_child(cards_label)
@@ -343,7 +343,7 @@ func _build_seat_strip() -> void:
 		seat_portraits[p] = por
 
 
-## A vaza atual: uma carta por assento, em cruz (você embaixo). O total de pontos em jogo
+## A rodada atual: uma carta por assento, em cruz (você embaixo). O total de pontos em jogo
 ## fica no meio, como o pote numa mesa de pôquer.
 func _build_arena() -> void:
 	arena = Control.new()
@@ -528,7 +528,7 @@ Por isso, Bout na mão é um bom motivo pra licitar mais alto.
 
 Cuidados:
 • O Petit é fraco: qualquer trunfo maior o vence, então proteja-o.
-• O Louco nunca vence uma vaza, mas quem o joga guarda os pontos dele.
+• O Louco nunca vence uma rodada, mas quem o joga guarda os pontos dele.
 • Bouts nunca podem ser devolvidos ao monte."""
 	var l := UIKit.label(text, 18, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -553,7 +553,7 @@ func _build_my_footer() -> void:
 	my_left.add_child(my_title)
 	var my_pts := UIKit.label("0,0 pts", 32, UIKit.INK)
 	my_left.add_child(my_pts)
-	var my_tr := UIKit.label("0 vazas", 16, UIKit.MUTED)
+	var my_tr := UIKit.label("0 rodadas", 16, UIKit.MUTED)
 	my_left.add_child(my_tr)
 	turn_hint = UIKit.label("Toque numa carta pra subir.\nToque de novo pra jogar.", 19, UIKit.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
 	turn_hint.visible = false
@@ -704,8 +704,8 @@ func _rebuild_hand() -> void:
 	_layout_hand.call_deferred()
 
 
-## Quem tem a vez agora, em qualquer fase (licitação, descarte ou vaza) — usado pra
-## destacar o avatar certo na mesa, não só durante as vazas.
+## Quem tem a vez agora, em qualquer fase (licitação, descarte ou rodada) — usado pra
+## destacar o avatar certo na mesa, não só durante as rodadas.
 func _current_turn_player() -> int:
 	if not engine.bidding_done:
 		return engine.bid_turn
@@ -726,7 +726,7 @@ func _refresh_hud() -> void:
 	var turn_player := _current_turn_player()
 	for p in range(engine.num_players):
 		(hud_points[p] as Label).text = "%s pts" % UIKit.fmt_dec(engine.points_of(p), 1)
-		(hud_tricks[p] as Label).text = "%d vazas" % trick_wins[p]
+		(hud_tricks[p] as Label).text = "%d rodadas" % trick_wins[p]
 		var turn := p == turn_player
 		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 1) if turn else Color(0.8, 0.78, 0.86, 1)
 		if p > 0:
@@ -747,9 +747,9 @@ func _refresh_hud() -> void:
 	else:
 		var n := mini(engine.trick_number + 1, engine.total_tricks)
 		if n == engine.total_tricks:
-			info_label.text = "ÚLTIMA VAZA · fim da partida%s" % extra
+			info_label.text = "ÚLTIMA RODADA · fim da partida%s" % extra
 		else:
-			info_label.text = "VAZA %d DE %d%s" % [n, engine.total_tricks, extra]
+			info_label.text = "RODADA %d DE %d%s" % [n, engine.total_tricks, extra]
 		if not hold_boss:
 			_refresh_boss(true)
 
@@ -946,7 +946,7 @@ func _enable_bid_ladder(opts: Array, forced: bool) -> void:
 
 # ------------------------------------------------------------------ apresentação do chefe
 
-## Antes da rodada começar: quem é o chefe, o contrato, a vida dele e o time contra ele.
+## Antes do nível começar: quem é o chefe, o contrato, a vida dele e o time contra ele.
 func _show_intro() -> void:
 	if GameState.autoplay or engine.taker == -1:
 		return
@@ -960,7 +960,7 @@ func _show_intro() -> void:
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_theme_constant_override("separation", 10)
 	v.custom_minimum_size = Vector2(640, 0)
-	v.add_child(UIKit.label("VOCÊ É O ATACANTE" if mine else "O CHEFE DA RODADA", 19, UIKit.GOLD if mine else UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("VOCÊ É O ATACANTE" if mine else "O CHEFE DO NÍVEL", 19, UIKit.GOLD if mine else UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	var hero_box := CenterContainer.new()
 	hero_box.add_child(Portrait.new().setup(t, UIKit.GOLD if mine else UIKit.BOSS, 220.0))
 	v.add_child(hero_box)
@@ -986,7 +986,7 @@ func _show_intro() -> void:
 	if mine:
 		rule_text = "Você precisa de %s pontos (a meta cai com cada Bout que você tiver). Encha a barra: se bater, cada um dos outros 3 te paga ×%d." % [UIKit.fmt_dec(n["target"], 1), int(Scoring.CONTRACT_MULT[engine.contract])]
 	else:
-		rule_text = "Precisa de %s pontos. A barra começa vazia e enche a cada vaza dele. Se a Defesa não deixar encher, o contrato cai e cada um da Defesa ganha ×%d." % [UIKit.fmt_dec(n["target"], 1), int(Scoring.CONTRACT_MULT[engine.contract])]
+		rule_text = "Precisa de %s pontos. A barra começa vazia e enche a cada rodada dele. Se a Defesa não deixar encher, o contrato cai e cada um da Defesa ganha ×%d." % [UIKit.fmt_dec(n["target"], 1), int(Scoring.CONTRACT_MULT[engine.contract])]
 	var rl := UIKit.label(rule_text, 20, Color("#d6cbbb"), HORIZONTAL_ALIGNMENT_CENTER)
 	rl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(rl)
@@ -1006,7 +1006,7 @@ func _show_intro() -> void:
 		col.add_child(UIKit.label("Você" if p == 0 else str(config["names"][p]), 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 		col.add_child(UIKit.label("DEFESA", 14, UIKit.DEF, HORIZONTAL_ALIGNMENT_CENTER))
 		team.add_child(col)
-	var btn := UIKit.button("COMEÇAR A RODADA", UIKit.GOLD, 28)
+	var btn := UIKit.button("COMEÇAR O NÍVEL", UIKit.GOLD, 28)
 	btn.custom_minimum_size = Vector2(0, 64)
 	v.add_child(btn)
 	ov.add_child(UIKit.centered(v))
@@ -1020,7 +1020,7 @@ func _show_intro() -> void:
 
 func _run_bidding() -> void:
 	if tutorial:
-		await _tutorial_modal("COMO FUNCIONA A LICITAÇÃO", "Toda rodada começa com a licitação: cada jogador, em ordem, diz se quer jogar sozinho contra os outros 3.\n\nQuem joga sozinho é o ATACANTE (o ataque). Os outros 3 formam a DEFESA.\n\nNa sua vez, você PASSA ou dá um LANCE mais alto que o anterior. O lance não custa nada: é só dizer que você confia na sua mão.\n\nO lance mais alto vira o Atacante. Cada contrato tem uma explicação curta do risco dele.")
+		await _tutorial_modal("COMO FUNCIONA A LICITAÇÃO", "Todo nível começa com a licitação: cada jogador, em ordem, diz se quer jogar sozinho contra os outros 3.\n\nQuem joga sozinho é o ATACANTE (o ataque). Os outros 3 formam a DEFESA.\n\nNa sua vez, você PASSA ou dá um LANCE mais alto que o anterior. O lance não custa nada: é só dizer que você confia na sua mão.\n\nO lance mais alto vira o Atacante. Cada contrato tem uma explicação curta do risco dele.")
 		if not is_inside_tree():
 			return
 	while true:
@@ -1052,7 +1052,7 @@ func _run_bidding() -> void:
 			status_label.text = "Todos passaram — nova mão."
 			trick_label.text = ""
 			if tutorial:
-				await _tutorial_modal("TODOS PASSARAM", "Se ninguém der lance, a mão é anulada e as cartas são distribuídas de novo. Não conta como rodada. Vai acontecer agora.")
+				await _tutorial_modal("TODOS PASSARAM", "Se ninguém der lance, a mão é anulada e as cartas são distribuídas de novo. Não conta como nível. Vai acontecer agora.")
 				if not is_inside_tree():
 					return
 			else:
@@ -1071,9 +1071,9 @@ func _run_bidding() -> void:
 	trick_label.text = ""
 	if tutorial:
 		if engine.taker == 0:
-			await _tutorial_modal("VOCÊ É O ATAQUE (ATACANTE)", "Você deu o maior lance: %s. %s\n\nAgora você joga sozinho contra os outros 3 (a Defesa). No fim, somam-se os pontos das cartas que você ganhou nas vazas (e do monte, dependendo do contrato). Se chegar na meta, você ganha pontos dos outros 3. Se não chegar, você paga." % [Scoring.CONTRACT_NAMES[engine.contract], Scoring.CONTRACT_HINTS[engine.contract]])
+			await _tutorial_modal("VOCÊ É O ATAQUE (ATACANTE)", "Você deu o maior lance: %s. %s\n\nAgora você joga sozinho contra os outros 3 (a Defesa). No fim, somam-se os pontos das cartas que você ganhou nas rodadas (e do monte, dependendo do contrato). Se chegar na meta, você ganha pontos dos outros 3. Se não chegar, você paga." % [Scoring.CONTRACT_NAMES[engine.contract], Scoring.CONTRACT_HINTS[engine.contract]])
 		else:
-			await _tutorial_modal("VOCÊ É DA DEFESA", "%s deu o maior lance (%s) e é o ATACANTE: joga sozinho contra os outros 3, incluindo você.\n\nVocê e mais 2 jogadores são a DEFESA. Os pontos que vocês ganharem nas vazas ajudam a impedir %s de chegar na meta. Se ele não chegar, a Defesa ganha pontos. Se chegar, a Defesa paga." % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract], config["names"][engine.taker]])
+			await _tutorial_modal("VOCÊ É DA DEFESA", "%s deu o maior lance (%s) e é o ATACANTE: joga sozinho contra os outros 3, incluindo você.\n\nVocê e mais 2 jogadores são a DEFESA. Os pontos que vocês ganharem nas rodadas ajudam a impedir %s de chegar na meta. Se ele não chegar, a Defesa ganha pontos. Se chegar, a Defesa paga." % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract], config["names"][engine.taker]])
 		if not is_inside_tree():
 			return
 	else:
@@ -1227,15 +1227,15 @@ func _run_declarations() -> void:
 				return
 			engine.declare_poignee(declare)
 			if declare:
-				_announce_toast("Você mostrou os trunfos (Poignée)! +%d se fechar a rodada" % bonus)
+				_announce_toast("Você mostrou os trunfos (Poignée)! +%d se fechar o nível" % bonus)
 				_speech_bubble(0, "Poignée!")
 				await _wait(0.6)
-		var chelem: bool = await _ask_yes_no("CHELEM: GANHAR TODAS AS VAZAS?", "Quer avisar que vai ganhar as 18 vazas? Se conseguir: +400. Se falhar: -200. Sem avisar, se ganhar todas mesmo assim: +200, sem risco.")
+		var chelem: bool = await _ask_yes_no("CHELEM: GANHAR TODAS AS RODADAS?", "Quer avisar que vai ganhar as 18 rodadas? Se conseguir: +400. Se falhar: -200. Sem avisar, se ganhar todas mesmo assim: +200, sem risco.")
 		if not is_inside_tree():
 			return
 		engine.announce_chelem(chelem)
 		if chelem:
-			_announce_toast("Você avisou Chelem! Ganhe as 18 vazas pro bônus.")
+			_announce_toast("Você avisou Chelem! Ganhe as 18 rodadas pro bônus.")
 			_speech_bubble(0, "Chelem!")
 			await _wait(0.6)
 	else:
@@ -1249,7 +1249,7 @@ func _run_declarations() -> void:
 				return
 		if BotAI.decide_chelem(strength, int(config["difficulty"][engine.taker]), bot_rng):
 			engine.announce_chelem(true)
-			_announce_toast("%s avisou Chelem: vai tentar ganhar as 18 vazas!" % config["names"][engine.taker])
+			_announce_toast("%s avisou Chelem: vai tentar ganhar as 18 rodadas!" % config["names"][engine.taker])
 			_speech_bubble(engine.taker, "Chelem!")
 			await _wait(0.6)
 			if not is_inside_tree():
@@ -1304,7 +1304,7 @@ func _run_round() -> void:
 		_refresh_hud()
 		if engine.plays.is_empty() and engine.trick_number == engine.total_tricks - 1 and not last_banner_done:
 			last_banner_done = true
-			_banner("ÚLTIMA VAZA", UIKit.GOLD)
+			_banner("ÚLTIMA RODADA", UIKit.GOLD)
 		var card: CardData
 		if p == 0 and not GameState.autoplay:
 			card = await _wait_human()
@@ -1332,7 +1332,7 @@ func _run_round() -> void:
 		_finish_match()
 
 
-## Carta do bot conforme a dificuldade: Fácil joga a regra simples (ganhar a vaza, senão a
+## Carta do bot conforme a dificuldade: Fácil joga a regra simples (ganhar a rodada, senão a
 ## carta mais fraca, sem ajudar ninguém); Normal e Difícil jogam de forma estratégica
 ## (ver BotStrategy).
 func _bot_card(p: int) -> CardData:
@@ -1404,7 +1404,7 @@ func _wait_human() -> CardData:
 	human_turn = true
 	var ls := TrickRules.lead_suit(engine.plays)
 	if ls == -1:
-		status_label.text = "Sua vez — abra a vaza"
+		status_label.text = "Sua vez — abra a rodada"
 	elif ls == CardData.Suit.TRUNFO:
 		status_label.text = "Sua vez — precisa cobrir com Trunfo maior, se tiver"
 	else:
@@ -1439,7 +1439,7 @@ func _check_tutorial_trick_hints(ls: int) -> void:
 		return
 	for c in hand:
 		if (c as CardData).is_louco():
-			_tutorial_once("louco", "Você tem O Louco. Pode jogá-lo quando quiser: ele nunca ganha a vaza, mas você fica com ele e com os 4,5 pontos dele (só na última vaza ele vai pra quem ganhar).")
+			_tutorial_once("louco", "Você tem O Louco. Pode jogá-lo quando quiser: ele nunca ganha a rodada, mas você fica com ele e com os 4,5 pontos dele (só na última rodada ele vai pra quem ganhar).")
 			return
 
 
@@ -1525,7 +1525,7 @@ func _resolve_trick(result: Dictionary) -> void:
 		pulse.tween_property(win_view, "scale", Vector2(ARENA_SCALE, ARENA_SCALE) * 1.18, GameState.anim(0.12))
 		pulse.tween_property(win_view, "scale", Vector2(ARENA_SCALE, ARENA_SCALE) * 1.08, GameState.anim(0.12))
 
-	trick_label.text = "%s venceu a vaza · +%s pts" % [str(config["names"][winner]).to_upper(), UIKit.fmt_dec(points, 1)]
+	trick_label.text = "%s venceu a rodada · +%s pts" % [str(config["names"][winner]).to_upper(), UIKit.fmt_dec(points, 1)]
 	Sfx.play("chip")
 
 	if tutorial and engine.is_round_over():
@@ -1535,7 +1535,7 @@ func _resolve_trick(result: Dictionary) -> void:
 				has_petit = true
 				break
 		if has_petit:
-			_tutorial_hint("O Trunfo 1 (Le Petit) apareceu na última vaza! Quem ganhou essa vaza leva +10 pontos.")
+			_tutorial_hint("O Trunfo 1 (Le Petit) apareceu na última rodada! Quem ganhou essa rodada leva +10 pontos.")
 
 	# A barra do chefe só se mexe agora, junto do número que sobe da mesa.
 	hold_boss = false
@@ -1562,7 +1562,7 @@ func _resolve_trick(result: Dictionary) -> void:
 	_refresh_hud()
 
 
-## Quando o chefe (bot) leva a vaza, o retrato dele dá um pulo: a barra dele acabou de encher.
+## Quando o chefe (bot) leva a rodada, o retrato dele dá um pulo: a barra dele acabou de encher.
 func _boss_scores(winner: int) -> void:
 	if engine.taker == 0 or winner != engine.taker or not boss_panel.visible:
 		return
@@ -1572,7 +1572,7 @@ func _boss_scores(winner: int) -> void:
 	tw.tween_property(boss_portrait, "scale", Vector2.ONE, GameState.anim(0.2))
 
 
-## Número que sobe da mesa: "+X". Quando é o Atacante que leva a vaza, ele voa até o painel
+## Número que sobe da mesa: "+X". Quando é o Atacante que leva a rodada, ele voa até o painel
 ## do chefe (é a barra dele que enche); quando é a Defesa, sobe na própria mesa.
 func _float_points(winner: int, points: float) -> void:
 	var to_boss := winner == engine.taker
@@ -1650,16 +1650,16 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 		bonus_lines.append("✦ Poignée: %s mostrou os trunfos (+%d)" % [str(config["names"][r["taker"]]), int(bonuses["poignee"])])
 	var chelem: float = float(bonuses.get("chelem", 0.0))
 	if chelem > 0.0 and engine.chelem_announced:
-		bonus_lines.append("✦ Chelem avisado e cumprido: %s ganhou todas as vazas (+%d)" % [str(config["names"][r["taker"]]), int(chelem)])
+		bonus_lines.append("✦ Chelem avisado e cumprido: %s ganhou todas as rodadas (+%d)" % [str(config["names"][r["taker"]]), int(chelem)])
 	elif chelem > 0.0:
-		bonus_lines.append("✦ Chelem: %s ganhou todas as vazas sem avisar (+%d)" % [str(config["names"][r["taker"]]), int(chelem)])
+		bonus_lines.append("✦ Chelem: %s ganhou todas as rodadas sem avisar (+%d)" % [str(config["names"][r["taker"]]), int(chelem)])
 	elif chelem < 0.0:
 		bonus_lines.append("✦ Chelem avisado e não cumprido: %s errou (%d)" % [str(config["names"][r["taker"]]), int(chelem)])
 	var petit: float = float(bonuses.get("petit_au_bout", 0.0))
 	if petit > 0.0:
-		bonus_lines.append("✦ Petit na última vaza: ponto pro Atacante (+%d)" % int(petit))
+		bonus_lines.append("✦ Petit na última rodada: ponto pro Atacante (+%d)" % int(petit))
 	elif petit < 0.0:
-		bonus_lines.append("✦ Petit na última vaza: ponto pra Defesa (%d)" % int(petit))
+		bonus_lines.append("✦ Petit na última rodada: ponto pra Defesa (%d)" % int(petit))
 	if not bonus_lines.is_empty():
 		for line in bonus_lines:
 			v.add_child(UIKit.label(str(line), 28, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
@@ -1745,14 +1745,14 @@ func _show_zoom(view: CardView) -> void:
 func _open_help() -> void:
 	var v := UIKit.modal(overlay_layer, "COMO FUNCIONA")
 	var text := """O BÁSICO
-• Uma vaza é uma jogada de 4 cartas, uma de cada jogador. Quem jogou a carta mais forte leva as 4 e os pontos delas.
+• Uma rodada é uma jogada de 4 cartas, uma de cada jogador. Quem jogou a carta mais forte leva as 4 e os pontos delas.
 • Você tem que jogar o naipe da primeira carta. Se não tiver, tem que jogar um Trunfo. Se também não tiver Trunfo, joga qualquer carta.
 • O Trunfo ganha de qualquer naipe. Entre trunfos, o número maior ganha.
 • Em cada naipe, do menor pro maior: Ás, 2 a 10, Valete (J), Cavaleiro (N), Rainha (Q), Rei (K).
 
 OS BOUTS
 • São as 3 cartas mais valiosas: o Trunfo 1 (Le Petit), o Trunfo 21 (Le Monde) e O Louco. Valem 4,5 pontos cada, como um Rei.
-• O Louco nunca ganha a vaza. Quem o joga fica com ele (só na última vaza ele vai pra quem ganhar).
+• O Louco nunca ganha a rodada. Quem o joga fica com ele (só na última rodada ele vai pra quem ganhar).
 
 LICITAÇÃO: QUEM JOGA SOZINHO
 • Cada um passa ou dá um lance. O lance mais alto vira o Atacante: ele joga sozinho contra os outros 3 (a Defesa).
@@ -1770,8 +1770,8 @@ COMO SE GANHA
 
 BÔNUS (só o Atacante escolhe)
 • Poignée: com 10 ou mais trunfos, ele pode mostrá-los pra ganhar pontos extras.
-• Chelem: ganhar as 18 vazas. Se avisar antes e conseguir: +400. Se avisar e falhar: -200. Sem avisar, se acontecer: +200.
-• Petit na última vaza: quem ganhar a última vaza com o Trunfo 1 nela leva +10."""
+• Chelem: ganhar as 18 rodadas. Se avisar antes e conseguir: +400. Se avisar e falhar: -200. Sem avisar, se acontecer: +200.
+• Petit na última rodada: quem ganhar a última rodada com o Trunfo 1 nela leva +10."""
 	var l := UIKit.label(text, 32, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(620, 0)

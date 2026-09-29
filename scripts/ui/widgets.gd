@@ -183,7 +183,7 @@ static func icon_button(text: String, color: Color = Color("#6B6BC4")) -> Button
 	return b
 
 
-## Fileira de bolinhas de progresso (ex.: vaza 3 de 8): feitas, atual e pendentes.
+## Fileira de bolinhas de progresso (ex.: rodada 3 de 8): feitas, atual e pendentes.
 static func progress_dots(row: HBoxContainer, total: int, done: int) -> void:
 	for c in row.get_children():
 		c.queue_free()

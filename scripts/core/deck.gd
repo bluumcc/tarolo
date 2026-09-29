@@ -32,7 +32,7 @@ static func shuffle(arr: Array, rng: RandomNumberGenerator) -> void:
 
 ## Distribui `per_player` cartas para cada jogador a partir do baralho já embaralhado.
 ## O que sobra vira "rest" — no Vanilla (18 cartas/jogador) são as 6 do talão (chien);
-## no Caos (8 cartas/jogador) é o restante do baralho, não usado nessa rodada.
+## no Caos (8 cartas/jogador) é o restante do baralho, não usado nesse nível.
 static func deal(cards: Array, players: int, per_player: int) -> Dictionary:
 	var hands: Array = []
 	for p in range(players):
