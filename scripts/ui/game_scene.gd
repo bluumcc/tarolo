@@ -364,20 +364,20 @@ func _build_arena() -> void:
 	pot_box.grow_vertical = Control.GROW_DIRECTION_BOTH
 	pot_label = UIKit.label("", 42, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	pot_box.add_child(pot_label)
-	pot_sub = UIKit.label("", 14, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	pot_sub = UIKit.label("", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	pot_box.add_child(pot_sub)
 	arena_tags.resize(engine.num_players)
 	for p in range(engine.num_players):
-		var tag := UIKit.label(str(config["names"][p]).to_upper(), 16, UIKit.MUTED)
+		var tag := UIKit.label(str(config["names"][p]).to_upper(), 20, UIKit.INK)
 		arena.add_child(tag)
 		arena_tags[p] = tag
 
 
 func _draw_arena() -> void:
-	var c := arena.size / 2.0
-	var r := minf(arena.size.x, arena.size.y) * 0.46
-	arena.draw_arc(c, r, 0.0, TAU, 72, Color(UIKit.GOLD, 0.18), 2.0, true)
-	arena.draw_arc(c, r * 0.62, 0.0, TAU, 56, Color(UIKit.GOLD, 0.10), 2.0, true)
+	# Mesa oval, igual à do Caos: mesmo feltro e mesma borda, pra as duas telas parecerem
+	# do mesmo jogo.
+	var sb := UIKit.box(Color(0.10, 0.08, 0.30, 0.85), Color("#5B4FC9"), 3, 200, 0)
+	arena.draw_style_box(sb, Rect2(Vector2.ZERO, arena.size))
 
 
 ## Tela da licitação: os 4 assentos em ordem, cada um com o que falou, e embaixo a escada
