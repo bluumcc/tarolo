@@ -26,7 +26,7 @@ const ICONS := {
 }
 
 const DESCRIPTIONS := {
-	Item.ESCUDO_NAIPE: "Se a rodada sortear Naipe Fraco, suas cartas desse naipe NÃO perdem valor — só pra você.",
+	Item.ESCUDO_NAIPE: "Se a rodada sortear Naipe Fraco ou Naipe Maldito, suas cartas desse naipe NÃO perdem valor — só pra você.",
 	Item.TRUNFO_AFIADO: "Toda vaza que você vencer com um Trunfo, esse Trunfo vale +1 ponto extra.",
 	Item.FOLEGO_PESSOAL: "Todos os pontos que você capturar nessa rodada valem ×1,25 — acumula com o Fôlego da mesa.",
 	Item.ROUBO_VAZA: "A 1ª vaza que você vencer nessa rodada rouba 4 pontos de quem está em 1º lugar no total.",
@@ -43,7 +43,7 @@ static func offer(rng: RandomNumberGenerator) -> Array:
 ## Escolha do bot: prioriza o item que combina com o modificador da rodada que vem,
 ## senão sorteia entre as duas opções oferecidas.
 static func bot_choose(options: Array, modifier: int, rng: RandomNumberGenerator) -> int:
-	if modifier == ChaosModifiers.Modifier.NAIPE_FRACO and options.has(Item.ESCUDO_NAIPE):
+	if (modifier == ChaosModifiers.Modifier.NAIPE_FRACO or modifier == ChaosModifiers.Modifier.NAIPE_MALDITO) and options.has(Item.ESCUDO_NAIPE):
 		return Item.ESCUDO_NAIPE
 	if modifier == ChaosModifiers.Modifier.TRUNFO_DOBRO and options.has(Item.TRUNFO_AFIADO):
 		return Item.TRUNFO_AFIADO

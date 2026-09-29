@@ -45,6 +45,7 @@ var main_area: BoxContainer
 var side_col: VBoxContainer
 var seat_nodes: Array = []
 var first_round_done := false
+var modifier_revealed := false   # surpresa de vaza já foi revelada nessa rodada
 var info_label: Label
 var trick_dots: HBoxContainer
 var shown_totals: Array = []
@@ -460,8 +461,8 @@ func _refresh_hud() -> void:
 			(hud_cards[p] as Label).text = "%d cartas" % (engine.hands[p] as Array).size()
 	info_label.text = "RODADA %d/%d" % [engine.round_index + 1, ChaosEngine.ROUNDS]
 	Widgets.progress_dots(trick_dots, ChaosEngine.HAND_SIZE, engine.trick_number)
-	var mod_name := "✦ %s" % ChaosModifiers.label(engine.modifier, engine.weak_suit)
-	modifier_label.text = "%s — %s" % [mod_name, ChaosModifiers.DESCRIPTIONS[engine.modifier]] if modifier_expanded else "%s" % mod_name
+	var rest := _rest_banner()
+	modifier_label.text = "%s — %s" % [rest[0], rest[1]] if modifier_expanded else str(rest[0])
 	var profile := SaveManager.section("profile")
 	wager_label.text = "◎ Suas fichas: %d   ·   Pote da mesa: %d (buy-in %d)" % [int(profile["fichas"]), int(engine.pot), int(engine.buy_in)]
 	_update_turn_highlight(turn_player)
@@ -505,15 +506,41 @@ func _announce_round() -> void:
 	var final := engine.is_final_round()
 	var kicker := "RODADA FINAL" if final else "RODADA %d DE %d" % [engine.round_index + 1, ChaosEngine.ROUNDS]
 	var lines: Array = []
-	lines.append({"head": "REGRA DA RODADA", "title": "✦ %s" % ChaosModifiers.label(engine.modifier, engine.weak_suit), "text": "%s\n%s" % [ChaosModifiers.DESCRIPTIONS[engine.modifier], ChaosModifiers.TIPS[engine.modifier]], "color": UIKit.OK})
+	lines.append(_intro_block())
 	if final:
 		lines.append({"head": "RODADA FINAL", "title": "PONTOS EM DOBRO", "text": "Tudo que você marcar nessa rodada vale ×2. Ninguém está fora até a última vaza.", "color": UIKit.GOLD})
 	if engine.folego_player != -1:
 		lines.append({"head": "FÔLEGO", "title": "♨ %s" % str(config["names"][engine.folego_player]).to_upper(), "text": "Está em último e ganha ×%s nos pontos dessa rodada." % UIKit.fmt_dec(ChaosEngine.FOLEGO_MULT, 1), "color": UIKit.GOLD})
-	lines.append({"head": "SURPRESA", "title": "? NA VAZA %d" % (ChaosEngine.EVENT_TRICK + 1), "text": "Algo vai mudar as regras da vaza 4. Você só descobre quando chegar lá.", "color": UIKit.DANGER})
 	await _transition(kicker, lines, 3.4 if not first_round_done else 3.0)
 	first_round_done = true
+	modifier_revealed = false
 	_banner_clear()
+
+
+## Cartão do modificador na tela de início: rodada inteira mostra a regra; vaza-surpresa
+## só avisa que vem algo; vaza fixa (1ª/última) já diz qual é.
+func _intro_block() -> Dictionary:
+	var m := engine.modifier
+	if ChaosModifiers.scope_of(m) == ChaosModifiers.Scope.ROUND:
+		return {"head": "MODIFICADOR · RODADA INTEIRA", "title": "✦ %s" % ChaosModifiers.label(m, engine.weak_suit), "text": "%s\n%s" % [ChaosModifiers.DESCRIPTIONS[m], ChaosModifiers.TIPS[m]], "color": UIKit.OK}
+	if ChaosModifiers.is_secret(m):
+		return {"head": "MODIFICADOR · SURPRESA", "title": "? EM ALGUMA VAZA", "text": "Uma regra especial vai valer só em UMA vaza dessa rodada. Você só descobre qual e quando ela começar.", "color": UIKit.DANGER}
+	return {"head": "MODIFICADOR · VAZA %d" % (engine.modifier_trick + 1), "title": "%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.NAMES[m]], "text": "%s\n%s" % [ChaosModifiers.DESCRIPTIONS[m], ChaosModifiers.TIPS[m]], "color": UIKit.GOLD}
+
+
+## Texto da faixa em repouso (nenhuma mensagem ativa): lembra o modificador da rodada sem
+## entregar a surpresa antes da hora. Retorna [título, subtítulo, cor].
+func _rest_banner() -> Array:
+	var m := engine.modifier
+	if ChaosModifiers.scope_of(m) == ChaosModifiers.Scope.ROUND:
+		return ["✦ %s" % ChaosModifiers.label(m, engine.weak_suit), str(ChaosModifiers.DESCRIPTIONS[m]), UIKit.OK]
+	var known := modifier_revealed or not ChaosModifiers.is_secret(m)
+	if not known:
+		return ["? Surpresa em alguma vaza", "Uma regra especial vale em uma vaza só. Você descobre quando ela começar.", UIKit.DANGER]
+	var when := "vaza %d" % (engine.modifier_trick + 1)
+	var done := engine.trick_number > engine.modifier_trick
+	var sub := "já aconteceu · %s" % when if done else "%s · %s" % [ChaosModifiers.DESCRIPTIONS[m], when]
+	return ["%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.NAMES[m]], sub, ChaosModifiers.color_of(m)]
 
 
 ## Tela cheia de transição. `blocks`: [{head, title, text, color}]. Fecha ao tocar ou
@@ -572,30 +599,37 @@ func _banner(title: String, sub: String, color: Color) -> void:
 
 
 func _banner_clear() -> void:
-	# Em repouso a faixa lembra a regra da rodada (informação útil no lugar de um vazio).
-	banner_title.text = "✦ %s" % ChaosModifiers.label(engine.modifier, engine.weak_suit)
-	banner_title.add_theme_color_override("font_color", UIKit.OK)
-	banner_sub.text = str(ChaosModifiers.DESCRIPTIONS[engine.modifier])
+	# Em repouso a faixa lembra o modificador da rodada (informação útil no lugar de um vazio).
+	var rest := _rest_banner()
+	banner_title.text = str(rest[0])
+	banner_title.add_theme_color_override("font_color", rest[2])
+	banner_sub.text = str(rest[1])
 	banner_box.modulate.a = 1.0
 	banner_box.add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, UIKit.MUTED, 3, 4, 12))
 
 
 # ------------------------------------------------------------------ loop de turnos
 
-## Vaza 4: revela o evento surpresa numa tela cheia e deixa um aviso fixo durante a vaza.
-func _reveal_event() -> void:
-	var ev := engine.event
-	await _transition("PLOT TWIST!", [{"head": "VAZA %d" % (ChaosEngine.EVENT_TRICK + 1), "title": "%s %s" % [ChaosEvents.ICONS[ev], ChaosEvents.NAMES[ev]], "text": ChaosEvents.DESCRIPTIONS[ev], "color": ChaosEvents.COLORS[ev]}], 2.6)
+## Começo de vaza: se o modificador de vaza (surpresa) vale agora, revela numa tela cheia
+## (surpresa) ou só na faixa (1ª/última, já conhecidas); deixa o aviso fixo durante a vaza.
+func _trick_start() -> void:
+	var m := engine.active_modifier()
+	if m == -1 or ChaosModifiers.scope_of(m) == ChaosModifiers.Scope.ROUND:
+		return
+	var color := ChaosModifiers.color_of(m)
+	if ChaosModifiers.is_secret(m) and not modifier_revealed:
+		await _transition("PLOT TWIST!", [{"head": "VAZA %d" % (engine.trick_number + 1), "title": "%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.NAMES[m]], "text": "%s\n%s" % [ChaosModifiers.DESCRIPTIONS[m], ChaosModifiers.TIPS[m]], "color": color}], 2.6)
+	modifier_revealed = true
 	if is_inside_tree():
-		_banner("%s %s" % [ChaosEvents.ICONS[ev], ChaosEvents.NAMES[ev]], ChaosEvents.DESCRIPTIONS[ev], ChaosEvents.COLORS[ev])
+		_banner("%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.NAMES[m]], str(ChaosModifiers.DESCRIPTIONS[m]), color)
 
 
 func _run_round() -> void:
 	while not engine.is_round_over():
 		if not is_inside_tree():
 			return
-		if engine.plays.is_empty() and engine.trick_number == ChaosEngine.EVENT_TRICK:
-			await _reveal_event()
+		if engine.plays.is_empty():
+			await _trick_start()
 			if not is_inside_tree():
 				return
 		var p := engine.current
@@ -662,7 +696,7 @@ func _show_item_modal(options: Array) -> int:
 	v.add_theme_constant_override("separation", 10)
 	box.add_child(v)
 	v.add_child(UIKit.label("ESCOLHA SEU ITEM", 30, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("Vale só pra você, só na Rodada %d/%d — modificador: %s" % [engine.round_index + 1, ChaosEngine.ROUNDS, ChaosModifiers.label(engine.modifier, engine.weak_suit)], 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("Vale só pra você, só na Rodada %d/%d — modificador: %s" % [engine.round_index + 1, ChaosEngine.ROUNDS, (str(_rest_banner()[0]).trim_prefix("✦ ") if not ChaosModifiers.is_secret(engine.modifier) else "surpresa em alguma vaza")], 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	for item in options:
 		var btn := UIKit.button("%s  %s" % [ChaosItems.ICONS[item], ChaosItems.NAMES[item]], UIKit.OK)
@@ -813,8 +847,13 @@ func _resolve_trick(result: Dictionary) -> void:
 	var notes: Array = []
 	if bool(result.get("final", false)):
 		notes.append("rodada final ×2")
-	if int(result.get("event", 0)) == ChaosEvents.Event.DOURADA:
-		notes.append("vaza dourada ×3")
+	match int(result.get("modifier", -1)):
+		ChaosModifiers.Modifier.VAZA_DOURADA:
+			notes.append("vaza dourada ×3")
+		ChaosModifiers.Modifier.PRIMEIRA_DOBRO:
+			notes.append("vaza relâmpago ×2")
+		ChaosModifiers.Modifier.ULTIMA_TRIPLO:
+			notes.append("última é tudo ×3")
 	if bool(result.get("folego_applied", false)):
 		notes.append("fôlego ♨")
 	var sub := "Pontos da vaza: %s" % UIKit.fmt_dec(float(result["base_points"]), 1)
@@ -833,11 +872,17 @@ func _resolve_trick(result: Dictionary) -> void:
 		return
 	var extras: Array = []
 	for id in result.get("combos", []):
-		extras.append([str(ChaosEvents.COMBO_NAMES[id]) + "!", "%s — %s" % [wname, ChaosEvents.COMBO_DESCRIPTIONS[id]], UIKit.OK])
+		extras.append([str(ChaosModifiers.COMBO_NAMES[id]) + "!", "%s — %s" % [wname, ChaosModifiers.COMBO_DESCRIPTIONS[id]], UIKit.OK])
 	if bool(result.get("roubo_applied", false)):
 		extras.append(["⚔ ROUBO DE VAZA!", "%s roubou %s pts de %s" % [wname, UIKit.fmt_dec(float(result["roubo_amount"]), 1), str(config["names"][int(result["roubo_target"])]).to_upper()], UIKit.DANGER])
 	if float(result.get("saque_amount", 0.0)) > 0.0:
 		extras.append(["⚔ SAQUE!", "%s levou %s pts dos rivais" % [wname, UIKit.fmt_dec(float(result["saque_amount"]), 1)], UIKit.DANGER])
+	if float(result.get("assalto_amount", 0.0)) > 0.0:
+		extras.append(["⚔ ASSALTO AO LÍDER!", "%s roubou %s pts de quem liderava" % [wname, UIKit.fmt_dec(float(result["assalto_amount"]), 1)], UIKit.DANGER])
+	if int(result.get("modifier", -1)) == ChaosModifiers.Modifier.VAZA_MALDITA:
+		extras.append(["☠ VAZA MALDITA!", "%s perdeu %s pts por vencer essa vaza" % [wname, UIKit.fmt_dec(ChaosEngine.CURSE_PENALTY, 0)], UIKit.DANGER])
+	if int(result.get("modifier", -1)) == ChaosModifiers.Modifier.VAZA_MAIS_UM:
+		pass
 	for e in extras:
 		_banner(e[0], e[1], e[2])
 		Sfx.play("win")
@@ -984,15 +1029,14 @@ func _open_help() -> void:
 • 5 rodadas curtas de 8 cartas cada — sem licitação, sem monte, todo mundo joga pra si.
 • Vence a partida quem somar mais pontos no total das 5 rodadas.
 
-MODIFICADOR
-• Cada rodada sorteia uma regra especial diferente (nunca repete duas vezes na mesma partida), sempre visível na barra logo acima da mesa.
-• As cartas afetadas mostram o valor real (com bônus ou penalidade) direto na carta — decida o que jogar olhando pra esse número, não só pro placar.
+MODIFICADOR DA RODADA
+• Toda rodada sorteia UM modificador (nunca repete na mesma partida). Ele pode valer na rodada inteira ou só numa vaza.
+• Rodada inteira: você vê a regra logo no início (ex.: Trunfo em Dobro, Naipe Fraco, Mundo ao Contrário, Naipe Maldito).
+• Uma vaza só: é surpresa. Você só descobre qual e quando ela começa, numa tela cheia (ex.: Vaza Dourada ×3, Vaza Maldita, Saque, Assalto ao Líder).
+• As cartas afetadas mostram o valor real direto na carta; decida olhando esse número.
 
 ITENS
-• A partir da Rodada 2, antes de cada rodada você escolhe 1 de 2 itens sorteados — uma vantagem ativa só sua, só naquela rodada (Escudo, Trunfo Afiado, Fôlego Pessoal ou Roubo de Vaza). Os bots escolhem também.
-
-PLOT TWIST (VAZA 4)
-• Em toda rodada, na vaza 4, acontece um evento surpresa que você só descobre na hora: VAZA DOURADA (pontos ×3), VAZA INVERTIDA (vence a MENOR carta do naipe) ou SAQUE (quem vencer rouba 2 pts de cada rival). A tela avisa antes da vaza começar.
+• A partir da Rodada 2, antes de cada rodada você escolhe 1 de 2 itens sorteados: uma vantagem só sua, só naquela rodada (Escudo, Trunfo Afiado, Fôlego Pessoal ou Roubo de Vaza). Os bots escolhem também.
 
 COMBOS (aparecem no aviso acima da mesa)
 • MÃO QUENTE: 3 vazas seguidas na rodada — pontos ×1,5.

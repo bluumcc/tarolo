@@ -1,57 +1,135 @@
 class_name ChaosModifiers
 extends RefCounted
-## Modificadores do modo Caos: uma regra especial sorteada a cada rodada, sempre visível
-## bem grande na tela. Só efeitos simples de entender (multiplicador de pontos ou uma
-## exceção pontual de regra) — nada que exija decorar coisa nova no meio da partida.
+## Modificadores do modo Caos: toda rodada sorteia UM (e só um), sem repetir na partida.
+## Escopo RODADA = vale em todas as vazas e é anunciado no início da rodada.
+## Escopo VAZA = vale numa vaza só (sorteada da 2ª à 7ª, ou fixa na 1ª/última) e, quando
+## é surpresa, só é revelado quando essa vaza começa.
 
-enum Modifier { TRUNFO_DOBRO, REIS_DOBRO, LOUCO_VENCE, PRIMEIRA_DOBRO, ULTIMA_TRIPLO, NAIPE_FRACO }
+enum Modifier {
+	TRUNFO_DOBRO, REIS_DOBRO, LOUCO_VENCE, NAIPE_FRACO, NAIPE_FORTE, MUNDO_CONTRARIO,
+	VAZA_MAIS_UM, PEQUENAS_IMPORTAM, NAIPE_MALDITO,
+	VAZA_DOURADA, VAZA_INVERTIDA, SAQUE, ASSALTO_LIDER, VAZA_MALDITA, PRIMEIRA_DOBRO, ULTIMA_TRIPLO,
+}
+enum Scope { ROUND, TRICK }
 
-const ALL := [
-	Modifier.TRUNFO_DOBRO,
-	Modifier.REIS_DOBRO,
-	Modifier.LOUCO_VENCE,
-	Modifier.PRIMEIRA_DOBRO,
-	Modifier.ULTIMA_TRIPLO,
-	Modifier.NAIPE_FRACO,
+const ROUND_MODS := [
+	Modifier.TRUNFO_DOBRO, Modifier.REIS_DOBRO, Modifier.LOUCO_VENCE, Modifier.NAIPE_FRACO,
+	Modifier.NAIPE_FORTE, Modifier.MUNDO_CONTRARIO, Modifier.VAZA_MAIS_UM,
+	Modifier.PEQUENAS_IMPORTAM, Modifier.NAIPE_MALDITO,
 ]
+const TRICK_MODS := [
+	Modifier.VAZA_DOURADA, Modifier.VAZA_INVERTIDA, Modifier.SAQUE, Modifier.ASSALTO_LIDER,
+	Modifier.VAZA_MALDITA, Modifier.PRIMEIRA_DOBRO, Modifier.ULTIMA_TRIPLO,
+]
+const ALL := ROUND_MODS + TRICK_MODS
+## Modificadores que sorteiam um naipe.
+const SUIT_MODS := [Modifier.NAIPE_FRACO, Modifier.NAIPE_FORTE, Modifier.NAIPE_MALDITO]
 
 const NAMES := {
 	Modifier.TRUNFO_DOBRO: "Trunfo em Dobro",
 	Modifier.REIS_DOBRO: "Reis em Dobro",
 	Modifier.LOUCO_VENCE: "O Louco Vence",
+	Modifier.NAIPE_FRACO: "Naipe Fraco",
+	Modifier.NAIPE_FORTE: "Naipe Forte",
+	Modifier.MUNDO_CONTRARIO: "Mundo ao Contrário",
+	Modifier.VAZA_MAIS_UM: "Cada Vaza Vale +1",
+	Modifier.PEQUENAS_IMPORTAM: "Cartas Pequenas Importam",
+	Modifier.NAIPE_MALDITO: "Naipe Maldito",
+	Modifier.VAZA_DOURADA: "Vaza Dourada",
+	Modifier.VAZA_INVERTIDA: "Vaza Invertida",
+	Modifier.SAQUE: "Saque",
+	Modifier.ASSALTO_LIDER: "Assalto ao Líder",
+	Modifier.VAZA_MALDITA: "Vaza Maldita",
 	Modifier.PRIMEIRA_DOBRO: "Vaza Relâmpago",
 	Modifier.ULTIMA_TRIPLO: "Última é Tudo",
-	Modifier.NAIPE_FRACO: "Naipe Fraco",
+}
+
+const ICONS := {
+	Modifier.VAZA_DOURADA: "★", Modifier.VAZA_INVERTIDA: "⇅", Modifier.SAQUE: "⚔",
+	Modifier.ASSALTO_LIDER: "♛", Modifier.VAZA_MALDITA: "☠", Modifier.PRIMEIRA_DOBRO: "⚡",
+	Modifier.ULTIMA_TRIPLO: "⚑",
 }
 
 const DESCRIPTIONS := {
-	Modifier.TRUNFO_DOBRO: "Toda carta de Trunfo vale o DOBRO de pontos nessa rodada.",
-	Modifier.REIS_DOBRO: "Todo Rei vale o DOBRO de pontos nessa rodada.",
-	Modifier.LOUCO_VENCE: "Só nessa rodada, O Louco PODE vencer a vaza — funciona como um Trunfo fraquinho (perde pra Trunfo de verdade, vence naipe comum).",
+	Modifier.TRUNFO_DOBRO: "Toda carta de Trunfo vale o DOBRO de pontos, na rodada inteira.",
+	Modifier.REIS_DOBRO: "Todo Rei vale o DOBRO de pontos, na rodada inteira.",
+	Modifier.LOUCO_VENCE: "O Louco PODE vencer a vaza, como um Trunfo fraquinho (perde pra Trunfo de verdade, vence naipe comum).",
+	Modifier.NAIPE_FRACO: "Um naipe sorteado vale só METADE dos pontos, na rodada inteira.",
+	Modifier.NAIPE_FORTE: "Um naipe sorteado vale 1,5× os pontos, na rodada inteira.",
+	Modifier.MUNDO_CONTRARIO: "Em toda vaza vence a MENOR carta do naipe. Trunfo não corta.",
+	Modifier.VAZA_MAIS_UM: "Quem vence uma vaza ganha +1 ponto fixo, em toda vaza.",
+	Modifier.PEQUENAS_IMPORTAM: "As cartas de 0,5 ponto valem 1,0, na rodada inteira.",
+	Modifier.NAIPE_MALDITO: "Cada carta do naipe sorteado vale −1 ponto pra quem a captura.",
+	Modifier.VAZA_DOURADA: "Os pontos dessa vaza valem ×3.",
+	Modifier.VAZA_INVERTIDA: "Nessa vaza vence a MENOR carta do naipe. Trunfo não corta.",
+	Modifier.SAQUE: "Quem vencer essa vaza rouba 2 pontos de cada rival.",
+	Modifier.ASSALTO_LIDER: "Quem vencer essa vaza rouba 4 pontos de quem lidera o placar.",
+	Modifier.VAZA_MALDITA: "Quem vencer essa vaza PERDE 3 pontos. Todo mundo quer perder!",
 	Modifier.PRIMEIRA_DOBRO: "A primeira vaza da rodada vale o DOBRO de pontos.",
-	Modifier.ULTIMA_TRIPLO: "A última vaza da rodada vale o TRIPLO de pontos — segura suas cartas boas até o fim.",
-	Modifier.NAIPE_FRACO: "Um naipe sorteado vale só METADE dos pontos nessa rodada.",
+	Modifier.ULTIMA_TRIPLO: "A última vaza da rodada vale o TRIPLO de pontos.",
 }
 
-## Dica de jogada — o que fazer DIFERENTE por causa do modificador ativo. Mostrada no
-## banner de início de rodada, pra deixar claro que é uma decisão do jogador, não só
-## matemática passiva.
+## Dica de jogada — o que fazer DIFERENTE por causa do modificador ativo.
 const TIPS := {
-	Modifier.TRUNFO_DOBRO: "Seus trunfos valem o dobro agora — não gaste os fracos à toa, guarde os fortes pra vazas que valem a pena ganhar.",
-	Modifier.REIS_DOBRO: "Seus Reis valem o dobro — não descarte um Rei numa vaza qualquer, espere o momento certo pra fazer ele valer.",
-	Modifier.LOUCO_VENCE: "O Louco pode roubar a vaza de qualquer naipe comum nessa rodada — use-o como arma, não como fuga.",
-	Modifier.PRIMEIRA_DOBRO: "A 1ª vaza vale dobro — abra com força total, essa é a hora de arriscar.",
-	Modifier.ULTIMA_TRIPLO: "A última vaza vale TRIPLO — segure suas melhores cartas até o fim, mesmo que doa perder vazas no meio.",
-	Modifier.NAIPE_FRACO: "As cartas desse naipe valem metade — livre-se delas cedo, elas não vão te ajudar a pontuar.",
+	Modifier.TRUNFO_DOBRO: "Não gaste Trunfo fraco à toa: guarde os fortes pra vazas que valem a pena ganhar.",
+	Modifier.REIS_DOBRO: "Não descarte um Rei numa vaza qualquer: espere o momento certo pra ele valer.",
+	Modifier.LOUCO_VENCE: "O Louco pode roubar a vaza de qualquer naipe comum. Use-o como arma, não como fuga.",
+	Modifier.NAIPE_FRACO: "Livre-se cedo das cartas desse naipe: elas não vão te ajudar a pontuar.",
+	Modifier.NAIPE_FORTE: "Disputem esse naipe: quem capturar mais cartas dele leva vantagem.",
+	Modifier.MUNDO_CONTRARIO: "Tudo se inverte: carta baixa vence. Guarde as cartas fracas e jogue as fortes só quando quiser perder a vaza.",
+	Modifier.VAZA_MAIS_UM: "Vencer muitas vazas pequenas compensa: cada uma vale +1.",
+	Modifier.PEQUENAS_IMPORTAM: "Até as cartas mais fracas somam: quantidade de cartas capturadas importa.",
+	Modifier.NAIPE_MALDITO: "Empurre as cartas desse naipe pros outros: quem as captura perde pontos.",
+	Modifier.VAZA_DOURADA: "Uma vaza só vale ×3. Guarde uma carta forte pra ela.",
+	Modifier.VAZA_INVERTIDA: "Numa vaza só, a menor carta vence. Fique atento.",
+	Modifier.SAQUE: "Numa vaza só, vencer rouba pontos dos rivais.",
+	Modifier.ASSALTO_LIDER: "Numa vaza só, vencer rouba do líder do placar.",
+	Modifier.VAZA_MALDITA: "Numa vaza só, vencer custa pontos. Tente perder essa!",
+	Modifier.PRIMEIRA_DOBRO: "A 1ª vaza vale dobro: abra com força total.",
+	Modifier.ULTIMA_TRIPLO: "A última vaza vale TRIPLO: segure suas melhores cartas até o fim.",
 }
+
+const COMBO_NAMES := {
+	"MAO_QUENTE": "MÃO QUENTE",
+	"CORTADO": "CORTADO",
+	"CORTE_REI": "CORTE DE REI",
+}
+
+const COMBO_DESCRIPTIONS := {
+	"MAO_QUENTE": "3 vazas seguidas: pontos ×1,5",
+	"CORTADO": "Você quebrou a sequência de alguém: +2 pts",
+	"CORTE_REI": "Cortou um Rei com Trunfo: +3 pts",
+}
+
+
+static func scope_of(modifier: int) -> int:
+	return Scope.ROUND if ROUND_MODS.has(modifier) else Scope.TRICK
+
+
+static func has_suit(modifier: int) -> bool:
+	return SUIT_MODS.has(modifier)
+
+
+## Verdadeiro se a vaza sorteada é surpresa (só revelada quando começa). A 1ª e a última
+## têm posição fixa e conhecida, então são anunciadas já no início da rodada.
+static func is_secret(modifier: int) -> bool:
+	return scope_of(modifier) == Scope.TRICK and modifier != Modifier.PRIMEIRA_DOBRO and modifier != Modifier.ULTIMA_TRIPLO
+
+
+static func color_of(modifier: int) -> Color:
+	if modifier in [Modifier.SAQUE, Modifier.VAZA_MALDITA, Modifier.ASSALTO_LIDER]:
+		return Color("#FF4D6A")
+	if scope_of(modifier) == Scope.TRICK:
+		return Color("#FFC933")
+	return Color("#36D97B")
 
 
 static func random_modifier(rng: RandomNumberGenerator) -> int:
 	return ALL[rng.randi_range(0, ALL.size() - 1)]
 
 
-## Rótulo pronto pra mostrar na tela — já inclui o naipe sorteado quando for Naipe Fraco.
+## Rótulo pronto pra tela — inclui o naipe sorteado quando o modificador tem naipe.
 static func label(modifier: int, weak_suit: int) -> String:
-	if modifier == Modifier.NAIPE_FRACO and weak_suit != -1:
+	if has_suit(modifier) and weak_suit != -1:
 		return "%s (%s)" % [NAMES[modifier], CardData.SUIT_NAMES[weak_suit]]
 	return NAMES[modifier]

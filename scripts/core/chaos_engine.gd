@@ -15,13 +15,17 @@ const FOLEGO_MULT := 1.5   # bônus de pontos pra quem tá em último ANTES da r
 const ITEM_MULT := 1.25    # bônus do item Fôlego Pessoal
 const ITEM_STEAL := 4.0    # pontos roubados pelo item Roubo de Vaza
 const BUY_IN := 100.0
-const EVENT_TRICK := 3      # o evento surpresa acontece na vaza 4 (índice 3) de cada rodada
 const GOLD_MULT := 3.0      # Vaza Dourada
 const FINAL_MULT := 2.0     # todos os pontos da última rodada
 const STREAK_MULT := 1.5    # Mão Quente: 3ª vitória seguida (e seguintes) na rodada
 const KING_CUT_BONUS := 3.0 # Corte de Rei
 const BREAK_BONUS := 2.0    # Cortado: quebrar a sequência de 2+ vitórias de alguém
-const SAQUE_AMOUNT := 2.0   # pontos roubados de cada rival no evento Saque
+const SAQUE_AMOUNT := 2.0   # pontos roubados de cada rival no Saque
+const ASSALTO_AMOUNT := 4.0 # pontos roubados do líder no Assalto ao Líder
+const CURSE_PENALTY := 3.0  # pontos perdidos por quem vence a Vaza Maldita
+const FORTE_MULT := 1.5     # Naipe Forte
+const VAZA_PLUS := 1.0      # bônus fixo de Cada Vaza Vale +1
+const NAIPE_CURSED_VALUE := -1.0  # valor de cada carta do Naipe Maldito
 const PAYOUT_SHARES := [0.5, 0.3, 0.15, 0.05]  # fatia do pote por colocação (1º a 4º)
 
 var num_players := 4
@@ -32,7 +36,7 @@ var round_index := 0
 var modifier_sequence: Array = []  # ordem embaralhada dos modificadores, sem repetir na partida
 var modifier := -1
 var weak_suit := -1
-var event := ChaosEvents.Event.NONE  # evento surpresa dessa rodada, na vaza EVENT_TRICK
+var modifier_trick := -1      # vaza (0..7) onde o modificador de escopo VAZA vale; -1 = rodada inteira
 var streak: Array = []        # vitórias seguidas de cada jogador, dentro da rodada
 var last_winner := -1
 var folego_player := -1       # quem recebe o bônus de virada nessa rodada (-1 = ninguém)
@@ -82,7 +86,6 @@ func _setup_round() -> void:
 	roubo_used = []
 	streak = []
 	last_winner = -1
-	event = ChaosEvents.ALL[rng.randi_range(0, ChaosEvents.ALL.size() - 1)]
 	for p in range(num_players):
 		streak.append(0)
 		captured.append([])
@@ -91,7 +94,15 @@ func _setup_round() -> void:
 		roubo_used.append(false)
 	modifier = modifier_sequence[round_index % modifier_sequence.size()]
 	weak_suit = -1
-	if modifier == ChaosModifiers.Modifier.NAIPE_FRACO:
+	modifier_trick = -1
+	if ChaosModifiers.scope_of(modifier) == ChaosModifiers.Scope.TRICK:
+		if modifier == ChaosModifiers.Modifier.PRIMEIRA_DOBRO:
+			modifier_trick = 0
+		elif modifier == ChaosModifiers.Modifier.ULTIMA_TRIPLO:
+			modifier_trick = HAND_SIZE - 1
+		else:
+			modifier_trick = rng.randi_range(1, HAND_SIZE - 2)
+	if ChaosModifiers.has_suit(modifier):
 		var suits := [CardData.Suit.OUROS, CardData.Suit.PAUS, CardData.Suit.COPAS, CardData.Suit.ESPADAS]
 		weak_suit = suits[rng.randi_range(0, suits.size() - 1)]
 	folego_player = _lowest_player() if round_index > 0 else -1
@@ -135,6 +146,19 @@ func louco_can_win() -> bool:
 	return modifier == ChaosModifiers.Modifier.LOUCO_VENCE
 
 
+## Modificador que vale na vaza que está sendo jogada agora (-1 se nenhum): os de rodada
+## inteira valem sempre; os de vaza só na vaza sorteada.
+func active_modifier() -> int:
+	if ChaosModifiers.scope_of(modifier) == ChaosModifiers.Scope.ROUND or trick_number == modifier_trick:
+		return modifier
+	return -1
+
+
+## Verdadeiro se `mod` está valendo na vaza atual.
+func is_active(mod: int) -> bool:
+	return active_modifier() == mod
+
+
 func legal_for(player: int) -> Array:
 	return TrickRules.legal_cards(hands[player], plays)
 
@@ -176,18 +200,23 @@ func card_value(c: CardData, player: int = -1) -> float:
 		ChaosModifiers.Modifier.NAIPE_FRACO:
 			if c.suit == weak_suit:
 				v *= 0.5
+		ChaosModifiers.Modifier.NAIPE_FORTE:
+			if c.suit == weak_suit:
+				v *= FORTE_MULT
+		ChaosModifiers.Modifier.PEQUENAS_IMPORTAM:
+			if is_equal_approx(c.points(), 0.5):
+				v = 1.0
+		ChaosModifiers.Modifier.NAIPE_MALDITO:
+			if c.suit == weak_suit:
+				v = NAIPE_CURSED_VALUE
 	if player != -1 and player < player_items.size():
 		var item: int = player_items[player]
-		if item == ChaosItems.Item.ESCUDO_NAIPE and modifier == ChaosModifiers.Modifier.NAIPE_FRACO and c.suit == weak_suit:
+		var shield_applies := (modifier == ChaosModifiers.Modifier.NAIPE_FRACO or modifier == ChaosModifiers.Modifier.NAIPE_MALDITO) and c.suit == weak_suit
+		if item == ChaosItems.Item.ESCUDO_NAIPE and shield_applies:
 			v = c.points()
 		elif item == ChaosItems.Item.TRUNFO_AFIADO and c.is_trunfo():
 			v += 1.0
 	return v
-
-
-## Evento surpresa ativo na vaza que está sendo jogada agora (NONE nas demais).
-func event_now() -> int:
-	return event if trick_number == EVENT_TRICK else ChaosEvents.Event.NONE
 
 
 func is_final_round() -> bool:
@@ -208,8 +237,9 @@ func _lowest_index() -> int:
 
 
 func _resolve_trick() -> Dictionary:
-	var ev := event_now()
-	var idx := _lowest_index() if ev == ChaosEvents.Event.INVERTIDA else TrickRules.winning_index(plays, louco_can_win())
+	var ev := active_modifier()
+	var inverted := ev == ChaosModifiers.Modifier.MUNDO_CONTRARIO or ev == ChaosModifiers.Modifier.VAZA_INVERTIDA
+	var idx := _lowest_index() if inverted else TrickRules.winning_index(plays, louco_can_win())
 	var winner: int = plays[idx]["player"]
 	var cards: Array = plays.map(func(p): return p["card"])
 	captured[winner].append_array(cards)
@@ -217,17 +247,21 @@ func _resolve_trick() -> Dictionary:
 	for c in cards:
 		base_points += card_value(c, winner)
 	var mult := 1.0
-	if modifier == ChaosModifiers.Modifier.PRIMEIRA_DOBRO and trick_number == 0:
+	if ev == ChaosModifiers.Modifier.PRIMEIRA_DOBRO:
 		mult *= 2.0
-	if modifier == ChaosModifiers.Modifier.ULTIMA_TRIPLO and trick_number == HAND_SIZE - 1:
+	if ev == ChaosModifiers.Modifier.ULTIMA_TRIPLO:
 		mult *= 3.0
-	if ev == ChaosEvents.Event.DOURADA:
+	if ev == ChaosModifiers.Modifier.VAZA_DOURADA:
 		mult *= GOLD_MULT
 	if is_final_round():
 		mult *= FINAL_MULT
 	# Combos: sequência, quebra de sequência e corte de Rei.
 	var combos: Array = []
 	var bonus := 0.0
+	if ev == ChaosModifiers.Modifier.VAZA_MAIS_UM:
+		bonus += VAZA_PLUS
+	if ev == ChaosModifiers.Modifier.VAZA_MALDITA:
+		bonus -= CURSE_PENALTY
 	var prev_streak: int = streak[last_winner] if last_winner != -1 else 0
 	var broke := last_winner != -1 and last_winner != winner and prev_streak >= 2
 	for q in range(num_players):
@@ -256,7 +290,14 @@ func _resolve_trick() -> Dictionary:
 		mult *= ITEM_MULT
 	var points := base_points * mult + bonus
 	var saque_amount := 0.0
-	if ev == ChaosEvents.Event.SAQUE:
+	var assalto_amount := 0.0
+	if ev == ChaosModifiers.Modifier.ASSALTO_LIDER:
+		var lead_p := _highest_player()
+		if lead_p != winner:
+			assalto_amount = minf(ASSALTO_AMOUNT, totals[lead_p])
+			totals[lead_p] -= assalto_amount
+			round_points[lead_p] -= assalto_amount
+	if ev == ChaosModifiers.Modifier.SAQUE:
 		for q in range(num_players):
 			if q == winner:
 				continue
@@ -289,15 +330,16 @@ func _resolve_trick() -> Dictionary:
 		"roubo_amount": roubo_amount,
 		"roubo_target": roubo_target,
 		"trick_number": trick_number,
-		"event": ev,
+		"modifier": ev,
 		"combos": combos,
 		"bonus": bonus,
 		"saque_amount": saque_amount,
+		"assalto_amount": assalto_amount,
 		"final": is_final_round(),
 	}
 	history.append(trick_result)
-	round_points[winner] += points + roubo_amount + saque_amount
-	totals[winner] += points + roubo_amount + saque_amount
+	round_points[winner] += points + roubo_amount + saque_amount + assalto_amount
+	totals[winner] += points + roubo_amount + saque_amount + assalto_amount
 	plays = []
 	trick_number += 1
 	leader = winner
@@ -308,6 +350,7 @@ func _resolve_trick() -> Dictionary:
 			"round": round_index,
 			"modifier": modifier,
 			"weak_suit": weak_suit,
+			"modifier_trick": modifier_trick,
 			"folego_player": folego_player,
 			"round_points": round_points.duplicate(),
 			"totals": totals.duplicate(),

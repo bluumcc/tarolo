@@ -397,14 +397,14 @@ func _test_chaos() -> void:
 	check(int(steal_result["roubo_target"]) == 1, "Roubo de Vaza mira em quem está em 1º lugar no total")
 	check(e6.totals[1] == 16.0, "alvo do roubo perde os pontos roubados")
 
-	# Eventos surpresa e combos.
+	# Modificadores de vaza única e combos.
 	var e7 := ChaosEngine.new()
 	e7.setup_match({"seed": 9})
-	e7.modifier = -1
+	e7.modifier = ChaosModifiers.Modifier.VAZA_INVERTIDA
+	e7.modifier_trick = 3
 	e7.folego_player = -1
 	e7.round_index = 0
-	e7.trick_number = ChaosEngine.EVENT_TRICK
-	e7.event = ChaosEvents.Event.INVERTIDA
+	e7.trick_number = 3
 	e7.plays = [
 		{"player": 0, "card": c(CardData.Suit.PAUS, 9)},
 		{"player": 1, "card": c(CardData.Suit.PAUS, 2)},
@@ -413,21 +413,61 @@ func _test_chaos() -> void:
 	]
 	var inv := e7._resolve_trick()
 	check(int(inv["winner"]) == 1, "Vaza Invertida: a MENOR carta do naipe vence")
-	e7.trick_number = ChaosEngine.EVENT_TRICK
-	e7.event = ChaosEvents.Event.DOURADA
+	e7.trick_number = 2
 	e7.plays = [
 		{"player": 0, "card": c(CardData.Suit.PAUS, 9)},
 		{"player": 1, "card": c(CardData.Suit.PAUS, 2)},
 		{"player": 2, "card": c(CardData.Suit.PAUS, 12)},
 		{"player": 3, "card": c(CardData.Suit.PAUS, 6)},
 	]
+	check(int(e7._resolve_trick()["winner"]) == 2, "fora da vaza sorteada a regra normal vale (maior vence)")
+	e7.modifier = ChaosModifiers.Modifier.VAZA_DOURADA
+	e7.modifier_trick = 3
+	e7.trick_number = 3
 	e7.current = 0
 	e7.last_winner = 0
 	e7.streak = [2, 0, 0, 0]
+	e7.plays = [
+		{"player": 0, "card": c(CardData.Suit.PAUS, 9)},
+		{"player": 1, "card": c(CardData.Suit.PAUS, 2)},
+		{"player": 2, "card": c(CardData.Suit.PAUS, 12)},
+		{"player": 3, "card": c(CardData.Suit.PAUS, 6)},
+	]
 	var gold := e7._resolve_trick()
 	check(is_equal_approx(float(gold["mult"]), ChaosEngine.GOLD_MULT), "Vaza Dourada multiplica os pontos por 3")
 	check("CORTADO" in gold["combos"], "vencer depois de alguém ter 2+ vitórias seguidas é CORTADO")
-	e7.event = ChaosEvents.Event.NONE
+	e7.modifier = ChaosModifiers.Modifier.VAZA_MALDITA
+	e7.trick_number = 3
+	e7.streak = [0, 0, 0, 0]
+	e7.last_winner = -1
+	e7.plays = [
+		{"player": 0, "card": c(CardData.Suit.PAUS, 9)},
+		{"player": 1, "card": c(CardData.Suit.PAUS, 2)},
+		{"player": 2, "card": c(CardData.Suit.PAUS, 3)},
+		{"player": 3, "card": c(CardData.Suit.PAUS, 6)},
+	]
+	var curse := e7._resolve_trick()
+	check(float(curse["points"]) < 0.0, "Vaza Maldita: quem vence perde pontos")
+	e7.modifier = ChaosModifiers.Modifier.NAIPE_MALDITO
+	e7.weak_suit = CardData.Suit.COPAS
+	check(e7.card_value(c(CardData.Suit.COPAS, 14)) == -1.0, "Naipe Maldito: carta do naipe vale -1")
+	e7.modifier = ChaosModifiers.Modifier.PEQUENAS_IMPORTAM
+	check(e7.card_value(c(CardData.Suit.PAUS, 3)) == 1.0, "Cartas Pequenas Importam: 0,5 vira 1,0")
+	e7.modifier = ChaosModifiers.Modifier.NAIPE_FORTE
+	e7.weak_suit = CardData.Suit.PAUS
+	check(e7.card_value(c(CardData.Suit.PAUS, 14)) == 6.75, "Naipe Forte: 1,5x nos pontos do naipe")
+	e7.modifier = ChaosModifiers.Modifier.VAZA_MAIS_UM
+	e7.streak = [0, 0, 0, 0]
+	e7.last_winner = -1
+	e7.trick_number = 1
+	e7.plays = [
+		{"player": 0, "card": c(CardData.Suit.PAUS, 9)},
+		{"player": 1, "card": c(CardData.Suit.PAUS, 2)},
+		{"player": 2, "card": c(CardData.Suit.PAUS, 3)},
+		{"player": 3, "card": c(CardData.Suit.PAUS, 6)},
+	]
+	check(is_equal_approx(float(e7._resolve_trick()["bonus"]), 1.0), "Cada Vaza Vale +1 soma 1 ponto fixo")
+	e7.modifier = ChaosModifiers.Modifier.TRUNFO_DOBRO
 	e7.trick_number = 0
 	e7.last_winner = 0
 	e7.streak = [2, 0, 0, 0]
@@ -439,6 +479,23 @@ func _test_chaos() -> void:
 	]
 	var hot := e7._resolve_trick()
 	check("MAO_QUENTE" in hot["combos"], "3ª vitória seguida é MÃO QUENTE")
+	# Sorteio: escopo de vaza sempre tem vaza definida; escopo de rodada não.
+	var e8 := ChaosEngine.new()
+	e8.setup_match({"seed": 11})
+	var seen_trick := 0
+	var seen_round := 0
+	for r in range(ChaosEngine.ROUNDS):
+		if ChaosModifiers.scope_of(e8.modifier) == ChaosModifiers.Scope.TRICK:
+			check(e8.modifier_trick >= 0 and e8.modifier_trick < ChaosEngine.HAND_SIZE, "modificador de vaza tem vaza sorteada")
+			seen_trick += 1
+		else:
+			check(e8.modifier_trick == -1, "modificador de rodada não tem vaza")
+			seen_round += 1
+		if ChaosModifiers.has_suit(e8.modifier):
+			check(e8.weak_suit != -1, "modificador de naipe sorteia o naipe")
+		if r < ChaosEngine.ROUNDS - 1:
+			e8.advance_round()
+	check(seen_trick + seen_round == ChaosEngine.ROUNDS, "toda rodada sorteia exatamente um modificador")
 	e7.round_index = ChaosEngine.ROUNDS - 1
 	check(e7.is_final_round(), "última rodada é a rodada final (pontos ×2)")
 
