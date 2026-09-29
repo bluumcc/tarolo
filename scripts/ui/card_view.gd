@@ -98,8 +98,8 @@ func _refresh() -> void:
 func _refresh_border() -> void:
 	if data == null or not face_up:
 		return
-	var border := UIKit.BLACK
-	var bg := Color("#15122A")
+	var border := Color("#4A4290")
+	var bg := Color("#1A1544")
 	if data.is_louco():
 		border = UIKit.SUIT_COLORS[CardData.Suit.LOUCO]
 		bg = Color("#241a33")
@@ -110,7 +110,9 @@ func _refresh_border() -> void:
 		border = UIKit.GOLD
 	if selected:
 		border = UIKit.GOLD
-	body.add_theme_stylebox_override("panel", UIKit.box(bg, border, 4 if selected else 3, 6, 6))
+	var sb := UIKit.box(bg, border, 4 if selected else 2, 6, 6)
+	sb.set_corner_radius_all(14)
+	body.add_theme_stylebox_override("panel", sb)
 
 
 # ------------------------------------------------------------------ input

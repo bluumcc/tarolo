@@ -2,13 +2,14 @@ class_name UIKit
 extends RefCounted
 ## Paleta Dark Brutalist e fábrica de estilos/nós Control reutilizados pelas cenas.
 
-const NIGHT := Color("#0B1026")
-const PURPLE := Color("#2A1B3D")
-const PURPLE_DEEP := Color("#1A1128")
+const NIGHT := Color("#0E0A2B")
+const PURPLE := Color("#33267A")
+const PURPLE_DEEP := Color("#1D1547")
 const BLACK := Color("#07070B")
-const INK := Color("#EDE6F2")
-const MUTED := Color("#8C82A3")
-const GOLD := Color("#E8C170")
+const INK := Color("#F1EEFF")
+const MUTED := Color("#9C93C9")
+const GOLD := Color("#F0C879")
+const VIOLET := Color("#7C6CFF")  ## destaque principal (botão primário, barras)
 const DANGER := Color("#FF5C7A")
 const OK := Color("#7FD1AE")
 const CHIPS := Color("#5FA8FF")
@@ -33,10 +34,17 @@ const CARD_BACKS := {
 static func box(bg: Color, border: Color = BLACK, border_w: int = 3, radius: int = 4, pad: int = 12) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
-	sb.border_color = border
+	# Visual "vidro": borda preta vira um filete claro translúcido, cantos bem arredondados.
+	if border == BLACK:
+		sb.border_color = Color(1, 1, 1, 0.10)
+		border_w = mini(border_w, 2)
+	else:
+		sb.border_color = border
+		border_w = mini(border_w, 3)
 	sb.set_border_width_all(border_w)
-	sb.set_corner_radius_all(radius)
+	sb.set_corner_radius_all(maxi(radius, 18))
 	sb.set_content_margin_all(pad)
+	sb.anti_aliasing = true
 	return sb
 
 
@@ -61,13 +69,25 @@ static func button(text: String, accent: Color = GOLD, size: int = 25) -> Button
 	b.add_theme_color_override("font_pressed_color", BLACK)
 	b.add_theme_color_override("font_focus_color", INK)
 	b.add_theme_color_override("font_disabled_color", MUTED)
-	b.add_theme_stylebox_override("normal", box(PURPLE, accent, 3, 2, 16))
-	b.add_theme_stylebox_override("hover", box(accent, accent, 3, 2, 16))
-	b.add_theme_stylebox_override("pressed", box(accent.darkened(0.2), INK, 3, 2, 16))
-	b.add_theme_stylebox_override("focus", box(Color(0, 0, 0, 0), INK, 2, 2, 16))
-	b.add_theme_stylebox_override("disabled", box(PURPLE_DEEP, MUTED.darkened(0.4), 3, 2, 16))
+	b.add_theme_stylebox_override("normal", pill(accent.darkened(0.62), accent))
+	b.add_theme_stylebox_override("hover", pill(accent, accent))
+	b.add_theme_stylebox_override("pressed", pill(accent.darkened(0.2), INK))
+	b.add_theme_stylebox_override("focus", pill(Color(0, 0, 0, 0), INK))
+	b.add_theme_stylebox_override("disabled", pill(PURPLE_DEEP, MUTED.darkened(0.4)))
 	b.pressed.connect(func(): sfx("tick"))
 	return b
+
+
+## Botão em pílula (cantos totalmente arredondados), como nos apps de cartas modernos.
+static func pill(bg: Color, border: Color) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.border_color = border
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(40)
+	sb.set_content_margin_all(16)
+	sb.anti_aliasing = true
+	return sb
 
 
 ## Toca um efeito via autoload `Sfx` (resolvido em runtime para o kit funcionar fora da árvore).

@@ -12,7 +12,8 @@ signal match_finished(summary: Dictionary)
 const CARD_SCENE := preload("res://scenes/Card.tscn")
 
 ## As cartas da mão têm o tamanho cheio; as da mesa ficam menores pra caber 4 lado a lado.
-const TABLE_SCALE := 0.62
+const TABLE_SCALE := 0.54
+const SEAT_COLORS := [Color("#F0C879"), Color("#7FD1AE"), Color("#FF7A9C"), Color("#8FA0FF")]
 const TURN_SECONDS := 10.0   # tempo pra jogar; estourou, joga a carta mais fraca
 
 var engine := ChaosEngine.new()
@@ -42,7 +43,7 @@ var turn_bar: ProgressBar
 var turn_left := 0.0
 var main_area: BoxContainer
 var side_col: VBoxContainer
-var opp_hud: BoxContainer
+var seat_nodes: Array = []
 var first_round_done := false
 var info_label: Label
 var modifier_label: Label
@@ -151,56 +152,7 @@ func _build_ui() -> void:
 	center_col.add_theme_constant_override("separation", 12)
 	main_area.add_child(center_col)
 
-	# Placar dos outros 3 jogadores. Toque abre/fecha o detalhe.
-	opp_hud = BoxContainer.new()
-	opp_hud.add_theme_constant_override("separation", 10)
-	side_col.add_child(opp_hud)
-	for p in range(1, engine.num_players):
-		# O card em si reage a toque — abre/fecha o detalhe (pontos da rodada, cartas
-		# na mão). Por padrão só mostra o essencial: quem é, quanto tem.
-		var badge := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MUTED, 14)
-		badge.mouse_filter = Control.MOUSE_FILTER_STOP
-		badge.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var outer := VBoxContainer.new()
-		outer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		outer.add_theme_constant_override("separation", 2)
-		badge.add_child(outer)
-
-		var top_row := HBoxContainer.new()
-		top_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		outer.add_child(top_row)
-		var title_label := UIKit.label(str(config["names"][p]).to_upper(), 16, UIKit.MUTED)
-		title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		top_row.add_child(title_label)
-		var chevron := UIKit.label("▸", 15, UIKit.MUTED)
-		top_row.add_child(chevron)
-		var total := UIKit.label("0,0 pts", 25, UIKit.INK)
-		outer.add_child(total)
-
-		var detail := VBoxContainer.new()
-		detail.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		detail.visible = false
-		detail.add_theme_constant_override("separation", 1)
-		outer.add_child(detail)
-		var rp := UIKit.label("+0,0 na rodada", 15, UIKit.MUTED)
-		detail.add_child(rp)
-		var cards_label := UIKit.label("", 15, UIKit.MUTED)
-		detail.add_child(cards_label)
-
-		badge.gui_input.connect(func(event: InputEvent):
-			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-				Sfx.play("tick")
-				detail.visible = not detail.visible
-				chevron.text = "▾" if detail.visible else "▸")
-
-		opp_hud.add_child(badge)
-		hud_badges[p] = badge
-		hud_titles[p] = title_label
-		hud_totals[p] = total
-		hud_round_pts[p] = rp
-		hud_cards[p] = cards_label
-		seat_avatars[p] = badge
-
+	# (Os 3 rivais ficam sentados ao redor da mesa — veja _build_seats.)
 
 	# Regra da rodada — aviso fixo, sempre visível.
 	var mod_box := UIKit.panel(UIKit.OK.darkened(0.75), UIKit.OK, 10)
@@ -236,11 +188,13 @@ func _build_ui() -> void:
 	# Mesa de jogo — só a vaza atual, cada carta numa vaga fixa por assento.
 	table_center = Panel.new()
 	table_center.name = "TableCenter"
-	table_center.custom_minimum_size = Vector2(0, 260)
+	table_center.custom_minimum_size = Vector2(0, 400)
 	table_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	table_center.add_theme_stylebox_override("panel", UIKit.box(Color(0.06, 0.05, 0.12, 0.65), UIKit.PURPLE, 3, 24, 0))
+	table_center.add_theme_stylebox_override("panel", UIKit.box(Color(0.10, 0.08, 0.30, 0.85), Color("#5B4FC9"), 3, 200, 0))
 	table_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center_col.add_child(table_center)
+	_build_seats()
+	table_center.resized.connect(_layout_table)
 
 	status_label = UIKit.label("", 21, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -331,11 +285,11 @@ func _is_wide() -> bool:
 func _apply_orientation() -> void:
 	var wide := _is_wide()
 	main_area.vertical = not wide
-	side_col.custom_minimum_size.x = 560 if wide else 0
-	opp_hud.vertical = wide
-	table_center.custom_minimum_size.y = 300 if wide else 250
-	for p in range(1, engine.num_players):
-		(hud_badges[p] as Control).size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	side_col.custom_minimum_size.x = 420 if wide else 0
+	modifier_expanded = wide
+	_refresh_hud()
+	table_center.custom_minimum_size.y = 420 if wide else 400
+	_layout_table()
 
 
 func _on_resize() -> void:
@@ -344,10 +298,55 @@ func _on_resize() -> void:
 	_layout_hand()
 
 
+## Rivais sentados ao redor da mesa: avatar redondo (inicial + cor), nome e pontos embaixo.
+func _build_seats() -> void:
+	seat_nodes.resize(engine.num_players)
+	for p in range(1, engine.num_players):
+		var seat := VBoxContainer.new()
+		seat.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		seat.add_theme_constant_override("separation", 2)
+		seat.alignment = BoxContainer.ALIGNMENT_CENTER
+		var ring := PanelContainer.new()
+		ring.custom_minimum_size = Vector2(76, 76)
+		ring.pivot_offset = Vector2(38, 38)
+		ring.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var letter := UIKit.label(str(config["names"][p]).substr(0, 1).to_upper(), 34, SEAT_COLORS[p % SEAT_COLORS.size()], HORIZONTAL_ALIGNMENT_CENTER)
+		letter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		ring.add_child(letter)
+		seat.add_child(ring)
+		var name_l := UIKit.label("", 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		seat.add_child(name_l)
+		var pts_l := UIKit.label("0,0 pts", 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+		seat.add_child(pts_l)
+		seat.custom_minimum_size = Vector2(130, 0)
+		table_center.add_child(seat)
+		seat_nodes[p] = seat
+		hud_badges[p] = seat
+		hud_titles[p] = name_l
+		hud_totals[p] = pts_l
+		hud_round_pts[p] = Label.new()
+		hud_cards[p] = Label.new()
+		seat_avatars[p] = ring
+
+
+func _seat_pos(p: int) -> Vector2:
+	var sz := table_center.size
+	var seat: Control = seat_nodes[p]
+	var w := 130.0
+	match p:
+		1: return Vector2(10.0, sz.y * 0.5 - 20.0)
+		2: return Vector2((sz.x - w) / 2.0, 6.0)
+		_: return Vector2(sz.x - w - 10.0, sz.y * 0.5 - 20.0)
+
+
 ## Reposiciona as cartas já em jogo quando a mesa muda de tamanho (ex.: virar o celular).
 func _layout_table() -> void:
 	if table_center == null:
 		return
+	for p in range(1, engine.num_players):
+		if seat_nodes.size() > p and seat_nodes[p] != null:
+			(seat_nodes[p] as Control).position = _seat_pos(p)
 	for v in table_views:
 		var cv: CardView = v["view"]
 		cv.position = _slot_pos(int(v["player"]))
@@ -358,11 +357,11 @@ func _layout_table() -> void:
 ## parecer preso a paisagem mesmo rodando em celular).
 func _slot_pos(player: int) -> Vector2:
 	var n := maxi(engine.num_players, 1)
-	var usable_w := maxf(table_center.size.x - 24.0, CardView.SIZE.x * TABLE_SCALE * n)
-	var slot_w := minf(usable_w / float(n), CardView.SIZE.x + 40.0)
-	var start := 12.0 + (usable_w - slot_w * n) / 2.0
-	var cx := start + slot_w * (player + 0.5)
-	return Vector2(cx - CardView.SIZE.x / 2.0, (table_center.size.y - CardView.SIZE.y) / 2.0)
+	var card_w := CardView.SIZE.x * TABLE_SCALE
+	var slot_w := card_w + 14.0
+	var start := (table_center.size.x - slot_w * n) / 2.0 + 7.0 - (CardView.SIZE.x - card_w) / 2.0
+	var y := table_center.size.y * 0.60 - CardView.SIZE.y / 2.0
+	return Vector2(start + slot_w * player, y)
 
 
 ## As cartas nunca encolhem: fileira reta ou leque, escolhido em Configurações — nos dois
@@ -455,7 +454,9 @@ func _update_turn_highlight(turn_player: int) -> void:
 		var accent := UIKit.GOLD if active else UIKit.MUTED
 		if p == engine.folego_player:
 			accent = UIKit.OK if not active else UIKit.GOLD
-		avatar.add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, accent, 4 if active else 2, 10, 14))
+		var ring := UIKit.box(UIKit.PURPLE_DEEP, accent, 5 if active else 3, 60, 0)
+		ring.set_corner_radius_all(40)
+		avatar.add_theme_stylebox_override("panel", ring)
 		if not active:
 			avatar.scale = Vector2.ONE
 	if turn_player > 0:
