@@ -24,6 +24,9 @@ var hud_titles: Array = []       # Label — nome do jogador (atualizado quando 
 var hud_points: Array = []       # Label — pontos capturados até agora (provisório)
 var hud_tricks: Array = []       # Label — vazas vencidas / colocação
 var hud_cards: Array = []        # Label — contagem de cartas na mão (só bots)
+var progress_box: Control        # barra de meta do Tomador — só visível depois da licitação
+var taker_progress: ProgressBar
+var taker_progress_label: Label
 var seat_avatars: Array = []     # PanelContainer circular por assento (destaca de quem é a vez), dentro do card do HUD
 var turn_pulse_token := 0        # invalida pulsos de destaque antigos quando a vez muda
 var table_center: Panel
@@ -117,11 +120,20 @@ func _build_ui() -> void:
 	hud.add_theme_constant_override("v_separation", 8)
 	root.add_child(hud)
 	for p in range(engine.num_players):
-		var badge := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MUTED, 12)
+		# O card em si é um botão — toque pra abrir/fechar o detalhe (vazas, cartas na
+		# mão). Por padrão só mostra o essencial: quem é, quanto tem capturado.
+		var badge := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MUTED, 10)
+		badge.mouse_filter = Control.MOUSE_FILTER_STOP
 		badge.custom_minimum_size = Vector2(190, 0)
+		var outer := VBoxContainer.new()
+		outer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		outer.add_theme_constant_override("separation", 4)
+		badge.add_child(outer)
+
 		var row := HBoxContainer.new()
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_theme_constant_override("separation", 10)
-		badge.add_child(row)
+		outer.add_child(row)
 		var avatar := PanelContainer.new()
 		avatar.custom_minimum_size = Vector2(52, 52)
 		avatar.pivot_offset = Vector2(26, 26)
@@ -134,6 +146,7 @@ func _build_ui() -> void:
 		row.add_child(avatar)
 		seat_avatars.append(avatar)
 		var v := VBoxContainer.new()
+		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		v.add_theme_constant_override("separation", 1)
 		v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(v)
@@ -141,18 +154,50 @@ func _build_ui() -> void:
 		v.add_child(title_label)
 		var pts := UIKit.label("0,0 pts", 22, UIKit.INK)
 		v.add_child(pts)
+		var chevron := UIKit.label("▸ detalhe", 10, UIKit.MUTED)
+		row.add_child(chevron)
+
+		var detail := VBoxContainer.new()
+		detail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		detail.visible = false
+		detail.add_theme_constant_override("separation", 1)
+		outer.add_child(detail)
 		var tr := UIKit.label("0 vazas", 12, UIKit.MUTED)
-		v.add_child(tr)
+		detail.add_child(tr)
 		var cards_label: Label
 		if p > 0:
 			cards_label = UIKit.label("", 12, UIKit.MUTED)
-			v.add_child(cards_label)
+			detail.add_child(cards_label)
+
+		badge.gui_input.connect(func(event: InputEvent):
+			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+				Sfx.play("tick")
+				detail.visible = not detail.visible
+				chevron.text = "▾ detalhe" if detail.visible else "▸ detalhe")
+
 		hud.add_child(badge)
 		hud_badges.append(badge)
 		hud_titles.append(title_label)
 		hud_points.append(pts)
 		hud_tricks.append(tr)
 		hud_cards.append(cards_label)
+
+	# Barra de meta do Tomador — o objetivo real da rodada, sempre visível assim que a
+	# licitação termina, em vez de só aparecer escondido no texto do resultado final.
+	progress_box = UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 8)
+	progress_box.visible = false
+	var pv := VBoxContainer.new()
+	pv.add_theme_constant_override("separation", 3)
+	progress_box.add_child(pv)
+	taker_progress_label = UIKit.label("", 12, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	pv.add_child(taker_progress_label)
+	taker_progress = ProgressBar.new()
+	taker_progress.custom_minimum_size = Vector2(0, 10)
+	taker_progress.show_percentage = false
+	taker_progress.add_theme_stylebox_override("background", UIKit.box(UIKit.PURPLE, UIKit.MUTED, 1, 5, 0))
+	taker_progress.add_theme_stylebox_override("fill", UIKit.box(UIKit.GOLD, UIKit.GOLD, 0, 5, 0))
+	pv.add_child(taker_progress)
+	root.add_child(progress_box)
 
 	if tutorial:
 		var tut_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.OK, 10)
@@ -305,26 +350,37 @@ func _refresh_hud() -> void:
 		(hud_points[p] as Label).text = "%s pts" % UIKit.fmt_dec(engine.points_of(p), 1)
 		(hud_tricks[p] as Label).text = "%d vazas" % trick_wins[p]
 		var turn := p == turn_player
-		(hud_badges[p] as PanelContainer).modulate = Color(1, 1, 1, 1) if turn else Color(0.78, 0.76, 0.85, 1)
+		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 1) if turn else Color(0.78, 0.76, 0.85, 1)
 		if p > 0:
 			(hud_cards[p] as Label).text = "%d cartas" % (engine.hands[p] as Array).size()
 	_update_turn_highlight(turn_player)
 	var mode_name: String = GameState.MODE_NAMES[GameState.mode]
 	var extra := ""
-	if engine.taker != -1:
-		var bouts_now := 0
-		for c in engine.captured[engine.taker]:
-			if (c as CardData).is_bout():
-				bouts_now += 1
-		var target := Scoring.target_for_bouts(bouts_now)
-		extra = "  ·  Tomador: %s (%s)  ·  Meta: %s pts" % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract], UIKit.fmt_dec(target, 1)]
 	if GameState.mode == GameState.Mode.RANKED:
 		var t := Ranked.tier_info(int(GameState.ranked()["points"]), int(GameState.ranked()["mmr"]))
-		extra += "  ·  %s" % t["label"]
+		extra = "  ·  %s" % t["label"]
 	if engine.taker == -1:
 		info_label.text = "%s  ·  Licitação" % mode_name.to_upper()
+		progress_box.visible = false
 	else:
 		info_label.text = "%s  ·  Vaza %d/%d%s" % [mode_name.to_upper(), mini(engine.trick_number + 1, engine.total_tricks), engine.total_tricks, extra]
+		_refresh_taker_progress()
+
+
+## Barra de meta do Tomador: o objetivo real da rodada, atualizada a cada vaza — em
+## vez de só revelar se bateu ou não na tela de resultado, no fim de tudo.
+func _refresh_taker_progress() -> void:
+	var bouts_now := 0
+	for c in engine.captured[engine.taker]:
+		if (c as CardData).is_bout():
+			bouts_now += 1
+	var target := Scoring.target_for_bouts(bouts_now)
+	var current := engine.points_of(engine.taker)
+	progress_box.visible = true
+	taker_progress.max_value = target
+	taker_progress.value = minf(current, target)
+	var who := "Você" if engine.taker == 0 else str(config["names"][engine.taker])
+	taker_progress_label.text = "%s (%s) — %s / %s pts pra bater a meta" % [who, Scoring.CONTRACT_NAMES[engine.contract], UIKit.fmt_dec(current, 1), UIKit.fmt_dec(target, 1)]
 
 
 ## Destaca com borda dourada + pulso o avatar de quem tem a vez agora (bots só — o
@@ -378,7 +434,8 @@ func _speech_bubble(player: int, text: String) -> void:
 func _update_taker_badge() -> void:
 	for p in range(engine.num_players):
 		var accent := UIKit.GOLD if p == engine.taker else UIKit.MUTED
-		(hud_badges[p] as PanelContainer).add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, accent, 3, 4, 8))
+		var badge: PanelContainer = hud_badges[p]
+		badge.add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, accent, 3, 4, 10))
 		var title: Label = hud_titles[p]
 		var base_name := str(config["names"][p]).to_upper()
 		title.text = "♛ " + base_name if p == engine.taker else base_name

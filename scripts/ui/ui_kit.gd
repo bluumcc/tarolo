@@ -81,6 +81,21 @@ static func panel(bg: Color = PURPLE_DEEP, border: Color = BLACK, pad: int = 16)
 	return p
 
 
+## Painel que reage a toque (ex.: card de jogador que expande detalhe) sem trocar de
+## nó — PanelContainer se auto-dimensiona certinho ao redor do conteúdo (Button não faz
+## isso com filhos arbitrários, então nunca use Button só pra "ser clicável").
+## Conecte o retorno de `on_tap` pra tratar o toque (recebe o próprio painel).
+static func tap_panel(bg: Color = PURPLE_DEEP, border: Color = MUTED, pad: int = 10, on_tap: Callable = Callable()) -> PanelContainer:
+	var p := panel(bg, border, pad)
+	p.mouse_filter = Control.MOUSE_FILTER_STOP
+	if on_tap.is_valid():
+		p.gui_input.connect(func(event: InputEvent):
+			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+				sfx("tick")
+				on_tap.call())
+	return p
+
+
 static func background() -> ColorRect:
 	var bg := ColorRect.new()
 	bg.color = NIGHT

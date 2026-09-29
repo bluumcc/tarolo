@@ -31,6 +31,7 @@ var status_label: Label
 var trick_label: Label
 var info_label: Label
 var modifier_label: Label
+var modifier_expanded := false
 var wager_label: Label
 var popup_layer: Control
 var overlay_layer: Control
@@ -121,11 +122,20 @@ func _build_ui() -> void:
 	hud.add_theme_constant_override("v_separation", 8)
 	root.add_child(hud)
 	for p in range(engine.num_players):
-		var badge := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MUTED, 12)
+		# O card em si é um botão — toque pra abrir/fechar o detalhe (pontos da rodada,
+		# cartas na mão, item ativo). Por padrão só mostra o essencial: quem é, quanto tem.
+		var badge := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MUTED, 10)
+		badge.mouse_filter = Control.MOUSE_FILTER_STOP
 		badge.custom_minimum_size = Vector2(190, 0)
+		var outer := VBoxContainer.new()
+		outer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		outer.add_theme_constant_override("separation", 4)
+		badge.add_child(outer)
+
 		var row := HBoxContainer.new()
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_theme_constant_override("separation", 10)
-		badge.add_child(row)
+		outer.add_child(row)
 		var avatar := PanelContainer.new()
 		avatar.custom_minimum_size = Vector2(52, 52)
 		avatar.pivot_offset = Vector2(26, 26)
@@ -138,6 +148,7 @@ func _build_ui() -> void:
 		row.add_child(avatar)
 		seat_avatars.append(avatar)
 		var v := VBoxContainer.new()
+		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		v.add_theme_constant_override("separation", 1)
 		v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(v)
@@ -145,12 +156,27 @@ func _build_ui() -> void:
 		v.add_child(title_label)
 		var total := UIKit.label("0,0 pts", 22, UIKit.INK)
 		v.add_child(total)
+		var chevron := UIKit.label("▸ detalhe", 10, UIKit.MUTED)
+		row.add_child(chevron)
+
+		var detail := VBoxContainer.new()
+		detail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		detail.visible = false
+		detail.add_theme_constant_override("separation", 1)
+		outer.add_child(detail)
 		var rp := UIKit.label("+0,0 na rodada", 12, UIKit.MUTED)
-		v.add_child(rp)
+		detail.add_child(rp)
 		var cards_label: Label
 		if p > 0:
 			cards_label = UIKit.label("", 12, UIKit.MUTED)
-			v.add_child(cards_label)
+			detail.add_child(cards_label)
+
+		badge.gui_input.connect(func(event: InputEvent):
+			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+				Sfx.play("tick")
+				detail.visible = not detail.visible
+				chevron.text = "▾ detalhe" if detail.visible else "▸ detalhe")
+
 		hud.add_child(badge)
 		hud_badges.append(badge)
 		hud_titles.append(title_label)
@@ -158,10 +184,20 @@ func _build_ui() -> void:
 		hud_round_pts.append(rp)
 		hud_cards.append(cards_label)
 
+	# Barra do modificador — compacta por padrão (nome só); a explicação completa já
+	# apareceu no banner de início de rodada, então aqui só repete em texto curto, com
+	# toque pra reabrir o texto inteiro se precisar consultar de novo.
 	var mod_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.OK, 10)
+	mod_box.mouse_filter = Control.MOUSE_FILTER_STOP
 	modifier_label = UIKit.label("", 14, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
 	modifier_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	mod_box.add_child(modifier_label)
+	mod_box.gui_input.connect(func(event: InputEvent):
+		if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
+			return
+		Sfx.play("tick")
+		modifier_expanded = not modifier_expanded
+		_refresh_hud())
 	root.add_child(mod_box)
 
 	var wager_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 8)
@@ -313,7 +349,7 @@ func _refresh_hud() -> void:
 		var rp: float = engine.round_points[p] if p < engine.round_points.size() else 0.0
 		(hud_round_pts[p] as Label).text = "+%s na rodada" % UIKit.fmt_dec(rp, 1)
 		var turn := p == turn_player
-		(hud_badges[p] as PanelContainer).modulate = Color(1, 1, 1, 1) if turn else Color(0.78, 0.76, 0.85, 1)
+		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 1) if turn else Color(0.78, 0.76, 0.85, 1)
 		var lead_accent := UIKit.GOLD if p == engine.folego_player else UIKit.MUTED
 		var item_icon: String = ChaosItems.ICONS.get(engine.player_items[p], "") if p < engine.player_items.size() else ""
 		var prefix := ("🔥 " if p == engine.folego_player else "") + (item_icon + " " if item_icon != "" else "")
@@ -322,7 +358,8 @@ func _refresh_hud() -> void:
 		if p > 0:
 			(hud_cards[p] as Label).text = "%d cartas" % (engine.hands[p] as Array).size()
 	info_label.text = "CAOS  ·  Rodada %d/%d  ·  Vaza %d/%d" % [engine.round_index + 1, ChaosEngine.ROUNDS, mini(engine.trick_number + 1, ChaosEngine.HAND_SIZE), ChaosEngine.HAND_SIZE]
-	modifier_label.text = "✦ %s — %s" % [ChaosModifiers.label(engine.modifier, engine.weak_suit), ChaosModifiers.DESCRIPTIONS[engine.modifier]]
+	var mod_name := "✦ %s" % ChaosModifiers.label(engine.modifier, engine.weak_suit)
+	modifier_label.text = "%s — %s" % [mod_name, ChaosModifiers.DESCRIPTIONS[engine.modifier]] if modifier_expanded else "%s  (toque p/ detalhe)" % mod_name
 	var profile := SaveManager.section("profile")
 	wager_label.text = "🪙 Suas fichas: %d   ·   Pote da mesa: %d (buy-in %d)" % [int(profile["fichas"]), int(engine.pot), int(engine.buy_in)]
 	_update_turn_highlight(turn_player)
