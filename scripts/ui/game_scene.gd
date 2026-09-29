@@ -1025,7 +1025,7 @@ func _run_discard() -> void:
 		if not is_inside_tree():
 			return
 		var legal := engine.legal_discards(engine.hands[engine.taker])
-		var chosen := BotAI.choose_discard(legal, Deck.CHIEN_SIZE)
+		var chosen: Array = BotAI.choose_discard(legal, Deck.CHIEN_SIZE) if int(config["difficulty"][engine.taker]) == BotAI.Difficulty.EASY else BotStrategy.choose_discard(engine.hands[engine.taker], legal, Deck.CHIEN_SIZE)
 		engine.discard(chosen)
 
 
@@ -1207,7 +1207,7 @@ func _run_round() -> void:
 			await _wait(_think_time(p))
 			if not is_inside_tree():
 				return
-			card = BotAI.choose(engine.hands[p], engine.plays, p, engine.num_players, int(config["difficulty"][p]), bot_rng)
+			card = _bot_card(p)
 		if card == null or not is_inside_tree():
 			return
 		var from := _source_position(p, card)
@@ -1224,6 +1224,16 @@ func _run_round() -> void:
 			await _resolve_trick(res["result"])
 	if is_inside_tree():
 		_finish_match()
+
+
+## Carta do bot conforme a dificuldade: Fácil joga a regra simples (ganhar a vaza, senão a
+## carta mais fraca, sem ajudar ninguém); Normal e Difícil jogam de forma estratégica
+## (ver BotStrategy).
+func _bot_card(p: int) -> CardData:
+	var diff := int(config["difficulty"][p])
+	if diff == BotAI.Difficulty.EASY:
+		return BotAI.choose(engine.hands[p], engine.plays, p, engine.num_players, BotAI.Difficulty.NORMAL, bot_rng)
+	return BotStrategy.choose(engine, p, diff, bot_rng)
 
 
 ## Quanto um bot "pensa" antes de jogar: um tempinho variável, pra dar pra acompanhar a

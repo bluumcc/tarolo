@@ -18,6 +18,7 @@ func _init() -> void:
 	_test_bidding()
 	_test_bonuses()
 	_test_chaos()
+	_test_bot_strategy()
 	print("\n%d ok, %d falhas" % [passed, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -394,3 +395,45 @@ func _test_chaos() -> void:
 	check(bool(steal_result["roubo_applied"]), "Roubo de Vaza dispara na 1ª vaza vencida com o item")
 	check(int(steal_result["roubo_target"]) == 1, "Roubo de Vaza mira em quem está em 1º lugar no total")
 	check(e6.totals[1] == 16.0, "alvo do roubo perde os pontos roubados")
+
+
+## Bots estratégicos: só fazem jogadas legais em qualquer nível e, na defesa, seguram muito
+## mais o Tomador do que o bot simples (mesmas mãos, mesma semente).
+func _test_bot_strategy() -> void:
+	var results := {}
+	for def_level in [-1, BotAI.Difficulty.NORMAL, BotAI.Difficulty.HARD]:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 99
+		var ok := 0
+		var rounds := 0
+		var i := 0
+		var illegal := 0
+		while rounds < 120:
+			i += 1
+			var e := MatchEngine.new()
+			e.rng.seed = 7000 + i
+			e.setup({"players": 4, "tutorial": false})
+			if BotAI.hand_strength(e.hands[0]) < 22.0:
+				continue
+			rounds += 1
+			e.place_bid(0, Scoring.Contract.PETITE)
+			while not e.bidding_done:
+				e.place_bid(e.bid_turn, -1)
+			if e.awaiting_discard:
+				e.discard(BotAI.choose_discard(e.legal_discards(e.hands[e.taker]), Deck.CHIEN_SIZE))
+			while not e.is_round_over():
+				var p := e.current
+				var card: CardData
+				if p == 0 or def_level == -1:
+					card = BotAI.choose(e.hands[p], e.plays, p, 4, BotAI.Difficulty.HARD, rng)
+				else:
+					card = BotStrategy.choose(e, p, def_level, rng)
+				if not TrickRules.legal_cards(e.hands[p], e.plays).has(card):
+					illegal += 1
+				e.play(p, card)
+			if e.result["success"]:
+				ok += 1
+		results[def_level] = ok
+		check(illegal == 0, "bot estratégico (nível %d) só joga cartas legais" % def_level)
+	check(int(results[BotAI.Difficulty.HARD]) < int(results[-1]), "defesa Difícil segura o Tomador mais que a simples (%d < %d)" % [results[BotAI.Difficulty.HARD], results[-1]])
+	check(int(results[BotAI.Difficulty.NORMAL]) < int(results[-1]), "defesa Normal também segura mais que a simples (%d < %d)" % [results[BotAI.Difficulty.NORMAL], results[-1]])

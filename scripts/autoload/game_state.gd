@@ -177,6 +177,14 @@ func report_chaos_match(result: Dictionary) -> Dictionary:
 	return summary
 
 
+## Dificuldade dos bots no Vanilla comum (Ajustes): 0 Fácil, 1 Normal, 2 Difícil. O
+## tutorial usa sempre Fácil (jogadas previsíveis) e o Ranqueado usa o seu elo.
+func bots_difficulty() -> int:
+	if tutorial:
+		return BotAI.Difficulty.EASY
+	return clampi(int(settings().get("difficulty", 1)), 0, 2)
+
+
 ## Configuração da partida para a GameScene / MatchEngine conforme o modo.
 func match_config() -> Dictionary:
 	var names := BOT_NAMES.duplicate()
@@ -184,7 +192,7 @@ func match_config() -> Dictionary:
 	var cfg := {
 		"players": 4,
 		"names": [player_name(), names[0], names[1], names[2]],
-		"difficulty": [BotAI.Difficulty.HARD, BotAI.Difficulty.NORMAL, BotAI.Difficulty.NORMAL, BotAI.Difficulty.NORMAL],
+		"difficulty": [BotAI.Difficulty.HARD, bots_difficulty(), bots_difficulty(), bots_difficulty()],
 		"tutorial": tutorial,
 	}
 	if mode == Mode.RANKED:
