@@ -52,6 +52,9 @@ var shown_totals: Array = []
 var modifier_label: Label
 var modifier_expanded := false
 var wager_label: Label
+var power_btn: Button
+var modal_open := false      # modal de poder/aposta aberto — o relógio da jogada pausa
+var best_trick := {}         # melhor vaza do jogador na partida (pra tela final)
 var popup_layer: Control
 var overlay_layer: Control
 var table_views: Array = []
@@ -74,6 +77,9 @@ func _ready() -> void:
 	_refresh_hud()
 	_rebuild_hand()
 	await _announce_round()
+	if not is_inside_tree():
+		return
+	await _pre_round()
 	if not is_inside_tree():
 		return
 	_run_round.call_deferred()
@@ -259,6 +265,10 @@ func _build_ui() -> void:
 	wager_label = UIKit.label("", 16, UIKit.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
 	wager_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	my_right.add_child(wager_label)
+	power_btn = UIKit.button("", UIKit.OK)
+	power_btn.custom_minimum_size = Vector2(0, 64)
+	power_btn.pressed.connect(_on_power_pressed)
+	my_right.add_child(power_btn)
 	root.add_child(my_box)
 	hud_badges[0] = my_box
 	hud_titles[0] = my_title
@@ -453,7 +463,7 @@ func _refresh_hud() -> void:
 		var turn := p == turn_player
 		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 1) if turn else Color(0.78, 0.76, 0.85, 1)
 		var lead_accent := UIKit.GOLD if p == engine.folego_player else UIKit.MUTED
-		var item_icon: String = ChaosItems.ICONS.get(engine.player_items[p], "") if p < engine.player_items.size() else ""
+		var item_icon: String = ChaosItems.ICONS.get(engine.player_items[p], "") if p < engine.player_items.size() and not engine.power_used[p] else ""
 		var prefix := ("♨ " if p == engine.folego_player else "") + (item_icon + " " if item_icon != "" else "")
 		(hud_titles[p] as Label).text = "%s%s" % [prefix, str(config["names"][p]).to_upper()]
 		(hud_titles[p] as Label).add_theme_color_override("font_color", lead_accent)
@@ -466,6 +476,21 @@ func _refresh_hud() -> void:
 	var profile := SaveManager.section("profile")
 	wager_label.text = "◎ Suas fichas: %d   ·   Pote da mesa: %d (buy-in %d)" % [int(profile["fichas"]), int(engine.pot), int(engine.buy_in)]
 	_update_turn_highlight(turn_player)
+	_refresh_power_button()
+
+
+func _refresh_power_button() -> void:
+	if power_btn == null:
+		return
+	var item: int = engine.player_items[0]
+	if item == ChaosItems.Item.NONE:
+		power_btn.visible = false
+		return
+	power_btn.visible = true
+	var used: bool = engine.power_used[0]
+	power_btn.text = "%s %s%s" % [ChaosItems.ICONS[item], str(ChaosItems.NAMES[item]).to_upper(), "  ✓" if used else ""]
+	power_btn.disabled = used or not human_turn
+	power_btn.tooltip_text = str(ChaosItems.DESCRIPTIONS[item])
 
 
 func _update_turn_highlight(turn_player: int) -> void:
@@ -522,7 +547,7 @@ func _announce_round() -> void:
 func _intro_block() -> Dictionary:
 	var m := engine.modifier
 	if ChaosModifiers.scope_of(m) == ChaosModifiers.Scope.ROUND:
-		return {"head": "MODIFICADOR · RODADA INTEIRA", "title": "✦ %s" % ChaosModifiers.label(m, engine.weak_suit), "text": "%s\n%s" % [ChaosModifiers.DESCRIPTIONS[m], ChaosModifiers.TIPS[m]], "color": UIKit.OK}
+		return {"spin": true, "head": "MODIFICADOR · RODADA INTEIRA", "title": "✦ %s" % ChaosModifiers.label(m, engine.weak_suit), "text": "%s\n%s" % [ChaosModifiers.DESCRIPTIONS[m], ChaosModifiers.TIPS[m]], "color": UIKit.OK}
 	if ChaosModifiers.is_secret(m):
 		return {"head": "MODIFICADOR · SURPRESA", "title": "? EM ALGUMA VAZA", "text": "Uma regra especial vai valer só em UMA vaza dessa rodada. Você só descobre qual e quando ela começar.", "color": UIKit.DANGER}
 	return {"head": "MODIFICADOR · VAZA %d" % (engine.modifier_trick + 1), "title": "%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.NAMES[m]], "text": "%s\n%s" % [ChaosModifiers.DESCRIPTIONS[m], ChaosModifiers.TIPS[m]], "color": UIKit.GOLD}
@@ -566,7 +591,10 @@ func _transition(kicker: String, blocks: Array, hold: float) -> void:
 		cv.add_theme_constant_override("separation", 4)
 		card.add_child(cv)
 		cv.add_child(UIKit.label(b["head"], 16, b["color"], HORIZONTAL_ALIGNMENT_CENTER))
-		cv.add_child(UIKit.label(b["title"], 30, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+		var title_lbl := UIKit.label(b["title"], 30, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+		cv.add_child(title_lbl)
+		if b.get("spin", false):
+			_spin_label(title_lbl, str(b["title"]))
 		var t := UIKit.label(b["text"], 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 		t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		cv.add_child(t)
@@ -586,6 +614,22 @@ func _transition(kicker: String, blocks: Array, hold: float) -> void:
 	tw.tween_property(ov, "modulate:a", 0.0, GameState.anim(0.18))
 	await tw.finished
 	ov.queue_free()
+
+
+## Caça-níquel do modificador: os nomes giram, desaceleram e travam no sorteado.
+func _spin_label(lbl: Label, final_text: String) -> void:
+	var names: Array = ChaosModifiers.ALL.map(func(m): return "✦ %s" % ChaosModifiers.NAMES[m])
+	var steps := 14
+	for i in range(steps):
+		if not is_instance_valid(lbl):
+			return
+		lbl.text = names[(i * 3 + 1) % names.size()]
+		Sfx.play("tick")
+		await get_tree().create_timer(0.05 + 0.014 * i).timeout
+	if is_instance_valid(lbl):
+		lbl.text = final_text
+		FX.pop(lbl, 1.35)
+		Sfx.play("win")
 
 
 ## Mensagem na faixa reservada acima da mesa (nunca cobre nada). `color` pinta a borda.
@@ -635,6 +679,10 @@ func _run_round() -> void:
 		var p := engine.current
 		_refresh_hud()
 		var card: CardData
+		if p != 0 or GameState.autoplay:
+			await _bot_power(p)
+			if not is_inside_tree():
+				return
 		if p == 0 and not GameState.autoplay:
 			card = await _wait_human()
 		else:
@@ -663,57 +711,150 @@ func _run_round() -> void:
 		_finish_match()
 	else:
 		engine.advance_round()
-		await _choose_items()
+		await _announce_round()
 		if not is_inside_tree():
 			return
-		await _announce_round()
+		await _pre_round()
 		if not is_inside_tree():
 			return
 		_run_round.call_deferred()
 
 
-## Entre rodadas (a partir da 2ª): cada jogador escolhe 1 de 2 itens sorteados pra usar
-## só nessa rodada — a decisão ativa que faltava, além de reagir ao modificador da vez.
-func _choose_items() -> void:
-	var options := ChaosItems.offer(engine.rng)
+## Antes de cada rodada: escolha do poder (1 de 3) e da aposta (quantas vazas você promete
+## vencer). Bots decidem na hora. São as duas decisões ativas da partida.
+func _pre_round() -> void:
 	for p in range(1, engine.num_players):
-		engine.set_item(p, ChaosItems.bot_choose(options, engine.modifier, bot_rng))
+		engine.set_item(p, ChaosBot.choose_power(bot_rng))
+		engine.set_bet(p, ChaosBot.choose_bet(engine.hands[p], int(config["difficulty"][p]), bot_rng))
 	if GameState.autoplay:
-		engine.set_item(0, ChaosItems.bot_choose(options, engine.modifier, bot_rng))
+		engine.set_item(0, ChaosBot.choose_power(bot_rng))
+		engine.set_bet(0, ChaosBot.choose_bet(engine.hands[0], BotAI.Difficulty.NORMAL, bot_rng))
 		return
-	var choice: int = await _show_item_modal(options)
+	var powers := ChaosItems.offer(engine.rng)
+	var opts: Array = []
+	for it in powers:
+		opts.append({"label": "%s  %s" % [ChaosItems.ICONS[it], str(ChaosItems.NAMES[it]).to_upper()], "desc": ChaosItems.DESCRIPTIONS[it], "color": UIKit.OK})
+	var pick := await _modal_choice("ESCOLHA SEU PODER", "Use uma vez nessa rodada, na sua vez (botão no rodapé).", opts)
 	if not is_inside_tree():
 		return
-	engine.set_item(0, choice)
+	engine.set_item(0, powers[pick])
+	var hand: Array = engine.hands[0]
+	var trunfos := hand.filter(func(c: CardData) -> bool: return c.is_trunfo() and not c.is_louco()).size()
+	var kings := hand.filter(func(c: CardData) -> bool: return c.rank == 14 and not c.is_trunfo()).size()
+	var bopts: Array = []
+	for b in ChaosEngine.BET_OPTIONS:
+		bopts.append({"label": "%s · %d+ vazas · +%d" % [b["name"], int(b["need"]), int(b["bonus"])], "desc": "", "color": UIKit.GOLD})
+	var bet := await _modal_choice("FAÇA SUA APOSTA", "Sua mão: %d Trunfos e %d Reis. Errou a aposta: −%d pts." % [trunfos, kings, int(ChaosEngine.BET_MISS)], bopts)
+	if not is_inside_tree():
+		return
+	engine.set_bet(0, bet)
+	_refresh_hud()
 
 
-func _show_item_modal(options: Array) -> int:
+## Modal genérico de escolha: `opts` = [{label, desc, color}]. Devolve o índice tocado,
+## ou -1 se `cancel` e o jogador desistiu.
+func _modal_choice(title: String, sub: String, opts: Array, cancel := false) -> int:
+	modal_open = true
 	var ov := UIKit.overlay()
 	overlay_layer.add_child(ov)
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 24)
-	box.custom_minimum_size = Vector2(580, 0)
+	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 40.0, 600.0), 0)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 10)
+	v.add_theme_constant_override("separation", 12)
 	box.add_child(v)
-	v.add_child(UIKit.label("ESCOLHA SEU ITEM", 30, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("Vale só pra você, só na Rodada %d/%d — modificador: %s" % [engine.round_index + 1, ChaosEngine.ROUNDS, (str(_rest_banner()[0]).trim_prefix("✦ ") if not ChaosModifiers.is_secret(engine.modifier) else "surpresa em alguma vaza")], 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label(title, 32, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	var sl := UIKit.label(sub, 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	sl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(sl)
 	v.add_child(HSeparator.new())
-	for item in options:
-		var btn := UIKit.button("%s  %s" % [ChaosItems.ICONS[item], ChaosItems.NAMES[item]], UIKit.OK)
-		btn.pressed.connect(func(): item_chosen.emit(item))
+	for i in range(opts.size()):
+		var o: Dictionary = opts[i]
+		var btn := UIKit.button(str(o["label"]), o.get("color", UIKit.OK))
+		btn.pressed.connect(func(): item_chosen.emit(i))
 		v.add_child(btn)
-		var desc := UIKit.label(ChaosItems.DESCRIPTIONS[item], 15, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		desc.custom_minimum_size = Vector2(520, 0)
-		v.add_child(desc)
+		if str(o.get("desc", "")) != "":
+			var desc := UIKit.label(str(o["desc"]), 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+			desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			v.add_child(desc)
+	if cancel:
+		var cb := UIKit.button("CANCELAR", UIKit.MUTED)
+		cb.pressed.connect(func(): item_chosen.emit(-1))
+		v.add_child(cb)
 	ov.add_child(UIKit.centered(box))
 	box.scale = Vector2(0.85, 0.85)
 	box.pivot_offset = box.custom_minimum_size / 2.0
 	create_tween().tween_property(box, "scale", Vector2.ONE, GameState.anim(0.2)).set_trans(Tween.TRANS_BACK)
 	var chosen: int = await item_chosen
+	modal_open = false
 	if is_inside_tree():
 		ov.queue_free()
 	return chosen
+
+
+func _pick_rival(title: String) -> int:
+	var opts: Array = []
+	var ids: Array = []
+	for q in range(1, engine.num_players):
+		ids.append(q)
+		opts.append({"label": str(config["names"][q]).to_upper(), "desc": "", "color": UIKit.DANGER})
+	var i := await _modal_choice(title, "Escolha o rival.", opts, true)
+	return -1 if i < 0 else int(ids[i])
+
+
+func _on_power_pressed() -> void:
+	if not human_turn or modal_open or not engine.can_use_power(0):
+		return
+	var item: int = engine.player_items[0]
+	match item:
+		ChaosItems.Item.TROCA:
+			var t := await _pick_rival("ROUBAR TRUNFO DE QUEM?")
+			if t < 0 or not is_inside_tree():
+				return
+			var res := engine.use_troca(0, t)
+			if res.is_empty():
+				return
+			Sfx.play("win")
+			_rebuild_hand()
+			_banner("⇅ TRUNFO ROUBADO!", "Você deu %s e levou %s de %s." % [res["given"].display_name(), res["taken"].display_name(), str(config["names"][t]).to_upper()], UIKit.OK)
+		ChaosItems.Item.ESPIADA:
+			var t := await _pick_rival("ESPIAR QUEM?")
+			if t < 0 or not is_inside_tree():
+				return
+			var seen := engine.use_espiada(0, t)
+			seen.sort_custom(func(a: CardData, b: CardData) -> bool:
+				if a.is_trunfo() != b.is_trunfo():
+					return a.is_trunfo()
+				return a.rank > b.rank)
+			var names: Array = seen.map(func(c: CardData) -> String: return c.display_name())
+			await _modal_choice("MÃO DE %s" % str(config["names"][t]).to_upper(), ", ".join(names), [{"label": "ENTENDI", "desc": "", "color": UIKit.OK}])
+		ChaosItems.Item.ARRISCAR:
+			if engine.use_arriscar(0):
+				Sfx.play("win")
+				_banner("⚡ ARRISCAR ATIVO!", "Essa vaza: vencer = ×2, perder = −2. Jogue forte!", UIKit.GOLD)
+	_refresh_hud()
+
+
+## Poder do bot na vez dele: mostra o que fez, pra ninguém ficar sem entender.
+func _bot_power(p: int) -> void:
+	var act := ChaosBot.maybe_power(engine, p, int(config["difficulty"][p]), bot_rng)
+	if act.is_empty():
+		return
+	var pname := str(config["names"][p]).to_upper()
+	if int(act["item"]) == ChaosItems.Item.TROCA:
+		var t: int = act["target"]
+		var res := engine.use_troca(p, t)
+		if res.is_empty():
+			return
+		Sfx.play("lose" if t == 0 else "chip")
+		_banner("⇅ %s ROUBOU UM TRUNFO!" % pname, "Levou um Trunfo de %s%s." % [str(config["names"][t]).to_upper(), " (você!)" if t == 0 else ""], UIKit.DANGER if t == 0 else UIKit.GOLD)
+		if t == 0:
+			_rebuild_hand()
+	else:
+		engine.use_arriscar(p)
+		Sfx.play("chip")
+		_banner("⚡ %s ARRISCOU!" % pname, "Essa vaza vale ×2 pra ele se vencer — e −2 se perder.", UIKit.GOLD)
+	_refresh_hud()
+	await _wait(1.3)
 
 
 func _wait(seconds: float) -> void:
@@ -734,15 +875,17 @@ func _wait_human() -> CardData:
 	turn_left = TURN_SECONDS
 	turn_bar.modulate.a = 1.0
 	_rebuild_hand()
+	_refresh_power_button()
 	var card: CardData = await human_card_chosen
 	human_turn = false
+	_refresh_power_button()
 	turn_bar.modulate.a = 0.0
 	status_label.text = ""
 	return card
 
 
 func _process(delta: float) -> void:
-	if not human_turn or paused or finished or turn_bar == null:
+	if not human_turn or paused or modal_open or finished or turn_bar == null:
 		return
 	turn_left -= delta
 	turn_bar.value = maxf(turn_left, 0.0)
@@ -843,6 +986,8 @@ func _resolve_trick(result: Dictionary) -> void:
 		pulse.tween_property(win_view, "scale", Vector2(TABLE_SCALE, TABLE_SCALE) * 1.18, GameState.anim(0.12))
 		pulse.tween_property(win_view, "scale", Vector2(TABLE_SCALE, TABLE_SCALE) * 1.08, GameState.anim(0.12))
 
+	if winner == 0 and points > float(best_trick.get("points", 0.0)):
+		best_trick = {"points": points, "round": engine.round_index + 1}
 	var wname := str(config["names"][winner]).to_upper()
 	var notes: Array = []
 	if bool(result.get("final", false)):
@@ -873,8 +1018,10 @@ func _resolve_trick(result: Dictionary) -> void:
 	var extras: Array = []
 	for id in result.get("combos", []):
 		extras.append([str(ChaosModifiers.COMBO_NAMES[id]) + "!", "%s — %s" % [wname, ChaosModifiers.COMBO_DESCRIPTIONS[id]], UIKit.OK])
-	if bool(result.get("roubo_applied", false)):
-		extras.append(["⚔ ROUBO DE VAZA!", "%s roubou %s pts de %s" % [wname, UIKit.fmt_dec(float(result["roubo_amount"]), 1), str(config["names"][int(result["roubo_target"])]).to_upper()], UIKit.DANGER])
+	if bool(result.get("arriscar_winner", false)):
+		extras.append(["⚡ ARRISCOU E ACERTOU!", "%s dobrou os pontos da vaza" % wname, UIKit.OK])
+	for q in result.get("arriscar_losers", []):
+		extras.append(["⚡ ARRISCOU E ERROU!", "%s perdeu %s pts" % [str(config["names"][int(q)]).to_upper(), UIKit.fmt_dec(ChaosEngine.ARRISCAR_LOSS, 0)], UIKit.DANGER])
 	if float(result.get("saque_amount", 0.0)) > 0.0:
 		extras.append(["⚔ SAQUE!", "%s levou %s pts dos rivais" % [wname, UIKit.fmt_dec(float(result["saque_amount"]), 1)], UIKit.DANGER])
 	if float(result.get("assalto_amount", 0.0)) > 0.0:
@@ -928,6 +1075,18 @@ func _show_round_summary() -> void:
 		var gained: float = (r["round_points"] as Array)[p]
 		var line := "%s%s  %s pts  (+%s)" % ["♛ " if p == order[0] else "", str(config["names"][p]).to_upper(), UIKit.fmt_dec(float(totals[p]), 1), UIKit.fmt_dec(gained, 1)]
 		v.add_child(UIKit.label(line, 20, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+	var bets: Array = r.get("bets", [])
+	var won: Array = r.get("tricks_won", [])
+	v.add_child(HSeparator.new())
+	v.add_child(UIKit.label("APOSTAS", 22, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	for p in range(engine.num_players):
+		var bd: Dictionary = bets[p]
+		if int(bd["bet"]) < 0:
+			continue
+		var opt: Dictionary = ChaosEngine.BET_OPTIONS[int(bd["bet"])]
+		var ok := bool(bd["hit"])
+		var bl := "%s  %s (%d+)  fez %d  %s %s" % [str(config["names"][p]).to_upper(), opt["name"], int(opt["need"]), int(won[p]), "✓" if ok else "✕", ("+" if ok else "") + UIKit.fmt_dec(float(bd["delta"]), 0)]
+		v.add_child(UIKit.label(bl, 20, UIKit.OK if ok else UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
 	var btn_text := "VER RESULTADO FINAL" if int(r["round"]) >= ChaosEngine.ROUNDS - 1 else "PRÓXIMA RODADA"
 	var btn := UIKit.button(btn_text)
 	v.add_child(btn)
@@ -975,9 +1134,11 @@ func _show_results(summary: Dictionary) -> void:
 		var line := "%d. %s%s — %s pts" % [i + 1, "♛ " if i == 0 else "", str(config["names"][p]).to_upper(), UIKit.fmt_dec(float(totals[p]), 1)]
 		v.add_child(UIKit.label(line, 22, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
+	if not best_trick.is_empty():
+		v.add_child(UIKit.label("★ Sua melhor vaza: +%s pts (rodada %d)" % [UIKit.fmt_dec(float(best_trick["points"]), 1), int(best_trick["round"])], 22, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	for line in summary["lines"]:
 		v.add_child(UIKit.label(str(line), 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-	var again := UIKit.button("NOVA PARTIDA")
+	var again := UIKit.button("REVANCHE!")
 	again.pressed.connect(func(): get_tree().reload_current_scene())
 	v.add_child(again)
 	var btn := UIKit.button("MENU PRINCIPAL", UIKit.MUTED)
@@ -1035,8 +1196,14 @@ MODIFICADOR DA RODADA
 • Uma vaza só: é surpresa. Você só descobre qual e quando ela começa, numa tela cheia (ex.: Vaza Dourada ×3, Vaza Maldita, Saque, Assalto ao Líder).
 • As cartas afetadas mostram o valor real direto na carta; decida olhando esse número.
 
-ITENS
-• A partir da Rodada 2, antes de cada rodada você escolhe 1 de 2 itens sorteados: uma vantagem só sua, só naquela rodada (Escudo, Trunfo Afiado, Fôlego Pessoal ou Roubo de Vaza). Os bots escolhem também.
+PODER (1 por rodada)
+• Antes de cada rodada você escolhe 1 de 3 poderes e usa UMA vez, na sua vez, pelo botão no rodapé:
+• ⇅ ROUBAR TRUNFO — dá sua pior carta e leva o melhor Trunfo de um rival.
+• ◎ ESPIAR — vê a mão inteira de um rival.
+• ⚡ ARRISCAR — na vaza em que usar: vencer = ×2 nos pontos, perder = −2.
+
+APOSTA (1 por rodada)
+• Escolha quantas vazas promete vencer: SEGURO 2+ (+4), OUSADO 4+ (+9) ou LENDA 6+ (+18). Errou: −3. Os bots apostam também.
 
 COMBOS (aparecem no aviso acima da mesa)
 • MÃO QUENTE: 3 vazas seguidas na rodada — pontos ×1,5.

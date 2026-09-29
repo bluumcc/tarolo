@@ -367,24 +367,26 @@ func _test_chaos() -> void:
 	check(is_equal_approx(paid, e5.pot), "a soma dos pagamentos por colocação esgota o pote")
 	check(e5.payout_for(0) > e5.payout_for(1) and e5.payout_for(1) > e5.payout_for(2) and e5.payout_for(2) > e5.payout_for(3), "pagamento cai a cada colocação pior")
 
-	# Itens: efeito de cada um em card_value/roubo, isolado do jogador que não tem o item.
+	# Poderes e aposta da rodada.
 	var e6 := ChaosEngine.new()
 	e6.setup_match({"seed": 5})
-	e6.modifier = ChaosModifiers.Modifier.NAIPE_FRACO
-	e6.weak_suit = CardData.Suit.OUROS
-	e6.player_items[0] = ChaosItems.Item.ESCUDO_NAIPE
-	check(e6.card_value(c(0, 14), 0) == 4.5, "Escudo de Naipe cancela a penalidade do Naipe Fraco pra quem tem o item")
-	check(e6.card_value(c(0, 14), 1) == 2.25, "Escudo de Naipe não afeta quem não tem o item")
-
-	e6.modifier = -1
-	e6.weak_suit = -1
-	e6.player_items[0] = ChaosItems.Item.TRUNFO_AFIADO
-	check(e6.card_value(c(4, 5), 0) == 1.5, "Trunfo Afiado soma +1 pt fixo no Trunfo de quem tem o item")
-	check(e6.card_value(c(4, 5), 1) == 0.5, "Trunfo Afiado não afeta quem não tem o item")
-
-	e6.totals = [0.0, 20.0, 0.0, 0.0]
-	e6.player_items = [ChaosItems.Item.ROUBO_VAZA, ChaosItems.Item.NONE, ChaosItems.Item.NONE, ChaosItems.Item.NONE]
-	e6.roubo_used = [false, false, false, false]
+	e6.modifier = ChaosModifiers.Modifier.TRUNFO_DOBRO
+	e6.modifier_trick = -1
+	e6.current = 0
+	e6.player_items[0] = ChaosItems.Item.TROCA
+	e6.hands[0] = [c(CardData.Suit.PAUS, 2), c(CardData.Suit.PAUS, 14)]
+	e6.hands[1] = [c(CardData.Suit.TRUNFO, 15), c(CardData.Suit.COPAS, 3)]
+	var swap := e6.use_troca(0, 1)
+	check(swap["given"].rank == 2 and swap["taken"].rank == 15, "Roubar Trunfo: entrega a pior carta e leva o melhor Trunfo")
+	check((e6.hands[1] as Array).size() == 2 and e6.use_troca(0, 1).is_empty(), "poder só pode ser usado uma vez")
+	e6.player_items[0] = ChaosItems.Item.ESPIADA
+	e6.power_used[0] = false
+	check(e6.use_espiada(0, 2).size() == 8, "Espiar mostra a mão inteira do rival")
+	e6.player_items[0] = ChaosItems.Item.ARRISCAR
+	e6.power_used[0] = false
+	check(e6.use_arriscar(0) and e6.arriscar_on[0], "Arriscar arma pra vaza atual")
+	e6.totals = [0.0, 0.0, 0.0, 0.0]
+	e6.round_points = [0.0, 0.0, 0.0, 0.0]
 	e6.plays = [
 		{"player": 1, "card": c(CardData.Suit.PAUS, 3)},
 		{"player": 2, "card": c(CardData.Suit.PAUS, 5)},
@@ -392,10 +394,29 @@ func _test_chaos() -> void:
 		{"player": 0, "card": c(CardData.Suit.PAUS, 10)},
 	]
 	e6.trick_number = 1
-	var steal_result := e6._resolve_trick()
-	check(bool(steal_result["roubo_applied"]), "Roubo de Vaza dispara na 1ª vaza vencida com o item")
-	check(int(steal_result["roubo_target"]) == 1, "Roubo de Vaza mira em quem está em 1º lugar no total")
-	check(e6.totals[1] == 16.0, "alvo do roubo perde os pontos roubados")
+	var risk := e6._resolve_trick()
+	check(bool(risk["arriscar_winner"]) and is_equal_approx(float(risk["mult"]), ChaosEngine.ARRISCAR_MULT), "Arriscar vencido dobra os pontos")
+	e6.arriscar_on[1] = true
+	e6.plays = [
+		{"player": 1, "card": c(CardData.Suit.PAUS, 3)},
+		{"player": 2, "card": c(CardData.Suit.PAUS, 5)},
+		{"player": 3, "card": c(CardData.Suit.PAUS, 7)},
+		{"player": 0, "card": c(CardData.Suit.PAUS, 10)},
+	]
+	e6.totals[1] = 10.0
+	e6._resolve_trick()
+	check(e6.totals[1] == 8.0, "Arriscar perdido custa 2 pontos")
+	var eb2 := ChaosEngine.new()
+	eb2.setup_match({"seed": 3})
+	eb2.set_bet(0, 0)
+	eb2.set_bet(1, 2)
+	eb2.history = []
+	for k in range(3):
+		eb2.history.append({"winner": 0})
+	var settled := eb2._settle_bets()
+	check(bool(settled[0]["hit"]) and float(settled[0]["delta"]) == 4.0, "Aposta SEGURO (2+) acertada rende +4")
+	check(not bool(settled[1]["hit"]) and float(settled[1]["delta"]) == -3.0, "Aposta LENDA errada custa -3")
+	check(int(settled[2]["bet"]) == -1, "sem aposta não muda nada")
 
 	# Modificadores de vaza única e combos.
 	var e7 := ChaosEngine.new()

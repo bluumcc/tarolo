@@ -21,7 +21,14 @@ const TRICK_MODS := [
 	Modifier.VAZA_DOURADA, Modifier.VAZA_INVERTIDA, Modifier.SAQUE, Modifier.ASSALTO_LIDER,
 	Modifier.VAZA_MALDITA, Modifier.PRIMEIRA_DOBRO, Modifier.ULTIMA_TRIPLO,
 ]
-const ALL := ROUND_MODS + TRICK_MODS
+## Todos os modificadores que o motor sabe aplicar (os testes cobrem todos).
+const EVERY := ROUND_MODS + TRICK_MODS
+## Pool ativa — versão enxuta pra testar a diversão: 4 de rodada inteira + 4 de uma vaza só.
+## Os demais continuam implementados e podem voltar por nível/temporada.
+const ALL := [
+	Modifier.TRUNFO_DOBRO, Modifier.REIS_DOBRO, Modifier.LOUCO_VENCE, Modifier.MUNDO_CONTRARIO,
+	Modifier.VAZA_DOURADA, Modifier.VAZA_INVERTIDA, Modifier.VAZA_MALDITA, Modifier.SAQUE,
+]
 ## Modificadores que sorteiam um naipe.
 const SUIT_MODS := [Modifier.NAIPE_FRACO, Modifier.NAIPE_FORTE, Modifier.NAIPE_MALDITO]
 

@@ -12,8 +12,15 @@ signal match_finished(result: Dictionary)
 const HAND_SIZE := 8
 const ROUNDS := 5
 const FOLEGO_MULT := 1.5   # bônus de pontos pra quem tá em último ANTES da rodada começar
-const ITEM_MULT := 1.25    # bônus do item Fôlego Pessoal
-const ITEM_STEAL := 4.0    # pontos roubados pelo item Roubo de Vaza
+const ARRISCAR_MULT := 2.0  # poder Arriscar: vaza vencida vale ×2
+const ARRISCAR_LOSS := 2.0  # ...e se perder, −2
+# Aposta da rodada: vazas que você promete vencer → bônus se acertar; errou, perde BET_MISS.
+const BET_OPTIONS := [
+	{"need": 2, "bonus": 4.0, "name": "SEGURO"},
+	{"need": 4, "bonus": 9.0, "name": "OUSADO"},
+	{"need": 6, "bonus": 18.0, "name": "LENDA"},
+]
+const BET_MISS := 3.0
 const BUY_IN := 100.0
 const GOLD_MULT := 3.0      # Vaza Dourada
 const FINAL_MULT := 2.0     # todos os pontos da última rodada
@@ -48,7 +55,9 @@ var plays: Array = []
 var captured: Array = []
 var round_points: Array = []  # pontos ganhos só nessa rodada, por jogador
 var player_items: Array = []  # item ativo de cada jogador nessa rodada (ChaosItems.Item)
-var roubo_used: Array = []    # se o jogador já usou o Roubo de Vaza nessa rodada
+var power_used: Array = []    # se o jogador já usou o poder dessa rodada
+var arriscar_on: Array = []   # Arriscar armado pra vaza atual
+var bets: Array = []          # índice em BET_OPTIONS de cada jogador (-1 = sem aposta)
 var leader := -1
 var current := -1
 var trick_number := 0
@@ -83,7 +92,9 @@ func _setup_round() -> void:
 	captured = []
 	round_points = []
 	player_items = []
-	roubo_used = []
+	power_used = []
+	arriscar_on = []
+	bets = []
 	streak = []
 	last_winner = -1
 	for p in range(num_players):
@@ -91,7 +102,9 @@ func _setup_round() -> void:
 		captured.append([])
 		round_points.append(0.0)
 		player_items.append(ChaosItems.Item.NONE)
-		roubo_used.append(false)
+		power_used.append(false)
+		arriscar_on.append(false)
+		bets.append(-1)
 	modifier = modifier_sequence[round_index % modifier_sequence.size()]
 	weak_suit = -1
 	modifier_trick = -1
@@ -209,13 +222,6 @@ func card_value(c: CardData, player: int = -1) -> float:
 		ChaosModifiers.Modifier.NAIPE_MALDITO:
 			if c.suit == weak_suit:
 				v = NAIPE_CURSED_VALUE
-	if player != -1 and player < player_items.size():
-		var item: int = player_items[player]
-		var shield_applies := (modifier == ChaosModifiers.Modifier.NAIPE_FRACO or modifier == ChaosModifiers.Modifier.NAIPE_MALDITO) and c.suit == weak_suit
-		if item == ChaosItems.Item.ESCUDO_NAIPE and shield_applies:
-			v = c.points()
-		elif item == ChaosItems.Item.TRUNFO_AFIADO and c.is_trunfo():
-			v += 1.0
 	return v
 
 
@@ -298,9 +304,8 @@ func _resolve_trick() -> Dictionary:
 	var folego_applied := winner == folego_player
 	if folego_applied:
 		mult *= FOLEGO_MULT
-	var item_folego: bool = winner < player_items.size() and player_items[winner] == ChaosItems.Item.FOLEGO_PESSOAL
-	if item_folego:
-		mult *= ITEM_MULT
+	if arriscar_on[winner]:
+		mult *= ARRISCAR_MULT
 	var points := base_points * mult + bonus
 	var saque_amount := 0.0
 	var assalto_amount := 0.0
@@ -318,18 +323,18 @@ func _resolve_trick() -> Dictionary:
 			totals[q] -= take
 			round_points[q] -= take
 			saque_amount += take
-	var roubo_applied := false
-	var roubo_amount := 0.0
-	var roubo_target := -1
-	if winner < player_items.size() and player_items[winner] == ChaosItems.Item.ROUBO_VAZA and not roubo_used[winner]:
-		roubo_used[winner] = true
-		var target := _highest_player()
-		if target != winner:
-			roubo_amount = minf(ITEM_STEAL, totals[target])
-			totals[target] -= roubo_amount
-			round_points[target] -= roubo_amount
-			roubo_applied = roubo_amount > 0.0
-			roubo_target = target
+	var arriscar_loss := 0.0
+	for q in range(num_players):
+		if q != winner and arriscar_on[q]:
+			arriscar_loss += ARRISCAR_LOSS
+			totals[q] -= ARRISCAR_LOSS
+			round_points[q] -= ARRISCAR_LOSS
+	var arriscar_winner: bool = arriscar_on[winner]
+	var arriscar_losers: Array = []
+	for q in range(num_players):
+		if q != winner and arriscar_on[q]:
+			arriscar_losers.append(q)
+		arriscar_on[q] = false
 	var trick_result := {
 		"winner": winner,
 		"winning_index": idx,
@@ -338,10 +343,8 @@ func _resolve_trick() -> Dictionary:
 		"base_points": base_points,
 		"mult": mult,
 		"folego_applied": folego_applied,
-		"item_folego": item_folego,
-		"roubo_applied": roubo_applied,
-		"roubo_amount": roubo_amount,
-		"roubo_target": roubo_target,
+		"arriscar_winner": arriscar_winner,
+		"arriscar_losers": arriscar_losers,
 		"trick_number": trick_number,
 		"modifier": ev,
 		"combos": combos,
@@ -351,15 +354,18 @@ func _resolve_trick() -> Dictionary:
 		"final": is_final_round(),
 	}
 	history.append(trick_result)
-	round_points[winner] += points + roubo_amount + saque_amount + assalto_amount
-	totals[winner] += points + roubo_amount + saque_amount + assalto_amount
+	round_points[winner] += points + saque_amount + assalto_amount
+	totals[winner] += points + saque_amount + assalto_amount
 	plays = []
 	trick_number += 1
 	leader = winner
 	current = winner
 	trick_resolved.emit(trick_result)
 	if is_round_over():
+		var bet_results := _settle_bets()
 		round_result = {
+			"bets": bet_results,
+			"tricks_won": _tricks_won(),
 			"round": round_index,
 			"modifier": modifier,
 			"weak_suit": weak_suit,
@@ -375,6 +381,88 @@ func _resolve_trick() -> Dictionary:
 			match_result = {"totals": totals.duplicate(), "standings": order}
 			match_finished.emit(match_result)
 	return trick_result
+
+
+func _tricks_won() -> Array:
+	var won: Array = []
+	for p in range(num_players):
+		won.append(0)
+	for h in history:
+		won[int(h["winner"])] += 1
+	return won
+
+
+## Acerta as apostas da rodada: bônus por acertar, penalidade por errar.
+func _settle_bets() -> Array:
+	var won := _tricks_won()
+	var out: Array = []
+	for p in range(num_players):
+		var b: int = bets[p]
+		if b < 0:
+			out.append({"bet": -1, "hit": false, "delta": 0.0})
+			continue
+		var opt: Dictionary = BET_OPTIONS[b]
+		var hit: bool = int(won[p]) >= int(opt["need"])
+		var delta: float = float(opt["bonus"]) if hit else -BET_MISS
+		totals[p] += delta
+		round_points[p] += delta
+		out.append({"bet": b, "hit": hit, "delta": delta})
+	return out
+
+
+func set_bet(player: int, bet: int) -> void:
+	bets[player] = bet
+
+
+## ---- Poderes ---------------------------------------------------------------
+
+func can_use_power(player: int) -> bool:
+	return player_items[player] != ChaosItems.Item.NONE and not power_used[player] \
+		and current == player and not is_round_over()
+
+
+## Roubar Trunfo: entrega a carta mais fraca e leva o melhor Trunfo do alvo (ou a melhor
+## carta dele se não tiver Trunfo). Retorna {"given", "taken"}.
+func use_troca(player: int, target: int) -> Dictionary:
+	if not can_use_power(player) or player_items[player] != ChaosItems.Item.TROCA or target == player:
+		return {}
+	var mine: Array = hands[player]
+	var theirs: Array = hands[target]
+	var given: CardData = mine[0]
+	for c in mine:
+		if _swap_worth(c) < _swap_worth(given):
+			given = c
+	var taken: CardData = theirs[0]
+	for c in theirs:
+		if _swap_worth(c) > _swap_worth(taken):
+			taken = c
+	mine.erase(given)
+	theirs.erase(taken)
+	mine.append(taken)
+	theirs.append(given)
+	power_used[player] = true
+	return {"given": given, "taken": taken}
+
+
+func _swap_worth(c: CardData) -> float:
+	if c.is_louco():
+		return 5.0
+	return float(c.rank) + (100.0 if c.is_trunfo() else 0.0) + (50.0 if c.is_bout() else 0.0)
+
+
+func use_espiada(player: int, target: int) -> Array:
+	if not can_use_power(player) or player_items[player] != ChaosItems.Item.ESPIADA or target == player:
+		return []
+	power_used[player] = true
+	return (hands[target] as Array).duplicate()
+
+
+func use_arriscar(player: int) -> bool:
+	if not can_use_power(player) or player_items[player] != ChaosItems.Item.ARRISCAR:
+		return false
+	power_used[player] = true
+	arriscar_on[player] = true
+	return true
 
 
 ## Chamado pela UI depois de mostrar o resumo da rodada, pra sortear/preparar a próxima.

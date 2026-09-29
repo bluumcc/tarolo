@@ -78,3 +78,68 @@ static func _cheapest(engine: ChaosEngine, cards: Array, player: int) -> CardDat
 			return va < vb
 		return a.rank < b.rank)
 	return pool[0]
+
+
+## Poder que o bot leva pra rodada: Espiar não ajuda quem já decide por regra, então só
+## Roubar Trunfo ou Arriscar.
+static func choose_power(rng: RandomNumberGenerator) -> int:
+	return ChaosItems.Item.TROCA if rng.randf() < 0.5 else ChaosItems.Item.ARRISCAR
+
+
+## Aposta do bot: estima quantas vazas a mão rende (Trunfos altos e Reis) e escolhe o
+## degrau que combina. Bots fáceis chutam mais.
+static func choose_bet(hand: Array, difficulty: int, rng: RandomNumberGenerator) -> int:
+	var expected := 0.0
+	for c in hand:
+		var card: CardData = c
+		if card.is_louco():
+			continue
+		if card.is_trunfo():
+			expected += 0.35 + float(card.rank) / 60.0
+		elif card.rank == 14:
+			expected += 0.45
+		elif card.rank == 13:
+			expected += 0.2
+	if difficulty == BotAI.Difficulty.EASY:
+		expected += rng.randf_range(-1.5, 1.5)
+	elif difficulty == BotAI.Difficulty.NORMAL:
+		expected += rng.randf_range(-0.7, 0.7)
+	if expected >= 5.0:
+		return 2
+	if expected >= 3.2:
+		return 1
+	return 0
+
+
+## Se o bot deve usar o poder agora (antes de jogar a carta). Retorna {} ou
+## {"item": Item, "target": int}.
+static func maybe_power(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> Dictionary:
+	if not engine.can_use_power(player):
+		return {}
+	var item: int = engine.player_items[player]
+	if item == ChaosItems.Item.TROCA:
+		if engine.trick_number > 3 or (difficulty == BotAI.Difficulty.EASY and rng.randf() < 0.5):
+			return {}
+		var target := -1
+		var best := 0
+		for q in range(engine.num_players):
+			if q == player:
+				continue
+			var n := (engine.hands[q] as Array).filter(func(c: CardData) -> bool: return c.is_trunfo() and not c.is_louco()).size()
+			if n > best:
+				best = n
+				target = q
+		if target == -1:
+			return {}
+		return {"item": item, "target": target}
+	if item == ChaosItems.Item.ARRISCAR:
+		var legal: Array = engine.legal_for(player)
+		var can_win := legal.any(func(c: CardData) -> bool: return engine.would_win(c, player))
+		var last := engine.plays.size() == engine.num_players - 1
+		if can_win and (last or engine.trick_number >= HAND_LAST):
+			if engine.active_modifier() != ChaosModifiers.Modifier.VAZA_MALDITA:
+				return {"item": item, "target": -1}
+	return {}
+
+
+const HAND_LAST := 6
