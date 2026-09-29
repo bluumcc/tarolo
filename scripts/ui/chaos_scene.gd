@@ -303,8 +303,9 @@ func _layout_table() -> void:
 func _slot_pos(player: int) -> Vector2:
 	var n := maxi(engine.num_players, 1)
 	var usable_w := maxf(table_center.size.x - 24.0, CardView.SIZE.x * TABLE_SCALE * n)
-	var slot_w := usable_w / float(n)
-	var cx := 12.0 + slot_w * (player + 0.5)
+	var slot_w := minf(usable_w / float(n), CardView.SIZE.x + 40.0)
+	var start := 12.0 + (usable_w - slot_w * n) / 2.0
+	var cx := start + slot_w * (player + 0.5)
 	return Vector2(cx - CardView.SIZE.x / 2.0, (table_center.size.y - CardView.SIZE.y) / 2.0)
 
 
