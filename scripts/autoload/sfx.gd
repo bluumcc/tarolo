@@ -17,6 +17,9 @@ func _ready() -> void:
 	_streams["combo"] = _tones([523.25, 659.25, 783.99, 1046.5], 0.08, 0.35)
 	_streams["win"] = _tones([392.0, 523.25, 659.25, 783.99, 1046.5], 0.11, 0.35)
 	_streams["lose"] = _tones([329.63, 293.66, 246.94, 196.0], 0.16, 0.3)
+	_streams["boost"] = _tones([392.0, 523.25, 783.99], 0.06, 0.35)
+	_streams["flip"] = _noise_burst(0.05, 0.4)
+	_streams["jackpot"] = _tones([523.25, 659.25, 783.99, 1046.5, 1318.5, 1568.0, 2093.0], 0.07, 0.35)
 	_streams["buy"] = _tones([987.77, 1318.5], 0.07, 0.3)
 	for i in range(6):
 		var p := AudioStreamPlayer.new()

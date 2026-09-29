@@ -104,7 +104,7 @@ func _ready() -> void:
 	_rebuild_hand()
 	_banner.call_deferred("LICITAÇÃO", UIKit.GOLD)
 	if tutorial:
-		await _tutorial_modal("BEM-VINDO AO TUTORIAL", "Essa mão foi montada pra você aprender as regras principais. Antes de cada decisão nova tem uma explicação curta. Não tem pressa: a tela só avança quando você toca em ENTENDI.\n\nOlhe sua mão (embaixo da tela) e continue.")
+		await _tutorial_modal("BEM-VINDO AO TUTORIAL", "Essa mão foi montada pra você aprender as regras principais. Antes de cada decisão nova tem uma explicação curta. Não tem pressa: a tela só avança quando você toca em ENTENDI. Olhe sua mão (embaixo da tela) e continue.")
 		if not is_inside_tree():
 			return
 	await _run_bidding()
@@ -1020,7 +1020,7 @@ func _show_intro() -> void:
 
 func _run_bidding() -> void:
 	if tutorial:
-		await _tutorial_modal("COMO FUNCIONA A LICITAÇÃO", "Todo nível começa com a licitação: cada jogador, em ordem, diz se quer jogar sozinho contra os outros 3.\n\nQuem joga sozinho é o ATACANTE (o ataque). Os outros 3 formam a DEFESA.\n\nNa sua vez, você PASSA ou dá um LANCE mais alto que o anterior. O lance não custa nada: é só dizer que você confia na sua mão.\n\nO lance mais alto vira o Atacante. Cada contrato tem uma explicação curta do risco dele.")
+		await _tutorial_modal("COMO FUNCIONA A LICITAÇÃO", "Todo nível começa com a licitação: cada jogador, em ordem, diz se quer jogar sozinho contra os outros 3. Quem joga sozinho é o ATACANTE (o ataque). Os outros 3 formam a DEFESA. Na sua vez, você PASSA ou dá um LANCE mais alto que o anterior. O lance não custa nada: é só dizer que você confia na sua mão. O lance mais alto vira o Atacante. Cada contrato tem uma explicação curta do risco dele.")
 		if not is_inside_tree():
 			return
 	while true:
@@ -1071,9 +1071,9 @@ func _run_bidding() -> void:
 	trick_label.text = ""
 	if tutorial:
 		if engine.taker == 0:
-			await _tutorial_modal("VOCÊ É O ATAQUE (ATACANTE)", "Você deu o maior lance: %s. %s\n\nAgora você joga sozinho contra os outros 3 (a Defesa). No fim, somam-se os pontos das cartas que você ganhou nas rodadas (e do monte, dependendo do contrato). Se chegar na meta, você ganha pontos dos outros 3. Se não chegar, você paga." % [Scoring.CONTRACT_NAMES[engine.contract], Scoring.CONTRACT_HINTS[engine.contract]])
+			await _tutorial_modal("VOCÊ É O ATAQUE (ATACANTE)", "Você deu o maior lance: %s. %s Agora você joga sozinho contra os outros 3 (a Defesa). No fim, somam-se os pontos das cartas que você ganhou nas rodadas (e do monte, dependendo do contrato). Se chegar na meta, você ganha pontos dos outros 3. Se não chegar, você paga." % [Scoring.CONTRACT_NAMES[engine.contract], Scoring.CONTRACT_HINTS[engine.contract]])
 		else:
-			await _tutorial_modal("VOCÊ É DA DEFESA", "%s deu o maior lance (%s) e é o ATACANTE: joga sozinho contra os outros 3, incluindo você.\n\nVocê e mais 2 jogadores são a DEFESA. Os pontos que vocês ganharem nas rodadas ajudam a impedir %s de chegar na meta. Se ele não chegar, a Defesa ganha pontos. Se chegar, a Defesa paga." % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract], config["names"][engine.taker]])
+			await _tutorial_modal("VOCÊ É DA DEFESA", "%s deu o maior lance (%s) e é o ATACANTE: joga sozinho contra os outros 3, incluindo você. Você e mais 2 jogadores são a DEFESA. Os pontos que vocês ganharem nas rodadas ajudam a impedir %s de chegar na meta. Se ele não chegar, a Defesa ganha pontos. Se chegar, a Defesa paga." % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract], config["names"][engine.taker]])
 		if not is_inside_tree():
 			return
 	else:
@@ -1114,7 +1114,7 @@ func _run_discard() -> void:
 		return
 	if engine.taker == 0 and not GameState.autoplay:
 		if tutorial:
-			await _tutorial_modal("O MONTE ENTROU NA SUA MÃO", "O monte são 6 cartas viradas no meio da mesa, que ninguém vê até a licitação acabar. Com %s, elas entraram na sua mão. Na próxima tela, as marcadas como \"monte\" são essas 6.\n\nAgora escolha 6 cartas da sua mão pra devolver. Os pontos delas ficam com você no final. Reis e Bouts não podem ser devolvidos." % Scoring.CONTRACT_NAMES[engine.contract])
+			await _tutorial_modal("O MONTE ENTROU NA SUA MÃO", "O monte são 6 cartas viradas no meio da mesa, que ninguém vê até a licitação acabar. Com %s, elas entraram na sua mão. Na próxima tela, as marcadas como \"monte\" são essas 6. Agora escolha 6 cartas da sua mão pra devolver. Os pontos delas ficam com você no final. Reis e Bouts não podem ser devolvidos." % Scoring.CONTRACT_NAMES[engine.contract])
 			if not is_inside_tree():
 				return
 		var chosen: Array = await _wait_human_discard()
@@ -1790,7 +1790,7 @@ func _open_pause() -> void:
 	v.custom_minimum_size = Vector2(620, 0)
 	box.add_child(v)
 	v.add_child(UIKit.label("PAUSA", 40, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar,\nou arraste-a pra cima e solte na mesa. Segure / botão direito = zoom.", 30, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar, ou arraste-a pra cima e solte na mesa. Segure / botão direito = zoom.", 30, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	paused = true
 	ov.tree_exited.connect(func(): paused = false)
 	var resume := UIKit.button("CONTINUAR")

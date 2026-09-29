@@ -10,6 +10,11 @@ func _ready() -> void:
 		args[kv[0]] = kv[1] if kv.size() > 1 else ""
 	SaveManager.persist = false
 	var scene: String = str(args.get("scene", "menu"))
+	if args.has("speed"):
+		Engine.time_scale = float(args["speed"])   # acelera timers/tweens (a jogada do humano estoura sozinha)
+	if args.has("notips"):
+		for k in ["chaos_intro", "turn", "power", "double"]:
+			SaveManager.section("tips")[k] = true
 	var lookup := {"menu": "res://scenes/MainMenu.tscn", "game": "res://scenes/GameScene.tscn", "bid": "res://scenes/GameScene.tscn", "tutorial": "res://scenes/GameScene.tscn", "ranked": "res://scenes/RankedLobby.tscn", "chaos": "res://scenes/ChaosScene.tscn"}  # "tutorial" reusa a mesa, só troca a mão/dicas
 	var path: String = lookup[scene]
 	GameState.autoplay = scene == "game"
@@ -26,11 +31,14 @@ func _ready() -> void:
 		await get_tree().create_timer(0.6).timeout
 		inst.call(str(args["call"]))
 	if args.has("press"):
-		await get_tree().create_timer(0.8).timeout
-		for b in inst.find_children("*", "Button", true, false):
-			if (b as Button).text.contains(str(args["press"])):
-				(b as Button).pressed.emit()
-	await get_tree().create_timer(float(args.get("wait", "1.0"))).timeout
+		# Vários botões em sequência: press=PULAR,ENTENDI,APOSTAR (espera entre cada um).
+		for token in str(args["press"]).split(","):
+			await get_tree().create_timer(float(args.get("pw", "0.9")) + (2.6 if token.begins_with("ENTENDI") else 0.0), true, false, true).timeout
+			for b in inst.find_children("*", "Button", true, false):
+				if (b as Button).visible and not (b as Button).disabled and (b as Button).text.contains(token):
+					(b as Button).pressed.emit()
+					break
+	await get_tree().create_timer(float(args.get("wait", "1.0")), true, false, true).timeout
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(str(args.get("out", "/tmp/shot.png")))
 	get_tree().quit()

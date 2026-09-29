@@ -122,7 +122,7 @@ func _open_fichas() -> void:
 	var v := _modal("SUAS FICHAS")
 	var bal := UIKit.label("◎ %s" % UIKit.fmt_int(int(SaveManager.section("profile")["fichas"])), 72, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(bal)
-	var info := UIKit.label("Fichas são o dinheiro do jogo: pagam a entrada da mesa, entram nas suas apostas e o prêmio da partida vem em fichas.\n\nAcabaram? Recarregue quando quiser, quantas vezes quiser.", 28, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	var info := UIKit.label("Fichas são o dinheiro do jogo: pagam a entrada da mesa, entram nas suas apostas e o prêmio da partida vem em fichas. Acabaram? Recarregue quando quiser, quantas vezes quiser.", 28, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(info)
 	var reload := UIKit.button("RECARREGAR  +%d FICHAS" % RELOAD_AMOUNT, UIKit.OK)
@@ -369,7 +369,7 @@ func _open_chaos_confirm() -> void:
 	var fichas := int(profile["fichas"])
 	v.add_child(UIKit.label("Buy-in: %d fichas" % buy_in, 22, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(UIKit.label("Você tem %d fichas" % fichas, 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-	var pot_text := "Pote da mesa (4 jogadores): %d fichas\n1º leva 50%% · 2º 30%% · 3º 15%% · 4º 5%%" % (buy_in * 4)
+	var pot_text := "Pote da mesa (4 jogadores): %d fichas. 1º leva 50%% · 2º 30%% · 3º 15%% · 4º 5%%" % (buy_in * 4)
 	var pot_l := UIKit.label(pot_text, 16, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	pot_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	pot_l.custom_minimum_size = Vector2(620, 0)

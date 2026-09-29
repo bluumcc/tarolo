@@ -406,18 +406,66 @@ func _test_chaos() -> void:
 	e6.totals[1] = 10.0
 	e6._resolve_trick()
 	check(e6.totals[1] == 8.0, "Arriscar perdido custa 2 pontos")
+	# Palpite exato + pote.
 	var eb2 := ChaosEngine.new()
 	eb2.setup_match({"seed": 3})
-	eb2.set_bet(0, 0)
-	eb2.set_bet(1, 1)
-	eb2.history = []
-	for k in range(3):
-		eb2.history.append({"winner": 0})
+	eb2.set_bet(0, 2, 10)
+	eb2.set_bet(1, 4, 25)
+	eb2.set_bet(2, 0, 50)
+	check(is_equal_approx(eb2.bet_pot(), 85.0), "pote soma todas as apostas")
+	eb2.history = [{"winner": 0}, {"winner": 0}, {"winner": 1}, {"winner": 1}, {"winner": 1}]
+	eb2.trick_number = 5
+	check(eb2.bet_status(0) == "on" and eb2.bet_status(1) == "chase", "status ao vivo: no alvo / ainda dá")
 	var settled := eb2._settle_bets()
-	check(bool(settled[0]["hit"]) and float(settled[0]["delta"]) == 10.0, "Aposta SEGURO (2+) acertada rende +10 fichas")
-	check(not bool(settled[1]["hit"]) and float(settled[1]["delta"]) == -20.0, "Aposta OUSADO errada custa a aposta (20 fichas)")
-	check(is_equal_approx(eb2.bet_chips[0], 10.0) and is_equal_approx(eb2.bet_chips[1], -20.0), "saldo de fichas das apostas acumula")
-	check(int(settled[2]["bet"]) == -1, "sem aposta não muda nada")
+	var items: Array = settled["items"]
+	check(bool(items[0]["hit"]) and bool(items[2]["hit"]) and not bool(items[1]["hit"]), "acertou o número exato divide o pote")
+	check(is_equal_approx(float(items[1]["refund"]), 13.0), "errou por 1 recebe metade da aposta de volta")
+	check(is_equal_approx(float(items[0]["share"]) + float(items[2]["share"]), 72.0), "pote (menos reembolsos) é pago por inteiro")
+	check(float(items[2]["share"]) > float(items[0]["share"]), "peso maior (aposta maior) leva mais do pote")
+	check(int(items[3]["predict"]) == -1 and is_equal_approx(float(items[3]["delta"]), 0.0), "sem aposta não muda nada")
+	check(is_equal_approx(eb2.bet_chips[1], -12.0), "saldo líquido de fichas acumula")
+	# Jackpot acumulado quando ninguém acerta.
+	var eb3 := ChaosEngine.new()
+	eb3.setup_match({"seed": 4})
+	eb3.set_bet(0, 5, 25)
+	eb3.set_bet(1, 6, 25)
+	eb3.history = [{"winner": 2}, {"winner": 3}]
+	var jack := eb3._settle_bets()
+	check(bool(jack["jackpot"]) and is_equal_approx(eb3.bet_carry, 50.0), "ninguém acertou: pote acumula pro próximo nível")
+	eb3.advance_round()
+	check(is_equal_approx(eb3.bet_pot(), 50.0), "pote acumulado sobrevive ao próximo nível")
+	# Dobrar.
+	var eb4 := ChaosEngine.new()
+	eb4.setup_match({"seed": 5})
+	eb4.set_bet(0, 1, 25)
+	check(not eb4.can_double(0), "dobrar só a partir da 4ª rodada")
+	eb4.trick_number = 4
+	eb4.history = [{"winner": 0}, {"winner": 1}, {"winner": 2}, {"winner": 3}]
+	check(eb4.can_double(0) and is_equal_approx(eb4.double_bet(0), 25.0) and is_equal_approx(eb4.bet_stake[0], 50.0), "dobrar dobra a aposta")
+	check(not eb4.can_double(0), "dobrar só uma vez por nível")
+	# Combos de mesa e sequência.
+	check("CHUVA_TRUNFOS" in ChaosCombos.detect([{"card": c(CardData.Suit.TRUNFO, 3)}, {"card": c(CardData.Suit.TRUNFO, 9)}, {"card": c(CardData.Suit.TRUNFO, 15)}, {"card": c(CardData.Suit.PAUS, 2)}]), "3 Trunfos na mesa = Chuva de Trunfos")
+	check("REALEZA" in ChaosCombos.detect([{"card": c(CardData.Suit.PAUS, 11)}, {"card": c(CardData.Suit.PAUS, 13)}, {"card": c(CardData.Suit.PAUS, 14)}, {"card": c(CardData.Suit.PAUS, 2)}]), "3 figuras na mesa = Realeza")
+	check("ESCADA" in ChaosCombos.detect([{"card": c(CardData.Suit.PAUS, 7)}, {"card": c(CardData.Suit.PAUS, 8)}, {"card": c(CardData.Suit.PAUS, 9)}, {"card": c(CardData.Suit.COPAS, 2)}]), "3 cartas seguidas do mesmo naipe = Escada")
+	check(ChaosCombos.detect([{"card": c(CardData.Suit.PAUS, 7)}, {"card": c(CardData.Suit.COPAS, 8)}, {"card": c(CardData.Suit.PAUS, 10)}, {"card": c(CardData.Suit.PAUS, 2)}]).is_empty(), "sem combo quando não há sequência, figuras ou Trunfos")
+	check(is_equal_approx(ChaosCombos.streak_mult(1), 1.0) and is_equal_approx(ChaosCombos.streak_mult(2), 1.25) and is_equal_approx(ChaosCombos.streak_mult(3), 1.5) and is_equal_approx(ChaosCombos.streak_mult(9), 2.0), "vitórias seguidas sobem o multiplicador até ×2")
+	# Bot: palpite e leitura do alvo.
+	var bpick := ChaosBot.choose_bet([c(CardData.Suit.TRUNFO, 21), c(CardData.Suit.TRUNFO, 20), c(CardData.Suit.PAUS, 14), c(CardData.Suit.COPAS, 14), c(CardData.Suit.TRUNFO, 15), c(CardData.Suit.PAUS, 2), c(CardData.Suit.PAUS, 3), c(CardData.Suit.COPAS, 4)], BotAI.Difficulty.HARD, RandomNumberGenerator.new())
+	check(int(bpick["predict"]) >= 3, "bot prevê muitas rodadas com mão forte")
+	var eb5 := ChaosEngine.new()
+	eb5.setup_match({"seed": 6})
+	eb5.set_bet(3, 1, 10)
+	eb5.history = [{"winner": 3}]
+	eb5.trick_number = 1
+	eb5.current = 3
+	eb5.plays = [
+		{"player": 0, "card": c(CardData.Suit.PAUS, 4)},
+		{"player": 1, "card": c(CardData.Suit.PAUS, 2)},
+		{"player": 2, "card": c(CardData.Suit.PAUS, 3)},
+	]
+	eb5.hands[3] = [c(CardData.Suit.PAUS, 12), c(CardData.Suit.PAUS, 1)]
+	var tpick := ChaosBot.choose(eb5, 3, BotAI.Difficulty.HARD, RandomNumberGenerator.new())
+	check(not eb5.would_win(tpick, 3), "bot que já cumpriu o palpite evita ganhar mais")
 
 	# Modificadores de vaza única e combos.
 	var e7 := ChaosEngine.new()

@@ -100,12 +100,18 @@ const COMBO_NAMES := {
 	"MAO_QUENTE": "MÃO QUENTE",
 	"CORTADO": "CORTADO",
 	"CORTE_REI": "CORTE DE REI",
+	"CHUVA_TRUNFOS": "CHUVA DE TRUNFOS",
+	"REALEZA": "REALEZA",
+	"ESCADA": "ESCADA",
 }
 
 const COMBO_DESCRIPTIONS := {
-	"MAO_QUENTE": "3 rodadas seguidas: pontos ×1,5",
+	"MAO_QUENTE": "3 rodadas seguidas: pontos ×1,5 (4 seguidas: ×2)",
 	"CORTADO": "Você quebrou a sequência de alguém: +2 pts",
 	"CORTE_REI": "Cortou um Rei com Trunfo: +3 pts",
+	"CHUVA_TRUNFOS": "3 ou mais Trunfos na mesa: pontos ×2",
+	"REALEZA": "3 ou mais figuras (Valete, Cavaleiro, Dama, Rei) na mesa: pontos ×1,5",
+	"ESCADA": "3 cartas seguidas do mesmo naipe na mesa: +3 pts",
 }
 
 

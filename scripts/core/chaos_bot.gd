@@ -18,15 +18,34 @@ static func choose(engine: ChaosEngine, player: int, difficulty: int, rng: Rando
 	var mods := ChaosModifiers.Modifier
 	# Quer perder a rodada? (Rodada Maldita, ou Assalto ao Líder sendo ele o líder não muda nada.)
 	var want_lose := ev == mods.VAZA_MALDITA
+	# Palpite exato: no alvo, não ganha mais; faltando tudo que resta, vai pra cima.
+	var bet_lose := false
+	var bet_push := false
+	var predict: int = engine.bet_predict[player]
+	if predict >= 0:
+		var won := engine.tricks_won_by(player)
+		if won >= predict:
+			bet_lose = true
+		elif engine.tricks_left() <= predict - won:
+			bet_push = true
 	# Aposta alta: vale gastar a carta mais forte pra garantir.
 	var high_stakes := ev in [mods.VAZA_DOURADA, mods.ULTIMA_TRIPLO, mods.PRIMEIRA_DOBRO, mods.SAQUE] \
 		or (ev == mods.ASSALTO_LIDER and player == engine._highest_player()) \
-		or engine.is_final_round()
+		or engine.is_final_round() or bet_push
 
 	var is_last := engine.plays.size() == engine.num_players - 1
 	var winners: Array = legal.filter(func(c: CardData) -> bool: return engine.would_win(c, player))
 	var losers: Array = legal.filter(func(c: CardData) -> bool: return not engine.would_win(c, player))
 
+	if bet_lose and not want_lose and not losers.is_empty():
+		# Já cumpriu o palpite: joga a carta forte que não vence (larga o risco de ganhar depois).
+		var shed: Array = losers.filter(func(c: CardData) -> bool: return not c.is_bout())
+		if shed.is_empty():
+			shed = losers
+		shed.sort_custom(func(a: CardData, b: CardData) -> bool: return a.rank > b.rank)
+		return shed[0]
+	if bet_lose and not want_lose and losers.is_empty():
+		return _cheapest(engine, winners, player)
 	if want_lose:
 		if not losers.is_empty():
 			return _cheapest(engine, losers, player)
@@ -86,31 +105,57 @@ static func choose_power(rng: RandomNumberGenerator) -> int:
 	return ChaosItems.Item.TROCA if rng.randf() < 0.5 else ChaosItems.Item.ARRISCAR
 
 
-## Aposta do bot: estima quantas rodadas a mão rende (Trunfos altos e Reis) e escolhe o
-## degrau que combina. Bots fáceis chutam mais.
-static func choose_bet(hand: Array, difficulty: int, rng: RandomNumberGenerator) -> int:
+## Palpite do bot: estima quantas rodadas a mão rende (Trunfos altos e Reis) e crava o
+## número. Devolve {predict, stake} ou {} se ficar de fora. Bots fáceis erram mais.
+static func choose_bet(hand: Array, difficulty: int, rng: RandomNumberGenerator) -> Dictionary:
 	var expected := 0.0
 	for c in hand:
 		var card: CardData = c
 		if card.is_louco():
 			continue
 		if card.is_trunfo():
-			expected += 0.35 + float(card.rank) / 60.0
+			expected += 0.8 if card.rank >= 14 else (0.5 if card.rank >= 8 else 0.2)
 		elif card.rank == 14:
-			expected += 0.45
+			expected += 0.6
 		elif card.rank == 13:
-			expected += 0.2
+			expected += 0.3
 	if difficulty == BotAI.Difficulty.EASY:
 		expected += rng.randf_range(-1.5, 1.5)
 	elif difficulty == BotAI.Difficulty.NORMAL:
 		expected += rng.randf_range(-0.7, 0.7)
-	if expected >= 5.0:
-		return 2
-	if expected < 1.6 and rng.randf() < 0.5:
-		return -1
-	if expected >= 3.2:
-		return 1
-	return 0
+	var predict := clampi(roundi(expected), 0, 7)
+	if difficulty == BotAI.Difficulty.EASY and rng.randf() < 0.35:
+		return {}
+	var stake: int = ChaosEngine.STAKES[0]
+	if difficulty == BotAI.Difficulty.HARD:
+		# Mais confiança quando a mão é decisiva (muito forte ou muito fraca).
+		if predict >= 4 or predict == 0:
+			stake = ChaosEngine.STAKES[2]
+		elif predict >= 2:
+			stake = ChaosEngine.STAKES[1]
+	elif difficulty == BotAI.Difficulty.NORMAL:
+		stake = ChaosEngine.STAKES[1] if predict >= 3 else ChaosEngine.STAKES[0]
+	return {"predict": predict, "stake": stake}
+
+
+## Se o bot deve DOBRAR agora (na vez dele).
+static func maybe_double(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> bool:
+	if difficulty == BotAI.Difficulty.EASY or not engine.can_double(player):
+		return false
+	var predict: int = engine.bet_predict[player]
+	var won := engine.tricks_won_by(player)
+	var chance := 0.0
+	if won == predict:
+		# Já cumpriu: dobra se ainda tem carta que não ganha (dá pra perder de propósito).
+		var legal: Array = engine.legal_for(player)
+		var can_lose := legal.any(func(c: CardData) -> bool: return not engine.would_win(c, player))
+		chance = 0.55 if can_lose else 0.0
+	elif predict - won == 1 and engine.tricks_left() >= 2:
+		var strong := (engine.hands[player] as Array).any(func(c: CardData) -> bool: return c.is_trunfo() and c.rank >= 15)
+		chance = 0.5 if strong else 0.0
+	if difficulty == BotAI.Difficulty.NORMAL:
+		chance *= 0.6
+	return rng.randf() < chance
 
 
 ## Se o bot deve usar o poder agora (antes de jogar a carta). Retorna {} ou

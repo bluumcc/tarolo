@@ -37,8 +37,9 @@ Novos, todos lidos direto na mesa, sem regra escondida:
 
 | Combo | Como faz | Efeito |
 |---|---|---|
-| **Naipe Puro** | as 4 cartas da rodada do mesmo naipe | ×1,5 para quem leva |
-| **Escada** | 3 ou mais valores consecutivos na mesa | +3 pts |
+| **Realeza** | 3 ou mais figuras (Valete, Cavaleiro, Dama, Rei) na mesa | ×1,5 para quem leva |
+<!-- Naipe Puro foi trocado por Realeza: 4 cartas do mesmo naipe acontece o tempo todo, então não era um "combo". -->
+| **Escada** | 3 ou mais cartas seguidas do mesmo naipe na mesa | +3 pts |
 | **Chuva de Trunfos** | 3 ou mais Trunfos na mesma rodada | ×2 para quem leva |
 
 - **Nível de combo** (o medidor de chamas): cada vitória seguida sobe ×1,0 → ×1,25 → ×1,5 → ×2 (limite). Perder a rodada zera. Substitui o "Mão Quente" solto e fica sempre visível.

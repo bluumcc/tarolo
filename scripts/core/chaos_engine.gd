@@ -14,17 +14,18 @@ const ROUNDS := 5
 const FOLEGO_MULT := 1.5   # bônus de pontos pra quem tá em último ANTES do nível começar
 const ARRISCAR_MULT := 2.0  # poder Arriscar: rodada vencida vale ×2
 const ARRISCAR_LOSS := 2.0  # ...e se perder, −2
-# Aposta em fichas (estilo poker): antes do nível você aposta `stake` fichas que fará
-# `need`+ rodadas. Acertou: ganha `win` fichas (e recebe a aposta de volta). Errou: perde a aposta.
-const BET_OPTIONS := [
-	{"need": 2, "stake": 10, "win": 10, "name": "SEGURO"},
-	{"need": 4, "stake": 20, "win": 50, "name": "OUSADO"},
-	{"need": 6, "stake": 30, "win": 150, "name": "LENDA"},
-]
+# Aposta em fichas (estilo poker): antes do nível você crava quantas rodadas vai ganhar
+# (palpite exato) e quanto aposta. Todas as apostas vão pro pote do nível; quem acerta o
+# número exato divide o pote pelo peso (aposta × dificuldade × combos). Errou por 1 recebe
+# metade da aposta de volta; errou por mais perde tudo. Sem vencedor, o pote acumula.
+const STAKES := [10, 25, 50]
+const DOUBLE_FROM_TRICK := 3        # DOBRAR liberado a partir da 4ª rodada (índice 3)
+const NEAR_REFUND := 0.5            # errou por 1: devolve metade da aposta
+const COMBO_WEIGHT := 0.25          # cada combo feito no nível: +25% no peso
+const COMBO_WEIGHT_MAX := 1.0       # ...até +100% (peso ×2)
 const BUY_IN := 100.0
 const GOLD_MULT := 3.0      # Rodada Dourada
 const FINAL_MULT := 2.0     # todos os pontos do último nível
-const STREAK_MULT := 1.5    # Mão Quente: 3ª vitória seguida (e seguintes) no nível
 const KING_CUT_BONUS := 3.0 # Corte de Rei
 const BREAK_BONUS := 2.0    # Cortado: quebrar a sequência de 2+ vitórias de alguém
 const SAQUE_AMOUNT := 2.0   # pontos roubados de cada rival no Saque
@@ -57,8 +58,12 @@ var round_points: Array = []  # pontos ganhos só nesse nível, por jogador
 var player_items: Array = []  # item ativo de cada jogador nesse nível (ChaosItems.Item)
 var power_used: Array = []    # se o jogador já usou o poder desse nível
 var arriscar_on: Array = []   # Arriscar armado pra rodada atual
-var bets: Array = []          # índice em BET_OPTIONS de cada jogador (-1 = sem aposta)
-var bet_chips: Array = []     # saldo de fichas das apostas na partida, por jogador
+var bet_predict: Array = []   # palpite de cada jogador: nº de rodadas que vai ganhar (-1 = sem aposta)
+var bet_stake: Array = []     # fichas apostadas no nível (dobram se doubled)
+var bet_doubled: Array = []   # já usou DOBRAR nesse nível
+var bet_carry := 0.0          # pote acumulado dos níveis em que ninguém acertou
+var bet_chips: Array = []     # saldo líquido de fichas das apostas na partida, por jogador
+var combo_count: Array = []   # combos feitos no nível (contam pro peso do palpite)
 var leader := -1
 var current := -1
 var trick_number := 0
@@ -80,6 +85,7 @@ func setup_match(config: Dictionary) -> void:
 	for p in range(num_players):
 		totals.append(0.0)
 	round_index = 0
+	bet_carry = 0.0
 	bet_chips = []
 	for p in range(num_players):
 		bet_chips.append(0.0)
@@ -98,7 +104,10 @@ func _setup_round() -> void:
 	player_items = []
 	power_used = []
 	arriscar_on = []
-	bets = []
+	bet_predict = []
+	bet_stake = []
+	bet_doubled = []
+	combo_count = []
 	streak = []
 	last_winner = -1
 	for p in range(num_players):
@@ -108,7 +117,10 @@ func _setup_round() -> void:
 		player_items.append(ChaosItems.Item.NONE)
 		power_used.append(false)
 		arriscar_on.append(false)
-		bets.append(-1)
+		bet_predict.append(-1)
+		bet_stake.append(0.0)
+		bet_doubled.append(false)
+		combo_count.append(0)
 	modifier = modifier_sequence[round_index % modifier_sequence.size()]
 	weak_suit = -1
 	modifier_trick = -1
@@ -289,9 +301,18 @@ func _resolve_trick() -> Dictionary:
 	var broke := last_winner != -1 and last_winner != winner and prev_streak >= 2
 	for q in range(num_players):
 		streak[q] = streak[q] + 1 if q == winner else 0
+	var streak_mult := ChaosCombos.streak_mult(int(streak[winner]))
+	mult *= streak_mult
 	if streak[winner] >= 3:
-		mult *= STREAK_MULT
 		combos.append("MAO_QUENTE")
+	for cid in ChaosCombos.detect(plays):
+		combos.append(cid)
+		if cid == "CHUVA_TRUNFOS":
+			mult *= ChaosCombos.CHUVA_MULT
+		elif cid == "REALEZA":
+			mult *= ChaosCombos.REALEZA_MULT
+		elif cid == "ESCADA":
+			bonus += ChaosCombos.ESCADA_BONUS
 	if broke:
 		bonus += BREAK_BONUS
 		combos.append("CORTADO")
@@ -305,6 +326,7 @@ func _resolve_trick() -> Dictionary:
 				combos.append("CORTE_REI")
 				break
 	last_winner = winner
+	combo_count[winner] += combos.size()
 	var folego_applied := winner == folego_player
 	if folego_applied:
 		mult *= FOLEGO_MULT
@@ -352,6 +374,8 @@ func _resolve_trick() -> Dictionary:
 		"trick_number": trick_number,
 		"modifier": ev,
 		"combos": combos,
+		"streak": int(streak[winner]),
+		"streak_mult": streak_mult,
 		"bonus": bonus,
 		"saque_amount": saque_amount,
 		"assalto_amount": assalto_amount,
@@ -368,7 +392,8 @@ func _resolve_trick() -> Dictionary:
 	if is_round_over():
 		var bet_results := _settle_bets()
 		round_result = {
-			"bets": bet_results,
+			"bets": bet_results["items"],
+			"pot_info": bet_results,
 			"tricks_won": _tricks_won(),
 			"round": round_index,
 			"modifier": modifier,
@@ -396,25 +421,149 @@ func _tricks_won() -> Array:
 	return won
 
 
-## Acerta as apostas em fichas ao fim do nível. `delta` = ganho líquido (+win ou -stake).
-func _settle_bets() -> Array:
-	var won := _tricks_won()
-	var out: Array = []
+## Dificuldade do palpite: prever muitas rodadas paga mais.
+static func difficulty_of(predict: int) -> float:
+	if predict <= 2:
+		return 1.0
+	if predict <= 4:
+		return 1.5
+	return 2.0
+
+
+func tricks_left() -> int:
+	return HAND_SIZE - trick_number
+
+
+func tricks_won_by(player: int) -> int:
+	return int(_tricks_won()[player])
+
+
+## Pote do nível agora: acumulado dos níveis anteriores + todas as apostas.
+func bet_pot() -> float:
+	var total := bet_carry
 	for p in range(num_players):
-		var b: int = bets[p]
-		if b < 0:
-			out.append({"bet": -1, "hit": false, "delta": 0.0})
+		if int(bet_predict[p]) >= 0:
+			total += float(bet_stake[p])
+	return total
+
+
+## Menor erro ainda possível no palpite (0 = ainda dá pra acertar exato).
+func bet_min_error(player: int) -> int:
+	var predict: int = bet_predict[player]
+	var won := tricks_won_by(player)
+	if won > predict:
+		return won - predict
+	if won + tricks_left() < predict:
+		return predict - (won + tricks_left())
+	return 0
+
+
+## Situação ao vivo do palpite: "none", "on" (no alvo), "chase" (falta ganhar mais),
+## "near" (só dá pra errar por 1) ou "bust" (estourou).
+func bet_status(player: int) -> String:
+	if int(bet_predict[player]) < 0:
+		return "none"
+	var err := bet_min_error(player)
+	if err >= 2:
+		return "bust"
+	if err == 1:
+		return "near"
+	return "on" if tricks_won_by(player) == int(bet_predict[player]) else "chase"
+
+
+## Peso de um jogador na divisão do pote se acertar.
+func bet_weight(player: int) -> float:
+	var combo_bonus := minf(COMBO_WEIGHT * float(combo_count[player]), COMBO_WEIGHT_MAX)
+	return float(bet_stake[player]) * difficulty_of(int(bet_predict[player])) * (1.0 + combo_bonus)
+
+
+func set_bet(player: int, predict: int, stake: int = 0) -> void:
+	if predict < 0 or stake <= 0:
+		bet_predict[player] = -1
+		bet_stake[player] = 0.0
+		return
+	bet_predict[player] = clampi(predict, 0, HAND_SIZE)
+	bet_stake[player] = float(stake)
+	bet_doubled[player] = false
+
+
+func can_double(player: int) -> bool:
+	return int(bet_predict[player]) >= 0 and not bet_doubled[player] \
+		and trick_number >= DOUBLE_FROM_TRICK and not is_round_over() and bet_min_error(player) == 0
+
+
+## Dobra a aposta (e o peso). Devolve as fichas extras que entraram no pote (0 = não deu).
+func double_bet(player: int) -> float:
+	if not can_double(player):
+		return 0.0
+	var extra: float = bet_stake[player]
+	bet_stake[player] = extra * 2.0
+	bet_doubled[player] = true
+	return extra
+
+
+## Acerta o pote ao fim do nível. Cada item: {predict, won, stake, doubled, err, hit,
+## refund, share, delta, weight, combos}; `delta` = ganho líquido de fichas (share + refund − stake).
+func _settle_bets() -> Dictionary:
+	var won := _tricks_won()
+	var carry_in := bet_carry
+	var total_pot := bet_pot()
+	var out: Array = []
+	var refunds_total := 0.0
+	var hitters: Array = []
+	var weight_sum := 0.0
+	var best_err := 99
+	for p in range(num_players):
+		var predict: int = bet_predict[p]
+		if predict < 0:
+			out.append({"predict": -1, "won": int(won[p]), "stake": 0.0, "doubled": false, "err": 0, "hit": false, "refund": 0.0, "share": 0.0, "delta": 0.0, "weight": 0.0, "combos": int(combo_count[p])})
 			continue
-		var opt: Dictionary = BET_OPTIONS[b]
-		var hit: bool = int(won[p]) >= int(opt["need"])
-		var delta: float = float(opt["win"]) if hit else -float(opt["stake"])
-		bet_chips[p] += delta
-		out.append({"bet": b, "hit": hit, "delta": delta})
-	return out
-
-
-func set_bet(player: int, bet: int) -> void:
-	bets[player] = bet
+		var err := absi(int(won[p]) - predict)
+		var stake: float = bet_stake[p]
+		var refund := 0.0
+		var weight := 0.0
+		if err == 0:
+			hitters.append(p)
+			weight = bet_weight(p)
+			weight_sum += weight
+		elif err == 1:
+			refund = roundf(stake * NEAR_REFUND)
+			refunds_total += refund
+		best_err = mini(best_err, err)
+		out.append({"predict": predict, "won": int(won[p]), "stake": stake, "doubled": bool(bet_doubled[p]), "err": err, "hit": err == 0, "refund": refund, "share": 0.0, "delta": 0.0, "weight": weight, "combos": int(combo_count[p])})
+	var pool := total_pot - refunds_total
+	var carry_out := 0.0
+	var consolation := false
+	if pool > 0.0:
+		var takers := hitters
+		if takers.is_empty() and is_final_round():
+			# Último nível sem acerto: o pote vai pros que chegaram mais perto.
+			consolation = true
+			for p in range(num_players):
+				if int(bet_predict[p]) >= 0 and int(out[p]["err"]) == best_err:
+					takers.append(p)
+					out[p]["weight"] = float(bet_stake[p])
+					weight_sum += float(bet_stake[p])
+		if takers.is_empty():
+			carry_out = pool
+		else:
+			var paid := 0.0
+			var top: int = takers[0]
+			for p in takers:
+				var sh := floorf(pool * float(out[p]["weight"]) / weight_sum)
+				out[p]["share"] = sh
+				paid += sh
+				if float(out[p]["weight"]) > float(out[top]["weight"]):
+					top = p
+			out[top]["share"] = float(out[top]["share"]) + (pool - paid)
+	for p in range(num_players):
+		var o: Dictionary = out[p]
+		if int(o["predict"]) < 0:
+			continue
+		o["delta"] = float(o["share"]) + float(o["refund"]) - float(o["stake"])
+		bet_chips[p] += float(o["delta"])
+	bet_carry = carry_out
+	return {"items": out, "pot": total_pot, "carry_in": carry_in, "carry_out": carry_out, "jackpot": carry_out > 0.0, "consolation": consolation, "hitters": hitters}
 
 
 ## ---- Poderes ---------------------------------------------------------------
