@@ -528,7 +528,7 @@ Cuidados:
 • Bouts nunca podem ser devolvidos ao monte."""
 	var l := UIKit.label(text, 18, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(340, 0)
+	l.custom_minimum_size = Vector2(520, 0)
 	v.add_child(l)
 	UIKit.close_button(overlay_layer, v)
 
@@ -1266,7 +1266,7 @@ func _ask_yes_no(title: String, body: String) -> bool:
 	v.add_child(UIKit.label(title, 19, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	var body_label := UIKit.label(body, 15, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body_label.custom_minimum_size = Vector2(340, 0)
+	body_label.custom_minimum_size = Vector2(520, 0)
 	v.add_child(body_label)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
@@ -1374,7 +1374,7 @@ func _tutorial_modal(title: String, body: String, button_text: String = "ENTENDI
 	var v := UIKit.modal(overlay_layer, title, 380.0)
 	var l := UIKit.label(body, 18, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(340, 0)
+	l.custom_minimum_size = Vector2(520, 0)
 	v.add_child(l)
 	var btn := UIKit.button(button_text, UIKit.OK)
 	v.add_child(btn)
@@ -1621,7 +1621,7 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 	var ov := UIKit.overlay()
 	overlay_layer.add_child(ov)
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD if summary["won"] else UIKit.DANGER, 24)
-	box.custom_minimum_size = Vector2(400, 0)
+	box.custom_minimum_size = Vector2(580, 0)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	box.add_child(v)
@@ -1678,7 +1678,7 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 		v.add_child(HSeparator.new())
 		var tut_close := UIKit.label("Tutorial concluído! Isso não afeta suas Fragmentos nem seu elo — quando quiser, jogue de verdade no Vanilla ou Ranqueado.", 16, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
 		tut_close.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		tut_close.custom_minimum_size = Vector2(340, 0)
+		tut_close.custom_minimum_size = Vector2(520, 0)
 		v.add_child(tut_close)
 	var next: String = summary["next"]
 	var btn: Button
@@ -1725,7 +1725,7 @@ func _show_zoom(view: CardView) -> void:
 	v.add_child(holder)
 	var desc := UIKit.label(view.describe(), 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc.custom_minimum_size = Vector2(340, 0)
+	desc.custom_minimum_size = Vector2(520, 0)
 	v.add_child(desc)
 	v.add_child(UIKit.label("toque para fechar", 15, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	ov.add_child(UIKit.centered(v))
@@ -1769,7 +1769,7 @@ BÔNUS (só o Atacante escolhe)
 • Petit na última vaza: quem ganhar a última vaza com o Trunfo 1 nela leva +10."""
 	var l := UIKit.label(text, 16, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(340, 0)
+	l.custom_minimum_size = Vector2(520, 0)
 	v.add_child(l)
 	UIKit.close_button(overlay_layer, v)
 
@@ -1782,7 +1782,7 @@ func _open_pause() -> void:
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 24)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
-	v.custom_minimum_size = Vector2(320, 0)
+	v.custom_minimum_size = Vector2(520, 0)
 	box.add_child(v)
 	v.add_child(UIKit.label("PAUSA", 40, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar,\nou arraste-a pra cima e solte na mesa. Segure / botão direito = zoom.", 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))

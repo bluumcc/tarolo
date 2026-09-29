@@ -14,10 +14,14 @@ var _track_sb := StyleBoxFlat.new()
 
 
 func _init() -> void:
-	custom_minimum_size = Vector2(0, 26)
+	custom_minimum_size = Vector2(0, 32)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_fill_sb.set_corner_radius_all(6)
-	_track_sb.set_corner_radius_all(6)
+	_fill_sb.set_corner_radius_all(16)
+	_track_sb.set_corner_radius_all(16)
+	_track_sb.border_color = Color("#0B0626")
+	_track_sb.set_border_width_all(4)
+	_fill_sb.border_color = Color("#0B0626")
+	_fill_sb.set_border_width_all(4)
 
 
 func set_colors(fill: Color, track: Color) -> void:

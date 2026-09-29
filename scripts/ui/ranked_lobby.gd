@@ -10,21 +10,48 @@ var searching := false
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(UIKit.background())
+	var page := VBoxContainer.new()
+	page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	page.add_theme_constant_override("separation", 0)
+	add_child(page)
+
+	# Cabeçalho fixo: voltar + título.
+	var head := PanelContainer.new()
+	var hsb := UIKit.box(Color("#1B1258"), UIKit.BLACK, 3, 0, 12)
+	hsb.set_corner_radius_all(0)
+	hsb.corner_radius_bottom_left = 28
+	hsb.corner_radius_bottom_right = 28
+	hsb.content_margin_left = Widgets.MARGIN
+	hsb.content_margin_right = Widgets.MARGIN
+	head.add_theme_stylebox_override("panel", hsb)
+	head.custom_minimum_size = Vector2(0, Widgets.TOPBAR_H)
+	var hrow := HBoxContainer.new()
+	hrow.add_theme_constant_override("separation", 16)
+	head.add_child(hrow)
+	var back := Widgets.icon_button("◀")
+	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
+	hrow.add_child(back)
+	var rk0 := GameState.ranked()
+	var ttl := UIKit.label("RANQUEADO · TEMPORADA %d" % int(rk0["season"]), 30, UIKit.INK)
+	ttl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ttl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hrow.add_child(ttl)
+	page.add_child(head)
+
 	var scroll := ScrollContainer.new()
-	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	add_child(scroll)
+	page.add_child(scroll)
 	var center := CenterContainer.new()
 	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.add_child(center)
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 16)
+		margin.add_theme_constant_override("margin_" + side, Widgets.MARGIN)
 	center.add_child(margin)
 	content = VBoxContainer.new()
-	content.custom_minimum_size = Vector2(360, 0)
-	content.add_theme_constant_override("separation", 12)
+	content.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - Widgets.MARGIN * 2.0, 672.0), 0)
+	content.add_theme_constant_override("separation", 18)
 	margin.add_child(content)
 	_render()
 
@@ -34,52 +61,70 @@ func _render() -> void:
 	var t := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
 	var color := Color(Ranked.TIER_COLORS[t["tier"]])
 
-	content.add_child(UIKit.label("MODO RANQUEADO · TEMPORADA %d" % int(rk["season"]), 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-	var badge := UIKit.panel(UIKit.PURPLE_DEEP, color, 20)
+	# Cartão da liga: emblema, nome, barra de LP e números.
+	var badge := UIKit.panel(UIKit.PURPLE_DEEP, color, 24)
 	var bv := VBoxContainer.new()
-	bv.add_theme_constant_override("separation", 6)
+	bv.add_theme_constant_override("separation", 10)
 	badge.add_child(bv)
-	bv.add_child(UIKit.label(str(t["label"]).to_upper(), 55, color, HORIZONTAL_ALIGNMENT_CENTER))
-	var bar := ProgressBar.new()
-	bar.min_value = 0.0
-	bar.max_value = 1.0
-	bar.value = float(t["progress"])
-	bar.show_percentage = false
-	bar.custom_minimum_size = Vector2(0, 14)
-	var fill := UIKit.box(color, color, 0, 2, 0)
-	bar.add_theme_stylebox_override("fill", fill)
-	bar.add_theme_stylebox_override("background", UIKit.box(UIKit.BLACK, UIKit.BLACK, 0, 2, 0))
+	var emblem := PanelContainer.new()
+	emblem.custom_minimum_size = Vector2(150, 150)
+	emblem.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var esb := UIKit.chunky(color)
+	esb.set_corner_radius_all(75)
+	esb.content_margin_left = 0
+	esb.content_margin_right = 0
+	emblem.add_theme_stylebox_override("panel", esb)
+	var div := UIKit.label(str(t["division"]) if str(t["division"]) != "" else "★", 64, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	div.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	div.add_theme_color_override("font_outline_color", color.darkened(0.6))
+	emblem.add_child(div)
+	bv.add_child(emblem)
+	bv.add_child(UIKit.label(str(t["label"]).to_upper(), 56, color, HORIZONTAL_ALIGNMENT_CENTER))
+	var bar := MeterBar.new()
+	bar.custom_minimum_size = Vector2(0, 34)
+	bar.set_colors(color, Color("#0B0626"))
+	bar.set_values(float(t["progress"]), 1.0, false)
 	bv.add_child(bar)
-	bv.add_child(UIKit.label("%d LP  ·  MMR %s  ·  %dV / %dD" % [int(t["lp"]), UIKit.fmt_int(int(rk["mmr"])), int(rk["wins"]), int(rk["losses"])], 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+	bv.add_child(UIKit.label("%d LP  ·  MMR %s" % [int(t["lp"]), UIKit.fmt_int(int(rk["mmr"]))], 28, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	var peak := Ranked.tier_info(int(rk["peak_points"]), int(rk["mmr"]))
-	bv.add_child(UIKit.label("Pico da temporada: %s" % peak["label"], 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	bv.add_child(UIKit.label("%d vitórias · %d derrotas · pico: %s" % [int(rk["wins"]), int(rk["losses"]), peak["label"]], 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	content.add_child(badge)
 
-	var ladder := HFlowContainer.new()
-	ladder.alignment = FlowContainer.ALIGNMENT_CENTER
-	ladder.add_theme_constant_override("h_separation", 6)
+	# Escada de ligas: uma bolinha por liga, as alcançadas coloridas.
+	var ladder := HBoxContainer.new()
+	ladder.alignment = BoxContainer.ALIGNMENT_CENTER
+	ladder.add_theme_constant_override("separation", 10)
 	for i in range(Ranked.TIERS.size()):
 		var reached := i <= int(t["tier"])
-		ladder.add_child(UIKit.label(Ranked.TIERS[i].to_upper(), 15, Color(Ranked.TIER_COLORS[i]) if reached else UIKit.MUTED.darkened(0.3)))
+		var dot := Panel.new()
+		dot.custom_minimum_size = Vector2(40, 40)
+		var dsb := StyleBoxFlat.new()
+		dsb.bg_color = Color(Ranked.TIER_COLORS[i]) if reached else Color("#241A70")
+		dsb.border_color = Color("#0B0626")
+		dsb.set_border_width_all(3)
+		dsb.set_corner_radius_all(20)
+		dot.add_theme_stylebox_override("panel", dsb)
+		ladder.add_child(dot)
 	content.add_child(ladder)
 
-	status = UIKit.label("1º/2º lugar ganham LP · 3º/4º perdem", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	status = UIKit.label("1º e 2º lugar ganham LP · 3º e 4º perdem", 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(status)
-	search_btn = UIKit.button("BUSCAR PARTIDA", color, 28)
+	search_btn = UIKit.button("BUSCAR PARTIDA", color, 36)
+	search_btn.custom_minimum_size = Vector2(0, 100)
 	search_btn.pressed.connect(_search)
 	content.add_child(search_btn)
-	var back := UIKit.button("VOLTAR", UIKit.MUTED, 20)
-	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
-	content.add_child(back)
 
-	content.add_child(UIKit.label("HISTÓRICO", 22, UIKit.INK))
+	content.add_child(UIKit.label("HISTÓRICO", 30, UIKit.INK))
 	var hist: Array = rk["history"]
 	if hist.is_empty():
-		content.add_child(UIKit.label("Nenhuma partida ranqueada ainda.", 18, UIKit.MUTED))
+		content.add_child(UIKit.label("Nenhuma partida ranqueada ainda.", 22, UIKit.MUTED))
 	for h in hist:
 		var lp := int(h["lp"])
-		var row := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.OK if lp >= 0 else UIKit.DANGER, 8)
-		row.add_child(UIKit.label("%dº  ·  %s pts  ·  %s%d LP  ·  %s" % [int(h["placement"]), UIKit.fmt_int(int(h["score"])), "+" if lp >= 0 else "", lp, h["tier"]], 18))
+		var row := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.OK if lp >= 0 else UIKit.DANGER, 14)
+		var rl := UIKit.label("%dº lugar  ·  %s pts  ·  %s%d LP  ·  %s" % [int(h["placement"]), UIKit.fmt_int(int(h["score"])), "+" if lp >= 0 else "", lp, h["tier"]], 22)
+		rl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		row.add_child(rl)
 		content.add_child(row)
 	search_btn.grab_focus.call_deferred()
 

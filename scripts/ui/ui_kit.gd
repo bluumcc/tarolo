@@ -2,6 +2,10 @@ class_name UIKit
 extends RefCounted
 ## Paleta Dark Brutalist e fábrica de estilos/nós Control reutilizados pelas cenas.
 
+## Tamanhos mínimos de texto (padrão de mercado pra 720 de largura): nada menor que isso.
+const MIN_FONT := 18
+const MIN_BUTTON_FONT := 24
+
 const NIGHT := Color("#150E45")
 const PURPLE := Color("#3A2A9C")
 const PURPLE_DEEP := Color("#241A70")
@@ -55,6 +59,7 @@ static func box(bg: Color, border: Color = BLACK, border_w: int = 3, radius: int
 ## Texto com contorno escuro (só a partir de 24 px) — é o que dá o ar "arcade" e garante
 ## contraste em cima de qualquer fundo.
 static func label(text: String, size: int = 22, color: Color = INK, align: int = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
+	size = maxi(size, MIN_FONT)
 	var l := Label.new()
 	l.text = text
 	l.horizontal_alignment = align
@@ -88,6 +93,7 @@ static func chunky(face: Color, pressed: bool = false) -> StyleBoxFlat:
 
 
 static func button(text: String, accent: Color = GOLD, size: int = 30) -> Button:
+	size = maxi(size, MIN_BUTTON_FONT)
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_ALL
@@ -201,7 +207,7 @@ static func fmt_dec(x: float, decimals: int = 1) -> String:
 
 ## Modal genérico (fundo escurecido + painel com scroll) usado fora do menu principal —
 ## ex: o botão de ajuda dentro da partida, pra explicar regras sem exigir decorar tudo antes.
-static func modal(overlay_layer: Control, title: String, width: float = 380.0) -> VBoxContainer:
+static func modal(overlay_layer: Control, title: String, width: float = 560.0) -> VBoxContainer:
 	var ov := overlay()
 	overlay_layer.add_child(ov)
 	var box_p := panel(PURPLE_DEEP, GOLD, 30)

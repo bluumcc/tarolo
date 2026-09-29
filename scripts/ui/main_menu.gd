@@ -133,7 +133,7 @@ func _modal(title: String) -> VBoxContainer:
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 24)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
-	v.custom_minimum_size = Vector2(360, 0)
+	v.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 96.0, 580.0), 0)
 	box.add_child(v)
 	v.add_child(UIKit.label(title, 38, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	var scroll := ScrollContainer.new()
@@ -328,7 +328,7 @@ func _open_chaos_confirm() -> void:
 	var pot_text := "Pote da mesa (4 jogadores): %d fichas\n1º leva 50%% · 2º 30%% · 3º 15%% · 4º 5%%" % (buy_in * 4)
 	var pot_l := UIKit.label(pot_text, 16, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	pot_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	pot_l.custom_minimum_size = Vector2(320, 0)
+	pot_l.custom_minimum_size = Vector2(520, 0)
 	v.add_child(pot_l)
 	if fichas < buy_in:
 		v.add_child(UIKit.label("Fichas insuficientes pra entrar.", 18, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
@@ -362,6 +362,6 @@ func _open_rules() -> void:
 • Primeira vez? Jogue o TUTORIAL: uma mão guiada com dicas em cada regra nova."""
 	var l := UIKit.label(text, 19, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(420, 0)
+	l.custom_minimum_size = Vector2(520, 0)
 	v.add_child(l)
 	_close_button(v)
