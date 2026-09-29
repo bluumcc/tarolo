@@ -37,7 +37,7 @@ var boss_panel: PanelContainer   # o Tomador como "chefe": retrato, contrato, vi
 var boss_portrait: Portrait
 var boss_name: Label
 var boss_chip: Label
-var boss_bar: HpBar
+var boss_bar: MeterBar
 var boss_bar_label: Label
 var boss_bar_value: Label
 var boss_meta: Label
@@ -62,7 +62,7 @@ var bid_waiting := false
 
 var my_portrait: Portrait
 var hand_container: Control
-var play_btn: Button
+var turn_hint: Label
 var selected_view: CardView
 var status_label: Label
 var trick_label: Label           # resultado transitório da última vaza
@@ -229,7 +229,7 @@ func _build_boss_panel() -> void:
 	boss_chip = UIKit.label("", 13, UIKit.BLACK)
 	chip.add_child(boss_chip)
 	name_row.add_child(chip)
-	boss_bar = HpBar.new()
+	boss_bar = MeterBar.new()
 	col.add_child(boss_bar)
 	var lab_row := HBoxContainer.new()
 	col.add_child(lab_row)
@@ -379,7 +379,7 @@ func _build_bid_panel() -> void:
 	_bid_reset()
 
 
-## Seu rodapé: retrato, pontos e o botão JOGAR (só liga quando há uma carta selecionada).
+## Seu rodapé: retrato, pontos e, na sua vez, a dica de como jogar (tocar, tocar de novo).
 func _build_my_footer() -> void:
 	var my_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 10)
 	var my_row := HBoxContainer.new()
@@ -397,13 +397,9 @@ func _build_my_footer() -> void:
 	my_left.add_child(my_pts)
 	var my_tr := UIKit.label("0 vazas", 13, UIKit.MUTED)
 	my_left.add_child(my_tr)
-	play_btn = UIKit.button("JOGAR", UIKit.GOLD, 24)
-	play_btn.custom_minimum_size = Vector2(190, 72)
-	play_btn.disabled = true
-	play_btn.pressed.connect(func():
-		if selected_view != null:
-			_on_card_play(selected_view))
-	my_row.add_child(play_btn)
+	turn_hint = UIKit.label("Toque numa carta pra subir.\nToque de novo pra jogar.", 15, UIKit.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
+	turn_hint.visible = false
+	my_row.add_child(turn_hint)
 	root_box.add_child(my_box)
 	hud_badges[0] = my_box
 	hud_titles[0] = my_title
@@ -500,7 +496,6 @@ func _rebuild_hand() -> void:
 		hand_container.remove_child(c)
 		c.queue_free()
 	selected_view = null
-	play_btn.disabled = true
 	var legal := engine.legal_for(0) if human_turn else []
 	for card in engine.hands[0]:
 		var cv: CardView = CARD_SCENE.instantiate()
@@ -508,7 +503,6 @@ func _rebuild_hand() -> void:
 		hand_container.add_child(cv)
 		cv.set_playable(human_turn and legal.has(card))
 		cv.tapped.connect(_on_card_tapped)
-		cv.play_requested.connect(_on_card_play)
 		cv.zoom_requested.connect(_show_zoom)
 	_layout_hand.call_deferred()
 
@@ -558,27 +552,18 @@ func _refresh_hud() -> void:
 			_refresh_boss(true)
 
 
-## Números do duelo. Contra um chefe (Tomador bot): a vida é quanto a Defesa ainda
-## precisa somar pra derrubar o contrato (91 pontos no jogo, menos a meta dele, mais meio
-## ponto). Se o Tomador é você, a barra é o progresso da sua meta.
+## Números do duelo: a barra do chefe começa vazia e enche com os pontos que o Tomador
+## captura, até a meta dele (que cai a cada Bout que ele pega). A Defesa joga pra segurar
+## a barra. Se o Tomador é você, é a mesma barra: a sua meta.
 func _boss_numbers() -> Dictionary:
 	var t := engine.taker
 	var bouts_now := 0
 	for c in engine.captured[t]:
 		if (c as CardData).is_bout():
 			bouts_now += 1
-	var target := Scoring.target_for_bouts(bouts_now)
-	var def_pts := 0.0
-	for p in range(engine.num_players):
-		if p != t:
-			def_pts += engine.points_of(p)
-	var hp_max := Scoring.TOTAL_POINTS - target + 0.5
 	return {
-		"target": target,
+		"target": Scoring.target_for_bouts(bouts_now),
 		"current": engine.points_of(t),
-		"def_pts": def_pts,
-		"hp_max": hp_max,
-		"hp": maxf(0.0, hp_max - def_pts),
 	}
 
 
@@ -601,22 +586,17 @@ func _refresh_boss(animate: bool = false) -> void:
 	boss_chip.text = "%s ×%d" % [str(Scoring.CONTRACT_NAMES[engine.contract]).to_upper(), int(Scoring.CONTRACT_MULT[engine.contract])]
 	boss_portrait.seat = engine.taker
 	boss_portrait.queue_redraw()
-	if mine:
-		boss_bar.set_colors(UIKit.GOLD, Color("#2b2413"))
-		boss_bar.set_values(minf(n["current"], n["target"]), n["target"], animate)
-		boss_bar_label.text = "Sua meta"
-		boss_bar_value.text = "%s / %s pts" % [UIKit.fmt_dec(n["current"], 1), UIKit.fmt_dec(n["target"], 1)]
-		var missing: float = maxf(0.0, n["target"] - n["current"])
-		boss_meta.text = "Meta batida!" if missing <= 0.0 else "Faltam %s pts. Os outros 3 jogam contra você." % UIKit.fmt_dec(missing, 1)
+	boss_bar.set_colors(UIKit.GOLD if mine else UIKit.BOSS, Color("#2b2413") if mine else Color("#2a1715"))
+	boss_bar.set_values(minf(n["current"], n["target"]), n["target"], animate)
+	boss_bar_label.text = "Sua meta" if mine else "Meta do chefe"
+	boss_bar_value.text = "%s / %s pts" % [UIKit.fmt_dec(n["current"], 1), UIKit.fmt_dec(n["target"], 1)]
+	var missing: float = maxf(0.0, n["target"] - n["current"])
+	if missing <= 0.0:
+		boss_meta.text = "Meta batida! O contrato está garantido." if not mine else "Meta batida!"
+	elif mine:
+		boss_meta.text = "Faltam %s pts. Os outros 3 jogam pra segurar a sua barra." % UIKit.fmt_dec(missing, 1)
 	else:
-		boss_bar.set_colors(UIKit.BOSS, Color("#2a1715"))
-		boss_bar.set_values(n["hp"], n["hp_max"], animate)
-		boss_bar_label.text = "Vida do chefe"
-		boss_bar_value.text = "%s / %s" % [UIKit.fmt_dec(n["hp"], 1), UIKit.fmt_dec(n["hp_max"], 1)]
-		if n["hp"] <= 0.0:
-			boss_meta.text = "O contrato caiu: a Defesa já tem pontos suficientes."
-		else:
-			boss_meta.text = "Precisa de %s pts e tem %s. A Defesa precisa de mais %s." % [UIKit.fmt_dec(n["target"], 1), UIKit.fmt_dec(n["current"], 1), UIKit.fmt_dec(n["hp"], 1)]
+		boss_meta.text = "Faltam %s pts pro chefe bater a meta. Segure a barra: não deixe encher." % UIKit.fmt_dec(missing, 1)
 
 
 ## Destaca com borda dourada + pulso o assento de quem tem a vez agora (bots só — o
@@ -787,26 +767,22 @@ func _show_intro() -> void:
 	v.add_child(seal_box)
 	v.add_child(UIKit.label(_taker_display_name().to_upper(), 46, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(UIKit.label("JOGA CONTRA OS OUTROS 3", 14, UIKit.GOLD if mine else UIKit.BOSS, HORIZONTAL_ALIGNMENT_CENTER))
-	var bar := HpBar.new()
+	var bar := MeterBar.new()
 	bar.custom_minimum_size = Vector2(0, 28)
-	if mine:
-		bar.set_colors(UIKit.GOLD, Color("#2b2413"))
-		bar.set_values(0.0, n["target"], false)
-	else:
-		bar.set_colors(UIKit.BOSS, Color("#2a1715"))
-		bar.set_values(n["hp_max"], n["hp_max"], false)
+	bar.set_colors(UIKit.GOLD if mine else UIKit.BOSS, Color("#2b2413") if mine else Color("#2a1715"))
+	bar.set_values(0.0, n["target"], false)
 	v.add_child(bar)
 	var bar_row := HBoxContainer.new()
-	var bl := UIKit.label("Sua meta" if mine else "Vida do chefe", 14, UIKit.MUTED)
+	var bl := UIKit.label("Sua meta" if mine else "Meta do chefe", 14, UIKit.MUTED)
 	bl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar_row.add_child(bl)
-	bar_row.add_child(UIKit.label("0,0 / %s pts" % UIKit.fmt_dec(n["target"], 1) if mine else "%s / %s" % [UIKit.fmt_dec(n["hp_max"], 1), UIKit.fmt_dec(n["hp_max"], 1)], 18, UIKit.INK))
+	bar_row.add_child(UIKit.label("0,0 / %s pts" % UIKit.fmt_dec(n["target"], 1), 18, UIKit.INK))
 	v.add_child(bar_row)
 	var rule_text := ""
 	if mine:
-		rule_text = "Você precisa de %s pontos (a meta cai com cada Bout que você tiver). Se bater, cada um dos outros 3 te paga ×%d." % [UIKit.fmt_dec(n["target"], 1), int(Scoring.CONTRACT_MULT[engine.contract])]
+		rule_text = "Você precisa de %s pontos (a meta cai com cada Bout que você tiver). Encha a barra: se bater, cada um dos outros 3 te paga ×%d." % [UIKit.fmt_dec(n["target"], 1), int(Scoring.CONTRACT_MULT[engine.contract])]
 	else:
-		rule_text = "Precisa de %s pontos pra bater a meta. Se a Defesa somar %s, o contrato cai e cada um da Defesa ganha ×%d." % [UIKit.fmt_dec(n["target"], 1), UIKit.fmt_dec(n["hp_max"], 1), int(Scoring.CONTRACT_MULT[engine.contract])]
+		rule_text = "Precisa de %s pontos. A barra começa vazia e enche a cada vaza dele. Se a Defesa não deixar encher, o contrato cai e cada um da Defesa ganha ×%d." % [UIKit.fmt_dec(n["target"], 1), int(Scoring.CONTRACT_MULT[engine.contract])]
 	var rl := UIKit.label(rule_text, 16, Color("#d6cbbb"), HORIZONTAL_ALIGNMENT_CENTER)
 	rl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(rl)
@@ -1210,6 +1186,7 @@ func _wait_human() -> CardData:
 	if tutorial:
 		_check_tutorial_trick_hints(ls)
 	_rebuild_hand()
+	turn_hint.visible = true
 	var card: CardData = await human_card_chosen
 	human_turn = false
 	return card
@@ -1251,7 +1228,6 @@ func _on_card_tapped(view: CardView) -> void:
 	for c in hand_container.get_children():
 		(c as CardView).set_selected(c == view)
 	selected_view = view
-	play_btn.disabled = false
 	(hand_container.get_parent() as HandScroller).reveal(view.position.x, CardView.SIZE.x)
 	Sfx.play("tick")
 
@@ -1261,7 +1237,7 @@ func _on_card_play(view: CardView) -> void:
 		return
 	human_turn = false
 	selected_view = null
-	play_btn.disabled = true
+	turn_hint.visible = false
 	human_card_chosen.emit(view.data)
 
 
@@ -1323,10 +1299,10 @@ func _resolve_trick(result: Dictionary) -> void:
 		if has_petit:
 			_tutorial_hint("Le Petit apareceu na última vaza! Quem venceu essa vaza leva um bônus extra de 10 pontos — é o Petit au bout.")
 
-	# O golpe: a barra do chefe só cai agora, junto do número que sobe da mesa.
+	# A barra do chefe só se mexe agora, junto do número que sobe da mesa.
 	hold_boss = false
 	_float_points(winner, points)
-	_boss_hit(winner)
+	_boss_scores(winner)
 	_refresh_boss(true)
 	await _wait(0.75)
 	if not is_inside_tree():
@@ -1348,32 +1324,33 @@ func _resolve_trick(result: Dictionary) -> void:
 	_refresh_hud()
 
 
-## Quando a Defesa leva a vaza contra um chefe bot, o retrato dele leva um tranco.
-func _boss_hit(winner: int) -> void:
-	if engine.taker == 0 or winner == engine.taker or not boss_panel.visible:
+## Quando o chefe (bot) leva a vaza, o retrato dele dá um pulo: a barra dele acabou de encher.
+func _boss_scores(winner: int) -> void:
+	if engine.taker == 0 or winner != engine.taker or not boss_panel.visible:
 		return
 	boss_portrait.pivot_offset = boss_portrait.size / 2.0
-	boss_portrait.modulate = Color(1.7, 0.7, 0.7)
 	var tw := create_tween()
-	tw.tween_property(boss_portrait, "scale", Vector2(1.18, 1.18), GameState.anim(0.08))
+	tw.tween_property(boss_portrait, "scale", Vector2(1.14, 1.14), GameState.anim(0.08))
 	tw.tween_property(boss_portrait, "scale", Vector2.ONE, GameState.anim(0.2))
-	tw.parallel().tween_property(boss_portrait, "modulate", Color.WHITE, GameState.anim(0.35))
 
 
-## Número que sobe da mesa: "−X" (dano) quando a Defesa leva a vaza do chefe, "+X" nos
-## outros casos.
+## Número que sobe da mesa: "+X". Quando é o Tomador que leva a vaza, ele voa até o painel
+## do chefe (é a barra dele que enche); quando é a Defesa, sobe na própria mesa.
 func _float_points(winner: int, points: float) -> void:
-	var boss_hit := engine.taker != 0 and winner != engine.taker
-	var l := UIKit.label("%s%s" % ["−" if boss_hit else "+", UIKit.fmt_dec(points, 1)], 56, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var to_boss := winner == engine.taker
+	var l := UIKit.label("+%s" % UIKit.fmt_dec(points, 1), 56, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var outline := UIKit.DEF
+	if to_boss:
+		outline = UIKit.GOLD.darkened(0.3) if winner == 0 else UIKit.BOSS
 	l.add_theme_constant_override("outline_size", 12)
-	l.add_theme_color_override("font_outline_color", UIKit.BOSS if boss_hit else UIKit.GOLD.darkened(0.55))
+	l.add_theme_color_override("font_outline_color", outline)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	popup_layer.add_child(l)
 	l.size = Vector2(260, 74)
 	l.global_position = arena.global_position + arena.size / 2.0 - l.size / 2.0
 	l.modulate.a = 0.0
 	var end_y := l.position.y - 70.0
-	if boss_hit and boss_panel.visible:
+	if to_boss and boss_panel.visible:
 		end_y = boss_panel.global_position.y + boss_panel.size.y * 0.5 - l.size.y * 0.5
 	var tw := create_tween()
 	tw.tween_property(l, "modulate:a", 1.0, GameState.anim(0.12))
@@ -1557,7 +1534,7 @@ func _open_pause() -> void:
 	v.custom_minimum_size = Vector2(320, 0)
 	box.add_child(v)
 	v.add_child(UIKit.label("PAUSA", 32, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("Toque numa carta para selecionar e de novo para jogar,\nou arraste-a para cima. Segure / botão direito = zoom.", 13, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar.\nSegure / botão direito = zoom.", 13, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	paused = true
 	ov.tree_exited.connect(func(): paused = false)
 	var resume := UIKit.button("CONTINUAR")

@@ -4,7 +4,6 @@ extends Control
 ## que se move (hover, arrasto), sem brigar com o layout do HBoxContainer.
 
 signal tapped(view: CardView)
-signal play_requested(view: CardView)
 signal zoom_requested(view: CardView)
 
 const SIZE := Vector2(150, 216)
@@ -40,8 +39,6 @@ func _ready() -> void:
 	body.pivot_offset = SIZE / 2.0
 	for n in [rank_label, suit_small, center_label, name_label, points_label, bout_label]:
 		(n as Label).mouse_filter = Control.MOUSE_FILTER_IGNORE
-	mouse_entered.connect(_on_hover.bind(true))
-	mouse_exited.connect(_on_hover.bind(false))
 	_refresh()
 
 
@@ -118,8 +115,9 @@ func _refresh_border() -> void:
 
 # ------------------------------------------------------------------ input
 #
-# Jogar é sempre por toque: toca pra selecionar, toca de novo (ou usa o botão JOGAR)
-# pra confirmar. Não existe mais arrastar a carta pra jogar — isso competia com o
+# Jogar é sempre por toque: toca pra selecionar (a carta sobe), toca de novo pra jogar.
+# Não tem efeito ao passar o dedo/mouse: no celular ele grudava e a carta ficava meio
+# levantada sem fazer nada. Não existe mais arrastar a carta pra jogar — isso competia com o
 # gesto de arrastar a mão inteira pra rolar (o toque na carta "comia" o arrasto antes
 # dele chegar ao ScrollContainer, e a rolagem nunca disparava de verdade). Aqui só
 # medimos se o dedo/mouse SE MOVEU (`_moved`) pra distinguir toque de "só passando",
@@ -141,8 +139,6 @@ func _gui_input(event: InputEvent) -> void:
 				_long_fired = false
 				_press_pos = mb.global_position
 				_press_time = 0.0
-				if mb.double_click and playable:
-					play_requested.emit(self)
 			else:
 				_release()
 			accept_event()
@@ -173,12 +169,6 @@ func _process(delta: float) -> void:
 		if _press_time >= LONG_PRESS:
 			_long_fired = true
 			zoom_requested.emit(self)
-
-
-func _on_hover(inside: bool) -> void:
-	if not interactive or not playable or _pressing or selected:
-		return
-	_lift(-12.0 if inside else 0.0)
 
 
 func _lift(y: float) -> void:

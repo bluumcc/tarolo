@@ -27,7 +27,6 @@ var seat_avatars: Array = []
 var turn_pulse_token := 0
 var table_center: Panel
 var hand_container: Control
-var play_btn: Button
 var selected_view: CardView
 var status_label: Label
 var trick_label: Label
@@ -215,14 +214,6 @@ func _build_ui() -> void:
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root.add_child(status_label)
 
-	# Botão JOGAR — aparece quando uma carta tá selecionada, como alternativa a tocar
-	# nela de novo pra confirmar.
-	play_btn = UIKit.button("JOGAR CARTA", UIKit.GOLD, 16)
-	play_btn.visible = false
-	play_btn.pressed.connect(func():
-		if selected_view != null:
-			_on_card_play(selected_view))
-	root.add_child(play_btn)
 
 	# Mão — cartas sempre no tamanho real (nunca encolhidas pra caber); quando não cabem
 	# todas na tela, a mão rola de lado (arrasto/swipe), igual qualquer app de cartas.
@@ -335,7 +326,6 @@ func _rebuild_hand() -> void:
 		hand_container.remove_child(c)
 		c.queue_free()
 	selected_view = null
-	play_btn.visible = false
 	var legal := engine.legal_for(0) if human_turn else []
 	for card in engine.hands[0]:
 		var cv: CardView = CARD_SCENE.instantiate()
@@ -343,7 +333,6 @@ func _rebuild_hand() -> void:
 		hand_container.add_child(cv)
 		cv.set_playable(human_turn and legal.has(card))
 		cv.tapped.connect(_on_card_tapped)
-		cv.play_requested.connect(_on_card_play)
 		cv.zoom_requested.connect(_show_zoom)
 		_apply_modifier_badge(cv, card)
 	_layout_hand.call_deferred()
@@ -598,7 +587,6 @@ func _on_card_tapped(view: CardView) -> void:
 	for c in hand_container.get_children():
 		(c as CardView).set_selected(c == view)
 	selected_view = view
-	play_btn.visible = true
 	(hand_container.get_parent() as HandScroller).reveal(view.position.x, CardView.SIZE.x)
 	Sfx.play("tick")
 
@@ -608,7 +596,6 @@ func _on_card_play(view: CardView) -> void:
 		return
 	human_turn = false
 	selected_view = null
-	play_btn.visible = false
 	human_card_chosen.emit(view.data)
 
 
@@ -864,7 +851,7 @@ func _open_pause() -> void:
 	v.custom_minimum_size = Vector2(320, 0)
 	box.add_child(v)
 	v.add_child(UIKit.label("PAUSA", 32, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("Toque numa carta para selecionar e de novo para jogar,\nou arraste-a para cima. Segure / botão direito = zoom.", 13, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar.\nSegure / botão direito = zoom.", 13, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	paused = true
 	ov.tree_exited.connect(func(): paused = false)
 	var resume := UIKit.button("CONTINUAR")
