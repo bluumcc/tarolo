@@ -9,6 +9,8 @@ signal zoom_requested(view: CardView)
 
 const SIZE := Vector2(150, 216)
 const DRAG_PLAY_DISTANCE := 70.0
+const MAX_LIFT := 92.0  ## até onde a carta sobe visualmente ao arrastar/selecionar — o
+## contêiner da mão reserva espaço pra esse valor, senão a carta corta na borda de cima.
 const LONG_PRESS := 0.45
 
 var data: CardData
@@ -143,7 +145,7 @@ func _gui_input(event: InputEvent) -> void:
 		if delta.length() > 12.0:
 			_dragging = true
 		if _dragging and playable:
-			body.position = Vector2(delta.x * 0.3, minf(delta.y, 0.0))
+			body.position = Vector2(delta.x * 0.3, clampf(delta.y, -MAX_LIFT, 0.0))
 			body.rotation = clampf(delta.x * 0.002, -0.2, 0.2)
 
 

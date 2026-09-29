@@ -196,7 +196,7 @@ func _build_ui() -> void:
 	# Mão — cartas sempre no tamanho real (nunca encolhidas pra caber); quando não cabem
 	# todas na tela, a mão rola de lado (arrasto/swipe), igual qualquer app de cartas. ---
 	var hand_scroll := ScrollContainer.new()
-	hand_scroll.custom_minimum_size = Vector2(0, CardView.SIZE.y + 16)
+	hand_scroll.custom_minimum_size = Vector2(0, CardView.SIZE.y + CardView.MAX_LIFT + 16)
 	hand_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	hand_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	root.add_child(hand_scroll)
@@ -204,7 +204,9 @@ func _build_ui() -> void:
 	hand_container = HBoxContainer.new()
 	hand_container.name = "HandContainer"
 	hand_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	hand_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# Fica encostada embaixo (SHRINK_END) e não esticada — a folga extra do hand_scroll
+	# vira espaço LIVRE ACIMA da carta, senão o arrasto pra jogar corta na borda de cima.
+	hand_container.size_flags_vertical = Control.SIZE_SHRINK_END
 	hand_scroll.add_child(hand_container)
 
 	popup_layer = Control.new()
