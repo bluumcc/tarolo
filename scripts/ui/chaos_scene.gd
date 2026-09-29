@@ -524,20 +524,15 @@ func _transition(kicker: String, blocks: Array, hold: float) -> void:
 		t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		cv.add_child(t)
 		v.add_child(card)
-	v.add_child(UIKit.label("toque para continuar", 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	var go := UIKit.button("ENTENDI, CONTINUAR")
+	v.add_child(go)
 	ov.add_child(UIKit.centered(v))
+	go.grab_focus.call_deferred()
 	ov.modulate.a = 0.0
 	create_tween().tween_property(ov, "modulate:a", 1.0, GameState.anim(0.18))
 	Sfx.play("chip")
-	var done := {"v": false}
-	ov.gui_input.connect(func(e: InputEvent):
-		if e is InputEventMouseButton and e.pressed:
-			done["v"] = true)
-	var waited := 0.0
-	while not done["v"] and waited < GameState.anim(hold) and is_inside_tree():
-		await get_tree().create_timer(0.05).timeout
-		if not paused:
-			waited += 0.05
+	# Só avança quando o jogador aperta o botão — sem tempo limite, dá pra ler com calma.
+	await go.pressed
 	if not is_inside_tree():
 		return
 	var tw := create_tween()
