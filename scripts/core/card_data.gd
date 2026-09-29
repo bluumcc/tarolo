@@ -48,7 +48,7 @@ func value() -> int:
 	return rank
 
 
-## Pontuação oficial do Jeu de Tarot: Rei/Bout = 4,5 · Dama = 3,5 · Cavaleiro = 2,5 ·
+## Pontuação oficial do Jeu de Tarot: Rei/Bout = 4,5 · Rainha = 3,5 · Cavaleiro = 2,5 ·
 ## Valete = 1,5 · qualquer outra carta (números e trunfos comuns) = 0,5.
 func points() -> float:
 	if is_bout():
@@ -57,7 +57,7 @@ func points() -> float:
 		return 0.5
 	match rank:
 		14: return 4.5  # Rei
-		13: return 3.5  # Dama
+		13: return 3.5  # Rainha
 		12: return 2.5  # Cavaleiro
 		11: return 1.5  # Valete
 		_: return 0.5
@@ -70,10 +70,10 @@ func rank_label() -> String:
 		return str(rank)
 	match rank:
 		1: return "A"
-		11: return "V"
-		12: return "C"
-		13: return "D"
-		14: return "R"
+		11: return "J"
+		12: return "N"
+		13: return "Q"
+		14: return "K"
 	return str(rank)
 
 
@@ -87,7 +87,7 @@ func display_name() -> String:
 	if is_trunfo():
 		var label := "Le Petit" if rank == PETIT else ("Le Monde" if rank == MONDE else "Trunfo %d" % rank)
 		return label
-	var names := {1: "Ás", 11: "Valete", 12: "Cavaleiro", 13: "Dama", 14: "Rei"}
+	var names := {1: "Ás", 11: "Valete", 12: "Cavaleiro", 13: "Rainha", 14: "Rei"}
 	var r: String = names.get(rank, str(rank))
 	return "%s de %s" % [r, SUIT_NAMES[suit]]
 

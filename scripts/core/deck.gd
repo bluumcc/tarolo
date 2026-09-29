@@ -1,7 +1,7 @@
 class_name Deck
 extends RefCounted
 ## Monta e distribui o baralho fixo de 78 cartas do Tarot: 4 naipes × 14 (Ás a Rei,
-## passando por Valete/Cavaleiro/Dama) + 21 Trunfos + O Louco.
+## passando por Valete/Cavaleiro/Rainha) + 21 Trunfos + O Louco.
 
 const TOTAL_CARDS := 78
 const CHIEN_SIZE := 6  # talão do modo Vanilla (4 jogadores × 18 cartas + 6 = 78)

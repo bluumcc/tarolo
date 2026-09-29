@@ -65,7 +65,7 @@ func _test_deck() -> void:
 
 func _test_points() -> void:
 	check(is_equal_approx(c(0, 14).points(), 4.5), "Rei vale 4,5")
-	check(is_equal_approx(c(0, 13).points(), 3.5), "Dama vale 3,5")
+	check(is_equal_approx(c(0, 13).points(), 3.5), "Rainha vale 3,5")
 	check(is_equal_approx(c(0, 12).points(), 2.5), "Cavaleiro vale 2,5")
 	check(is_equal_approx(c(0, 11).points(), 1.5), "Valete vale 1,5")
 	check(is_equal_approx(c(0, 5).points(), 0.5), "carta numérica vale 0,5")

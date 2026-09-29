@@ -332,7 +332,7 @@ func _open_chaos_confirm() -> void:
 
 func _open_rules() -> void:
 	var v := _modal("COMO JOGAR")
-	var text := """• Baralho de 78 cartas: 4 naipes de 14 (Ás a Rei, com Cavaleiro entre Valete e Dama), 21 Trunfos e O Louco.
+	var text := """• Baralho de 78 cartas: 4 naipes de 14 (Ás a Rei, com Cavaleiro entre Valete e Rainha), 21 Trunfos e O Louco.
 • Dentro do naipe, Ás é a carta mais baixa; sobe até Rei. Trunfo sempre vence naipe comum; entre trunfos, vence o maior número.
 • Obrigado a seguir o naipe líder. Sem ele, é obrigado a jogar Trunfo — e se alguém já cortou, precisa cobrir com um Trunfo maior, se tiver.
 • O Louco pode ser jogado a qualquer momento, nunca vence a vaza, mas o dono guarda os pontos dele.
