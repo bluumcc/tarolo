@@ -96,14 +96,14 @@ func _show_insufficient_fichas() -> void:
 	var ov := UIKit.overlay()
 	overlay_layer.add_child(ov)
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.DANGER, 24)
-	box.custom_minimum_size = Vector2(580, 0)
+	box.custom_minimum_size = Vector2(664, 0)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
 	box.add_child(v)
 	v.add_child(UIKit.label("FICHAS INSUFICIENTES", 28, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
-	var l := UIKit.label("Você precisa de %d fichas pra entrar na Mesa Caos. Jogue Vanilla ou Ranqueado, ou volte ao menu e peça um empréstimo da casa." % int(config["buy_in"]), 18, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var l := UIKit.label("Você precisa de %d fichas pra entrar na Mesa Caos. Jogue Vanilla ou Ranqueado, ou volte ao menu e peça um empréstimo da casa." % int(config["buy_in"]), 32, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(520, 0)
+	l.custom_minimum_size = Vector2(620, 0)
 	v.add_child(l)
 	var btn := UIKit.button("VOLTAR AO MENU", UIKit.MUTED)
 	btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
@@ -481,7 +481,7 @@ func _refresh_hud() -> void:
 	var rest := _rest_banner()
 	modifier_label.text = "%s — %s" % [rest[0], rest[1]] if modifier_expanded else str(rest[0])
 	var profile := SaveManager.section("profile")
-	wager_label.text = "◎ Suas fichas: %d   ·   Pote da mesa: %d (buy-in %d)" % [int(profile["fichas"]), int(engine.pot), int(engine.buy_in)]
+	wager_label.text = "◎ %d fichas\nPote %d" % [int(profile["fichas"]), int(engine.pot)]
 	_update_turn_highlight(turn_player)
 	_refresh_power_button()
 
@@ -597,12 +597,12 @@ func _transition(kicker: String, blocks: Array, hold: float) -> void:
 		var cv := VBoxContainer.new()
 		cv.add_theme_constant_override("separation", 4)
 		card.add_child(cv)
-		cv.add_child(UIKit.label(b["head"], 16, b["color"], HORIZONTAL_ALIGNMENT_CENTER))
-		var title_lbl := UIKit.label(b["title"], 30, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+		cv.add_child(UIKit.label(b["head"], 28, b["color"], HORIZONTAL_ALIGNMENT_CENTER))
+		var title_lbl := UIKit.label(b["title"], 40, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 		cv.add_child(title_lbl)
 		if b.get("spin", false):
 			_spin_label(title_lbl, str(b["title"]))
-		var t := UIKit.label(b["text"], 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		var t := UIKit.label(b["text"], 32, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 		t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		cv.add_child(t)
 		v.add_child(card)
@@ -780,7 +780,7 @@ func _modal_choice(title: String, sub: String, opts: Array, cancel := false) -> 
 		btn.pressed.connect(func(): item_chosen.emit(i))
 		v.add_child(btn)
 		if str(o.get("desc", "")) != "":
-			var desc := UIKit.label(str(o["desc"]), 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+			var desc := UIKit.label(str(o["desc"]), 30, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 			desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			v.add_child(desc)
 	if cancel:
@@ -1072,12 +1072,12 @@ func _show_round_summary() -> void:
 	var ov := UIKit.overlay()
 	overlay_layer.add_child(ov)
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 24)
-	box.custom_minimum_size = Vector2(580, 0)
+	box.custom_minimum_size = Vector2(664, 0)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	box.add_child(v)
 	v.add_child(UIKit.label("FIM DA RODADA %d/%d" % [int(r["round"]) + 1, ChaosEngine.ROUNDS], 30, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label(ChaosModifiers.label(int(r["modifier"]), int(r["weak_suit"])), 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label(ChaosModifiers.label(int(r["modifier"]), int(r["weak_suit"])), 30, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	var order := range(engine.num_players)
 	var totals: Array = r["totals"]
@@ -1085,11 +1085,11 @@ func _show_round_summary() -> void:
 	for p in order:
 		var gained: float = (r["round_points"] as Array)[p]
 		var line := "%s%s  %s pts  (+%s)" % ["♛ " if p == order[0] else "", str(config["names"][p]).to_upper(), UIKit.fmt_dec(float(totals[p]), 1), UIKit.fmt_dec(gained, 1)]
-		v.add_child(UIKit.label(line, 20, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label(line, 32, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	var bets: Array = r.get("bets", [])
 	var won: Array = r.get("tricks_won", [])
 	v.add_child(HSeparator.new())
-	v.add_child(UIKit.label("APOSTAS", 22, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("APOSTAS", 34, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	for p in range(engine.num_players):
 		var bd: Dictionary = bets[p]
 		if int(bd["bet"]) < 0:
@@ -1097,7 +1097,7 @@ func _show_round_summary() -> void:
 		var opt: Dictionary = ChaosEngine.BET_OPTIONS[int(bd["bet"])]
 		var ok := bool(bd["hit"])
 		var bl := "%s  %s (%d+)  fez %d  %s %s" % [str(config["names"][p]).to_upper(), opt["name"], int(opt["need"]), int(won[p]), "✓" if ok else "✕", ("+" if ok else "") + UIKit.fmt_dec(float(bd["delta"]), 0)]
-		v.add_child(UIKit.label(bl, 20, UIKit.OK if ok else UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label(bl, 30, UIKit.OK if ok else UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
 	var btn_text := "VER RESULTADO FINAL" if int(r["round"]) >= ChaosEngine.ROUNDS - 1 else "PRÓXIMA RODADA"
 	var btn := UIKit.button(btn_text)
 	v.add_child(btn)
@@ -1129,7 +1129,7 @@ func _show_results(summary: Dictionary) -> void:
 	var ov := UIKit.overlay()
 	overlay_layer.add_child(ov)
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD if summary["won"] else UIKit.DANGER, 24)
-	box.custom_minimum_size = Vector2(580, 0)
+	box.custom_minimum_size = Vector2(664, 0)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	box.add_child(v)
@@ -1143,12 +1143,12 @@ func _show_results(summary: Dictionary) -> void:
 	for i in range(order.size()):
 		var p: int = order[i]
 		var line := "%d. %s%s — %s pts" % [i + 1, "♛ " if i == 0 else "", str(config["names"][p]).to_upper(), UIKit.fmt_dec(float(totals[p]), 1)]
-		v.add_child(UIKit.label(line, 22, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label(line, 34, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	if not best_trick.is_empty():
-		v.add_child(UIKit.label("★ Sua melhor vaza: +%s pts (rodada %d)" % [UIKit.fmt_dec(float(best_trick["points"]), 1), int(best_trick["round"])], 22, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label("★ Sua melhor vaza: +%s pts (rodada %d)" % [UIKit.fmt_dec(float(best_trick["points"]), 1), int(best_trick["round"])], 30, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	for line in summary["lines"]:
-		v.add_child(UIKit.label(str(line), 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label(str(line), 30, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	var again := UIKit.button("REVANCHE!")
 	again.pressed.connect(func(): get_tree().reload_current_scene())
 	v.add_child(again)
@@ -1181,11 +1181,11 @@ func _show_zoom(view: CardView) -> void:
 	big.scale = Vector2(2.2, 2.2)
 	big.pivot_offset = Vector2.ZERO
 	v.add_child(holder)
-	var desc := UIKit.label(view.describe(), 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var desc := UIKit.label(view.describe(), 32, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc.custom_minimum_size = Vector2(520, 0)
+	desc.custom_minimum_size = Vector2(620, 0)
 	v.add_child(desc)
-	v.add_child(UIKit.label("toque para fechar", 15, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("toque para fechar", 28, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	ov.add_child(UIKit.centered(v))
 	holder.scale = Vector2(0.6, 0.6)
 	holder.pivot_offset = holder.custom_minimum_size / 2.0
@@ -1220,11 +1220,11 @@ func _intro_slides() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 14)
 	box.add_child(v)
-	var icon_l := UIKit.label("", 52, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	var title_l := UIKit.label("", 34, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	var text_l := UIKit.label("", 24, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var icon_l := UIKit.label("", 72, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	var title_l := UIKit.label("", 46, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	var text_l := UIKit.label("", 34, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	text_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	text_l.custom_minimum_size = Vector2(0, 220)
+	text_l.custom_minimum_size = Vector2(0, 330)
 	var dots := HBoxContainer.new()
 	dots.alignment = BoxContainer.ALIGNMENT_CENTER
 	dots.add_theme_constant_override("separation", 10)
@@ -1301,9 +1301,9 @@ FICHAS
 
 CARTAS
 • Mesmas regras de vaza do Vanilla: seguir naipe, cortar com Trunfo se não tiver, cobrir com Trunfo maior se alguém já cortou. O Louco nunca vence, a não ser no modificador "O Louco Vence"."""
-	var l := UIKit.label(text, 16, UIKit.INK)
+	var l := UIKit.label(text, 30, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(520, 0)
+	l.custom_minimum_size = Vector2(620, 0)
 	v.add_child(l)
 	var tut := UIKit.button("VER TUTORIAL (3 TELAS)", UIKit.OK)
 	tut.pressed.connect(func(): _intro_slides())
@@ -1319,10 +1319,10 @@ func _open_pause() -> void:
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 24)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
-	v.custom_minimum_size = Vector2(520, 0)
+	v.custom_minimum_size = Vector2(620, 0)
 	box.add_child(v)
 	v.add_child(UIKit.label("PAUSA", 40, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar,\nou arraste-a pra cima e solte na mesa. Segure / botão direito = zoom.", 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar,\nou arraste-a pra cima e solte na mesa. Segure / botão direito = zoom.", 28, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	paused = true
 	ov.tree_exited.connect(func(): paused = false)
 	var resume := UIKit.button("CONTINUAR")

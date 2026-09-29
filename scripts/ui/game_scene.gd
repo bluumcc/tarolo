@@ -532,7 +532,7 @@ Cuidados:
 • Bouts nunca podem ser devolvidos ao monte."""
 	var l := UIKit.label(text, 18, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(520, 0)
+	l.custom_minimum_size = Vector2(620, 0)
 	v.add_child(l)
 	UIKit.close_button(overlay_layer, v)
 
@@ -959,7 +959,7 @@ func _show_intro() -> void:
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_theme_constant_override("separation", 10)
-	v.custom_minimum_size = Vector2(560, 0)
+	v.custom_minimum_size = Vector2(640, 0)
 	v.add_child(UIKit.label("VOCÊ É O ATACANTE" if mine else "O CHEFE DA RODADA", 19, UIKit.GOLD if mine else UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	var hero_box := CenterContainer.new()
 	hero_box.add_child(Portrait.new().setup(t, UIKit.GOLD if mine else UIKit.BOSS, 220.0))
@@ -1267,10 +1267,10 @@ func _ask_yes_no(title: String, body: String) -> bool:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	panel.add_child(v)
-	v.add_child(UIKit.label(title, 19, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	var body_label := UIKit.label(body, 15, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(UIKit.label(title, 40, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	var body_label := UIKit.label(body, 32, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body_label.custom_minimum_size = Vector2(520, 0)
+	body_label.custom_minimum_size = Vector2(620, 0)
 	v.add_child(body_label)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
@@ -1376,9 +1376,9 @@ func _tutorial_modal(title: String, body: String, button_text: String = "ENTENDI
 	if not tutorial or GameState.autoplay:
 		return
 	var v := UIKit.modal(overlay_layer, title, 380.0)
-	var l := UIKit.label(body, 18, UIKit.INK)
+	var l := UIKit.label(body, 32, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(520, 0)
+	l.custom_minimum_size = Vector2(620, 0)
 	v.add_child(l)
 	var btn := UIKit.button(button_text, UIKit.OK)
 	v.add_child(btn)
@@ -1625,7 +1625,7 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 	var ov := UIKit.overlay()
 	overlay_layer.add_child(ov)
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD if summary["won"] else UIKit.DANGER, 24)
-	box.custom_minimum_size = Vector2(580, 0)
+	box.custom_minimum_size = Vector2(664, 0)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	box.add_child(v)
@@ -1661,28 +1661,28 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 		bonus_lines.append("✦ Petit na última vaza: ponto pra Defesa (%d)" % int(petit))
 	if not bonus_lines.is_empty():
 		for line in bonus_lines:
-			v.add_child(UIKit.label(str(line), 15, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+			v.add_child(UIKit.label(str(line), 28, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	for p in engine.standings():
 		var delta := int(r["deltas"][p])
 		var line := "%s%s  %s%d" % ["♛ " if p == r["taker"] else "", str(config["names"][p]).to_upper(), "+" if delta >= 0 else "", delta]
-		v.add_child(UIKit.label(line, 22, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label(line, 34, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	for line in summary["lines"]:
-		v.add_child(UIKit.label(str(line), 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label(str(line), 30, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	if not GameState.table.is_empty() and GameState.mode == GameState.Mode.CLASSIC and not tutorial:
 		v.add_child(HSeparator.new())
-		v.add_child(UIKit.label("PLACAR DA MESA · %d mão(s)" % int(GameState.table["hands"]), 18, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label("PLACAR DA MESA · %d mão(s)" % int(GameState.table["hands"]), 30, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 		var order: Array = range(engine.num_players)
 		order.sort_custom(func(a: int, b: int) -> bool: return float(GameState.table["totals"][a]) > float(GameState.table["totals"][b]))
 		for p in order:
 			var tot := int(GameState.table["totals"][p])
-			v.add_child(UIKit.label("%s  %s%d" % [str(config["names"][p]).to_upper(), "+" if tot >= 0 else "", tot], 20, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+			v.add_child(UIKit.label("%s  %s%d" % [str(config["names"][p]).to_upper(), "+" if tot >= 0 else "", tot], 32, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	if tutorial:
 		v.add_child(HSeparator.new())
-		var tut_close := UIKit.label("Tutorial concluído! Isso não afeta suas Fragmentos nem seu elo — quando quiser, jogue de verdade no Vanilla ou Ranqueado.", 16, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
+		var tut_close := UIKit.label("Tutorial concluído! Isso não afeta suas Fragmentos nem seu elo — quando quiser, jogue de verdade no Vanilla ou Ranqueado.", 30, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
 		tut_close.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		tut_close.custom_minimum_size = Vector2(520, 0)
+		tut_close.custom_minimum_size = Vector2(620, 0)
 		v.add_child(tut_close)
 	var next: String = summary["next"]
 	var btn: Button
@@ -1727,11 +1727,11 @@ func _show_zoom(view: CardView) -> void:
 	big.scale = Vector2(2.2, 2.2)
 	big.pivot_offset = Vector2.ZERO
 	v.add_child(holder)
-	var desc := UIKit.label(view.describe(), 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var desc := UIKit.label(view.describe(), 32, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc.custom_minimum_size = Vector2(520, 0)
+	desc.custom_minimum_size = Vector2(620, 0)
 	v.add_child(desc)
-	v.add_child(UIKit.label("toque para fechar", 15, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("toque para fechar", 28, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	ov.add_child(UIKit.centered(v))
 	holder.scale = Vector2(0.6, 0.6)
 	holder.pivot_offset = holder.custom_minimum_size / 2.0
@@ -1771,9 +1771,9 @@ BÔNUS (só o Atacante escolhe)
 • Poignée: com 10 ou mais trunfos, ele pode mostrá-los pra ganhar pontos extras.
 • Chelem: ganhar as 18 vazas. Se avisar antes e conseguir: +400. Se avisar e falhar: -200. Sem avisar, se acontecer: +200.
 • Petit na última vaza: quem ganhar a última vaza com o Trunfo 1 nela leva +10."""
-	var l := UIKit.label(text, 16, UIKit.INK)
+	var l := UIKit.label(text, 32, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(520, 0)
+	l.custom_minimum_size = Vector2(620, 0)
 	v.add_child(l)
 	UIKit.close_button(overlay_layer, v)
 
@@ -1786,10 +1786,10 @@ func _open_pause() -> void:
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 24)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
-	v.custom_minimum_size = Vector2(520, 0)
+	v.custom_minimum_size = Vector2(620, 0)
 	box.add_child(v)
 	v.add_child(UIKit.label("PAUSA", 40, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar,\nou arraste-a pra cima e solte na mesa. Segure / botão direito = zoom.", 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar,\nou arraste-a pra cima e solte na mesa. Segure / botão direito = zoom.", 30, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	paused = true
 	ov.tree_exited.connect(func(): paused = false)
 	var resume := UIKit.button("CONTINUAR")
