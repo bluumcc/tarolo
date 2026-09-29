@@ -7,7 +7,7 @@ signal tapped(view: CardView)
 signal play_requested(view: CardView)
 signal zoom_requested(view: CardView)
 
-const SIZE := Vector2(96, 138)
+const SIZE := Vector2(150, 216)
 const DRAG_PLAY_DISTANCE := 70.0
 const LONG_PRESS := 0.45
 

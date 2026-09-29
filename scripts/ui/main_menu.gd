@@ -20,59 +20,59 @@ func _ready() -> void:
 	scroll.add_child(center)
 
 	var col := VBoxContainer.new()
-	col.custom_minimum_size = Vector2(400, 0)
-	col.add_theme_constant_override("separation", 12)
+	col.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x * 0.9, 480.0), 0)
+	col.add_theme_constant_override("separation", 14)
 	center.add_child(col)
 
 	var title := UIKit.label("TAROLO", 64, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	col.add_child(title)
 	var sub := UIKit.label("— JOGO DE VAZAS —", 20, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	col.add_child(sub)
-	col.add_child(_spacer(12))
+	col.add_child(_spacer(16))
 
-	var tut := UIKit.button("TUTORIAL", UIKit.OK)
+	var tut := UIKit.button("TUTORIAL", UIKit.OK, 22)
 	tut.pressed.connect(func():
 		GameState.start_tutorial()
 		get_tree().change_scene_to_file("res://scenes/GameScene.tscn"))
 	col.add_child(tut)
 	col.add_child(_caption("Primeira vez? Uma mão guiada, com dicas em cada regra nova."))
 
-	var classic := UIKit.button("MODO VANILLA")
+	var classic := UIKit.button("MODO VANILLA", UIKit.GOLD, 22)
 	classic.pressed.connect(func():
 		GameState.mode = GameState.Mode.CLASSIC
 		get_tree().change_scene_to_file("res://scenes/GameScene.tscn"))
 	col.add_child(classic)
 	col.add_child(_caption("Tarot clássico: baralho de 78 cartas, trunfo e O Louco."))
 
-	var chaos := UIKit.button("MODO CAOS", UIKit.DANGER)
+	var chaos := UIKit.button("MODO CAOS", UIKit.DANGER, 22)
 	chaos.pressed.connect(_open_chaos_confirm)
 	col.add_child(chaos)
 	col.add_child(_caption("5 rodadas relâmpago, item novo por rodada, fichas na mesa, Fôlego pra quem tá por baixo."))
 
 	var rk := GameState.ranked()
 	var tier := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
-	var ranked := UIKit.button("MODO RANQUEADO", Color(Ranked.TIER_COLORS[tier["tier"]]))
+	var ranked := UIKit.button("MODO RANQUEADO", Color(Ranked.TIER_COLORS[tier["tier"]]), 22)
 	ranked.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn"))
 	col.add_child(ranked)
 	col.add_child(_caption("Temporada %d · %s · %d LP" % [int(rk["season"]), tier["label"], int(tier["lp"])]))
 
-	col.add_child(_spacer(6))
+	col.add_child(_spacer(8))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	col.add_child(row)
-	var cosm := UIKit.button("COSMÉTICOS", UIKit.MUTED, 16)
+	var cosm := UIKit.button("COSMÉTICOS", UIKit.MUTED, 17)
 	cosm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cosm.pressed.connect(_open_cosmetics)
 	row.add_child(cosm)
-	var sett := UIKit.button("CONFIGURAÇÕES", UIKit.MUTED, 16)
+	var sett := UIKit.button("CONFIGURAÇÕES", UIKit.MUTED, 17)
 	sett.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sett.pressed.connect(_open_settings)
 	row.add_child(sett)
-	var rules := UIKit.button("COMO JOGAR", UIKit.MUTED, 16)
+	var rules := UIKit.button("COMO JOGAR", UIKit.MUTED, 17)
 	rules.pressed.connect(_open_rules)
 	col.add_child(rules)
 	if not OS.has_feature("mobile") and not OS.has_feature("web"):
-		var quit := UIKit.button("SAIR", UIKit.DANGER, 16)
+		var quit := UIKit.button("SAIR", UIKit.DANGER, 17)
 		quit.pressed.connect(func(): get_tree().quit())
 		col.add_child(quit)
 

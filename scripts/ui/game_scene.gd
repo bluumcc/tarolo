@@ -1,6 +1,8 @@
 extends Control
 ## GameScene.tscn — mesa de Tarot Vanilla (Clássico e Ranqueado usam a mesma mesa).
-## Assentos: 0 = jogador (baixo), 1 = esquerda, 2 = topo, 3 = direita (sentido horário).
+## Layout pensado pra celular (retrato): pilha vertical — status dos jogadores no topo,
+## área de jogo compacta no meio, sua mão embaixo — em vez de uma mesa espalhada que só
+## faz sentido em paisagem. Assentos: 0 = jogador, 1/2/3 = bots, em ordem de turno.
 
 signal human_card_chosen(card: CardData)
 signal human_bid_chosen(choice: int)
@@ -9,8 +11,6 @@ signal human_discard_chosen(cards: Array)
 signal match_finished(summary: Dictionary)
 
 const CARD_SCENE := preload("res://scenes/Card.tscn")
-const SEAT_SLOTS := [Vector2(0.5, 0.74), Vector2(0.2, 0.5), Vector2(0.5, 0.26), Vector2(0.8, 0.5)]
-const TOP_RESERVE := 78.0  ## espaço fixo reservado pro avatar+nome do topo, nunca invadido pela mesa
 
 var engine := MatchEngine.new()
 var config: Dictionary = {}
@@ -23,12 +23,10 @@ var hud_badges: Array = []       # PanelContainer por jogador
 var hud_titles: Array = []       # Label — nome do jogador (atualizado quando o tomador é definido)
 var hud_points: Array = []       # Label — pontos capturados até agora (provisório)
 var hud_tricks: Array = []       # Label — vazas vencidas / colocação
-var seat_labels: Array = []      # Label de mão dos bots (contagem de cartas)
-var seat_avatars: Array = []     # PanelContainer circular por assento (destaca de quem é a vez)
-var seat_avatar_labels: Array = []
+var hud_cards: Array = []        # Label — contagem de cartas na mão (só bots)
+var seat_avatars: Array = []     # PanelContainer circular por assento (destaca de quem é a vez), dentro do card do HUD
 var turn_pulse_token := 0        # invalida pulsos de destaque antigos quando a vez muda
-var table_center: Control
-var table_area: Control
+var table_center: Panel
 var hand_container: HBoxContainer
 var status_label: Label
 var trick_label: Label           # resultado transitório da última vaza
@@ -92,43 +90,69 @@ func _build_ui() -> void:
 	root.add_theme_constant_override("separation", 8)
 	margin.add_child(root)
 
-	# HUD --------------------------------------------------------------
+	# Barra de topo — título + ações, uma linha só, sempre no mesmo lugar (como o topo
+	# de qualquer app) -------------------------------------------------
+	var topbar := HBoxContainer.new()
+	topbar.add_theme_constant_override("separation", 8)
+	root.add_child(topbar)
+	var info_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BLACK, 8)
+	info_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_label = UIKit.label("", 13, UIKit.INK)
+	info_box.add_child(info_label)
+	topbar.add_child(info_box)
+	var help_btn := UIKit.button("?", UIKit.GOLD, 20)
+	help_btn.custom_minimum_size = Vector2(52, 52)
+	help_btn.pressed.connect(_open_help)
+	topbar.add_child(help_btn)
+	var menu_btn := UIKit.button("☰", UIKit.MUTED, 20)
+	menu_btn.custom_minimum_size = Vector2(52, 52)
+	menu_btn.pressed.connect(_open_pause)
+	topbar.add_child(menu_btn)
+
+	# Placar dos jogadores — um cartão por jogador com avatar, pontos e vazas; quebra
+	# linha sozinho em telas estreitas (HFlowContainer) em vez de espalhar avatares
+	# soltos pela tela como numa mesa física. ---------------------------
 	var hud := HFlowContainer.new()
 	hud.add_theme_constant_override("h_separation", 8)
 	hud.add_theme_constant_override("v_separation", 8)
 	root.add_child(hud)
 	for p in range(engine.num_players):
-		var badge := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MUTED, 8)
-		badge.custom_minimum_size = Vector2(160, 0)
+		var badge := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MUTED, 12)
+		badge.custom_minimum_size = Vector2(190, 0)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		badge.add_child(row)
+		var avatar := PanelContainer.new()
+		avatar.custom_minimum_size = Vector2(52, 52)
+		avatar.pivot_offset = Vector2(26, 26)
+		avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		avatar.add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE, UIKit.MUTED, 2, 26, 0))
+		var av_label := UIKit.label(str(config["names"][p]).substr(0, 1).to_upper(), 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+		av_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		av_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		avatar.add_child(av_label)
+		row.add_child(avatar)
+		seat_avatars.append(avatar)
 		var v := VBoxContainer.new()
-		v.add_theme_constant_override("separation", 0)
-		badge.add_child(v)
+		v.add_theme_constant_override("separation", 1)
+		v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(v)
 		var title_label := UIKit.label(str(config["names"][p]).to_upper(), 13, UIKit.MUTED)
 		v.add_child(title_label)
 		var pts := UIKit.label("0,0 pts", 22, UIKit.INK)
 		v.add_child(pts)
 		var tr := UIKit.label("0 vazas", 12, UIKit.MUTED)
 		v.add_child(tr)
+		var cards_label: Label
+		if p > 0:
+			cards_label = UIKit.label("", 12, UIKit.MUTED)
+			v.add_child(cards_label)
 		hud.add_child(badge)
 		hud_badges.append(badge)
 		hud_titles.append(title_label)
 		hud_points.append(pts)
 		hud_tricks.append(tr)
-
-	var info_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BLACK, 8)
-	info_label = UIKit.label("", 13, UIKit.INK)
-	info_box.add_child(info_label)
-	hud.add_child(info_box)
-
-	var help_btn := UIKit.button("?", UIKit.GOLD, 20)
-	help_btn.custom_minimum_size = Vector2(52, 52)
-	help_btn.pressed.connect(_open_help)
-	hud.add_child(help_btn)
-
-	var menu_btn := UIKit.button("☰", UIKit.MUTED, 20)
-	menu_btn.custom_minimum_size = Vector2(52, 52)
-	menu_btn.pressed.connect(_open_pause)
-	hud.add_child(menu_btn)
+		hud_cards.append(cards_label)
 
 	if tutorial:
 		var tut_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.OK, 10)
@@ -138,55 +162,43 @@ func _build_ui() -> void:
 		tut_box.add_child(tutorial_label)
 		root.add_child(tut_box)
 
-	# Mesa -------------------------------------------------------------
-	table_area = Control.new()
-	table_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	table_area.custom_minimum_size = Vector2(0, 260 + TOP_RESERVE)
-	table_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(table_area)
-
+	# Mesa de jogo — só a vaza atual, uma faixa compacta e fixa (não uma mesa oval
+	# espalhada): cada carta jogada aparece numa posição fixa, em ordem de assento,
+	# igual qualquer jogo de cartas mobile mostra "o que já foi jogado". -----------
 	table_center = Panel.new()
 	table_center.name = "TableCenter"
-	table_center.add_theme_stylebox_override("panel", UIKit.box(Color(0.06, 0.05, 0.12, 0.65), UIKit.PURPLE, 3, 180, 0))
+	table_center.custom_minimum_size = Vector2(0, 190)
+	table_center.add_theme_stylebox_override("panel", UIKit.box(Color(0.06, 0.05, 0.12, 0.65), UIKit.PURPLE, 3, 24, 0))
 	table_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	table_area.add_child(table_center)
-
-	for p in range(engine.num_players):
-		var avatar := PanelContainer.new()
-		avatar.custom_minimum_size = Vector2(60, 60)
-		avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		avatar.add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE, UIKit.MUTED, 2, 30, 0))
-		var av_label := UIKit.label(str(config["names"][p]).substr(0, 1).to_upper(), 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-		av_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		av_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		avatar.add_child(av_label)
-		avatar.visible = p != 0   # o jogador humano já vê a própria mão embaixo
-		table_area.add_child(avatar)
-		seat_avatars.append(avatar)
-		seat_avatar_labels.append(av_label)
-
-		var l := UIKit.label("", 14, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-		table_area.add_child(l)
-		seat_labels.append(l)
+	root.add_child(table_center)
 
 	trick_label = UIKit.label("", 16, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	root.add_child(trick_label)
 
 	status_label = UIKit.label("", 18, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root.add_child(status_label)
 
-	# Mão --------------------------------------------------------------
-	var hand_scroll := Control.new()
-	hand_scroll.custom_minimum_size = Vector2(0, CardView.SIZE.y + 30)
-	hand_scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Empurra a mão pro rodapé — zona do polegar, jeito de app — em vez de deixar tudo
+	# flutuando no topo com um vão vazio embaixo em telas altas (celular).
+	var vspacer := Control.new()
+	vspacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vspacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(vspacer)
+
+	# Mão — cartas sempre no tamanho real (nunca encolhidas pra caber); quando não cabem
+	# todas na tela (mão cheia do Vanilla, até 18 cartas), a mão rola de lado
+	# (arrasto/swipe), igual qualquer app de cartas. ---------------------
+	var hand_scroll := ScrollContainer.new()
+	hand_scroll.custom_minimum_size = Vector2(0, CardView.SIZE.y + 16)
+	hand_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	hand_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	root.add_child(hand_scroll)
 	hand_scroll.resized.connect(_layout_hand)  # tamanho real só fica pronto depois do 1º sort — nunca confiar em call_deferred sozinho
 	hand_container = HBoxContainer.new()
 	hand_container.name = "HandContainer"
 	hand_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	hand_container.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	hand_container.offset_top = -CardView.SIZE.y
-	hand_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hand_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	hand_scroll.add_child(hand_container)
 
 	popup_layer = Control.new()
@@ -209,56 +221,31 @@ func _on_resize() -> void:
 	_layout_hand()
 
 
+## Reposiciona as cartas já em jogo quando a mesa muda de tamanho (ex.: virar o celular).
 func _layout_table() -> void:
-	if table_area == null:
+	if table_center == null:
 		return
-	var area := table_area.size
-	var usable_h := maxf(area.y - TOP_RESERVE, 120.0)
-	var portrait := usable_h > area.x
-	var w := minf(area.x - 40.0, 560.0)
-	var h := minf(usable_h - 4.0, 640.0 if portrait else 340.0)
-	table_center.size = Vector2(maxf(w, 280.0), maxf(h, 180.0))
-	table_center.position = Vector2((area.x - table_center.size.x) / 2.0, TOP_RESERVE + (usable_h - table_center.size.y) / 2.0)
-	var anchors := [Vector2(0.5, 1.0), Vector2(0.0, 0.5), Vector2(0.5, 0.0), Vector2(1.0, 0.5)]
-	var av_size := Vector2(60, 60)
-	for p in range(seat_labels.size()):
-		var l: Label = seat_labels[p]
-		l.size = Vector2(160, 24)
-		var avatar: Control = seat_avatars[p]
-		if p == 0:
-			l.visible = false
-			continue
-		if p == 2:
-			# Assento do topo tem uma faixa própria acima da mesa (TOP_RESERVE), fora do
-			# alcance de table_center — nunca mais disputa espaço com o que fica acima
-			# de table_area (barra de info/tutorial).
-			var cx := area.x / 2.0
-			avatar.position = Vector2(cx - av_size.x / 2.0, 0.0)
-			avatar.pivot_offset = av_size / 2.0
-			l.position = Vector2(cx - l.size.x / 2.0, av_size.y + 2.0)
-			continue
-		var a: Vector2 = anchors[p]
-		var pos := table_center.position + table_center.size * a
-		if p == 1:
-			pos.x = maxf(pos.x - 170.0, 0.0)
-		elif p == 3:
-			pos.x = minf(pos.x + 10.0, area.x - 160.0)
-		var av_pos := pos + Vector2(80.0 - av_size.x / 2.0, -av_size.y - 6.0)
-		avatar.position = av_pos
-		avatar.pivot_offset = av_size / 2.0
-		l.position = pos - Vector2(0, 12)
 	for v in table_views:
 		var cv: CardView = v["view"]
 		cv.position = _slot_pos(int(v["player"]))
 
 
+## Uma vaga fixa por assento, em fileira — igual qualquer app de cartas mostra a vaza
+## atual, em vez de espalhar geometricamente numa mesa oval (isso é o que fazia o jogo
+## parecer preso a paisagem mesmo rodando em celular).
 func _slot_pos(player: int) -> Vector2:
-	return table_center.size * (SEAT_SLOTS[player] as Vector2) - CardView.SIZE / 2.0
+	var n := maxi(engine.num_players, 1)
+	var usable_w := maxf(table_center.size.x - 24.0, CardView.SIZE.x * n)
+	var slot_w := usable_w / float(n)
+	var cx := 12.0 + slot_w * (player + 0.5)
+	return Vector2(cx - CardView.SIZE.x / 2.0, (table_center.size.y - CardView.SIZE.y) / 2.0)
 
 
 ## Encaixa a mão inteira na largura disponível, mesmo em celular: primeiro reduz o
 ## espaçamento até as cartas se sobreporem (efeito "leque"); se ainda faltar espaço
-## (mãos grandes numa tela estreita), encolhe a mão inteira de leve — nunca corta carta.
+## As cartas nunca encolhem: com poucas cartas, um espaçamento normal e a mão centralizada;
+## com muitas (mão cheia do Vanilla), sobrepõe em leque até um limite que ainda dá pra
+## reconhecer cada carta — e se mesmo assim não couber, a rolagem horizontal cobre o resto.
 func _layout_hand() -> void:
 	if hand_container == null:
 		return
@@ -267,24 +254,14 @@ func _layout_hand() -> void:
 		return
 	var avail := (hand_container.get_parent() as Control).size.x - 8.0
 	var card_w := CardView.SIZE.x
-	var sep := 6
-	var scale := 1.0
+	var sep := 10
 	if n > 1:
 		var gaps := n - 1
-		var max_overlap := card_w * 0.62
-		var min_needed := n * card_w - gaps * max_overlap
-		if min_needed > avail:
-			scale = clampf(avail / min_needed, 0.4, 1.0)
-			sep = int(-max_overlap)
-		else:
-			var natural := float(n * card_w)
-			if natural > avail:
-				sep = int(floor((avail - natural) / float(gaps)))
-	elif card_w > avail:
-		scale = clampf(avail / card_w, 0.4, 1.0)
+		var natural := float(n * card_w) + gaps * sep
+		if natural > avail:
+			var max_overlap := card_w * 0.5
+			sep = maxi(int(-max_overlap), int(floor((avail - n * card_w) / float(gaps))))
 	hand_container.add_theme_constant_override("separation", sep)
-	hand_container.pivot_offset = Vector2(hand_container.size.x / 2.0, hand_container.size.y)
-	hand_container.scale = Vector2(scale, scale)
 
 
 func _rebuild_hand() -> void:
@@ -328,7 +305,7 @@ func _refresh_hud() -> void:
 		var turn := p == turn_player
 		(hud_badges[p] as PanelContainer).modulate = Color(1, 1, 1, 1) if turn else Color(0.78, 0.76, 0.85, 1)
 		if p > 0:
-			(seat_labels[p] as Label).text = "%s · %d cartas" % [config["names"][p], (engine.hands[p] as Array).size()]
+			(hud_cards[p] as Label).text = "%d cartas" % (engine.hands[p] as Array).size()
 	_update_turn_highlight(turn_player)
 	var mode_name: String = GameState.MODE_NAMES[GameState.mode]
 	var extra := ""
@@ -378,12 +355,8 @@ func _pulse_avatar(avatar: PanelContainer, token: int) -> void:
 func _speech_bubble(player: int, text: String) -> void:
 	if not is_inside_tree():
 		return
-	var anchor_pos: Vector2
-	if player == 0:
-		anchor_pos = table_area.global_position - popup_layer.global_position + Vector2(table_area.size.x / 2.0, table_area.size.y - 20.0)
-	else:
-		var avatar: Control = seat_avatars[player]
-		anchor_pos = avatar.global_position - popup_layer.global_position + avatar.size / 2.0
+	var avatar: Control = seat_avatars[player]
+	var anchor_pos: Vector2 = avatar.global_position - popup_layer.global_position + avatar.size / 2.0
 	var l := UIKit.label(text, 13, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	var box := PanelContainer.new()
 	box.add_theme_stylebox_override("panel", UIKit.box(Color(0.03, 0.03, 0.07, 0.92), UIKit.GOLD, 2, 8, 8))
@@ -879,8 +852,8 @@ func _source_position(player: int, card: CardData) -> Vector2:
 			if (c as CardView).data == card:
 				return (c as CardView).body.global_position
 		return hand_container.global_position
-	var l: Label = seat_labels[player]
-	return l.global_position
+	var avatar: Control = seat_avatars[player]
+	return avatar.global_position
 
 
 func _animate_play(player: int, card: CardData, from: Vector2) -> void:
