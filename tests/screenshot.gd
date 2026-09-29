@@ -22,6 +22,9 @@ func _ready() -> void:
 	if args.has("bid"):
 		await get_tree().create_timer(0.6).timeout
 		inst.human_bid_chosen.emit(int(args["bid"]))
+	if args.has("call"):
+		await get_tree().create_timer(0.6).timeout
+		inst.call(str(args["call"]))
 	if args.has("press"):
 		await get_tree().create_timer(0.8).timeout
 		for b in inst.find_children("*", "Button", true, false):

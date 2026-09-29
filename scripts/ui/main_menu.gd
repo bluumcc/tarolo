@@ -4,6 +4,8 @@ extends Control
 var overlay_layer: Control
 var top_bar: PanelContainer
 
+const RELOAD_AMOUNT := 500
+
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -20,6 +22,12 @@ func _ready() -> void:
 	top_bar = Widgets.top_bar(str(prof["name"]), "%d vitórias · %d partidas" % [int(prof["wins"]), int(prof["matches"])], UIKit.fmt_int(int(prof["fichas"])), UIKit.fmt_int(int(prof["fragments"])))
 	top_bar.custom_minimum_size = Vector2(0, Widgets.TOPBAR_H)
 	page.add_child(top_bar)
+	var chips_pill := top_bar.find_child("ChipsPill", true, false) as Control
+	chips_pill.mouse_filter = Control.MOUSE_FILTER_STOP
+	chips_pill.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT and e.pressed:
+			UIKit.sfx("tick")
+			_open_fichas())
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -107,6 +115,27 @@ func _hero() -> Control:
 	var sub := UIKit.label("JOGO DE RODADAS", 26, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	box.add_child(sub)
 	return box
+
+
+## Popup das fichas: saldo e recarga ilimitada (as fichas são só do jogo, não valem dinheiro).
+func _open_fichas() -> void:
+	var v := _modal("SUAS FICHAS")
+	var bal := UIKit.label("◎ %s" % UIKit.fmt_int(int(SaveManager.section("profile")["fichas"])), 72, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(bal)
+	var info := UIKit.label("Fichas são o dinheiro do jogo: pagam a entrada da mesa, entram nas suas apostas e o prêmio da partida vem em fichas.\n\nAcabaram? Recarregue quando quiser, quantas vezes quiser.", 28, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(info)
+	var reload := UIKit.button("RECARREGAR  +%d FICHAS" % RELOAD_AMOUNT, UIKit.OK)
+	reload.pressed.connect(func():
+		var prof := SaveManager.section("profile")
+		prof["fichas"] = int(prof["fichas"]) + RELOAD_AMOUNT
+		SaveManager.save_game()
+		bal.text = "◎ %s" % UIKit.fmt_int(int(prof["fichas"]))
+		FX.pop(bal, 1.3)
+		UIKit.sfx("win")
+		_refresh_fragments())
+	v.add_child(reload)
+	_close_button(v)
 
 
 func _refresh_fragments() -> void:
