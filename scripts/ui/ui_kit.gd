@@ -40,7 +40,7 @@ static func box(bg: Color, border: Color = BLACK, border_w: int = 3, radius: int
 	return sb
 
 
-static func label(text: String, size: int = 18, color: Color = INK, align: int = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
+static func label(text: String, size: int = 22, color: Color = INK, align: int = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.horizontal_alignment = align
@@ -50,22 +50,22 @@ static func label(text: String, size: int = 18, color: Color = INK, align: int =
 	return l
 
 
-static func button(text: String, accent: Color = GOLD, size: int = 20) -> Button:
+static func button(text: String, accent: Color = GOLD, size: int = 25) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_ALL
-	b.custom_minimum_size = Vector2(0, 52)
+	b.custom_minimum_size = Vector2(0, 68)
 	b.add_theme_font_size_override("font_size", size)
 	b.add_theme_color_override("font_color", INK)
 	b.add_theme_color_override("font_hover_color", BLACK)
 	b.add_theme_color_override("font_pressed_color", BLACK)
 	b.add_theme_color_override("font_focus_color", INK)
 	b.add_theme_color_override("font_disabled_color", MUTED)
-	b.add_theme_stylebox_override("normal", box(PURPLE, accent, 3, 2, 10))
-	b.add_theme_stylebox_override("hover", box(accent, accent, 3, 2, 10))
-	b.add_theme_stylebox_override("pressed", box(accent.darkened(0.2), INK, 3, 2, 10))
-	b.add_theme_stylebox_override("focus", box(Color(0, 0, 0, 0), INK, 2, 2, 10))
-	b.add_theme_stylebox_override("disabled", box(PURPLE_DEEP, MUTED.darkened(0.4), 3, 2, 10))
+	b.add_theme_stylebox_override("normal", box(PURPLE, accent, 3, 2, 16))
+	b.add_theme_stylebox_override("hover", box(accent, accent, 3, 2, 16))
+	b.add_theme_stylebox_override("pressed", box(accent.darkened(0.2), INK, 3, 2, 16))
+	b.add_theme_stylebox_override("focus", box(Color(0, 0, 0, 0), INK, 2, 2, 16))
+	b.add_theme_stylebox_override("disabled", box(PURPLE_DEEP, MUTED.darkened(0.4), 3, 2, 16))
 	b.pressed.connect(func(): sfx("tick"))
 	return b
 
@@ -78,7 +78,7 @@ static func sfx(name: String) -> void:
 		node.play(name)
 
 
-static func panel(bg: Color = PURPLE_DEEP, border: Color = BLACK, pad: int = 16) -> PanelContainer:
+static func panel(bg: Color = PURPLE_DEEP, border: Color = BLACK, pad: int = 20) -> PanelContainer:
 	var p := PanelContainer.new()
 	p.add_theme_stylebox_override("panel", box(bg, border, 3, 4, pad))
 	return p
@@ -154,12 +154,12 @@ static func fmt_dec(x: float, decimals: int = 1) -> String:
 static func modal(overlay_layer: Control, title: String, width: float = 380.0) -> VBoxContainer:
 	var ov := overlay()
 	overlay_layer.add_child(ov)
-	var box_p := panel(PURPLE_DEEP, GOLD, 24)
+	var box_p := panel(PURPLE_DEEP, GOLD, 30)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	v.custom_minimum_size = Vector2(width, 0)
 	box_p.add_child(v)
-	v.add_child(label(title, 26, GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(label(title, 32, GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	var scroll := ScrollContainer.new()
 	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED

@@ -19,7 +19,7 @@ var human_turn := false
 var finished := false
 var paused := false
 
-const ARENA_SCALE := 0.78
+const ARENA_SCALE := 0.62
 const BID_SHORT := ["pega o monte (6 cartas) e devolve 6", "igual à Petite, mas vale o dobro", "não pega o monte; ele conta pra você", "não pega o monte; ele conta pra Defesa"]
 
 var root_box: VBoxContainer
@@ -144,7 +144,7 @@ func _build_ui() -> void:
 
 	if tutorial:
 		var tut_box := UIKit.panel(UIKit.OK.darkened(0.75), UIKit.OK, 10)
-		tutorial_label = UIKit.label("", 13, UIKit.OK)
+		tutorial_label = UIKit.label("", 16, UIKit.OK)
 		tutorial_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		tutorial_label.custom_minimum_size = Vector2(0, 0)
 		tut_box.add_child(tutorial_label)
@@ -158,9 +158,9 @@ func _build_ui() -> void:
 	_build_arena()
 	_build_bid_panel()
 
-	trick_label = UIKit.label("", 18, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	trick_label = UIKit.label("", 22, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	root_box.add_child(trick_label)
-	status_label = UIKit.label("", 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	status_label = UIKit.label("", 25, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root_box.add_child(status_label)
 
@@ -203,14 +203,14 @@ func _build_topbar() -> void:
 	root_box.add_child(topbar)
 	var info_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BLACK, 8)
 	info_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info_label = UIKit.label("", 13, UIKit.INK)
+	info_label = UIKit.label("", 22, UIKit.INK)
 	info_box.add_child(info_label)
 	topbar.add_child(info_box)
-	var help_btn := UIKit.button("?", UIKit.GOLD, 20)
+	var help_btn := UIKit.button("?", UIKit.GOLD, 25)
 	help_btn.custom_minimum_size = Vector2(52, 52)
 	help_btn.pressed.connect(_open_help)
 	topbar.add_child(help_btn)
-	var menu_btn := UIKit.button("☰", UIKit.MUTED, 20)
+	var menu_btn := UIKit.button("☰", UIKit.MUTED, 25)
 	menu_btn.custom_minimum_size = Vector2(52, 52)
 	menu_btn.pressed.connect(_open_pause)
 	topbar.add_child(menu_btn)
@@ -234,22 +234,22 @@ func _build_boss_panel() -> void:
 	var name_row := HBoxContainer.new()
 	name_row.add_theme_constant_override("separation", 10)
 	col.add_child(name_row)
-	boss_name = UIKit.label("", 28, UIKit.INK)
+	boss_name = UIKit.label("", 35, UIKit.INK)
 	name_row.add_child(boss_name)
 	var chip := UIKit.panel(UIKit.BOSS, UIKit.BOSS, 4)
-	boss_chip = UIKit.label("", 13, UIKit.BLACK)
+	boss_chip = UIKit.label("", 18, UIKit.BLACK)
 	chip.add_child(boss_chip)
 	name_row.add_child(chip)
 	boss_bar = MeterBar.new()
 	col.add_child(boss_bar)
 	var lab_row := HBoxContainer.new()
 	col.add_child(lab_row)
-	boss_bar_label = UIKit.label("", 13, UIKit.MUTED)
+	boss_bar_label = UIKit.label("", 19, UIKit.MUTED)
 	boss_bar_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lab_row.add_child(boss_bar_label)
-	boss_bar_value = UIKit.label("", 17, UIKit.INK)
+	boss_bar_value = UIKit.label("", 21, UIKit.INK)
 	lab_row.add_child(boss_bar_value)
-	boss_meta = UIKit.label("", 13, Color("#f0c7c2"))
+	boss_meta = UIKit.label("", 19, Color("#f0c7c2"))
 	boss_meta.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(boss_meta)
 	root_box.add_child(boss_panel)
@@ -272,17 +272,17 @@ func _build_seat_strip() -> void:
 		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		col.add_theme_constant_override("separation", 0)
 		row.add_child(col)
-		var title_label := UIKit.label(str(config["names"][p]).to_upper(), 14, UIKit.MUTED)
+		var title_label := UIKit.label(str(config["names"][p]).to_upper(), 18, UIKit.MUTED)
 		title_label.clip_text = true
 		col.add_child(title_label)
-		var pts := UIKit.label("0,0 pts", 22, UIKit.INK)
+		var pts := UIKit.label("0,0 pts", 28, UIKit.INK)
 		col.add_child(pts)
 		var sub := HBoxContainer.new()
 		sub.add_theme_constant_override("separation", 8)
 		col.add_child(sub)
-		var tr := UIKit.label("0 vazas", 12, UIKit.MUTED)
+		var tr := UIKit.label("0 vazas", 15, UIKit.MUTED)
 		sub.add_child(tr)
-		var cards_label := UIKit.label("", 12, UIKit.MUTED)
+		var cards_label := UIKit.label("", 15, UIKit.MUTED)
 		sub.add_child(cards_label)
 		seat_strip.add_child(badge)
 		hud_badges[p] = badge
@@ -313,13 +313,13 @@ func _build_arena() -> void:
 	pot_box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	pot_box.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	pot_box.grow_vertical = Control.GROW_DIRECTION_BOTH
-	pot_label = UIKit.label("", 34, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	pot_label = UIKit.label("", 42, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	pot_box.add_child(pot_label)
-	pot_sub = UIKit.label("", 11, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	pot_sub = UIKit.label("", 14, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	pot_box.add_child(pot_sub)
 	arena_tags.resize(engine.num_players)
 	for p in range(engine.num_players):
-		var tag := UIKit.label(str(config["names"][p]).to_upper(), 13, UIKit.MUTED)
+		var tag := UIKit.label(str(config["names"][p]).to_upper(), 16, UIKit.MUTED)
 		arena.add_child(tag)
 		arena_tags[p] = tag
 
@@ -335,11 +335,11 @@ func _draw_arena() -> void:
 ## de contratos (PASSAR + 4 lances) pra você escolher na sua vez.
 func _build_bid_panel() -> void:
 	bid_panel = VBoxContainer.new()
-	bid_panel.add_theme_constant_override("separation", 10)
+	bid_panel.add_theme_constant_override("separation", 12)
 	bid_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root_box.add_child(bid_panel)
-	bid_panel.add_child(UIKit.label("QUEM JOGA SOZINHO?", 30, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	var sub := UIKit.label("O lance mais alto vira o Tomador e joga sozinho contra os outros três. O monte são 6 cartas viradas no meio da mesa que o Tomador pode pegar.", 15, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	bid_panel.add_child(UIKit.label("QUEM JOGA SOZINHO?", 38, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	var sub := UIKit.label("Quem dá o lance mais alto joga sozinho contra os outros três.", 21, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bid_panel.add_child(sub)
 	bid_rows.resize(engine.num_players)
@@ -347,45 +347,51 @@ func _build_bid_panel() -> void:
 	bid_bubble_boxes.resize(engine.num_players)
 	bid_texts.resize(engine.num_players)
 	bid_states.resize(engine.num_players)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	bid_panel.add_child(grid)
 	for p in range(engine.num_players):
-		var row := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.PURPLE, 4)
+		var row := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.PURPLE, 8)
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var h := HBoxContainer.new()
-		h.add_theme_constant_override("separation", 12)
+		h.add_theme_constant_override("separation", 10)
 		row.add_child(h)
-		h.add_child(Portrait.new().setup(p, UIKit.GOLD if p == 0 else Color(0, 0, 0, 0), 44.0))
+		h.add_child(Portrait.new().setup(p, UIKit.GOLD if p == 0 else Color(0, 0, 0, 0), 64.0))
 		var col := VBoxContainer.new()
 		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		col.add_theme_constant_override("separation", 0)
+		col.add_theme_constant_override("separation", 4)
 		h.add_child(col)
-		col.add_child(UIKit.label("Você" if p == 0 else str(config["names"][p]), 20, UIKit.INK))
-		col.add_child(UIKit.label("%dº a falar" % (p + 1), 12, UIKit.MUTED))
+		col.add_child(UIKit.label("Você" if p == 0 else str(config["names"][p]), 24, UIKit.INK))
 		var bub_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.PURPLE_DEEP, 6)
-		bub_box.custom_minimum_size = Vector2(190, 0)
-		var bub := UIKit.label("aguardando", 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		var bub := UIKit.label("aguardando", 19, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		bub.clip_text = true
 		bub_box.add_child(bub)
-		h.add_child(bub_box)
-		bid_panel.add_child(row)
+		col.add_child(bub_box)
+		grid.add_child(row)
 		bid_rows[p] = row
 		bid_bubbles[p] = bub
 		bid_bubble_boxes[p] = bub_box
 	var ladder := VBoxContainer.new()
 	ladder.add_theme_constant_override("separation", 6)
 	bid_panel.add_child(ladder)
-	var pass_btn := UIKit.button("PASSAR  ·  fica na Defesa", UIKit.MUTED, 18)
+	var pass_btn := UIKit.button("PASSAR  ·  fica na Defesa", UIKit.MUTED, 22)
 	pass_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	pass_btn.disabled = true
 	pass_btn.pressed.connect(_on_bid_pressed.bind(-1))
 	ladder.add_child(pass_btn)
 	bid_buttons[-1] = pass_btn
 	for c in range(4):
-		var b := UIKit.button("%s ×%d  ·  %s" % [Scoring.CONTRACT_NAMES[c], Scoring.CONTRACT_MULT[c], BID_SHORT[c]], UIKit.GOLD, 18)
+		var b := UIKit.button("%s ×%d  ·  %s" % [Scoring.CONTRACT_NAMES[c], Scoring.CONTRACT_MULT[c], BID_SHORT[c]], UIKit.GOLD, 22)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.custom_minimum_size.y = 60
 		b.disabled = true
 		b.pressed.connect(_on_bid_pressed.bind(c))
 		ladder.add_child(b)
 		bid_buttons[c] = b
 		bid_base_text[c] = b.text
-	bid_msg = UIKit.label("", 15, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	bid_msg = UIKit.label("", 19, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	bid_msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bid_panel.add_child(bid_msg)
 	_build_hand_hint()
@@ -401,10 +407,10 @@ func _build_hand_hint() -> void:
 	box.add_child(v)
 	var top := HBoxContainer.new()
 	v.add_child(top)
-	hint_strength = UIKit.label("", 16, UIKit.INK)
+	hint_strength = UIKit.label("", 20, UIKit.INK)
 	hint_strength.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(hint_strength)
-	hint_suggest = UIKit.label("", 16, UIKit.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
+	hint_suggest = UIKit.label("", 20, UIKit.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
 	top.add_child(hint_suggest)
 	hint_bar = MeterBar.new()
 	hint_bar.custom_minimum_size = Vector2(0, 14)
@@ -413,10 +419,10 @@ func _build_hand_hint() -> void:
 	v.add_child(hint_bar)
 	var bottom := HBoxContainer.new()
 	v.add_child(bottom)
-	hint_counts = UIKit.label("", 13, UIKit.MUTED)
+	hint_counts = UIKit.label("", 16, UIKit.MUTED)
 	hint_counts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bottom.add_child(hint_counts)
-	var what := UIKit.button("O QUE É BOUT?", UIKit.GOLD, 13)
+	var what := UIKit.button("O QUE É BOUT?", UIKit.GOLD, 16)
 	what.custom_minimum_size = Vector2(0, 34)
 	what.pressed.connect(_open_bout_help)
 	bottom.add_child(what)
@@ -470,7 +476,7 @@ Cuidados:
 • O Petit é fraco: qualquer trunfo maior o vence, então proteja-o.
 • O Louco nunca vence uma vaza, mas quem o joga guarda os pontos dele.
 • Bouts nunca podem ser devolvidos ao monte."""
-	var l := UIKit.label(text, 14, UIKit.INK)
+	var l := UIKit.label(text, 18, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(340, 0)
 	v.add_child(l)
@@ -489,13 +495,13 @@ func _build_my_footer() -> void:
 	my_left.add_theme_constant_override("separation", 0)
 	my_left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	my_row.add_child(my_left)
-	var my_title := UIKit.label(str(config["names"][0]).to_upper(), 14, UIKit.MUTED)
+	var my_title := UIKit.label(str(config["names"][0]).to_upper(), 18, UIKit.MUTED)
 	my_left.add_child(my_title)
-	var my_pts := UIKit.label("0,0 pts", 30, UIKit.INK)
+	var my_pts := UIKit.label("0,0 pts", 38, UIKit.INK)
 	my_left.add_child(my_pts)
-	var my_tr := UIKit.label("0 vazas", 13, UIKit.MUTED)
+	var my_tr := UIKit.label("0 vazas", 16, UIKit.MUTED)
 	my_left.add_child(my_tr)
-	turn_hint = UIKit.label("Toque numa carta pra subir.\nToque de novo pra jogar.", 15, UIKit.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
+	turn_hint = UIKit.label("Toque numa carta pra subir.\nToque de novo pra jogar.", 19, UIKit.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
 	turn_hint.visible = false
 	my_row.add_child(turn_hint)
 	root_box.add_child(my_box)
@@ -509,10 +515,14 @@ func _build_my_footer() -> void:
 
 ## Licitação (true) x duelo (false): quem está visível em cada fase.
 func _set_phase(bidding: bool) -> void:
+	if is_inside_tree() and root_box.modulate.a > 0.5:
+		root_box.modulate.a = 0.0
+		create_tween().tween_property(root_box, "modulate:a", 1.0, GameState.anim(0.35))
 	bid_panel.visible = bidding
 	trick_label.visible = not bidding
 	status_label.visible = not bidding
 	seat_strip.visible = not bidding
+	(hud_badges[0] as Control).visible = not bidding
 	arena.visible = not bidding
 	var duel := not bidding and engine.taker != -1
 	boss_panel.visible = duel
@@ -645,9 +655,13 @@ func _refresh_hud() -> void:
 	pot_label.text = UIKit.fmt_dec(pot, 1) if not engine.plays.is_empty() else ""
 	pot_sub.text = "EM JOGO" if not engine.plays.is_empty() else ""
 	if engine.taker == -1:
-		info_label.text = "%s  ·  Licitação" % mode_name.to_upper()
+		info_label.text = "%s  ·  LICITAÇÃO" % mode_name.to_upper()
 	else:
-		info_label.text = "%s  ·  Vaza %d/%d%s" % [mode_name.to_upper(), mini(engine.trick_number + 1, engine.total_tricks), engine.total_tricks, extra]
+		var n := mini(engine.trick_number + 1, engine.total_tricks)
+		if n == engine.total_tricks:
+			info_label.text = "ÚLTIMA VAZA · fim da partida%s" % extra
+		else:
+			info_label.text = "VAZA %d DE %d%s" % [n, engine.total_tricks, extra]
 		if not hold_boss:
 			_refresh_boss(true)
 
@@ -733,7 +747,7 @@ func _speech_bubble(player: int, text: String) -> void:
 		return
 	var avatar: Control = seat_avatars[player]
 	var anchor_pos: Vector2 = avatar.global_position - popup_layer.global_position + avatar.size / 2.0
-	var l := UIKit.label(text, 16, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var l := UIKit.label(text, 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	var box := PanelContainer.new()
 	box.add_theme_stylebox_override("panel", UIKit.box(Color(0.03, 0.03, 0.07, 0.92), UIKit.GOLD, 2, 8, 8))
 	box.add_child(l)
@@ -773,7 +787,7 @@ func _bid_reset() -> void:
 		bid_texts[p] = ""
 		bid_states[p] = "idle"
 		_set_bubble(p, "aguardando", "idle")
-		(bid_rows[p] as PanelContainer).add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, UIKit.PURPLE, 2, 10, 4))
+		(bid_rows[p] as PanelContainer).add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, UIKit.PURPLE, 2, 10, 8))
 	for k in bid_buttons:
 		(bid_buttons[k] as Button).disabled = true
 		(bid_buttons[k] as Button).modulate = Color.WHITE
@@ -805,7 +819,7 @@ func _set_bubble(p: int, text: String, kind: String) -> void:
 
 func _bid_set_turn(p: int) -> void:
 	for q in range(engine.num_players):
-		(bid_rows[q] as PanelContainer).add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, UIKit.GOLD if q == p else UIKit.PURPLE, 3 if q == p else 2, 10, 4))
+		(bid_rows[q] as PanelContainer).add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, UIKit.GOLD if q == p else UIKit.PURPLE, 3 if q == p else 2, 10, 8))
 	if bid_states[p] == "idle":
 		_set_bubble(p, "SUA VEZ" if p == 0 else "pensando…", "wait")
 
@@ -858,37 +872,37 @@ func _show_intro() -> void:
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_theme_constant_override("separation", 10)
 	v.custom_minimum_size = Vector2(560, 0)
-	v.add_child(UIKit.label("VOCÊ É O TOMADOR" if mine else "O CHEFE DA RODADA", 15, UIKit.GOLD if mine else UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("VOCÊ É O TOMADOR" if mine else "O CHEFE DA RODADA", 19, UIKit.GOLD if mine else UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	var hero_box := CenterContainer.new()
 	hero_box.add_child(Portrait.new().setup(t, UIKit.GOLD if mine else UIKit.BOSS, 220.0))
 	v.add_child(hero_box)
 	var seal_box := CenterContainer.new()
 	var seal := UIKit.panel(UIKit.GOLD if mine else UIKit.BOSS, UIKit.GOLD if mine else UIKit.BOSS, 6)
-	seal.add_child(UIKit.label("%s ×%d" % [str(Scoring.CONTRACT_NAMES[engine.contract]).to_upper(), int(Scoring.CONTRACT_MULT[engine.contract])], 16, UIKit.BLACK))
+	seal.add_child(UIKit.label("%s ×%d" % [str(Scoring.CONTRACT_NAMES[engine.contract]).to_upper(), int(Scoring.CONTRACT_MULT[engine.contract])], 20, UIKit.BLACK))
 	seal_box.add_child(seal)
 	v.add_child(seal_box)
-	v.add_child(UIKit.label(_taker_display_name().to_upper(), 46, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("JOGA CONTRA OS OUTROS 3", 14, UIKit.GOLD if mine else UIKit.BOSS, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label(_taker_display_name().to_upper(), 58, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("JOGA CONTRA OS OUTROS 3", 18, UIKit.GOLD if mine else UIKit.BOSS, HORIZONTAL_ALIGNMENT_CENTER))
 	var bar := MeterBar.new()
 	bar.custom_minimum_size = Vector2(0, 28)
 	bar.set_colors(UIKit.GOLD if mine else UIKit.BOSS, Color("#2b2413") if mine else Color("#2a1715"))
 	bar.set_values(0.0, n["target"], false)
 	v.add_child(bar)
 	var bar_row := HBoxContainer.new()
-	var bl := UIKit.label("Sua meta" if mine else "Meta do chefe", 14, UIKit.MUTED)
+	var bl := UIKit.label("Sua meta" if mine else "Meta do chefe", 18, UIKit.MUTED)
 	bl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar_row.add_child(bl)
-	bar_row.add_child(UIKit.label("0,0 / %s pts" % UIKit.fmt_dec(n["target"], 1), 18, UIKit.INK))
+	bar_row.add_child(UIKit.label("0,0 / %s pts" % UIKit.fmt_dec(n["target"], 1), 22, UIKit.INK))
 	v.add_child(bar_row)
 	var rule_text := ""
 	if mine:
 		rule_text = "Você precisa de %s pontos (a meta cai com cada Bout que você tiver). Encha a barra: se bater, cada um dos outros 3 te paga ×%d." % [UIKit.fmt_dec(n["target"], 1), int(Scoring.CONTRACT_MULT[engine.contract])]
 	else:
 		rule_text = "Precisa de %s pontos. A barra começa vazia e enche a cada vaza dele. Se a Defesa não deixar encher, o contrato cai e cada um da Defesa ganha ×%d." % [UIKit.fmt_dec(n["target"], 1), int(Scoring.CONTRACT_MULT[engine.contract])]
-	var rl := UIKit.label(rule_text, 16, Color("#d6cbbb"), HORIZONTAL_ALIGNMENT_CENTER)
+	var rl := UIKit.label(rule_text, 20, Color("#d6cbbb"), HORIZONTAL_ALIGNMENT_CENTER)
 	rl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(rl)
-	v.add_child(UIKit.label("VS", 26, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("VS", 32, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	var team := HBoxContainer.new()
 	team.alignment = BoxContainer.ALIGNMENT_CENTER
 	team.add_theme_constant_override("separation", 26)
@@ -901,10 +915,10 @@ func _show_intro() -> void:
 		var pc := CenterContainer.new()
 		pc.add_child(Portrait.new().setup(p, UIKit.GOLD if p == 0 else UIKit.DEF, 84.0))
 		col.add_child(pc)
-		col.add_child(UIKit.label("Você" if p == 0 else str(config["names"][p]), 16, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
-		col.add_child(UIKit.label("DEFESA", 11, UIKit.DEF, HORIZONTAL_ALIGNMENT_CENTER))
+		col.add_child(UIKit.label("Você" if p == 0 else str(config["names"][p]), 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+		col.add_child(UIKit.label("DEFESA", 14, UIKit.DEF, HORIZONTAL_ALIGNMENT_CENTER))
 		team.add_child(col)
-	var btn := UIKit.button("COMEÇAR A RODADA", UIKit.GOLD, 22)
+	var btn := UIKit.button("COMEÇAR A RODADA", UIKit.GOLD, 28)
 	btn.custom_minimum_size = Vector2(0, 64)
 	v.add_child(btn)
 	ov.add_child(UIKit.centered(v))
@@ -1055,19 +1069,19 @@ func _wait_human_discard() -> Array:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	panel.add_child(v)
-	v.add_child(UIKit.label("DEVOLVA 6 CARTAS AO MONTE", 15, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("DEVOLVA 6 CARTAS AO MONTE", 19, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	var sub_hint := "Elas contam como pontos seus no final. Reis e Bouts (em cinza) não podem ir."
 	if tutorial:
 		sub_hint += " As marcadas \"monte\" são as 6 que acabaram de entrar na sua mão."
-	v.add_child(UIKit.label(sub_hint, 11, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-	var counter := UIKit.label("0 / %d selecionadas" % Deck.CHIEN_SIZE, 12, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(UIKit.label(sub_hint, 14, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	var counter := UIKit.label("0 / %d selecionadas" % Deck.CHIEN_SIZE, 15, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(counter)
 	var flow := HFlowContainer.new()
 	flow.add_theme_constant_override("h_separation", 6)
 	flow.add_theme_constant_override("v_separation", 6)
 	flow.custom_minimum_size = Vector2(420, 0)
 	v.add_child(flow)
-	var confirm := UIKit.button("CONFIRMAR", UIKit.GOLD, 14)
+	var confirm := UIKit.button("CONFIRMAR", UIKit.GOLD, 18)
 	confirm.disabled = true
 	var chien_ref: Array = engine.chien
 	for c in hand:
@@ -1076,7 +1090,7 @@ func _wait_human_discard() -> Array:
 		var from_chien: bool = tutorial and (chien_ref as Array).any(func(l: CardData) -> bool: return l.equals(card))
 		var col := VBoxContainer.new()
 		col.add_theme_constant_override("separation", 1)
-		var b := UIKit.button("%s%s" % [card.rank_label(), card.suit_symbol()], UIKit.GOLD if is_legal else UIKit.MUTED, 13)
+		var b := UIKit.button("%s%s" % [card.rank_label(), card.suit_symbol()], UIKit.GOLD if is_legal else UIKit.MUTED, 16)
 		b.custom_minimum_size = Vector2(52, 52)
 		b.disabled = not is_legal
 		b.toggle_mode = true
@@ -1096,7 +1110,7 @@ func _wait_human_discard() -> Array:
 			confirm.disabled = selected.size() != Deck.CHIEN_SIZE)
 		col.add_child(b)
 		if from_chien:
-			col.add_child(UIKit.label("monte", 8, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER))
+			col.add_child(UIKit.label("monte", 14, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER))
 		flow.add_child(col)
 	confirm.pressed.connect(func():
 		panel.queue_free()
@@ -1165,20 +1179,20 @@ func _ask_yes_no(title: String, body: String) -> bool:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	panel.add_child(v)
-	v.add_child(UIKit.label(title, 15, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	var body_label := UIKit.label(body, 12, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(UIKit.label(title, 19, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	var body_label := UIKit.label(body, 15, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body_label.custom_minimum_size = Vector2(340, 0)
 	v.add_child(body_label)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	v.add_child(row)
-	var no_btn := UIKit.button("NÃO", UIKit.MUTED, 14)
+	var no_btn := UIKit.button("NÃO", UIKit.MUTED, 18)
 	no_btn.pressed.connect(func():
 		panel.queue_free()
 		human_yesno_chosen.emit(false))
 	row.add_child(no_btn)
-	var yes_btn := UIKit.button("SIM", UIKit.GOLD, 14)
+	var yes_btn := UIKit.button("SIM", UIKit.GOLD, 18)
 	yes_btn.pressed.connect(func():
 		panel.queue_free()
 		human_yesno_chosen.emit(true))
@@ -1271,7 +1285,7 @@ func _tutorial_modal(title: String, body: String, button_text: String = "ENTENDI
 	if not tutorial or GameState.autoplay:
 		return
 	var v := UIKit.modal(overlay_layer, title, 380.0)
-	var l := UIKit.label(body, 14, UIKit.INK)
+	var l := UIKit.label(body, 18, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(340, 0)
 	v.add_child(l)
@@ -1470,7 +1484,7 @@ func _boss_scores(winner: int) -> void:
 ## do chefe (é a barra dele que enche); quando é a Defesa, sobe na própria mesa.
 func _float_points(winner: int, points: float) -> void:
 	var to_boss := winner == engine.taker
-	var l := UIKit.label("+%s" % UIKit.fmt_dec(points, 1), 56, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var l := UIKit.label("+%s" % UIKit.fmt_dec(points, 1), 70, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	var outline := UIKit.DEF
 	if to_boss:
 		outline = UIKit.GOLD.darkened(0.3) if winner == 0 else UIKit.BOSS
@@ -1527,7 +1541,7 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 		title = "VOCÊ BATEU A META" if r["success"] else "VOCÊ NÃO BATEU A META"
 	if GameState.mode == GameState.Mode.RANKED:
 		title = "%dº LUGAR" % (int(summary["placement"]) + 1)
-	v.add_child(UIKit.label(title, 26, UIKit.GOLD if r["success"] else UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label(title, 32, UIKit.GOLD if r["success"] else UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(UIKit.label("%s · %s · %s / %s pts (%s%s)" % [
 		str(config["names"][r["taker"]]),
 		Scoring.CONTRACT_NAMES[r["contract"]],
@@ -1535,7 +1549,7 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 		UIKit.fmt_dec(r["target"], 1),
 		"+" if r["margin"] >= 0.0 else "",
 		UIKit.fmt_dec(r["margin"], 1),
-	], 14, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	], 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	var bonuses: Dictionary = r.get("bonuses", {})
 	var bonus_lines: Array = []
 	if float(bonuses.get("poignee", 0.0)) > 0.0:
@@ -1554,18 +1568,18 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 		bonus_lines.append("✦ Petit na última vaza: ponto pra Defesa (%d)" % int(petit))
 	if not bonus_lines.is_empty():
 		for line in bonus_lines:
-			v.add_child(UIKit.label(str(line), 12, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+			v.add_child(UIKit.label(str(line), 15, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	for p in engine.standings():
 		var delta := int(r["deltas"][p])
 		var line := "%s%s  %s%d" % ["♛ " if p == r["taker"] else "", str(config["names"][p]).to_upper(), "+" if delta >= 0 else "", delta]
-		v.add_child(UIKit.label(line, 18, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label(line, 22, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	for line in summary["lines"]:
-		v.add_child(UIKit.label(str(line), 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label(str(line), 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	if tutorial:
 		v.add_child(HSeparator.new())
-		var tut_close := UIKit.label("Tutorial concluído! Isso não afeta suas Fragmentos nem seu elo — quando quiser, jogue de verdade no Vanilla ou Ranqueado.", 13, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
+		var tut_close := UIKit.label("Tutorial concluído! Isso não afeta suas Fragmentos nem seu elo — quando quiser, jogue de verdade no Vanilla ou Ranqueado.", 16, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
 		tut_close.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		tut_close.custom_minimum_size = Vector2(340, 0)
 		v.add_child(tut_close)
@@ -1610,11 +1624,11 @@ func _show_zoom(view: CardView) -> void:
 	big.scale = Vector2(2.2, 2.2)
 	big.pivot_offset = Vector2.ZERO
 	v.add_child(holder)
-	var desc := UIKit.label(view.describe(), 18, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var desc := UIKit.label(view.describe(), 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc.custom_minimum_size = Vector2(340, 0)
 	v.add_child(desc)
-	v.add_child(UIKit.label("toque para fechar", 12, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("toque para fechar", 15, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	ov.add_child(UIKit.centered(v))
 	holder.scale = Vector2(0.6, 0.6)
 	holder.pivot_offset = holder.custom_minimum_size / 2.0
@@ -1654,7 +1668,7 @@ BÔNUS (só o Tomador escolhe)
 • Poignée: com 10 ou mais trunfos, ele pode mostrá-los pra ganhar pontos extras.
 • Chelem: ganhar as 18 vazas. Se avisar antes e conseguir: +400. Se avisar e falhar: -200. Sem avisar, se acontecer: +200.
 • Petit na última vaza: quem ganhar a última vaza com o Trunfo 1 nela leva +10."""
-	var l := UIKit.label(text, 13, UIKit.INK)
+	var l := UIKit.label(text, 16, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(340, 0)
 	v.add_child(l)
@@ -1671,8 +1685,8 @@ func _open_pause() -> void:
 	v.add_theme_constant_override("separation", 12)
 	v.custom_minimum_size = Vector2(320, 0)
 	box.add_child(v)
-	v.add_child(UIKit.label("PAUSA", 32, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar,\nou arraste-a pra cima e solte na mesa. Segure / botão direito = zoom.", 13, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("PAUSA", 40, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar,\nou arraste-a pra cima e solte na mesa. Segure / botão direito = zoom.", 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	paused = true
 	ov.tree_exited.connect(func(): paused = false)
 	var resume := UIKit.button("CONTINUAR")

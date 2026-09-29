@@ -6,8 +6,8 @@ extends Control
 signal tapped(view: CardView)
 signal zoom_requested(view: CardView)
 
-const SIZE := Vector2(150, 216)
-const MAX_LIFT := 36.0  ## até onde a carta sobe visualmente ao selecionar/passar o mouse
+const SIZE := Vector2(188, 270)
+const MAX_LIFT := 44.0  ## até onde a carta sobe visualmente ao selecionar/passar o mouse
 const LONG_PRESS := 0.45
 
 var data: CardData
@@ -61,7 +61,7 @@ func set_selected(value: bool) -> void:
 	if selected == value:
 		return
 	selected = value
-	_lift(-26.0 if value else 0.0)
+	_lift(-32.0 if value else 0.0)
 	_refresh_border()
 
 

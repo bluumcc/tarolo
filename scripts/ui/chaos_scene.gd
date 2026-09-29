@@ -11,6 +11,9 @@ signal match_finished(summary: Dictionary)
 
 const CARD_SCENE := preload("res://scenes/Card.tscn")
 
+## As cartas da mão têm o tamanho cheio; as da mesa ficam menores pra caber 4 lado a lado.
+const TABLE_SCALE := 0.62
+
 var engine := ChaosEngine.new()
 var config: Dictionary = {}
 var bot_rng := RandomNumberGenerator.new()
@@ -71,8 +74,8 @@ func _show_insufficient_fichas() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
 	box.add_child(v)
-	v.add_child(UIKit.label("FICHAS INSUFICIENTES", 22, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
-	var l := UIKit.label("Você precisa de %d fichas pra entrar na Mesa Caos. Jogue Vanilla ou Ranqueado, ou volte ao menu e peça um empréstimo da casa." % int(config["buy_in"]), 14, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(UIKit.label("FICHAS INSUFICIENTES", 28, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+	var l := UIKit.label("Você precisa de %d fichas pra entrar na Mesa Caos. Jogue Vanilla ou Ranqueado, ou volte ao menu e peça um empréstimo da casa." % int(config["buy_in"]), 18, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(320, 0)
 	v.add_child(l)
@@ -112,14 +115,14 @@ func _build_ui() -> void:
 	root.add_child(topbar)
 	var info_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BLACK, 8)
 	info_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info_label = UIKit.label("", 13, UIKit.INK)
+	info_label = UIKit.label("", 22, UIKit.INK)
 	info_box.add_child(info_label)
 	topbar.add_child(info_box)
-	var help_btn := UIKit.button("?", UIKit.GOLD, 20)
+	var help_btn := UIKit.button("?", UIKit.GOLD, 25)
 	help_btn.custom_minimum_size = Vector2(52, 52)
 	help_btn.pressed.connect(_open_help)
 	topbar.add_child(help_btn)
-	var menu_btn := UIKit.button("☰", UIKit.MUTED, 20)
+	var menu_btn := UIKit.button("☰", UIKit.MUTED, 25)
 	menu_btn.custom_minimum_size = Vector2(52, 52)
 	menu_btn.pressed.connect(_open_pause)
 	topbar.add_child(menu_btn)
@@ -133,7 +136,7 @@ func _build_ui() -> void:
 	for p in range(1, engine.num_players):
 		# O card em si reage a toque — abre/fecha o detalhe (pontos da rodada, cartas
 		# na mão). Por padrão só mostra o essencial: quem é, quanto tem.
-		var badge := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MUTED, 10)
+		var badge := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MUTED, 14)
 		badge.mouse_filter = Control.MOUSE_FILTER_STOP
 		badge.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var outer := VBoxContainer.new()
@@ -144,12 +147,12 @@ func _build_ui() -> void:
 		var top_row := HBoxContainer.new()
 		top_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		outer.add_child(top_row)
-		var title_label := UIKit.label(str(config["names"][p]).to_upper(), 13, UIKit.MUTED)
+		var title_label := UIKit.label(str(config["names"][p]).to_upper(), 16, UIKit.MUTED)
 		title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		top_row.add_child(title_label)
-		var chevron := UIKit.label("▸", 12, UIKit.MUTED)
+		var chevron := UIKit.label("▸", 15, UIKit.MUTED)
 		top_row.add_child(chevron)
-		var total := UIKit.label("0,0 pts", 20, UIKit.INK)
+		var total := UIKit.label("0,0 pts", 25, UIKit.INK)
 		outer.add_child(total)
 
 		var detail := VBoxContainer.new()
@@ -157,9 +160,9 @@ func _build_ui() -> void:
 		detail.visible = false
 		detail.add_theme_constant_override("separation", 1)
 		outer.add_child(detail)
-		var rp := UIKit.label("+0,0 na rodada", 12, UIKit.MUTED)
+		var rp := UIKit.label("+0,0 na rodada", 15, UIKit.MUTED)
 		detail.add_child(rp)
-		var cards_label := UIKit.label("", 12, UIKit.MUTED)
+		var cards_label := UIKit.label("", 15, UIKit.MUTED)
 		detail.add_child(cards_label)
 
 		badge.gui_input.connect(func(event: InputEvent):
@@ -181,7 +184,7 @@ func _build_ui() -> void:
 	# completa já apareceu no banner de início de rodada — toque reabre se precisar.
 	var mod_box := UIKit.panel(UIKit.OK.darkened(0.75), UIKit.OK, 10)
 	mod_box.mouse_filter = Control.MOUSE_FILTER_STOP
-	modifier_label = UIKit.label("", 14, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
+	modifier_label = UIKit.label("", 18, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
 	modifier_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	mod_box.add_child(modifier_label)
 	mod_box.gui_input.connect(func(event: InputEvent):
@@ -204,15 +207,15 @@ func _build_ui() -> void:
 	# igual qualquer jogo de cartas mobile mostra "o que já foi jogado". -----------
 	table_center = Panel.new()
 	table_center.name = "TableCenter"
-	table_center.custom_minimum_size = Vector2(0, 190)
+	table_center.custom_minimum_size = Vector2(0, 220)
 	table_center.add_theme_stylebox_override("panel", UIKit.box(Color(0.06, 0.05, 0.12, 0.65), UIKit.PURPLE, 3, 24, 0))
 	table_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(table_center)
 
-	trick_label = UIKit.label("", 16, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	trick_label = UIKit.label("", 20, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	root.add_child(trick_label)
 
-	status_label = UIKit.label("", 18, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	status_label = UIKit.label("", 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root.add_child(status_label)
 
@@ -240,18 +243,18 @@ func _build_ui() -> void:
 	my_left.add_theme_constant_override("separation", 1)
 	my_left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	my_row.add_child(my_left)
-	var my_title := UIKit.label(str(config["names"][0]).to_upper(), 13, UIKit.MUTED)
+	var my_title := UIKit.label(str(config["names"][0]).to_upper(), 16, UIKit.MUTED)
 	my_left.add_child(my_title)
-	var my_total := UIKit.label("0,0 pts", 26, UIKit.INK)
+	var my_total := UIKit.label("0,0 pts", 32, UIKit.INK)
 	my_left.add_child(my_total)
-	var my_rp := UIKit.label("+0,0 na rodada", 13, UIKit.MUTED)
+	var my_rp := UIKit.label("+0,0 na rodada", 16, UIKit.MUTED)
 	my_left.add_child(my_rp)
 	var my_right := VBoxContainer.new()
 	my_right.add_theme_constant_override("separation", 1)
 	my_right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	my_right.alignment = BoxContainer.ALIGNMENT_CENTER
 	my_row.add_child(my_right)
-	wager_label = UIKit.label("", 13, UIKit.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
+	wager_label = UIKit.label("", 16, UIKit.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
 	wager_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	my_right.add_child(wager_label)
 	root.add_child(my_box)
@@ -299,7 +302,7 @@ func _layout_table() -> void:
 ## parecer preso a paisagem mesmo rodando em celular).
 func _slot_pos(player: int) -> Vector2:
 	var n := maxi(engine.num_players, 1)
-	var usable_w := maxf(table_center.size.x - 24.0, CardView.SIZE.x * n)
+	var usable_w := maxf(table_center.size.x - 24.0, CardView.SIZE.x * TABLE_SCALE * n)
 	var slot_w := usable_w / float(n)
 	var cx := 12.0 + slot_w * (player + 0.5)
 	return Vector2(cx - CardView.SIZE.x / 2.0, (table_center.size.y - CardView.SIZE.y) / 2.0)
@@ -378,7 +381,7 @@ func _refresh_hud() -> void:
 		(hud_titles[p] as Label).add_theme_color_override("font_color", lead_accent)
 		if p > 0:
 			(hud_cards[p] as Label).text = "%d cartas" % (engine.hands[p] as Array).size()
-	info_label.text = "CAOS  ·  Rodada %d/%d  ·  Vaza %d/%d" % [engine.round_index + 1, ChaosEngine.ROUNDS, mini(engine.trick_number + 1, ChaosEngine.HAND_SIZE), ChaosEngine.HAND_SIZE]
+	info_label.text = "CAOS · RODADA %d/%d · VAZA %d/%d" % [engine.round_index + 1, ChaosEngine.ROUNDS, mini(engine.trick_number + 1, ChaosEngine.HAND_SIZE), ChaosEngine.HAND_SIZE]
 	var mod_name := "✦ %s" % ChaosModifiers.label(engine.modifier, engine.weak_suit)
 	modifier_label.text = "%s — %s" % [mod_name, ChaosModifiers.DESCRIPTIONS[engine.modifier]] if modifier_expanded else "%s  (toque p/ detalhe)" % mod_name
 	var profile := SaveManager.section("profile")
@@ -417,7 +420,7 @@ func _speech_bubble(player: int, text: String) -> void:
 		return
 	var avatar: Control = seat_avatars[player]
 	var anchor_pos: Vector2 = avatar.global_position - popup_layer.global_position + avatar.size / 2.0
-	var l := UIKit.label(text, 13, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var l := UIKit.label(text, 16, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	var box := PanelContainer.new()
 	box.add_theme_stylebox_override("panel", UIKit.box(Color(0.03, 0.03, 0.07, 0.92), UIKit.GOLD, 2, 8, 8))
 	box.add_child(l)
@@ -455,8 +458,8 @@ func _show_round_banner(title: String, body: String) -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 6)
 	panel.add_child(v)
-	v.add_child(UIKit.label(title, 22, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	var body_label := UIKit.label(body, 14, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(UIKit.label(title, 28, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	var body_label := UIKit.label(body, 18, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body_label.custom_minimum_size = Vector2(360, 0)
 	v.add_child(body_label)
@@ -540,14 +543,14 @@ func _show_item_modal(options: Array) -> int:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	box.add_child(v)
-	v.add_child(UIKit.label("ESCOLHA SEU ITEM", 24, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("Vale só pra você, só na Rodada %d/%d — modificador: %s" % [engine.round_index + 1, ChaosEngine.ROUNDS, ChaosModifiers.label(engine.modifier, engine.weak_suit)], 13, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("ESCOLHA SEU ITEM", 30, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("Vale só pra você, só na Rodada %d/%d — modificador: %s" % [engine.round_index + 1, ChaosEngine.ROUNDS, ChaosModifiers.label(engine.modifier, engine.weak_suit)], 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	for item in options:
 		var btn := UIKit.button("%s  %s" % [ChaosItems.ICONS[item], ChaosItems.NAMES[item]], UIKit.OK)
 		btn.pressed.connect(func(): item_chosen.emit(item))
 		v.add_child(btn)
-		var desc := UIKit.label(ChaosItems.DESCRIPTIONS[item], 12, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+		var desc := UIKit.label(ChaosItems.DESCRIPTIONS[item], 15, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		desc.custom_minimum_size = Vector2(360, 0)
 		v.add_child(desc)
@@ -643,7 +646,7 @@ func _animate_play(player: int, card: CardData, from: Vector2) -> void:
 	var tw := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tw.tween_property(cv, "position", _slot_pos(player), GameState.anim(0.28))
 	tw.parallel().tween_property(cv, "rotation", randf_range(-0.06, 0.06), GameState.anim(0.28))
-	tw.parallel().tween_property(cv, "scale", Vector2.ONE, GameState.anim(0.28))
+	tw.parallel().tween_property(cv, "scale", Vector2(TABLE_SCALE, TABLE_SCALE), GameState.anim(0.28))
 	_refresh_hud()
 	await tw.finished
 
@@ -661,8 +664,8 @@ func _resolve_trick(result: Dictionary) -> void:
 	if win_view:
 		win_view.z_index = 5
 		var pulse := create_tween()
-		pulse.tween_property(win_view, "scale", Vector2(1.18, 1.18), GameState.anim(0.12))
-		pulse.tween_property(win_view, "scale", Vector2(1.08, 1.08), GameState.anim(0.12))
+		pulse.tween_property(win_view, "scale", Vector2(TABLE_SCALE, TABLE_SCALE) * 1.18, GameState.anim(0.12))
+		pulse.tween_property(win_view, "scale", Vector2(TABLE_SCALE, TABLE_SCALE) * 1.08, GameState.anim(0.12))
 
 	var extra := ""
 	if float(result.get("mult", 1.0)) > 1.0:
@@ -695,7 +698,7 @@ func _float_points(winner: int, points: float, folego: bool) -> void:
 	var text := "+%s pts" % UIKit.fmt_dec(points, 1)
 	if folego:
 		text += " 🔥"
-	var l := UIKit.label(text, 30, UIKit.GOLD if winner == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var l := UIKit.label(text, 38, UIKit.GOLD if winner == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	var box := PanelContainer.new()
 	box.add_theme_stylebox_override("panel", UIKit.box(Color(0.03, 0.03, 0.07, 0.85), UIKit.GOLD if winner == 0 else UIKit.PURPLE, 2, 4, 10))
 	box.add_child(l)
@@ -725,8 +728,8 @@ func _show_round_summary() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	box.add_child(v)
-	v.add_child(UIKit.label("FIM DA RODADA %d/%d" % [int(r["round"]) + 1, ChaosEngine.ROUNDS], 24, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label(ChaosModifiers.label(int(r["modifier"]), int(r["weak_suit"])), 14, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("FIM DA RODADA %d/%d" % [int(r["round"]) + 1, ChaosEngine.ROUNDS], 30, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label(ChaosModifiers.label(int(r["modifier"]), int(r["weak_suit"])), 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	var order := range(engine.num_players)
 	var totals: Array = r["totals"]
@@ -734,7 +737,7 @@ func _show_round_summary() -> void:
 	for p in order:
 		var gained: float = (r["round_points"] as Array)[p]
 		var line := "%s%s  %s pts  (+%s)" % ["👑 " if p == order[0] else "", str(config["names"][p]).to_upper(), UIKit.fmt_dec(float(totals[p]), 1), UIKit.fmt_dec(gained, 1)]
-		v.add_child(UIKit.label(line, 16, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label(line, 20, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	var btn_text := "VER RESULTADO FINAL" if int(r["round"]) >= ChaosEngine.ROUNDS - 1 else "PRÓXIMA RODADA"
 	var btn := UIKit.button(btn_text)
 	v.add_child(btn)
@@ -773,17 +776,17 @@ func _show_results(summary: Dictionary) -> void:
 	var title := "%dº LUGAR" % (int(summary["placement"]) + 1)
 	if summary["won"]:
 		title = "VOCÊ VENCEU!"
-	v.add_child(UIKit.label(title, 26, UIKit.GOLD if summary["won"] else UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label(title, 32, UIKit.GOLD if summary["won"] else UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	var order: Array = engine.match_result["standings"]
 	var totals: Array = engine.match_result["totals"]
 	for i in range(order.size()):
 		var p: int = order[i]
 		var line := "%d. %s%s — %s pts" % [i + 1, "👑 " if i == 0 else "", str(config["names"][p]).to_upper(), UIKit.fmt_dec(float(totals[p]), 1)]
-		v.add_child(UIKit.label(line, 18, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label(line, 22, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	for line in summary["lines"]:
-		v.add_child(UIKit.label(str(line), 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label(str(line), 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	var again := UIKit.button("NOVA PARTIDA")
 	again.pressed.connect(func(): get_tree().reload_current_scene())
 	v.add_child(again)
@@ -816,11 +819,11 @@ func _show_zoom(view: CardView) -> void:
 	big.scale = Vector2(2.2, 2.2)
 	big.pivot_offset = Vector2.ZERO
 	v.add_child(holder)
-	var desc := UIKit.label(view.describe(), 18, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var desc := UIKit.label(view.describe(), 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc.custom_minimum_size = Vector2(340, 0)
 	v.add_child(desc)
-	v.add_child(UIKit.label("toque para fechar", 12, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("toque para fechar", 15, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	ov.add_child(UIKit.centered(v))
 	holder.scale = Vector2(0.6, 0.6)
 	holder.pivot_offset = holder.custom_minimum_size / 2.0
@@ -851,7 +854,7 @@ FICHAS
 
 CARTAS
 • Mesmas regras de vaza do Vanilla: seguir naipe, cortar com Trunfo se não tiver, cobrir com Trunfo maior se alguém já cortou. O Louco nunca vence, a não ser no modificador "O Louco Vence"."""
-	var l := UIKit.label(text, 13, UIKit.INK)
+	var l := UIKit.label(text, 16, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(340, 0)
 	v.add_child(l)
@@ -868,8 +871,8 @@ func _open_pause() -> void:
 	v.add_theme_constant_override("separation", 12)
 	v.custom_minimum_size = Vector2(320, 0)
 	box.add_child(v)
-	v.add_child(UIKit.label("PAUSA", 32, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar,\nou arraste-a pra cima e solte na mesa. Segure / botão direito = zoom.", 13, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("PAUSA", 40, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar,\nou arraste-a pra cima e solte na mesa. Segure / botão direito = zoom.", 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	paused = true
 	ov.tree_exited.connect(func(): paused = false)
 	var resume := UIKit.button("CONTINUAR")

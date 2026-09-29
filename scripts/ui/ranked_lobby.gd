@@ -34,12 +34,12 @@ func _render() -> void:
 	var t := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
 	var color := Color(Ranked.TIER_COLORS[t["tier"]])
 
-	content.add_child(UIKit.label("MODO RANQUEADO · TEMPORADA %d" % int(rk["season"]), 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	content.add_child(UIKit.label("MODO RANQUEADO · TEMPORADA %d" % int(rk["season"]), 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	var badge := UIKit.panel(UIKit.PURPLE_DEEP, color, 20)
 	var bv := VBoxContainer.new()
 	bv.add_theme_constant_override("separation", 6)
 	badge.add_child(bv)
-	bv.add_child(UIKit.label(str(t["label"]).to_upper(), 44, color, HORIZONTAL_ALIGNMENT_CENTER))
+	bv.add_child(UIKit.label(str(t["label"]).to_upper(), 55, color, HORIZONTAL_ALIGNMENT_CENTER))
 	var bar := ProgressBar.new()
 	bar.min_value = 0.0
 	bar.max_value = 1.0
@@ -50,9 +50,9 @@ func _render() -> void:
 	bar.add_theme_stylebox_override("fill", fill)
 	bar.add_theme_stylebox_override("background", UIKit.box(UIKit.BLACK, UIKit.BLACK, 0, 2, 0))
 	bv.add_child(bar)
-	bv.add_child(UIKit.label("%d LP  ·  MMR %s  ·  %dV / %dD" % [int(t["lp"]), UIKit.fmt_int(int(rk["mmr"])), int(rk["wins"]), int(rk["losses"])], 16, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+	bv.add_child(UIKit.label("%d LP  ·  MMR %s  ·  %dV / %dD" % [int(t["lp"]), UIKit.fmt_int(int(rk["mmr"])), int(rk["wins"]), int(rk["losses"])], 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	var peak := Ranked.tier_info(int(rk["peak_points"]), int(rk["mmr"]))
-	bv.add_child(UIKit.label("Pico da temporada: %s" % peak["label"], 13, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	bv.add_child(UIKit.label("Pico da temporada: %s" % peak["label"], 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	content.add_child(badge)
 
 	var ladder := HFlowContainer.new()
@@ -60,26 +60,26 @@ func _render() -> void:
 	ladder.add_theme_constant_override("h_separation", 6)
 	for i in range(Ranked.TIERS.size()):
 		var reached := i <= int(t["tier"])
-		ladder.add_child(UIKit.label(Ranked.TIERS[i].to_upper(), 12, Color(Ranked.TIER_COLORS[i]) if reached else UIKit.MUTED.darkened(0.3)))
+		ladder.add_child(UIKit.label(Ranked.TIERS[i].to_upper(), 15, Color(Ranked.TIER_COLORS[i]) if reached else UIKit.MUTED.darkened(0.3)))
 	content.add_child(ladder)
 
-	status = UIKit.label("1º/2º lugar ganham LP · 3º/4º perdem", 14, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	status = UIKit.label("1º/2º lugar ganham LP · 3º/4º perdem", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	content.add_child(status)
-	search_btn = UIKit.button("BUSCAR PARTIDA", color, 22)
+	search_btn = UIKit.button("BUSCAR PARTIDA", color, 28)
 	search_btn.pressed.connect(_search)
 	content.add_child(search_btn)
-	var back := UIKit.button("VOLTAR", UIKit.MUTED, 16)
+	var back := UIKit.button("VOLTAR", UIKit.MUTED, 20)
 	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
 	content.add_child(back)
 
-	content.add_child(UIKit.label("HISTÓRICO", 18, UIKit.INK))
+	content.add_child(UIKit.label("HISTÓRICO", 22, UIKit.INK))
 	var hist: Array = rk["history"]
 	if hist.is_empty():
-		content.add_child(UIKit.label("Nenhuma partida ranqueada ainda.", 14, UIKit.MUTED))
+		content.add_child(UIKit.label("Nenhuma partida ranqueada ainda.", 18, UIKit.MUTED))
 	for h in hist:
 		var lp := int(h["lp"])
 		var row := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.OK if lp >= 0 else UIKit.DANGER, 8)
-		row.add_child(UIKit.label("%dº  ·  %s pts  ·  %s%d LP  ·  %s" % [int(h["placement"]), UIKit.fmt_int(int(h["score"])), "+" if lp >= 0 else "", lp, h["tier"]], 14))
+		row.add_child(UIKit.label("%dº  ·  %s pts  ·  %s%d LP  ·  %s" % [int(h["placement"]), UIKit.fmt_int(int(h["score"])), "+" if lp >= 0 else "", lp, h["tier"]], 18))
 		content.add_child(row)
 	search_btn.grab_focus.call_deferred()
 
