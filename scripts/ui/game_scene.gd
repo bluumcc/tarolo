@@ -98,6 +98,7 @@ func _ready() -> void:
 	await _run_bidding()
 	if not is_inside_tree():
 		return
+	Scoring.target_relief = Scoring.TAKER_RELIEF if _human_taker_relief() else 0.0
 	_set_phase(false)
 	_update_taker_badge()
 	_refresh_hud()
@@ -118,6 +119,15 @@ func _ready() -> void:
 
 
 # ------------------------------------------------------------------ UI
+
+## Você é o Tomador num Vanilla comum: a meta cai (ver Scoring.TAKER_RELIEF).
+func _human_taker_relief() -> bool:
+	return engine.taker == 0 and GameState.mode == GameState.Mode.CLASSIC and not tutorial
+
+
+func _exit_tree() -> void:
+	Scoring.target_relief = 0.0
+
 
 func _build_ui() -> void:
 	add_child(UIKit.background())
@@ -786,7 +796,7 @@ func _show_intro() -> void:
 	v.add_child(bar_row)
 	var rule_text := ""
 	if mine:
-		rule_text = "Você precisa de %s pontos (a meta cai com cada Bout que você tiver). Encha a barra: se bater, cada um dos outros 3 te paga ×%d." % [UIKit.fmt_dec(n["target"], 1), int(Scoring.CONTRACT_MULT[engine.contract])]
+		rule_text = "Você precisa de %s pontos (a meta cai com cada Bout que você tiver)%s. Encha a barra: se bater, cada um dos outros 3 te paga ×%d." % [UIKit.fmt_dec(n["target"], 1), " e tem bônus de Tomador: meta %d menor" % int(Scoring.target_relief) if Scoring.target_relief > 0.0 else "", int(Scoring.CONTRACT_MULT[engine.contract])]
 	else:
 		rule_text = "Precisa de %s pontos. A barra começa vazia e enche a cada vaza dele. Se a Defesa não deixar encher, o contrato cai e cada um da Defesa ganha ×%d." % [UIKit.fmt_dec(n["target"], 1), int(Scoring.CONTRACT_MULT[engine.contract])]
 	var rl := UIKit.label(rule_text, 16, Color("#d6cbbb"), HORIZONTAL_ALIGNMENT_CENTER)
@@ -1537,6 +1547,7 @@ DESCARTE (só Petite/Garde)
 
 META
 • O Tomador soma os pontos que capturou. Precisa bater: 56 pts com 0 Bouts, 51 com 1, 41 com 2, 36 com 3.
+• Bônus de Tomador: no Vanilla comum (fora do Ranqueado e do tutorial), quando é você o Tomador, a meta é 15 pontos menor.
 
 BÔNUS (o Tomador escolhe se arrisca)
 • Poignée: com 10+ trunfos, pode declarar — mostra suas cartas de trunfo, mas ganha pontos extras se a rodada fechar.
