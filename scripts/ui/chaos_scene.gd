@@ -293,7 +293,7 @@ func _is_wide() -> bool:
 func _apply_orientation() -> void:
 	var wide := _is_wide()
 	main_area.vertical = not wide
-	side_col.custom_minimum_size.x = 420 if wide else 0
+	side_col.visible = false  # a regra da rodada já fica na faixa de avisos, em repouso
 	modifier_expanded = wide
 	_refresh_hud()
 	table_center.custom_minimum_size.y = 420 if wide else 400

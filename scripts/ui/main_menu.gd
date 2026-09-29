@@ -30,7 +30,7 @@ func _ready() -> void:
 	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.add_child(center)
 	var col := VBoxContainer.new()
-	col.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - Widgets.MARGIN * 2.0, 672.0), 0)
+	col.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - Widgets.MARGIN * 2.0, 1040.0 if get_viewport_rect().size.x > get_viewport_rect().size.y else 672.0), 0)
 	col.add_theme_constant_override("separation", 18)
 	center.add_child(col)
 
@@ -39,16 +39,28 @@ func _ready() -> void:
 
 	var rk := GameState.ranked()
 	var tier := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
-	var chaos := Widgets.mode_card("MODO CAOS", "Rodadas relâmpago, plot twists e combos. Fichas na mesa!", UIKit.DANGER, 176, "⚡", _open_chaos_confirm, 46)
+	var chaos := Widgets.mode_card("MODO CAOS", "Rodadas relâmpago, plot twists e combos. Fichas na mesa!", UIKit.DANGER, 176 if get_viewport_rect().size.y > get_viewport_rect().size.x else 150, "⚡", _open_chaos_confirm, 46)
 	col.add_child(chaos)
-	col.add_child(Widgets.mode_card("MODO VANILLA", "Tarot clássico: 78 cartas, trunfo e O Louco.", UIKit.GOLD.darkened(0.12), 132, "♛", func():
-		GameState.mode = GameState.Mode.CLASSIC
-		GameState.leave_table()
-		get_tree().change_scene_to_file("res://scenes/GameScene.tscn")))
-	col.add_child(Widgets.mode_card("RANQUEADO", "Temporada %d · %s · %d LP" % [int(rk["season"]), tier["label"], int(tier["lp"])], Color(Ranked.TIER_COLORS[tier["tier"]]).darkened(0.1), 132, "🏆", func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn")))
-	col.add_child(Widgets.mode_card("TUTORIAL", "Primeira vez? Uma mão guiada, com dicas.", UIKit.OK.darkened(0.15), 112, "?", func():
-		GameState.start_tutorial()
-		get_tree().change_scene_to_file("res://scenes/GameScene.tscn"), 34))
+	var wide := get_viewport_rect().size.x > get_viewport_rect().size.y
+	var grid := GridContainer.new()
+	grid.columns = 3 if wide else 1
+	grid.add_theme_constant_override("h_separation", 18)
+	grid.add_theme_constant_override("v_separation", 18)
+	col.add_child(grid)
+	var h := 150 if wide else 132
+	var cards := [
+		Widgets.mode_card("VANILLA", "Tarot clássico: 78 cartas, trunfo e O Louco.", UIKit.GOLD.darkened(0.12), h, "♛", func():
+			GameState.mode = GameState.Mode.CLASSIC
+			GameState.leave_table()
+			get_tree().change_scene_to_file("res://scenes/GameScene.tscn"), 34),
+		Widgets.mode_card("RANQUEADO", "Temporada %d · %s · %d LP" % [int(rk["season"]), tier["label"], int(tier["lp"])], Color(Ranked.TIER_COLORS[tier["tier"]]).darkened(0.1), h, "🏆", func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn"), 34),
+		Widgets.mode_card("TUTORIAL", "Primeira vez? Uma mão guiada, com dicas.", UIKit.OK.darkened(0.15), h, "?", func():
+			GameState.start_tutorial()
+			get_tree().change_scene_to_file("res://scenes/GameScene.tscn"), 34),
+	]
+	for c in cards:
+		c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		grid.add_child(c)
 	col.add_child(_spacer(8))
 
 	var nav := Widgets.bottom_nav([
@@ -73,18 +85,21 @@ func _hero() -> Control:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 0)
 	var fan := Control.new()
-	fan.custom_minimum_size = Vector2(0, 210)
+	fan.custom_minimum_size = Vector2(0, 210 if get_viewport_rect().size.y > get_viewport_rect().size.x else 150)
 	fan.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(fan)
+	var wide := get_viewport_rect().size.x > get_viewport_rect().size.y
+	var cx := 520.0 if wide else 336.0
+	var sc := 0.5 if wide else 0.62
 	var specs := [[CardData.Suit.COPAS, 14, -14.0, -110.0], [CardData.Suit.TRUNFO, 21, 0.0, 0.0], [CardData.Suit.ESPADAS, 12, 14.0, 110.0]]
 	for sp in specs:
 		var cv: CardView = preload("res://scenes/Card.tscn").instantiate()
 		cv.setup(CardData.make(sp[0], sp[1]), true)
 		cv.interactive = false
-		cv.scale = Vector2(0.62, 0.62)
+		cv.scale = Vector2(sc, sc)
 		cv.rotation_degrees = sp[2]
 		fan.add_child(cv)
-		cv.position = Vector2(336.0 + sp[3] - CardView.SIZE.x / 2.0, 20.0 - abs(sp[2]) * 1.2)
+		cv.position = Vector2(cx + sp[3] * (sc / 0.62) - CardView.SIZE.x / 2.0, 10.0 - abs(sp[2]) * 1.2)
 	var title := UIKit.label("TAROLO", 88, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	title.add_theme_color_override("font_outline_color", Color("#3A1FA0"))
 	title.add_theme_constant_override("outline_size", 14)
