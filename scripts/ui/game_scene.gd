@@ -20,7 +20,7 @@ var finished := false
 var paused := false
 
 const ARENA_SCALE := 0.78
-const BID_SHORT := ["troca com o talão", "troca com o talão", "sem talão · ele é seu", "sem talão · ele é da Defesa"]
+const BID_SHORT := ["pega o monte (6 cartas) e devolve 6", "igual à Petite, mas vale o dobro", "não pega o monte; ele conta pra você", "não pega o monte; ele conta pra Defesa"]
 
 var root_box: VBoxContainer
 var hud_badges: Array = []       # painel de cada assento (0 = meu rodapé)
@@ -339,7 +339,7 @@ func _build_bid_panel() -> void:
 	bid_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root_box.add_child(bid_panel)
 	bid_panel.add_child(UIKit.label("QUEM JOGA SOZINHO?", 30, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	var sub := UIKit.label("O lance mais alto vira o Tomador e enfrenta os outros três.", 15, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	var sub := UIKit.label("O lance mais alto vira o Tomador e joga sozinho contra os outros três. O monte são 6 cartas viradas no meio da mesa que o Tomador pode pegar.", 15, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bid_panel.add_child(sub)
 	bid_rows.resize(engine.num_players)
@@ -469,7 +469,7 @@ Por isso, Bout na mão é um bom motivo pra licitar mais alto.
 Cuidados:
 • O Petit é fraco: qualquer trunfo maior o vence, então proteja-o.
 • O Louco nunca vence uma vaza, mas quem o joga guarda os pontos dele.
-• Bouts nunca podem ir pro descarte."""
+• Bouts nunca podem ser devolvidos ao monte."""
 	var l := UIKit.label(text, 14, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(340, 0)
@@ -969,7 +969,7 @@ func _run_bidding() -> void:
 	trick_label.text = ""
 	if tutorial:
 		if engine.taker == 0:
-			await _tutorial_modal("VOCÊ É O ATAQUE (TOMADOR)", "Você venceu a licitação com %s. %s\n\nAgora você joga sozinho contra os outros 3 (a Defesa). No fim da rodada, todos os pontos que as SUAS cartas capturarem nas vazas (mais o talão, dependendo do contrato) são somados — se bater a meta, você ganha pontos dos outros 3; se não bater, você paga." % [Scoring.CONTRACT_NAMES[engine.contract], Scoring.CONTRACT_HINTS[engine.contract]])
+			await _tutorial_modal("VOCÊ É O ATAQUE (TOMADOR)", "Você venceu a licitação com %s. %s\n\nAgora você joga sozinho contra os outros 3 (a Defesa). No fim da rodada, todos os pontos que as SUAS cartas capturarem nas vazas (mais as 6 cartas do monte, dependendo do contrato) são somados — se bater a meta, você ganha pontos dos outros 3; se não bater, você paga." % [Scoring.CONTRACT_NAMES[engine.contract], Scoring.CONTRACT_HINTS[engine.contract]])
 		else:
 			await _tutorial_modal("VOCÊ É DA DEFESA", "%s venceu a licitação com %s e virou o ATAQUE (Tomador) — joga sozinho contra a mesa toda, incluindo você.\n\nVocê e os outros 2 são a DEFESA: tudo que vocês capturarem nas vazas ajuda a impedir %s de bater a meta dele. Se ele não bater, todo mundo da Defesa ganha pontos; se ele bater, todo mundo da Defesa paga." % [config["names"][engine.taker], Scoring.CONTRACT_NAMES[engine.contract], config["names"][engine.taker]])
 		if not is_inside_tree():
@@ -1012,7 +1012,7 @@ func _run_discard() -> void:
 		return
 	if engine.taker == 0 and not GameState.autoplay:
 		if tutorial:
-			await _tutorial_modal("O TALÃO ENTROU NA SUA MÃO", "O talão são 6 cartas que ficam escondidas até a licitação acabar. Com %s, elas entraram direto na sua mão — na próxima tela, as cartas com borda roxa são exatamente essas 6.\n\nAgora você escolhe 6 cartas (de qualquer origem) pra devolver ao talão — elas somam pontos pra você no final, mas nunca podem ser Reis ou Bouts." % Scoring.CONTRACT_NAMES[engine.contract])
+			await _tutorial_modal("O MONTE ENTROU NA SUA MÃO", "O monte são 6 cartas viradas no meio da mesa, que ninguém vê até a licitação acabar. Com %s, elas entraram direto na sua mão — na próxima tela, as cartas marcadas como \"monte\" são exatamente essas 6.\n\nAgora você escolhe 6 cartas da sua mão (de qualquer origem) pra devolver ao monte — elas somam pontos pra você no final, mas nunca podem ser Reis ou Bouts." % Scoring.CONTRACT_NAMES[engine.contract])
 			if not is_inside_tree():
 				return
 		var chosen: Array = await _wait_human_discard()
@@ -1020,7 +1020,7 @@ func _run_discard() -> void:
 			return
 		engine.discard(chosen)
 	else:
-		status_label.text = "%s está escolhendo o descarte..." % config["names"][engine.taker]
+		status_label.text = "%s está escolhendo 6 cartas pra devolver ao monte..." % config["names"][engine.taker]
 		await _wait(0.5)
 		if not is_inside_tree():
 			return
@@ -1038,27 +1038,27 @@ func _run_talao_reveal() -> void:
 	match engine.contract:
 		Scoring.Contract.PETITE, Scoring.Contract.GARDE:
 			if engine.taker != 0:
-				await _tutorial_modal("O TALÃO (DESCARTE DO BOT)", "%s era o Tomador, então o talão (6 cartas escondidas) entrou na mão dele e ele escolheu sozinho o que devolver — você não vê essa escolha, só o resultado final na pontuação." % config["names"][engine.taker])
+				await _tutorial_modal("O MONTE (ESCOLHA DO BOT)", "%s era o Tomador, então pegou o monte (6 cartas viradas), olhou e devolveu 6 da mão dele — você não vê essa escolha, só o resultado final na pontuação." % config["names"][engine.taker])
 		Scoring.Contract.GARDE_SANS:
-			await _tutorial_modal("O TALÃO (GARDE SANS)", "Com Garde Sans, %s nem chegou a ver o talão — ninguém escolhe nada. Mas as 6 cartas dele já contam a favor do Tomador mesmo assim: %s." % [config["names"][engine.taker], _describe_cards(engine.chien)])
+			await _tutorial_modal("O MONTE (GARDE SANS)", "Com Garde Sans, %s não pegou o monte, nem chegou a ver as 6 cartas — ninguém escolhe nada. Mas os pontos delas já contam a favor do Tomador mesmo assim: %s." % [config["names"][engine.taker], _describe_cards(engine.chien)])
 		Scoring.Contract.GARDE_CONTRE:
-			await _tutorial_modal("O TALÃO (GARDE CONTRE)", "Com Garde Contre, %s nem chegou a ver o talão — e dessa vez essas 6 cartas nem contam pra ninguém, ficam fora da rodada: %s." % [config["names"][engine.taker], _describe_cards(engine.chien)])
+			await _tutorial_modal("O MONTE (GARDE CONTRE)", "Com Garde Contre, %s não pegou o monte, nem chegou a ver as 6 cartas — e dessa vez os pontos delas vão pra Defesa: %s." % [config["names"][engine.taker], _describe_cards(engine.chien)])
 
 
 func _wait_human_discard() -> Array:
 	var hand: Array = engine.hands[0]
 	var legal: Array = engine.legal_discards(hand)
-	status_label.text = "Escolha 6 cartas pra descartar no talão"
+	status_label.text = "Escolha 6 cartas da sua mão pra devolver ao monte"
 	var selected: Array = []
 	var panel := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 14)
 	panel.name = "DiscardPrompt"
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	panel.add_child(v)
-	v.add_child(UIKit.label("ESCOLHA 6 CARTAS PRO DESCARTE", 15, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("DEVOLVA 6 CARTAS AO MONTE", 15, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	var sub_hint := "Elas contam como pontos seus no final. Reis e Bouts (em cinza) não podem ir."
 	if tutorial:
-		sub_hint += " As marcadas \"talão\" são as 6 que acabaram de entrar na sua mão."
+		sub_hint += " As marcadas \"monte\" são as 6 que acabaram de entrar na sua mão."
 	v.add_child(UIKit.label(sub_hint, 11, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	var counter := UIKit.label("0 / %d selecionadas" % Deck.CHIEN_SIZE, 12, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(counter)
@@ -1096,7 +1096,7 @@ func _wait_human_discard() -> Array:
 			confirm.disabled = selected.size() != Deck.CHIEN_SIZE)
 		col.add_child(b)
 		if from_chien:
-			col.add_child(UIKit.label("talão", 8, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER))
+			col.add_child(UIKit.label("monte", 8, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER))
 		flow.add_child(col)
 	confirm.pressed.connect(func():
 		panel.queue_free()
@@ -1624,12 +1624,12 @@ func _open_help() -> void:
 LICITAÇÃO
 • Na sua vez: PASSAR ou dar um lance mais alto que o anterior.
 • O lance não custa nada — é só uma declaração de confiança na sua mão.
-• Petite (x1) → Garde (x2) → Garde Sans (x4, não vê o talão mas ele ainda conta) → Garde Contre (x6, não vê e ele vira ponto da defesa).
+• Petite (x1) → Garde (x2) → Garde Sans (x4, você não pega o monte, mas os pontos dele contam pra você) → Garde Contre (x6, não pega o monte e os pontos dele vão pra Defesa).
 • Quem der o lance mais alto vira o Tomador e joga sozinho contra os outros 3.
 
-DESCARTE (só Petite/Garde)
-• O talão (6 cartas escondidas) entra na sua mão e você escolhe 6 pra devolver.
-• Nunca pode descartar Reis ou Bouts — só cartas comuns (e Trunfo comum, se faltar carta comum).
+O MONTE (só Petite/Garde)
+• O monte são 6 cartas viradas no meio da mesa. Quem toma pega elas, olha e escolhe 6 cartas da mão pra devolver.
+• Nunca pode devolver Reis ou Bouts — só cartas comuns (e Trunfo comum, se faltar carta comum).
 
 META
 • O Tomador soma os pontos que capturou. Precisa bater: 56 pts com 0 Bouts, 51 com 1, 41 com 2, 36 com 3.

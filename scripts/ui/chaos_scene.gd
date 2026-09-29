@@ -833,7 +833,7 @@ func _show_zoom(view: CardView) -> void:
 func _open_help() -> void:
 	var v := UIKit.modal(overlay_layer, "COMO FUNCIONA O CAOS")
 	var text := """RODADAS
-• 5 rodadas curtas de 8 cartas cada — sem licitação, sem talão, todo mundo joga pra si.
+• 5 rodadas curtas de 8 cartas cada — sem licitação, sem monte, todo mundo joga pra si.
 • Vence a partida quem somar mais pontos no total das 5 rodadas.
 
 MODIFICADOR

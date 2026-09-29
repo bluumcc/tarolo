@@ -17,10 +17,10 @@ const CONTRACT_MULT := {Contract.PETITE: 1, Contract.GARDE: 2, Contract.GARDE_SA
 ## regras demais pra aprender de uma vez, então isso fica sempre visível ao lado do botão.
 ## Em linguagem direta: o que muda de verdade se você vencer ou perder com esse contrato.
 const CONTRACT_HINTS := [
-	"Risco baixo. Você vê e troca o talão. Se bater a meta, ganha pouco de cada um; se não bater, perde pouco.",
-	"Risco médio. Você vê e troca o talão. Dobra (x2) o que ganha ou perde perto da Petite.",
-	"Risco alto. Você NÃO vê o talão, mas ele ainda soma pontos a seu favor. Multiplica por 4 o que ganha ou perde.",
-	"Risco máximo. Você NÃO vê o talão, e os pontos dele vão pra Defesa. Multiplica por 6 o que ganha ou perde.",
+	"Risco baixo. Você pega o monte (6 cartas viradas), olha e devolve 6. Se bater a meta, ganha pouco de cada um; se não bater, perde pouco.",
+	"Risco médio. Você também pega o monte e devolve 6, mas ganha ou perde o dobro (x2) da Petite.",
+	"Risco alto. Você NÃO pega o monte (não vê as 6 cartas), mas os pontos delas contam a seu favor. Ganha ou perde x4.",
+	"Risco máximo. Você NÃO pega o monte, e os pontos dele vão pra Defesa. Ganha ou perde x6.",
 ]
 
 ## Toda rodada dá um piso de 25 pontos de aposta, que se soma à distância (pra mais ou
