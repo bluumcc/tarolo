@@ -15,6 +15,7 @@ const CARD_SCENE := preload("res://scenes/Card.tscn")
 ## As cartas da mão têm o tamanho cheio; as da mesa ficam menores pra caber 4 lado a lado.
 const TABLE_SCALE := 0.70
 const TURN_SECONDS := 10.0   # tempo pra jogar; estourou, joga a carta mais fraca
+const DISCARD_SECONDS := 15.0   # tempo pro descarte inicial (10 cartas pra olhar); estourou, descarta as 2 mais fracas
 
 var engine := ChaosEngine.new()
 var config: Dictionary = {}
@@ -74,6 +75,8 @@ var blitz_showdown := false     # Blitz: fim do nível — só aí o alvo dos ri
 var double_btn: Button
 var discard_btn: Button
 var discard_picks: Array = []   # Blitz: cartas marcadas na mão pra descartar (até BLITZ_DISCARD_SIZE)
+var discarding_now := false     # relógio do descarte rodando (reaproveita turn_bar)
+var discard_left := 0.0
 var shown_pot := 0.0
 var pot_locked := false        # contador do pote rolando: o refresh não sobrescreve
 
@@ -710,7 +713,8 @@ func _trick_start() -> void:
 		return
 	var m := engine.modifier
 	if m == -1:
-		# Conta nova (Blitz): primeiros níveis sem modificador nenhum, só o palpite puro.
+		# Defensivo: toda rodada de Blitz/Caos sorteia modificador, sem exceção — isto nunca
+		# deveria disparar, mas evita travar a tela cheia se `modifier_sequence` vier vazio.
 		_banner_clear()
 		return
 	var color := ChaosModifiers.color_of(m)
@@ -793,6 +797,18 @@ func _wait_human() -> CardData:
 
 
 func _process(delta: float) -> void:
+	if discarding_now and not paused and not modal_open and not finished and turn_bar != null:
+		discard_left -= delta
+		turn_bar.value = maxf(discard_left, 0.0)
+		var urgent_d := discard_left <= 3.0
+		turn_bar.add_theme_stylebox_override("fill", UIKit.box(UIKit.LOSS if urgent_d else UIKit.BRAND, UIKit.BRAND, 0, 7, 0))
+		if discard_left <= 0.0:
+			discarding_now = false
+			var auto: Array = ChaosBot.wants_discard(engine, 0, BotAI.Difficulty.NORMAL, bot_rng)
+			engine.apply_discard(0, auto)
+			_banner("TEMPO ESGOTADO", "Descartamos as 2 mais fracas por você.", UIKit.LOSS)
+			item_chosen.emit(1)
+		return
 	if not human_turn or paused or modal_open or finished or turn_bar == null:
 		return
 	turn_left -= delta
@@ -1894,7 +1910,14 @@ func _human_discard_play() -> void:
 	status_label.text = "Toque em %d cartas da sua mão pra descartar." % ChaosEngine.BLITZ_DISCARD_SIZE
 	discard_btn.visible = true
 	_refresh_discard_button()
+	discard_left = DISCARD_SECONDS
+	turn_bar.max_value = DISCARD_SECONDS
+	turn_bar.modulate.a = 1.0
+	discarding_now = true
 	await item_chosen
+	discarding_now = false
+	turn_bar.modulate.a = 0.0
+	turn_bar.max_value = TURN_SECONDS
 	discard_btn.visible = false
 	status_label.text = ""
 	discard_picks = []
@@ -1923,6 +1946,7 @@ func _refresh_discard_button() -> void:
 func _on_discard_pressed() -> void:
 	if discard_picks.size() != ChaosEngine.BLITZ_DISCARD_SIZE:
 		return
+	discarding_now = false
 	engine.apply_discard(0, discard_picks)
 	item_chosen.emit(1)
 

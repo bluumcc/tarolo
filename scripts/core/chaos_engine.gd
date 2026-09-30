@@ -141,16 +141,10 @@ func _setup_round() -> void:
 		streak.append(0)
 		captured.append([])
 		combo_count.append(0)
-	# Embaralha os modificadores: as 8 vazas do nível usam os 8 primeiros, sem repetir. Nos
-	# primeiros níveis de conta nova, nenhum modificador sorteia (-1 = sem efeito, sem naipe-alvo):
-	# só o palpite puro, pra aprender a mecânica principal antes de mais uma camada de regra.
-	if onboarding_levels > 0:
-		modifier_sequence = []
-		for _i in range(HAND_SIZE):
-			modifier_sequence.append(-1)
-	else:
-		modifier_sequence = (ChaosModifiers.blitz_pool() if blitz else ChaosModifiers.ALL).duplicate()
-		Deck.shuffle(modifier_sequence, rng)
+	# Embaralha os modificadores: as 8 vazas do nível usam os 8 primeiros, sem repetir. Sempre
+	# ativo, mesmo no onboarding — toda mesa de Blitz tem modificador em toda rodada, sem exceção.
+	modifier_sequence = (ChaosModifiers.blitz_pool() if blitz else ChaosModifiers.ALL).duplicate()
+	Deck.shuffle(modifier_sequence, rng)
 	modifier = -1
 	weak_suit = -1
 	leader = round_index % num_players

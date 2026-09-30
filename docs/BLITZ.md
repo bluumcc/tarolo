@@ -198,15 +198,22 @@ cena em `phase == "discard"`, `_rebuild_hand()` deixa as 10 cartas tocáveis, `_
 sobe a carta tocada (`CardView.set_selected`) e marca pra descarte, toca de novo pra desmarcar. O
 botão DESCARTAR (no lugar do DOBRAR, que essa hora do nível ainda não existe) só libera com
 exatamente `BLITZ_DISCARD_SIZE` marcadas; `_on_discard_pressed()` aplica e segue o nível.
-Sempre ativo, **inclusive no onboarding** — é a única etapa nova que não se esconde nas primeiras
-mesas de conta nova, porque molda a mão, não adiciona uma regra de aposta ou de rodada.
+Tem relógio próprio: `DISCARD_SECONDS` (15s, reaproveita a mesma `turn_bar` do relógio de jogar
+carta). Estourou sem confirmar, descarta as 2 mais fracas por você (mesma heurística do bot,
+`ChaosBot.wants_discard`), igual ao "jogamos sua carta mais fraca" de quando o relógio de jogar
+carta estoura. Sempre ativo, **inclusive no onboarding** — é a única etapa nova que não se esconde
+nas primeiras mesas de conta nova, porque molda a mão, não adiciona uma regra de aposta ou de
+rodada.
 
 ## Onboarding: camadas de regra pros primeiros níveis
-Conta nova, primeiras `GameState.ONBOARDING_LEVELS` (3) mesas de Blitz: sem modificador (a tela
-cheia nem abre), sem dobrar/cobrir — só o palpite puro (mais o descarte inicial, que continua
-ativo) pra aprender a mecânica central antes de mais uma camada. Contado por `profile.blitz_levels`
-(save), passado como `onboarding_levels` no config do motor. `_test_blitz_phase4`
-(`test_runner.gd`) cobre o comportamento.
+**Toda rodada de Blitz tem modificador, sempre — sem exceção, nem na conta nova, nem no nível 1.**
+Isso já foi tentado ao contrário (modificador escondido nos primeiros níveis) e revertido: virou
+bug reportado duas vezes ("sumiu?") sem eu nunca ter avisado que era onboarding, e modificador é
+parte central do jogo, não uma camada avançada pra esconder. O que o onboarding esconde hoje:
+primeiras `GameState.ONBOARDING_LEVELS` (3) mesas de Blitz de conta nova, **só dobrar/cobrir**
+ficam fora — o descarte inicial e os modificadores valem sempre, em toda mesa, em toda rodada.
+Contado por `profile.blitz_levels` (save), passado como `onboarding_levels` no config do motor.
+`_test_blitz_phase4` (`test_runner.gd`) cobre o comportamento.
 
 ## Fase 5: economia vs bots (medida, ver `docs/PLANO_COMPETITIVO.md`)
 Um jogador nível Oráculo lucra em média mesmo com a taxa ligada, mas pouco (+0,39 blind/nível,

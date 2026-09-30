@@ -924,12 +924,11 @@ func _test_blitz() -> void:
 
 
 func _test_blitz_phase4() -> void:
-	# Camadas de regra: conta nova não dobra nem sorteia modificador (mas o descarte inicial
-	# continua acontecendo — "sempre", mesmo no onboarding).
+	# Camadas de regra: conta nova não dobra, mas toda rodada de Blitz tem modificador, sempre —
+	# inclusive na conta nova. O descarte inicial também continua acontecendo, sempre.
 	var ob := ChaosEngine.new()
 	ob.setup_match({"seed": 21, "mode": "blitz", "blind": 10, "onboarding_levels": 2})
-	for m in ob.modifier_sequence:
-		check(int(m) == -1, "Onboarding: nenhum modificador sorteia")
+	check(ob.modifier_sequence.all(func(m): return int(m) != -1) and ob.modifier_sequence.size() >= ChaosEngine.HAND_SIZE, "Onboarding: modificador sorteia em toda rodada, igual a qualquer conta")
 	check((ob.hands[0] as Array).size() == ChaosEngine.BLITZ_DEAL_SIZE and ob.can_discard(0), "Onboarding: ainda recebe 10 e descarta 2 (não some com o onboarding)")
 	for p in range(4):
 		ob.blitz_place(p, 2)
@@ -938,11 +937,10 @@ func _test_blitz_phase4() -> void:
 	check(not ob.can_double(0), "Onboarding: não dobra")
 	ob.advance_round()
 	check(ob.onboarding_levels == 1, "Onboarding: contador desce 1 por nível")
-	for m in ob.modifier_sequence:
-		check(int(m) == -1, "Onboarding: ainda sem modificador no 2º nível")
+	check(ob.modifier_sequence.all(func(m): return int(m) != -1), "Onboarding: modificador continua sorteando no 2º nível")
 	ob.advance_round()
 	check(ob.onboarding_levels == 0, "Onboarding: acaba depois de 2 níveis")
-	check(ob.modifier_sequence.any(func(m): return int(m) != -1), "Onboarding: modificadores voltam a sortear")
+	check(ob.modifier_sequence.all(func(m): return int(m) != -1), "Onboarding: modificadores continuam sorteando fora do onboarding")
 
 	# Descarte inicial: recebe 10, descarta 2, sempre a 1ª decisão do nível — antes de qualquer
 	# modificador ou palpite.

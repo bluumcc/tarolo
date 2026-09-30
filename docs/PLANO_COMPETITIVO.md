@@ -152,9 +152,11 @@ tutorial guiado, cosméticos, torneios, novos modificadores.
   no onboarding. `engine.can_discard/apply_discard`, bot em `ChaosBot.wants_discard`, UI em
   `_human_discard_play()` (seleciona direto da mão, sem popup).
 - **Onboarding (camadas de regra):** feito, fora do plano original de 6 fases, junto da Fase 2.
+  Revertido em parte: modificador escondido nos primeiros níveis virou bug reportado 2x ("sumiu?")
+  sem eu ter avisado que era intencional — voltou a valer sempre, em toda conta, todo nível.
   `ChaosEngine.onboarding_levels` (config, contado por `GameState.ONBOARDING_LEVELS = 3`, salvo
-  em `profile.blitz_levels`): as primeiras mesas de Blitz de uma conta nova não sorteiam
-  modificador nem liberam dobrar/cobrir — só o palpite puro (o descarte inicial continua ativo).
+  em `profile.blitz_levels`): as primeiras mesas de Blitz de uma conta nova só escondem
+  dobrar/cobrir — modificador e o descarte inicial valem sempre.
 - **Fase 5 (economia vs bots):** medida, não calibrada. `tests/blitz_economy_check.gd`: um
   jogador nível Oráculo, mesmo com a taxa da casa ligada (4%), ainda lucra em média — mas pouco
   (+0,39 blind/nível, 6 sessões de 10 níveis, bem ruidoso: de −2,2 a +1,75 por sessão; o Oráculo
