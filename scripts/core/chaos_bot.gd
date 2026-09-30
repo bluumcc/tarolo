@@ -20,6 +20,18 @@ const BLUFF_CHANCE := 0.05
 
 static func style_of(engine: ChaosEngine, player: int) -> int:
 	return int(engine.styles[player]) if player < engine.styles.size() else Style.CALC
+
+
+## Tempo de "pensar" antes de dobrar/cobrir, por estilo — o único jeito de perceber quem é quem
+## agora que o palpite dos rivais é segredo (Fase 3): Agressivo decide rápido (impulsivo),
+## Cauteloso demora mais (deliberando), Calculista no meio. Não é um relógio perfeito — só um tell.
+static func style_delay_mult(engine: ChaosEngine, player: int) -> float:
+	match style_of(engine, player):
+		Style.AGRESSIVO:
+			return 0.55
+		Style.CAUTELOSO:
+			return 1.5
+	return 1.0
 ## Quanto vale, em blinds, fechar o palpite exato (aproximado: fatia esperada do pote).
 const HIT_VALUE_BLINDS := 6.0
 ## Pontos médios de uma carta que ainda vai cair na mesa (pra estimar o tamanho do prêmio).

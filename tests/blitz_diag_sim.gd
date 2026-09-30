@@ -4,7 +4,7 @@ extends SceneTree
 ## Uso: godot --headless --path . -s res://tests/blitz_diag_sim.gd
 
 const LEVELS := 30
-const SESSIONS := 60
+const SESSIONS := 30
 
 var stat := {"dbl1": 0, "dbl1_hit": 0, "dbl2": 0, "dbl2_hit": 0, "cover": 0, "cover_hit": 0, "levels": 0}
 

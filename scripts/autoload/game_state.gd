@@ -159,6 +159,9 @@ func chaos_buy_in(table: int = -1) -> int:
 ## Configuração da mesa pra ChaosScene / ChaosEngine — todo mundo joga pra si. Já cobra o
 ## buy-in das fichas do jogador (config["entered"] = false se não tinha saldo); ele volta
 ## como stack final quando você sai da mesa.
+const ONBOARDING_LEVELS := 3   # 1ª e 2ª mesas de Blitz: sem dobrar nem modificadores, pra aprender o palpite sozinho
+
+
 func chaos_config() -> Dictionary:
 	var names := BOT_NAMES.duplicate()
 	names.shuffle()
@@ -180,7 +183,16 @@ func chaos_config() -> Dictionary:
 		"mode": chaos_mode,
 		"levels": 3 if autoplay else 0,
 		"entered": entered,
+		"onboarding_levels": maxi(0, ONBOARDING_LEVELS - int(profile.get("blitz_levels", 0))) if chaos_mode == "blitz" else 0,
 	}
+
+
+## Chamado a cada nível de Blitz concluído: conta pro fim das regras simplificadas dos primeiros
+## níveis (ver `ONBOARDING_LEVELS`). Não faz nada fora do Blitz.
+func blitz_level_played() -> void:
+	var profile := SaveManager.section("profile")
+	profile["blitz_levels"] = int(profile.get("blitz_levels", 0)) + 1
+	SaveManager.save_game()
 
 
 ## Fecha uma sessão de mesa Caos (você saiu, quebrou ou a partida de teste acabou): devolve

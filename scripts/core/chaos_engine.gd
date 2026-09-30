@@ -78,6 +78,9 @@ var human_bonus := 0.0        # total de prêmios da casa recebidos pelo jogador
 var blitz_result: Dictionary = {}
 var point_factor := BLITZ_POINT_FACTOR   # ajustável (simulação)
 var styles: Array = []                  # estilo de cada bot (ChaosBot.Style), fixo enquanto ele estiver na mesa
+var onboarding_levels := 0              # níveis restantes sem dobrar/modificadores (Blitz, contas novas)
+var swap_cards: Array = []              # Blitz: 1 carta aberta do monte por jogador, oferecida antes do palpite
+var swap_used: Array = []               # já decidiu (trocou ou recusou) a carta aberta nesse nível
 
 var hands: Array = []
 var plays: Array = []
@@ -99,6 +102,7 @@ func setup_match(config: Dictionary) -> void:
 	levels = int(config.get("levels", 0))
 	blitz = str(config.get("mode", "chaos")) == "blitz"
 	point_factor = float(config.get("point_factor", BLITZ_POINT_FACTOR))
+	onboarding_levels = int(config.get("onboarding_levels", 0))
 	carry = 0.0
 	hit_streak = 0
 	human_bonus = 0.0
@@ -125,6 +129,13 @@ func _setup_round() -> void:
 	var deck := Deck.build(rng)
 	var dealt := Deck.deal(deck, num_players, HAND_SIZE)
 	hands = dealt["hands"]
+	var rest: Array = dealt["rest"]
+	swap_cards = []
+	swap_used = []
+	for p in range(num_players):
+		# Só no Blitz, fora da conta nova: 1 carta aberta do monte por jogador, antes do palpite.
+		swap_cards.append(rest[p] if blitz and onboarding_levels == 0 and p < rest.size() else null)
+		swap_used.append(false)
 	captured = []
 	combo_count = []
 	streak = []
@@ -134,9 +145,16 @@ func _setup_round() -> void:
 		streak.append(0)
 		captured.append([])
 		combo_count.append(0)
-	# Embaralha os modificadores: as 8 vazas do nível usam os 8 primeiros, sem repetir.
-	modifier_sequence = (ChaosModifiers.blitz_pool() if blitz else ChaosModifiers.ALL).duplicate()
-	Deck.shuffle(modifier_sequence, rng)
+	# Embaralha os modificadores: as 8 vazas do nível usam os 8 primeiros, sem repetir. Nos
+	# primeiros níveis de conta nova, nenhum modificador sorteia (-1 = sem efeito, sem naipe-alvo):
+	# só o palpite puro, pra aprender a mecânica principal antes de mais uma camada de regra.
+	if onboarding_levels > 0:
+		modifier_sequence = []
+		for _i in range(HAND_SIZE):
+			modifier_sequence.append(-1)
+	else:
+		modifier_sequence = (ChaosModifiers.blitz_pool() if blitz else ChaosModifiers.ALL).duplicate()
+		Deck.shuffle(modifier_sequence, rng)
 	modifier = -1
 	weak_suit = -1
 	leader = round_index % num_players
@@ -633,6 +651,9 @@ func clone_for_sim() -> ChaosEngine:
 	c.blitz = blitz
 	c.point_factor = point_factor
 	c.styles = styles.duplicate()
+	c.onboarding_levels = onboarding_levels
+	c.swap_cards = swap_cards.duplicate()
+	c.swap_used = swap_used.duplicate()
 	c.rake_on = rake_on
 	c.bonus_on = bonus_on
 	c.stacks = stacks.duplicate()
@@ -718,10 +739,41 @@ func can_double(player: int) -> bool:
 ## Cobrir a dobra/triplicada de um rival: mesmo efeito de `double_down`, mas sem a espera da
 ## rodada — é uma resposta imediata ao lance de outro jogador.
 func can_cover(player: int) -> bool:
-	if not blitz or is_round_over() or int(doubles[player]) >= BLITZ_MAX_DOUBLES:
+	if not blitz or is_round_over() or int(doubles[player]) >= BLITZ_MAX_DOUBLES or onboarding_levels > 0:
 		return false
 	var need := blitz_need(player)
 	return need >= 0 and need <= tricks_left() and stacks[player] >= blitz_entry()
+
+
+## Verdadeiro se ainda pode decidir a carta aberta (trocar ou recusar) — só antes do palpite.
+func can_swap(player: int) -> bool:
+	return blitz and player < swap_cards.size() and swap_cards[player] != null and not swap_used[player] and predicts[player] == -1
+
+
+## Troca `hand_card` (precisa estar na mão) pela carta aberta. Devolve false se a carta não
+## estava na mão ou a troca já não é mais possível.
+func apply_swap(player: int, hand_card: CardData) -> bool:
+	if not can_swap(player):
+		return false
+	var hand: Array = hands[player]
+	var idx := -1
+	for i in range(hand.size()):
+		if (hand[i] as CardData).equals(hand_card):
+			idx = i
+			break
+	if idx == -1:
+		return false
+	hand.remove_at(idx)
+	hand.append(swap_cards[player])
+	Deck.sort_hand(hand)
+	swap_used[player] = true
+	return true
+
+
+## Recusa a carta aberta: mantém a mão como está.
+func decline_swap(player: int) -> void:
+	if can_swap(player):
+		swap_used[player] = true
 
 
 func _pay_double(player: int) -> void:
@@ -950,6 +1002,7 @@ func tricks_won_by(player: int) -> int:
 ## Chamado pela UI depois do resumo do nível: distribui o próximo (a mesa não acaba).
 func advance_round() -> void:
 	round_index += 1
+	onboarding_levels = maxi(0, onboarding_levels - 1)
 	if levels == 0 or round_index < levels:
 		_setup_round()
 

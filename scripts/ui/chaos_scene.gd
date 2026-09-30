@@ -701,6 +701,10 @@ func _trick_start() -> void:
 	if not is_inside_tree():
 		return
 	var m := engine.modifier
+	if m == -1:
+		# Conta nova (Blitz): primeiros níveis sem modificador nenhum, só o palpite puro.
+		_banner_clear()
+		return
 	var color := ChaosModifiers.color_of(m)
 	var block := {
 		"spin": true, "head": "MODIFICADOR DA RODADA %d DE %d" % [engine.trick_number + 1, ChaosEngine.HAND_SIZE],
@@ -1001,6 +1005,7 @@ func _run_round() -> void:
 		await _blitz_settlement()
 		if not is_inside_tree() or finished:
 			return
+		GameState.blitz_level_played()
 	var choice := await _show_round_summary()
 	if not is_inside_tree() or finished:
 		return
@@ -1021,6 +1026,10 @@ func _play_cards() -> void:
 		var p := engine.current
 		_refresh_hud()
 		if engine.blitz and (p != 0 or GameState.autoplay) and ChaosBot.wants_double(engine, p, int(config["difficulty"][p]), bot_rng):
+			if p != 0 and not GameState.autoplay:
+				await _wait(bot_rng.randf_range(0.5, 1.0) * ChaosBot.style_delay_mult(engine, p))
+				if not is_inside_tree() or finished:
+					return
 			await _apply_double(p)
 			if not is_inside_tree() or finished:
 				return
@@ -1961,7 +1970,7 @@ func _offer_cover(actor: int) -> void:
 				await _apply_double(0, true)
 		elif ChaosBot.wants_cover(engine, q, int(config["difficulty"][q]), bot_rng):
 			if not GameState.autoplay:
-				await _wait(bot_rng.randf_range(0.3, 0.7))
+				await _wait(bot_rng.randf_range(0.3, 0.7) * ChaosBot.style_delay_mult(engine, q))
 				if not is_inside_tree() or finished:
 					return
 			await _apply_double(q, true)
