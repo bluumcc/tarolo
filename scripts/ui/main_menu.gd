@@ -118,9 +118,7 @@ func _hero() -> Control:
 
 ## Popup das fichas: saldo, recarga diária grátis e pacotes (compra simulada).
 func _open_fichas() -> void:
-	var v := _modal("FICHAS")
-	FichasShop.fill(v, _refresh_fragments)
-	_close_button(v)
+	FichasShop.open(overlay_layer, _refresh_fragments)
 
 
 func _refresh_fragments() -> void:
