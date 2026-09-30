@@ -17,6 +17,7 @@ SaveManager="*res://scripts/autoload/save_manager.gd"
 GameState="*res://scripts/autoload/game_state.gd"
 Sfx="*res://scripts/autoload/sfx.gd"
 FX="*res://scripts/autoload/fx.gd"
+TouchGuard="*res://scripts/autoload/touch_guard.gd"
 
 [display]
 

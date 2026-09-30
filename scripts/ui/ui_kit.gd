@@ -344,6 +344,7 @@ static func overlay() -> ColorRect:
 	o.color = Color(0.02, 0.02, 0.05, 0.82)
 	o.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	o.mouse_filter = Control.MOUSE_FILTER_STOP
+	o.add_to_group("touch_blocker")
 	return o
 
 
@@ -384,28 +385,11 @@ static func centered(child: Control) -> Control:
 	return scroll
 
 
-## Corta o clique de um botão que estava sendo segurado no instante em que a lista realmente
-## rola — sem isso, arrastar pra rolar a partir de cima de um botão também "aperta" ele ao
-## soltar o dedo (o Godot não distingue os dois gestos sozinho). Só desativa, bem brevemente,
-## o botão que estava mesmo pressionado (não a lista inteira) — reconecte em qualquer
-## ScrollContainer feito à mão (os montados por `centered()` já vêm com isso).
+## Registra a lista no TouchGuard (autoload): toque x arrasto tratados globalmente — rolar
+## começando (ou terminando) sobre botão, campo de texto ou dropdown nunca os aciona; só um toque
+## rápido interage. Toda ScrollContainer feita à mão deve chamar isto (as de `centered()` já vêm).
 static func suppress_click_on_scroll(scroll: ScrollContainer) -> void:
-	var cancel_pressed := func():
-		for n in scroll.find_children("*", "BaseButton", true, false):
-			var b := n as BaseButton
-			if b.get_draw_mode() in [BaseButton.DRAW_PRESSED, BaseButton.DRAW_HOVER_PRESSED]:
-				b.disabled = true
-				# Token por botão (não global): outro scroll cancelando algo em paralelo não
-				# pode deixar ESTE aqui travado desativado pra sempre.
-				var my_token: int = int(b.get_meta("scroll_cancel_token", 0)) + 1
-				b.set_meta("scroll_cancel_token", my_token)
-				var bb := b
-				scroll.get_tree().create_timer(0.25).timeout.connect(func():
-					if is_instance_valid(bb) and int(bb.get_meta("scroll_cancel_token", 0)) == my_token:
-						bb.disabled = false)
-	scroll.get_v_scroll_bar().value_changed.connect(func(_v): cancel_pressed.call())
-	if scroll.horizontal_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
-		scroll.get_h_scroll_bar().value_changed.connect(func(_v): cancel_pressed.call())
+	scroll.add_to_group("touch_scroll")
 
 
 const BOOST := 1.3
