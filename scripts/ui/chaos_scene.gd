@@ -508,6 +508,10 @@ func _rebuild_hand() -> void:
 ## de qual jogar ser visível e não só matemática escondida no placar. Mantém o texto do
 ## mesmo tamanho do padrão ("X,Y pts") pra não esticar a carta — só o ícone e a cor mudam.
 func _apply_modifier_badge(cv: CardView, card: CardData, player: int = 0) -> void:
+	if engine.blitz:
+		# No Blitz o valor em pontos da carta não conta pra nada (só quem vence a rodada).
+		cv.points_label.text = ""
+		return
 	var base := card.points()
 	var eff := engine.card_value(card, player)
 	if is_equal_approx(eff, base):
