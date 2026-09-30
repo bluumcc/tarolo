@@ -516,25 +516,7 @@ func _update_suggestion(opts: Array) -> void:
 
 
 func _open_bout_help() -> void:
-	var v := UIKit.modal(overlay_layer, "O QUE É BOUT?")
-	var text := """Bout (lê-se "bu") é o nome das 3 cartas mais valiosas do jogo:
-• Le Petit: o Trunfo 1
-• Le Monde: o Trunfo 21
-• O Louco
-
-Cada Bout vale 4,5 pontos, o mesmo que um Rei. E mais: os Bouts que o Atacante captura baixam a meta dele. Com 0 Bouts ele precisa de 56 pontos, com 1 precisa de 51, com 2 de 41 e com 3 de 36.
-
-Por isso, Bout na mão é um bom motivo pra licitar mais alto.
-
-Cuidados:
-• O Petit é fraco: qualquer trunfo maior o vence, então proteja-o.
-• O Louco nunca vence uma rodada, mas quem o joga guarda os pontos dele.
-• Bouts nunca podem ser devolvidos ao monte."""
-	var l := UIKit.label(text, 18, UIKit.INK)
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(620, 0)
-	v.add_child(l)
-	UIKit.close_button(overlay_layer, v)
+	StepsModal.open(overlay_layer, "BOUT", HelpContent.bout(), "ENTENDI", false)
 
 
 ## Seu rodapé: retrato, pontos e, na sua vez, a dica de como jogar (tocar, tocar de novo).
@@ -1703,9 +1685,7 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 			get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
 	v.add_child(btn)
 	ov.add_child(UIKit.centered(box))
-	box.scale = Vector2(0.85, 0.85)
-	box.pivot_offset = box.custom_minimum_size / 2.0
-	create_tween().tween_property(box, "scale", Vector2.ONE, GameState.anim(0.25)).set_trans(Tween.TRANS_BACK)
+	UIKit.pop_in(box, GameState.anim(0.25))
 	btn.grab_focus.call_deferred()
 
 
@@ -1734,49 +1714,14 @@ func _show_zoom(view: CardView) -> void:
 	v.add_child(desc)
 	v.add_child(UIKit.label("toque para fechar", 28, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	ov.add_child(UIKit.centered(v))
-	holder.scale = Vector2(0.6, 0.6)
-	holder.pivot_offset = holder.custom_minimum_size / 2.0
-	create_tween().tween_property(holder, "scale", Vector2.ONE, GameState.anim(0.18)).set_trans(Tween.TRANS_BACK)
+	UIKit.pop_in(holder, GameState.anim(0.18))
 	ov.gui_input.connect(func(e: InputEvent):
 		if e is InputEventMouseButton and e.pressed:
 			ov.queue_free())
 
 
 func _open_help() -> void:
-	var v := UIKit.modal(overlay_layer, "COMO FUNCIONA")
-	var text := """O BÁSICO
-• Uma rodada é uma jogada de 4 cartas, uma de cada jogador. Quem jogou a carta mais forte leva as 4 e os pontos delas.
-• Você tem que jogar o naipe da primeira carta. Se não tiver, tem que jogar um Trunfo. Se também não tiver Trunfo, joga qualquer carta.
-• O Trunfo ganha de qualquer naipe. Entre trunfos, o número maior ganha.
-• Em cada naipe, do menor pro maior: Ás, 2 a 10, Valete (J), Cavaleiro (N), Rainha (Q), Rei (K).
-
-OS BOUTS
-• São as 3 cartas mais valiosas: o Trunfo 1 (Le Petit), o Trunfo 21 (Le Monde) e O Louco. Valem 4,5 pontos cada, como um Rei.
-• O Louco nunca ganha a rodada. Quem o joga fica com ele (só na última rodada ele vai pra quem ganhar).
-
-LICITAÇÃO: QUEM JOGA SOZINHO
-• Cada um passa ou dá um lance. O lance mais alto vira o Atacante: ele joga sozinho contra os outros 3 (a Defesa).
-• Do mais leve ao mais arriscado: Petite ×1, Garde ×2, Garde Sans ×4, Garde Contre ×6. O número é quanto você ganha ou perde.
-• O lance não custa nada. É só dizer que você confia na sua mão.
-
-O MONTE
-• São 6 cartas viradas no meio da mesa.
-• Petite e Garde: o Atacante pega o monte, olha e devolve 6 cartas da mão (nunca Reis nem Bouts).
-• Garde Sans: não pega; os pontos do monte contam pra ele. Garde Contre: não pega; os pontos vão pra Defesa.
-
-COMO SE GANHA
-• O Atacante precisa somar estes pontos com as cartas que ganhar: 56 sem Bout, 51 com 1 Bout, 41 com 2, 36 com 3.
-• Se conseguir, ganha pontos dos outros 3. Se não, paga.
-
-BÔNUS (só o Atacante escolhe)
-• Poignée: com 10 ou mais trunfos, ele pode mostrá-los pra ganhar pontos extras.
-• Chelem: ganhar as 18 rodadas. Se avisar antes e conseguir: +400. Se avisar e falhar: -200. Sem avisar, se acontecer: +200.
-• Petit na última rodada: quem ganhar a última rodada com o Trunfo 1 nela leva +10."""
-	var l := UIKit.label(text, 32, UIKit.INK)
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(620, 0)
-	v.add_child(l)
-	UIKit.close_button(overlay_layer, v)
+	StepsModal.open(overlay_layer, "COMO FUNCIONA", HelpContent.vanilla(), "ENTENDI", false)
 
 
 func _open_pause() -> void:

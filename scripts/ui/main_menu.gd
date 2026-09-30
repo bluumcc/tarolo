@@ -398,19 +398,4 @@ func _open_chaos_confirm() -> void:
 
 
 func _open_rules() -> void:
-	var v := _modal("COMO JOGAR")
-	var text := """• O baralho tem 78 cartas: 4 naipes, 21 Trunfos e O Louco.
-• Uma rodada é uma jogada de 4 cartas, uma de cada jogador. Quem jogou a mais forte leva as 4 e os pontos delas.
-• Você tem que jogar o naipe da primeira carta. Se não tiver, tem que jogar um Trunfo. O Trunfo ganha de qualquer naipe.
-• Bouts são as 3 cartas mais valiosas: Trunfo 1, Trunfo 21 e O Louco. O Louco nunca ganha a rodada, mas quem o joga fica com ele.
-• Antes de jogar, cada um passa ou dá um lance (Petite, Garde, Garde Sans ou Garde Contre). O lance mais alto joga sozinho contra os outros 3: é o Atacante. O lance não custa nada.
-• O monte são 6 cartas viradas no meio da mesa. Com Petite ou Garde, o Atacante pega o monte e devolve 6 cartas da mão.
-• O Atacante precisa somar 56 pontos sem Bout, 51 com 1 Bout, 41 com 2 ou 36 com 3. Se conseguir, ganha pontos dos outros. Se não, paga.
-• Bônus do Atacante: mostrar 10 ou mais trunfos (Poignée) e ganhar as 18 rodadas (Chelem). Quem ganha a última rodada com o Trunfo 1 leva +10.
-• Ranqueado: sua colocação entre 4 jogadores define seus pontos de liga.
-• Primeira vez? Jogue o TUTORIAL: uma mão guiada com dicas em cada regra nova."""
-	var l := UIKit.label(text, 19, UIKit.INK)
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(620, 0)
-	v.add_child(l)
-	_close_button(v)
+	StepsModal.open(overlay_layer, "COMO JOGAR", HelpContent.vanilla(), "ENTENDI", false)

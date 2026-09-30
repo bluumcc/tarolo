@@ -18,6 +18,18 @@ const DANGER := Color("#FF4D6A")
 const OK := Color("#36D97B")
 const CHIPS := Color("#3FA9FF")
 const MULT := Color("#FF5C7A")
+
+# ---- Papéis de cor (cor = função; ver docs/DESIGN_CORES.md). Use estes nomes nas telas.
+const ACTION := VIOLET                  ## ação primária (um botão por tela)
+const MONEY := GOLD                     ## fichas, stack, pote, ganho
+const TURN := Color("#5EEAD4")          ## vez / foco / ordem de jogada
+const GAIN := OK                        ## ganho, sucesso
+const LOSS := Color("#FF6F86")          ## perda, perigo (legível como texto sobre roxo)
+const INFO := CHIPS                     ## informação neutra
+const COMBO := Color("#FF9A3D")         ## chamas, sequência, combos
+const MODIFIER := Color("#C792EA")      ## modificador de nível, Trunfos
+const TEXT_ON_LIGHT := Color("#1A1240") ## texto sobre superfícies claras (dourado, verde)
+
 ## Duelo do Vanilla: o Atacante é o "chefe" (vermelho), a Defesa é o time contra ele (azul).
 const BOSS := Color("#E2463B")
 const DEF := Color("#5AA9FF")
@@ -94,25 +106,72 @@ static func chunky(face: Color, pressed: bool = false) -> StyleBoxFlat:
 	return sb
 
 
-static func button(text: String, accent: Color = GOLD, size: int = 30) -> Button:
+## Luminância relativa (WCAG) e razão de contraste entre duas cores.
+static func luminance(c: Color) -> float:
+	var f := func(v: float) -> float: return v / 12.92 if v <= 0.03928 else pow((v + 0.055) / 1.055, 2.4)
+	return 0.2126 * f.call(c.r) + 0.7152 * f.call(c.g) + 0.0722 * f.call(c.b)
+
+
+static func contrast(a: Color, b: Color) -> float:
+	var la := luminance(a)
+	var lb := luminance(b)
+	return (maxf(la, lb) + 0.05) / (minf(la, lb) + 0.05)
+
+
+## Cor de texto legível sobre uma face: branco, ou escuro se a face for clara (dourado, verde).
+static func text_on(face: Color) -> Color:
+	return INK if contrast(INK, face) >= 3.0 else TEXT_ON_LIGHT
+
+
+## Estilos reaproveitados (mesmos parâmetros = mesmo objeto): evita recriar StyleBoxFlat a
+## cada atualização de HUD.
+static var _box_cache := {}
+
+static func box_cached(bg: Color, border: Color = BLACK, border_w: int = 3, radius: int = 4, pad: int = 12) -> StyleBoxFlat:
+	var key := "%s|%s|%d|%d|%d" % [bg.to_html(), border.to_html(), border_w, radius, pad]
+	if not _box_cache.has(key):
+		_box_cache[key] = box(bg, border, border_w, radius, pad)
+	return _box_cache[key]
+
+
+## Animação padrão de entrada de popup: cresce de 88% com leve "mola".
+static func pop_in(node: Control, seconds: float = 0.2) -> void:
+	node.scale = Vector2(0.88, 0.88)
+	var center := func(): node.pivot_offset = node.size / 2.0
+	node.resized.connect(center)
+	center.call()
+	var tw := node.create_tween()
+	tw.tween_property(node, "scale", Vector2.ONE, seconds).set_trans(Tween.TRANS_BACK)
+
+
+static func button(text: String, accent: Color = ACTION, size: int = 30) -> Button:
 	size = maxi(size, MIN_BUTTON_FONT)
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_ALL
 	b.custom_minimum_size = Vector2(0, 84)
 	b.add_theme_font_size_override("font_size", size)
+	var face0 := accent if accent != MUTED else Color("#6B6BC4")
+	var fg := text_on(face0)
 	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		b.add_theme_color_override(c, INK)
+		b.add_theme_color_override(c, fg)
 	b.add_theme_color_override("font_disabled_color", MUTED)
-	b.add_theme_constant_override("outline_size", 5)
+	b.add_theme_constant_override("outline_size", 5 if fg == INK else 0)
 	b.add_theme_color_override("font_outline_color", accent.darkened(0.6))
-	var face := accent if accent != MUTED else Color("#6B6BC4")
+	var face := face0
 	b.add_theme_stylebox_override("normal", chunky(face))
 	b.add_theme_stylebox_override("hover", chunky(face.lightened(0.12)))
 	b.add_theme_stylebox_override("pressed", chunky(face.darkened(0.08), true))
 	b.add_theme_stylebox_override("focus", chunky(face.lightened(0.12)))
 	b.add_theme_stylebox_override("disabled", chunky(Color("#3A3570")))
 	b.pressed.connect(func(): sfx("tick"))
+	# Feedback de toque: o botão "afunda" um pouco ao apertar.
+	b.resized.connect(func(): b.pivot_offset = b.size / 2.0)
+	b.button_down.connect(func():
+		if b.disabled:
+			return
+		b.create_tween().tween_property(b, "scale", Vector2(0.97, 0.97), 0.06))
+	b.button_up.connect(func(): b.create_tween().tween_property(b, "scale", Vector2.ONE, 0.1).set_trans(Tween.TRANS_BACK))
 	return b
 
 

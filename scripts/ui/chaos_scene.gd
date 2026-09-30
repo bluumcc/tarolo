@@ -74,7 +74,7 @@ var prog_tags: Array = []      # "1/3 ♨×1,5" ao vivo por assento
 var shown_pot := 0.0
 var pot_locked := false        # contador do pote rolando: o refresh não sobrescreve
 
-const FLAME := Color("#FF9A3D")
+const FLAME := UIKit.COMBO
 const SEAT_W := 150.0
 const POT_W := 250.0
 
@@ -115,12 +115,12 @@ func _ready() -> void:
 func _show_insufficient_fichas() -> void:
 	var ov := UIKit.overlay()
 	overlay_layer.add_child(ov)
-	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.DANGER, 24)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.LOSS, 24)
 	box.custom_minimum_size = Vector2(664, 0)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
 	box.add_child(v)
-	v.add_child(UIKit.label("FICHAS INSUFICIENTES", 28, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("FICHAS INSUFICIENTES", 28, UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER))
 	var l := UIKit.label("Você precisa de %d fichas pra sentar na Mesa Caos. Jogue Vanilla ou Ranqueado, ou volte ao menu e peça um empréstimo da casa." % int(config["buy_in"]), 32, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(620, 0)
@@ -346,7 +346,7 @@ func _build_seats() -> HBoxContainer:
 		var ord := _badge("", UIKit.PURPLE_DEEP, UIKit.MUTED)
 		ord.position = Vector2(0, 0)
 		wrap.add_child(ord)
-		var dl := _badge("D", UIKit.GOLD, UIKit.GOLD)
+		var dl := _badge("D", UIKit.INK, UIKit.MUTED)
 		dl.position = Vector2(66, 62)
 		dl.visible = false
 		wrap.add_child(dl)
@@ -393,7 +393,7 @@ func _badge(text: String, fill: Color, border: Color) -> PanelContainer:
 	var sb := UIKit.box(fill, border, 3, 15, 0)
 	sb.set_corner_radius_all(15)
 	b.add_theme_stylebox_override("panel", sb)
-	var l := UIKit.label(text, 20, UIKit.INK if fill != UIKit.GOLD else UIKit.BLACK, HORIZONTAL_ALIGNMENT_CENTER)
+	var l := UIKit.label(text, 20, UIKit.TEXT_ON_LIGHT if fill == UIKit.INK else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	l.autowrap_mode = TextServer.AUTOWRAP_OFF
 	b.add_child(l)
 	return b
@@ -493,7 +493,7 @@ func _apply_modifier_badge(cv: CardView, card: CardData, player: int = 0) -> voi
 	cv.points_label.text = "%s %s pts" % ["▲" if boosted else "▼", UIKit.fmt_dec(eff, 1)]
 	var dark_face := card.is_trunfo() or card.is_louco()
 	var good := UIKit.OK if dark_face else Color("#1E8A5C")
-	var bad := UIKit.DANGER if dark_face else Color("#D42A3C")
+	var bad := UIKit.LOSS if dark_face else Color("#D42A3C")
 	cv.points_label.add_theme_color_override("font_color", good if boosted else bad)
 
 
@@ -534,10 +534,10 @@ func _announce_round() -> void:
 func _intro_block() -> Dictionary:
 	var m := engine.modifier
 	if ChaosModifiers.scope_of(m) == ChaosModifiers.Scope.ROUND:
-		return {"spin": true, "head": "MODIFICADOR · NÍVEL INTEIRO", "title": "✦ %s" % ChaosModifiers.label(m, engine.weak_suit), "text": "%s %s" % [ChaosModifiers.DESCRIPTIONS[m], ChaosModifiers.TIPS[m]], "color": UIKit.OK}
+		return {"spin": true, "head": "MODIFICADOR · NÍVEL INTEIRO", "title": "✦ %s" % ChaosModifiers.label(m, engine.weak_suit), "text": "%s %s" % [ChaosModifiers.DESCRIPTIONS[m], ChaosModifiers.TIPS[m]], "color": UIKit.MODIFIER}
 	if ChaosModifiers.is_secret(m):
-		return {"head": "MODIFICADOR · SURPRESA", "title": "? EM ALGUMA RODADA", "text": "Uma regra especial vai valer só em UMA rodada desse nível. Você só descobre qual e quando ela começar.", "color": UIKit.DANGER}
-	return {"head": "MODIFICADOR · RODADA %d" % (engine.modifier_trick + 1), "title": "%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.NAMES[m]], "text": "%s %s" % [ChaosModifiers.DESCRIPTIONS[m], ChaosModifiers.TIPS[m]], "color": UIKit.GOLD}
+		return {"head": "MODIFICADOR · SURPRESA", "title": "? EM ALGUMA RODADA", "text": "Uma regra especial vai valer só em UMA rodada desse nível. Você só descobre qual e quando ela começar.", "color": UIKit.LOSS}
+	return {"head": "MODIFICADOR · RODADA %d" % (engine.modifier_trick + 1), "title": "%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.NAMES[m]], "text": "%s %s" % [ChaosModifiers.DESCRIPTIONS[m], ChaosModifiers.TIPS[m]], "color": ChaosModifiers.color_of(m)}
 
 
 ## Texto da faixa em repouso (nenhuma mensagem ativa): lembra o modificador do nível sem
@@ -545,10 +545,10 @@ func _intro_block() -> Dictionary:
 func _rest_banner() -> Array:
 	var m := engine.modifier
 	if ChaosModifiers.scope_of(m) == ChaosModifiers.Scope.ROUND:
-		return ["✦ %s" % ChaosModifiers.label(m, engine.weak_suit), str(ChaosModifiers.DESCRIPTIONS[m]), UIKit.OK]
+		return ["✦ %s" % ChaosModifiers.label(m, engine.weak_suit), str(ChaosModifiers.DESCRIPTIONS[m]), UIKit.MODIFIER]
 	var known := modifier_revealed or not ChaosModifiers.is_secret(m)
 	if not known:
-		return ["? Surpresa em alguma rodada", "Uma regra especial vale em uma rodada só. Você descobre quando ela começar.", UIKit.DANGER]
+		return ["? Surpresa em alguma rodada", "Uma regra especial vale em uma rodada só. Você descobre quando ela começar.", UIKit.LOSS]
 	var when := "rodada %d" % (engine.modifier_trick + 1)
 	var done := engine.trick_number > engine.modifier_trick
 	var sub := "já aconteceu · %s" % when if done else "%s · %s" % [ChaosModifiers.DESCRIPTIONS[m], when]
@@ -707,9 +707,7 @@ func _modal_choice(title: String, sub: String, opts: Array, cancel := false) -> 
 		cb.pressed.connect(func(): item_chosen.emit(-1))
 		v.add_child(cb)
 	ov.add_child(UIKit.centered(box))
-	box.scale = Vector2(0.85, 0.85)
-	box.pivot_offset = box.custom_minimum_size / 2.0
-	create_tween().tween_property(box, "scale", Vector2.ONE, GameState.anim(0.2)).set_trans(Tween.TRANS_BACK)
+	UIKit.pop_in(box, GameState.anim(0.2))
 	var chosen: int = await item_chosen
 	modal_open = false
 	if is_inside_tree():
@@ -749,7 +747,7 @@ func _process(delta: float) -> void:
 	turn_left -= delta
 	turn_bar.value = maxf(turn_left, 0.0)
 	var urgent := turn_left <= 3.0
-	turn_bar.add_theme_stylebox_override("fill", UIKit.box(UIKit.DANGER if urgent else UIKit.GOLD, UIKit.GOLD, 0, 7, 0))
+	turn_bar.add_theme_stylebox_override("fill", UIKit.box(UIKit.LOSS if urgent else UIKit.GOLD, UIKit.GOLD, 0, 7, 0))
 	if turn_left <= 0.0:
 		var legal := engine.legal_for(0)
 		if legal.is_empty():
@@ -759,7 +757,7 @@ func _process(delta: float) -> void:
 			if (c as CardData).points() < weakest.points():
 				weakest = c
 		human_turn = false
-		_banner("TEMPO ESGOTADO", "Jogamos sua carta mais fraca por você.", UIKit.DANGER)
+		_banner("TEMPO ESGOTADO", "Jogamos sua carta mais fraca por você.", UIKit.LOSS)
 		human_card_chosen.emit(weakest)
 
 
@@ -856,9 +854,7 @@ func _show_zoom(view: CardView) -> void:
 	v.add_child(desc)
 	v.add_child(UIKit.label("toque para fechar", 28, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	ov.add_child(UIKit.centered(v))
-	holder.scale = Vector2(0.6, 0.6)
-	holder.pivot_offset = holder.custom_minimum_size / 2.0
-	create_tween().tween_property(holder, "scale", Vector2.ONE, GameState.anim(0.18)).set_trans(Tween.TRANS_BACK)
+	UIKit.pop_in(holder, GameState.anim(0.18))
 	ov.gui_input.connect(func(e: InputEvent):
 		if e is InputEventMouseButton and e.pressed:
 			ov.queue_free())
@@ -874,106 +870,16 @@ func _tip(key: String, title: String, text: String) -> void:
 	await _modal_choice(title, text, [{"label": "ENTENDI", "desc": "", "color": UIKit.OK}])
 
 
-## Tutorial de 3 telas: mostrado na primeira partida e sempre que tocar em "?".
+## Tutorial de 3 passos: mostrado na primeira partida e sempre que tocar em "?".
 func _intro_slides() -> void:
-	var slides := [
-		{"icon": "♠ ♥ ◆ ♣", "title": "GANHE RODADAS", "text": "Cada nível tem 8 cartas e um modificador sorteado que muda as regras. Em cada rodada todo mundo joga 1 carta: vence a maior do naipe (Trunfo corta). Quem vence leva o pote."},
-		{"icon": "◎ ♨ ◎", "title": "APOSTE, PASSE OU DESISTA", "text": "Antes de cada rodada todo mundo paga o blind. Aí, na sua vez, você pode PASSAR, AUMENTAR, PAGAR ou DESISTIR. Só quem fica joga carta. Aumente com uma mão fraca e, se todo mundo desistir, o pote é seu sem mostrar nada: isso é um blefe."},
-		{"icon": "✦ ⚡ ★", "title": "BÔNUS E COMBOS", "text": "Cartas fortes, modificadores e combos rendem um prêmio extra da banca, tipo 3 Trunfos, 3 figuras ou 3 cartas seguidas do mesmo naipe. Ganhar rodadas seguidas multiplica o prêmio. Suas fichas na mesa são seu placar: saia quando quiser levando a stack."},
-	]
 	modal_open = true
-	var ov := UIKit.overlay()
-	overlay_layer.add_child(ov)
-	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 24)
-	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 40.0, 620.0), 0)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 14)
-	box.add_child(v)
-	var icon_l := UIKit.label("", 72, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	var title_l := UIKit.label("", 46, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	var text_l := UIKit.label("", 34, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	text_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	text_l.custom_minimum_size = Vector2(0, 330)
-	var dots := HBoxContainer.new()
-	dots.alignment = BoxContainer.ALIGNMENT_CENTER
-	dots.add_theme_constant_override("separation", 10)
-	var next := UIKit.button("PRÓXIMO", UIKit.OK)
-	var skip := UIKit.button("PULAR", UIKit.MUTED)
-	for n in [icon_l, title_l, text_l, dots, next, skip]:
-		v.add_child(n)
-	ov.add_child(UIKit.centered(box))
-	var state := {"i": 0}
-	var render := func():
-		var sl: Dictionary = slides[state["i"]]
-		icon_l.text = sl["icon"]
-		title_l.text = sl["title"]
-		text_l.text = sl["text"]
-		for c in dots.get_children():
-			c.queue_free()
-		for k in range(slides.size()):
-			dots.add_child(UIKit.label("●" if k == state["i"] else "○", 28, UIKit.GOLD if k == state["i"] else UIKit.MUTED))
-		next.text = "VAMOS JOGAR!" if state["i"] == slides.size() - 1 else "PRÓXIMO"
-		skip.visible = state["i"] < slides.size() - 1
-		FX.pop(title_l, 1.2)
-	render.call()
-	next.pressed.connect(func():
-		Sfx.play("tick")
-		if state["i"] >= slides.size() - 1:
-			slides_done.emit()
-		else:
-			state["i"] += 1
-			render.call())
-	skip.pressed.connect(func(): slides_done.emit())
-	await slides_done
+	var m := StepsModal.open(overlay_layer, "MESA CAOS", HelpContent.chaos_intro(), "VAMOS JOGAR!")
+	await m.closed
 	modal_open = false
-	if is_inside_tree():
-		ov.queue_free()
 
 
 func _open_help() -> void:
-	var v := UIKit.modal(overlay_layer, "COMO FUNCIONA O CAOS")
-	var text := """MESA
-• Você senta com uma stack (20 blinds) e joga sem fim: a cada 8 rodadas as cartas são distribuídas de novo e um novo modificador é sorteado. Suas fichas na mesa são seu placar. Saia quando quiser e leve a stack de volta pra sua carteira.
-• Ficou sem fichas pro blind? Recompre ou saia da mesa. Rivais que quebram são trocados por jogadores novos.
-
-APOSTAS EM CADA RODADA
-• Todo mundo paga o blind (a aposta mínima da mesa) pro pote. O botão (D) gira a cada rodada e fala por último.
-• Na sua vez: PASSAR (se ninguém aumentou), AUMENTAR (no mínimo mais 1 blind, até o all-in), PAGAR (igualar) ou DESISTIR (perde o que pôs e não joga carta).
-• Cada rodada permite até 2 aumentos. Todo mundo que aumentou ou pagou põe o mesmo valor.
-• Só quem ficou joga carta. Quem vence leva o pote. Se todo mundo desistir, o último leva o pote sem jogar: o blefe funcionou.
-• Quem desistiu descarta a carta mais fraca, virada, então todas as mãos continuam do mesmo tamanho.
-• Sua mão: o painel mostra se ela está fraca, média, boa ou forte pra essa rodada. Um Trunfo alto ou um Rei costumam vencer.
-
-MODIFICADOR DO NÍVEL
-• Todo nível sorteia UM modificador. Ele pode valer no nível inteiro ou só numa rodada.
-• Nível inteiro: você vê a regra logo no início (ex.: Trunfo em Dobro, Naipe Fraco, Mundo ao Contrário, Naipe Maldito).
-• Uma rodada só: é surpresa, revelada quando começa e antes das apostas (ex.: Rodada Dourada ×3, Rodada Maldita, Saque, Assalto ao Líder).
-• As cartas afetadas mostram o valor real direto na carta.
-
-PRÊMIO DA BANCA
-• Os pontos das cartas da rodada viram fichas extras pagas pela banca a quem vence: cada ponto vale ¼ do blind. Modificadores e combos aumentam esse prêmio.
-
-COMBOS
-• SEQUÊNCIA: 2 rodadas seguidas ×1,25, 3 seguidas ×1,5 (MÃO QUENTE), 4 ou mais ×2. As chamas ♨ mostram seu nível.
-• CORTADO: você quebra a sequência de 2+ vitórias de alguém.
-• CORTE DE REI: você corta um Rei com Trunfo.
-• CHUVA DE TRUNFOS: 3 ou mais Trunfos na mesa, ×2.
-• REALEZA: 3 ou mais figuras (Valete, Cavaleiro, Dama, Rei) na mesa, ×1,5.
-• ESCADA: 3 cartas seguidas do mesmo naipe na mesa.
-
-RELÓGIO
-• Você tem 10 segundos pra jogar a carta (a barra embaixo da mesa esvazia). Estourou, jogamos sua carta mais fraca.
-
-CARTAS
-• Regras de rodada do Vanilla: seguir naipe e cortar com Trunfo se não tiver. No Caos você NÃO é obrigado a cobrir com Trunfo maior: qualquer Trunfo vale, e você decide se quer ganhar a rodada ou não. O Louco nunca vence, a não ser no modificador "O Louco Vence"."""
-	var l := UIKit.label(text, 30, UIKit.INK)
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(620, 0)
-	v.add_child(l)
-	var tut := UIKit.button("VER TUTORIAL (3 TELAS)", UIKit.OK)
-	tut.pressed.connect(func(): _intro_slides())
-	v.add_child(tut)
-	UIKit.close_button(overlay_layer, v)
+	StepsModal.open(overlay_layer, "COMO FUNCIONA O CAOS", HelpContent.chaos(), "ENTENDI", false)
 
 
 func _open_pause() -> void:
@@ -1006,9 +912,7 @@ func _open_pause() -> void:
 		human_card_chosen.emit(null))
 	v.add_child(quit)
 	ov.add_child(UIKit.centered(box))
-	box.scale = Vector2(0.9, 0.9)
-	box.pivot_offset = box.size / 2.0
-	create_tween().tween_property(box, "scale", Vector2.ONE, GameState.anim(0.2)).set_trans(Tween.TRANS_BACK)
+	UIKit.pop_in(box, GameState.anim(0.2))
 	resume.grab_focus.call_deferred()
 
 
@@ -1204,9 +1108,7 @@ func _human_bet() -> Dictionary:
 		if bool(st["raising"]):
 			_build_raise_picker(body, opt, st, done)
 	(st["render"] as Callable).call()
-	box.scale = Vector2(0.9, 0.9)
-	box.pivot_offset = Vector2(box.custom_minimum_size.x / 2.0, 0)
-	create_tween().tween_property(box, "scale", Vector2.ONE, GameState.anim(0.15)).set_trans(Tween.TRANS_BACK)
+	UIKit.pop_in(box, GameState.anim(0.15))
 	await item_chosen
 	modal_open = false
 	if is_inside_tree():
@@ -1327,13 +1229,13 @@ func _resolve_trick(result: Dictionary) -> void:
 	if streak_n >= 2 and not ("MAO_QUENTE" in result.get("combos", [])):
 		extras.append(["♨ SEQUÊNCIA ×%s!" % UIKit.fmt_dec(float(result.get("streak_mult", 1.0)), 2), "%s ganhou %d rodadas seguidas" % [wname, streak_n], FLAME])
 	for id in result.get("combos", []):
-		extras.append([str(ChaosModifiers.COMBO_NAMES[id]) + "!", "%s — %s" % [wname, ChaosModifiers.COMBO_DESCRIPTIONS[id]], UIKit.OK])
+		extras.append([str(ChaosModifiers.COMBO_NAMES[id]) + "!", "%s — %s" % [wname, ChaosModifiers.COMBO_DESCRIPTIONS[id]], UIKit.COMBO])
 	if float(result.get("saque_amount", 0.0)) > 0.0:
-		extras.append(["⚔ SAQUE!", "%s levou ◎%d dos rivais" % [wname, int(result["saque_amount"])], UIKit.DANGER])
+		extras.append(["⚔ SAQUE!", "%s levou ◎%d dos rivais" % [wname, int(result["saque_amount"])], UIKit.LOSS])
 	if float(result.get("assalto_amount", 0.0)) > 0.0:
-		extras.append(["⚔ ASSALTO!", "%s roubou ◎%d de quem tinha mais fichas" % [wname, int(result["assalto_amount"])], UIKit.DANGER])
+		extras.append(["⚔ ASSALTO!", "%s roubou ◎%d de quem tinha mais fichas" % [wname, int(result["assalto_amount"])], UIKit.LOSS])
 	if int(result.get("modifier", -1)) == ChaosModifiers.Modifier.VAZA_MALDITA:
-		extras.append(["☠ RODADA MALDITA!", "%s paga à banca por vencer essa rodada" % wname, UIKit.DANGER])
+		extras.append(["☠ RODADA MALDITA!", "%s paga à banca por vencer essa rodada" % wname, UIKit.LOSS])
 	for e in extras:
 		_banner(e[0], e[1], e[2])
 		Sfx.play("combo")
@@ -1414,9 +1316,7 @@ func _show_round_summary() -> String:
 		item_chosen.emit(1))
 	v.add_child(leave)
 	ov.add_child(UIKit.centered(box))
-	box.scale = Vector2(0.85, 0.85)
-	box.pivot_offset = box.custom_minimum_size / 2.0
-	create_tween().tween_property(box, "scale", Vector2.ONE, GameState.anim(0.2)).set_trans(Tween.TRANS_BACK)
+	UIKit.pop_in(box, GameState.anim(0.2))
 	next.grab_focus.call_deferred()
 	await item_chosen
 	if is_inside_tree():
@@ -1445,14 +1345,14 @@ func _finish_match() -> void:
 func _show_results(summary: Dictionary) -> void:
 	var ov := UIKit.overlay()
 	overlay_layer.add_child(ov)
-	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD if summary["won"] else UIKit.DANGER, 24)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD if summary["won"] else UIKit.LOSS, 24)
 	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 40.0, 664.0), 0)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	box.add_child(v)
 	var net := int(summary["net_fichas"])
 	var title := "VOCÊ SAIU NO LUCRO!" if summary["won"] else ("VOCÊ SAIU DA MESA" if net == 0 else "VOCÊ SAIU NO PREJUÍZO")
-	v.add_child(UIKit.label(title, 32, UIKit.GOLD if summary["won"] else UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label(title, 32, UIKit.GOLD if summary["won"] else UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	var order: Array = engine.match_result["standings"]
 	var stacks: Array = engine.match_result["stacks"]
@@ -1469,7 +1369,7 @@ func _show_results(summary: Dictionary) -> void:
 	if best_gain > 0.0:
 		v.add_child(UIKit.label("★ Maior pote seu: +◎%d" % int(best_gain), 30, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	for line in summary["lines"]:
-		var ll := UIKit.label(str(line), 30, UIKit.OK if net >= 0 else UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER)
+		var ll := UIKit.label(str(line), 30, UIKit.OK if net >= 0 else UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER)
 		ll.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(ll)
 	var again := UIKit.button("NOVA MESA")
@@ -1479,9 +1379,7 @@ func _show_results(summary: Dictionary) -> void:
 	btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
 	v.add_child(btn)
 	ov.add_child(UIKit.centered(box))
-	box.scale = Vector2(0.85, 0.85)
-	box.pivot_offset = box.custom_minimum_size / 2.0
-	create_tween().tween_property(box, "scale", Vector2.ONE, GameState.anim(0.25)).set_trans(Tween.TRANS_BACK)
+	UIKit.pop_in(box, GameState.anim(0.25))
 	btn.grab_focus.call_deferred()
 
 
@@ -1535,7 +1433,7 @@ func _refresh_hud() -> void:
 		var out: bool = phase != "idle" and engine.folded[p]
 		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 0.45 if out else 1.0)
 		(hud_titles[p] as Label).text = "VOCÊ" if p == 0 else str(config["names"][p]).to_upper()
-		(hud_titles[p] as Label).add_theme_color_override("font_color", UIKit.GOLD if p == turn_player else UIKit.INK)
+		(hud_titles[p] as Label).add_theme_color_override("font_color", UIKit.TURN if p == turn_player else UIKit.INK)
 		(dealer_badges[p] as Control).visible = engine.hand_no > 0 and engine.button == p
 		# Ordem: 1 = age agora, 2 = próximo...
 		var idx := order.find(p)
@@ -1543,10 +1441,8 @@ func _refresh_hud() -> void:
 		ob.visible = idx >= 0
 		if idx >= 0:
 			(ob.get_child(0) as Label).text = str(idx + 1)
-			var sb := UIKit.box(UIKit.GOLD if idx == 0 else UIKit.PURPLE_DEEP, UIKit.GOLD if idx == 0 else UIKit.MUTED, 3, 15, 0)
-			sb.set_corner_radius_all(15)
-			ob.add_theme_stylebox_override("panel", sb)
-			(ob.get_child(0) as Label).add_theme_color_override("font_color", UIKit.BLACK if idx == 0 else UIKit.INK)
+			ob.add_theme_stylebox_override("panel", UIKit.box_cached(UIKit.TURN if idx == 0 else UIKit.PURPLE_DEEP, UIKit.TURN if idx == 0 else UIKit.MUTED, 3, 15, 0))
+			(ob.get_child(0) as Label).add_theme_color_override("font_color", UIKit.TEXT_ON_LIGHT if idx == 0 else UIKit.INK)
 		_refresh_bet_tags(p, idx)
 	info_label.text = "NÍVEL %d%s · BLIND ◎%d" % [engine.round_index + 1, ("/%d" % engine.levels) if engine.levels > 0 else "", engine.blind]
 	Widgets.progress_dots(trick_dots, ChaosEngine.HAND_SIZE, engine.trick_number)
@@ -1572,24 +1468,24 @@ func _refresh_bet_tags(p: int, idx: int) -> void:
 	var pile := float(engine.contrib[p]) if not bets_gathered and phase != "idle" else 0.0
 	var pill := bet_pills[p] as PanelContainer
 	(bet_tags[p] as Label).text = "◎ %d" % int(pile)
-	(bet_tags[p] as Label).add_theme_color_override("font_color", UIKit.DANGER if engine.folded[p] else UIKit.GOLD)
+	(bet_tags[p] as Label).add_theme_color_override("font_color", UIKit.LOSS if engine.folded[p] else UIKit.GOLD)
 	pill.modulate.a = 1.0 if pile > 0.0 else 0.0
 	var status := ""
 	var col := UIKit.MUTED
 	if idx == 0:
-		status = "É A VEZ" if p != 0 else "SUA VEZ"
-		col = UIKit.GOLD
+		status = "▶ É A VEZ" if p != 0 else "▶ SUA VEZ"
+		col = UIKit.TURN
 	elif idx == 1:
 		status = "PRÓXIMO"
 		col = UIKit.INK
 	elif phase != "idle" and engine.folded[p]:
-		status = "DESISTIU"
-		col = UIKit.DANGER
+		status = "✕ DESISTIU"
+		col = UIKit.LOSS
 	elif str(action_text[p]) != "":
 		status = str(action_text[p])
 		col = action_color[p]
 	elif phase == "play" and engine.plays.any(func(pl): return int(pl["player"]) == p):
-		status = "JOGOU"
+		status = "✓ JOGOU"
 	if flames != "":
 		status = (status + " " + flames).strip_edges()
 	var st := prog_tags[p] as Label
@@ -1647,10 +1543,7 @@ func _update_turn_highlight(turn_player: int) -> void:
 	for p in range(seat_avatars.size()):
 		var avatar: PanelContainer = seat_avatars[p]
 		var active := p == turn_player
-		var accent := UIKit.GOLD if active else UIKit.MUTED
-		var ring := UIKit.box(UIKit.PURPLE_DEEP, accent, 6 if active else 3, 60, 0)
-		ring.set_corner_radius_all(42)
-		avatar.add_theme_stylebox_override("panel", ring)
+		avatar.add_theme_stylebox_override("panel", UIKit.box_cached(UIKit.PURPLE_DEEP, UIKit.TURN if active else UIKit.MUTED, 6 if active else 3, 42, 0))
 		if not active:
 			avatar.scale = Vector2.ONE
 	if turn_player >= 0:
@@ -1713,27 +1606,27 @@ func _show_bet_action(p: int, r: Dictionary) -> void:
 	var col := UIKit.MUTED
 	match str(r.get("action", "")):
 		"check":
-			action_text[p] = "PASSOU"
+			action_text[p] = "– PASSOU"
 			title = "%s PASSOU" % pname
 			sub = "Fica na rodada sem aumentar."
 		"call":
-			action_text[p] = "PAGOU"
+			action_text[p] = "✓ PAGOU"
 			title = "%s PAGOU" % pname
 			sub = "Pagou ◎ %d pra igualar em ◎ %d." % [int(amount), int(engine.bet_level)]
-			col = UIKit.OK
+			col = UIKit.INFO
 		"raise":
-			action_text[p] = "AUMENTOU"
+			action_text[p] = "▲ AUMENTOU"
 			title = "%s AUMENTOU!" % pname
 			sub = "Aposta agora em ◎ %d. Quem não pagar, desiste." % int(r["to"])
-			col = UIKit.GOLD
+			col = UIKit.MONEY
 		"fold":
-			action_text[p] = "DESISTIU"
+			action_text[p] = "✕ DESISTIU"
 			title = "%s DESISTIU" % pname
 			sub = "Fora da rodada: perde o que pôs e descarta a carta mais fraca."
 			if p == 0 and not engine.last_discard.is_empty():
 				sub = "Você perdeu o que pôs e descartou %s, sua carta mais fraca." % (engine.last_discard["card"] as CardData).display_name()
 				_rebuild_hand()
-			col = UIKit.DANGER
+			col = UIKit.LOSS
 	action_color[p] = col
 	_banner(title, sub, col if col != UIKit.MUTED else UIKit.INK)
 	_refresh_hud()
@@ -1757,7 +1650,7 @@ func _gather_bets() -> void:
 		for p in range(engine.num_players):
 			if engine.contrib[p] > 0.0:
 				any = true
-				FX.fly_chips(popup_layer, _pill_center(p), _global_center(pot_box), _chips_for(float(engine.contrib[p])), UIKit.DANGER if engine.folded[p] else UIKit.GOLD)
+				FX.fly_chips(popup_layer, _pill_center(p), _global_center(pot_box), _chips_for(float(engine.contrib[p])), UIKit.LOSS if engine.folded[p] else UIKit.GOLD)
 		if any:
 			_banner("APOSTAS FECHADAS", "Todas as fichas vão pro pote.", UIKit.GOLD)
 			Sfx.play("combo")
@@ -1780,7 +1673,7 @@ func _collect_pot(winner: int, total: float, gain: float) -> void:
 	await _wait(0.55)
 	if not is_inside_tree():
 		return
-	FX.float_text(popup_layer, seat_at, "%s◎ %d" % ["+" if gain >= 0.0 else "−", absi(int(gain))], UIKit.OK if gain >= 0.0 else UIKit.DANGER)
+	FX.float_text(popup_layer, seat_at, "%s◎ %d" % ["+" if gain >= 0.0 else "−", absi(int(gain))], UIKit.OK if gain >= 0.0 else UIKit.LOSS)
 	FX.burst(popup_layer, seat_at - popup_layer.global_position, UIKit.OK if winner == 0 else UIKit.GOLD, 16)
 	if winner == 0:
 		FX.shake(main_area, clampf(total / (float(engine.blind) * 20.0), 0.3, 0.9))

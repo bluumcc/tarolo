@@ -19,6 +19,7 @@ func _init() -> void:
 	_test_bidding()
 	_test_bonuses()
 	_test_chaos()
+	_test_colors()
 	_test_bot_strategy()
 	print("\n%d ok, %d falhas" % [passed, failures])
 	quit(1 if failures > 0 else 0)
@@ -648,3 +649,15 @@ func _test_louco_ownership() -> void:
 	]
 	e3._resolve_trick()
 	check((e3.captured[2] as Array).any(func(x: CardData) -> bool: return x.is_louco()), "última vaza: o Louco vai pro vencedor")
+
+
+## Contraste das cores por função sobre os fundos do jogo (WCAG: texto ≥ 4,5:1).
+func _test_colors() -> void:
+	var bgs := {"NIGHT": UIKit.NIGHT, "PURPLE_DEEP": UIKit.PURPLE_DEEP}
+	var fgs := {"INK": UIKit.INK, "MUTED": UIKit.MUTED, "MONEY": UIKit.MONEY, "TURN": UIKit.TURN, "GAIN": UIKit.GAIN, "LOSS": UIKit.LOSS, "INFO": UIKit.INFO, "COMBO": UIKit.COMBO, "MODIFIER": UIKit.MODIFIER}
+	for bn in bgs:
+		for fn in fgs:
+			check(UIKit.contrast(fgs[fn], bgs[bn]) >= 4.5, "cor %s legível sobre %s (%.1f:1)" % [fn, bn, UIKit.contrast(fgs[fn], bgs[bn])])
+	check(UIKit.text_on(UIKit.GOLD) == UIKit.TEXT_ON_LIGHT and UIKit.text_on(UIKit.OK) == UIKit.TEXT_ON_LIGHT, "botões dourado e verde usam texto escuro")
+	check(UIKit.text_on(UIKit.PURPLE_DEEP) == UIKit.INK and UIKit.text_on(UIKit.VIOLET) == UIKit.INK, "botões escuros usam texto claro")
+	check(UIKit.contrast(UIKit.TEXT_ON_LIGHT, UIKit.GOLD) >= 4.5, "texto escuro legível sobre dourado")

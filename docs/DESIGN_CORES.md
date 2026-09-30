@@ -65,3 +65,8 @@ Regras:
 
 ## 5. Popups no celular
 - `UIKit.fit()` roda em todo popup: reduz larguras mínimas fixas para caber na tela (margem de 16 px), faz botões e textos longos quebrarem linha e mantém o scroll vertical quando o conteúdo passa da altura.
+
+## 6. Status da implementação
+Feito: papéis de cor em `UIKit` (`ACTION`, `MONEY`, `TURN`, `GAIN`, `LOSS`, `INFO`, `COMBO`, `MODIFIER`, `TEXT_ON_LIGHT`), texto escuro automático em botões e cards claros (`UIKit.text_on`), botão primário em violeta, ciano para vez e ordem na Mesa Caos, status dos assentos com ícone (▶ ▲ ✓ – ✕), dealer branco, cores dos modificadores por função, estilos em cache no HUD (`UIKit.box_cached`), animação padrão de popup (`UIKit.pop_in`), feedback de toque nos botões, teste de contraste no `test_runner`.
+Mantido de propósito: títulos de popup em dourado (identidade da marca).
+Componentes: `StepsModal` (popup em passos) e `HelpContent` (textos das ajudas). Ver `scripts/ui/steps_modal.gd` e `scripts/ui/help_content.gd`.
