@@ -23,7 +23,10 @@ func _ready() -> void:
 	if scene == "tutorial":
 		GameState.start_tutorial()
 	var inst: Node = load(path).instantiate()
-	add_child(inst)
+	# Direto na raiz, como o jogo real (o tema global não atravessa um Node comum).
+	get_tree().root.add_child.call_deferred(inst)
+	await get_tree().process_frame
+	await get_tree().process_frame
 	if args.has("bid"):
 		await get_tree().create_timer(0.6).timeout
 		inst.human_bid_chosen.emit(int(args["bid"]))

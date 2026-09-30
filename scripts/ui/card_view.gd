@@ -71,11 +71,11 @@ func _refresh() -> void:
 	if not face_up:
 		var back_id := str(SaveManager.section("cosmetics")["equipped"])
 		var back_col := Color(UIKit.CARD_BACKS.get(back_id, UIKit.CARD_BACKS["noite"])["color"])
-		body.add_theme_stylebox_override("panel", UIKit.box(back_col, UIKit.GOLD.darkened(0.35), 3, 6, 6))
+		body.add_theme_stylebox_override("panel", UIKit.box(back_col, UIKit.BRAND.darkened(0.35), 3, 6, 6))
 		rank_label.text = ""
 		suit_small.text = ""
 		center_label.text = "✶"
-		center_label.add_theme_color_override("font_color", UIKit.GOLD)
+		center_label.add_theme_color_override("font_color", UIKit.BRAND)
 		name_label.text = ""
 		points_label.text = ""
 		bout_label.text = ""
@@ -92,7 +92,7 @@ func _refresh() -> void:
 	points_label.text = "%s pts" % UIKit.fmt_dec(data.points(), 1)
 	points_label.add_theme_color_override("font_color", UIKit.MUTED if _dark_face() else Color("#5B5670"))
 	bout_label.text = "BOUT" if data.is_bout() else ""
-	bout_label.add_theme_color_override("font_color", UIKit.GOLD if _dark_face() else Color("#B8860B"))
+	bout_label.add_theme_color_override("font_color", UIKit.BRAND if _dark_face() else Color("#B8860B"))
 
 
 ## Trunfos e O Louco têm a face escura roxa; as demais cartas são brancas com tinta
@@ -123,9 +123,9 @@ func _refresh_border() -> void:
 		border = UIKit.SUIT_COLORS[CardData.Suit.TRUNFO]
 		bg = Color("#221436")
 	if data.is_bout():
-		border = UIKit.GOLD if _dark_face() else Color("#D9A21B")
+		border = UIKit.BRAND if _dark_face() else Color("#D9A21B")
 	if selected:
-		border = UIKit.GOLD
+		border = UIKit.BRAND
 	var sb := UIKit.box(bg, border, 4 if selected else 2, 6, 6)
 	sb.set_corner_radius_all(14)
 	body.add_theme_stylebox_override("panel", sb)

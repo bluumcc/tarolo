@@ -30,6 +30,39 @@ const COMBO := Color("#FF9A3D")         ## chamas, sequência, combos
 const MODIFIER := Color("#C792EA")      ## modificador de nível, Trunfos
 const TEXT_ON_LIGHT := Color("#1A1240") ## texto sobre superfícies claras (dourado, verde)
 
+## Identidade (o dourado da marca): títulos e molduras de popup; e o jogador local.
+const BRAND := GOLD
+const ME := GOLD
+const CLEAR := Color(0, 0, 0, 0)
+
+## Superfícies e fundos (roxo profundo do jogo).
+const SURFACE := Color("#1B1258")          ## barras e caixas de informação
+const SURFACE_DEEP := Color("#0F0A33")     ## selos e pílulas escuras
+const SURFACE_POT := Color("#2A1B4D")      ## caixa do pote
+const TABLE_FILL := Color(0.10, 0.08, 0.30, 0.85)
+const TABLE_EDGE := Color("#5B4FC9")
+const SCRIM := Color(0.03, 0.02, 0.07, 0.97)      ## tela cheia de transição
+const SCRIM_SOFT := Color(0.04, 0.03, 0.06, 0.88)
+const OUTLINE := Color("#0B0626")           ## contorno escuro de textos e barras
+const BUTTON_MUTED := Color("#6B6BC4")      ## face de botão secundário
+const DOT_OFF := Color("#4A3FA0")           ## bolinha pendente
+const GOLD_LIGHT := Color("#FFE58A")
+const TITLE_OUTLINE := Color("#3A1FA0")
+const GOOD_ON_LIGHT := Color("#1E8A5C")     ## verde legível sobre carta clara
+const BAD_ON_LIGHT := Color("#D42A3C")
+## Painéis do Vanilla (duelo chefe x defesa).
+const BOSS_BG := Color(0.20, 0.07, 0.08, 0.9)
+const BOSS_TRACK := Color("#2a1715")
+const BOSS_META_TEXT := Color("#f0c7c2")
+const ME_BG := Color(0.24, 0.20, 0.08, 0.9)
+const ME_TRACK := Color("#2b2413")
+const RULE_TEXT := Color("#d6cbbb")
+const PAPER := Color("#f3ece0")
+const TICK_EMPTY := Color("#2a2320")
+const HUD_DIM := Color(0.8, 0.78, 0.86, 1.0)
+const HINT_BG := Color(0.10, 0.08, 0.14, 0.9)
+const TOAST_BG := Color(0.03, 0.03, 0.07, 0.92)
+
 ## Duelo do Vanilla: o Atacante é o "chefe" (vermelho), a Defesa é o time contra ele (azul).
 const BOSS := Color("#E2463B")
 const DEF := Color("#5AA9FF")
@@ -54,7 +87,7 @@ static func box(bg: Color, border: Color = BLACK, border_w: int = 3, radius: int
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
 	if border == BLACK:
-		sb.border_color = Color("#0B0626")
+		sb.border_color = OUTLINE
 		sb.set_border_width_all(3)
 		sb.border_width_bottom = 6
 	else:
@@ -82,7 +115,7 @@ static func label(text: String, size: int = 22, color: Color = INK, align: int =
 	l.add_theme_color_override("font_color", color)
 	if size >= 24:
 		l.add_theme_constant_override("outline_size", maxi(size / 8, 3))
-		l.add_theme_color_override("font_outline_color", Color("#0B0626"))
+		l.add_theme_color_override("font_outline_color", OUTLINE)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
 
@@ -152,7 +185,7 @@ static func button(text: String, accent: Color = ACTION, size: int = 30) -> Butt
 	b.focus_mode = Control.FOCUS_ALL
 	b.custom_minimum_size = Vector2(0, 84)
 	b.add_theme_font_size_override("font_size", size)
-	var face0 := accent if accent != MUTED else Color("#6B6BC4")
+	var face0 := accent if accent != MUTED else BUTTON_MUTED
 	var fg := text_on(face0)
 	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		b.add_theme_color_override(c, fg)
@@ -174,6 +207,80 @@ static func button(text: String, accent: Color = ACTION, size: int = 30) -> Butt
 		b.create_tween().tween_property(b, "scale", Vector2(0.97, 0.97), 0.06))
 	b.button_up.connect(func(): b.create_tween().tween_property(b, "scale", Vector2.ONE, 0.1).set_trans(Tween.TRANS_BACK))
 	return b
+
+
+## Botão de ícone quadrado (68 px, acima do mínimo de toque de 56).
+static func icon_button(text: String, color: Color = BUTTON_MUTED) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(68, 68)
+	b.add_theme_font_size_override("font_size", 32)
+	for cn in ["font_color", "font_hover_color", "font_pressed_color"]:
+		b.add_theme_color_override(cn, text_on(color))
+	var n := chunky(color)
+	n.set_corner_radius_all(22)
+	n.set_border_width_all(3)
+	n.border_width_bottom = 8
+	n.content_margin_left = 6
+	n.content_margin_right = 6
+	n.content_margin_top = 6
+	n.content_margin_bottom = 12
+	var h := n.duplicate() as StyleBoxFlat
+	h.bg_color = color.lightened(0.12)
+	var pr := chunky(color, true)
+	pr.set_corner_radius_all(22)
+	pr.border_width_bottom = 3
+	pr.content_margin_left = 6
+	pr.content_margin_right = 6
+	b.add_theme_stylebox_override("normal", n)
+	b.add_theme_stylebox_override("hover", h)
+	b.add_theme_stylebox_override("pressed", pr)
+	b.pressed.connect(func(): sfx("tick"))
+	return b
+
+
+## Botão de navegação (barra inferior): o central é um botão 3D em destaque, os outros são planos.
+static func nav_button(icon: String, center: bool, face: Color = DANGER) -> Button:
+	var btn := Button.new()
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.text = icon
+	btn.custom_minimum_size = Vector2(96 if center else 72, 84 if center else 64)
+	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	btn.add_theme_font_size_override("font_size", 44 if center else 34)
+	for cn in ["font_color", "font_hover_color", "font_pressed_color"]:
+		btn.add_theme_color_override(cn, INK)
+	if center:
+		btn.add_theme_stylebox_override("normal", chunky(face))
+		btn.add_theme_stylebox_override("hover", chunky(face.lightened(0.1)))
+		btn.add_theme_stylebox_override("pressed", chunky(face, true))
+	else:
+		var flat := StyleBoxFlat.new()
+		flat.bg_color = CLEAR
+		for st in ["normal", "hover", "pressed"]:
+			btn.add_theme_stylebox_override(st, flat)
+	btn.pressed.connect(func(): sfx("tick"))
+	return btn
+
+
+## Bolinha redonda (progresso, escada de ligas): cheia (cor) ou vazia (só contorno).
+static func dot_style(fill: Color, border: Color, radius: int) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = fill
+	sb.border_color = border
+	sb.set_border_width_all(3)
+	sb.set_corner_radius_all(radius)
+	return sb
+
+
+## Barra de meta (preenchimento e trilho com contorno escuro).
+static func bar_style(color: Color) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = color
+	sb.border_color = OUTLINE
+	sb.set_border_width_all(4)
+	sb.set_corner_radius_all(16)
+	return sb
 
 
 ## Botão em pílula (mantido pra chips e botões pequenos).
@@ -381,3 +488,66 @@ static func close_button(overlay_layer: Control, v: VBoxContainer) -> void:
 static func is_portrait(node: Control) -> bool:
 	var s := node.get_viewport_rect().size
 	return s.y > s.x
+
+
+## Tema global aplicado à raiz (GameState): todo controle criado fora do UIKit (menus de
+## opção, caixas de seleção, campos de texto, barras de rolagem, sliders) já sai no padrão.
+static func build_theme() -> Theme:
+	var t := Theme.new()
+	t.set_color("font_color", "Label", INK)
+	# Botões.
+	var face := BUTTON_MUTED
+	for cls in ["Button", "OptionButton", "MenuButton"]:
+		t.set_stylebox("normal", cls, chunky(face))
+		t.set_stylebox("hover", cls, chunky(face.lightened(0.12)))
+		t.set_stylebox("pressed", cls, chunky(face.darkened(0.08), true))
+		t.set_stylebox("focus", cls, chunky(face.lightened(0.12)))
+		t.set_stylebox("disabled", cls, chunky(Color("#3A3570")))
+		for cn in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+			t.set_color(cn, cls, INK)
+		t.set_color("font_disabled_color", cls, MUTED)
+		t.set_font_size("font_size", cls, MIN_BUTTON_FONT)
+	# Caixa de seleção / interruptor.
+	for cn in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		t.set_color(cn, "CheckButton", INK)
+		t.set_color(cn, "CheckBox", INK)
+	t.set_font_size("font_size", "CheckButton", MIN_FONT)
+	t.set_font_size("font_size", "CheckBox", MIN_FONT)
+	# Campo de texto.
+	var le := box(SURFACE_DEEP, MUTED, 3, 22, 14)
+	t.set_stylebox("normal", "LineEdit", le)
+	t.set_stylebox("focus", "LineEdit", box(SURFACE_DEEP, GOLD, 3, 22, 14))
+	t.set_color("font_color", "LineEdit", INK)
+	t.set_color("caret_color", "LineEdit", GOLD)
+	t.set_font_size("font_size", "LineEdit", MIN_FONT)
+	# Menu suspenso.
+	var pm := box(PURPLE_DEEP, GOLD, 3, 16, 8)
+	t.set_stylebox("panel", "PopupMenu", pm)
+	t.set_stylebox("hover", "PopupMenu", box(PURPLE, GOLD, 2, 10, 6))
+	t.set_color("font_color", "PopupMenu", INK)
+	t.set_color("font_hover_color", "PopupMenu", INK)
+	t.set_font_size("font_size", "PopupMenu", MIN_FONT)
+	# Slider e barras.
+	var track := StyleBoxFlat.new()
+	track.bg_color = OUTLINE
+	track.set_corner_radius_all(8)
+	track.content_margin_top = 6
+	track.content_margin_bottom = 6
+	t.set_stylebox("slider", "HSlider", track)
+	var grab := StyleBoxFlat.new()
+	grab.bg_color = ACTION
+	grab.set_corner_radius_all(8)
+	t.set_stylebox("grabber_area", "HSlider", grab)
+	t.set_stylebox("grabber_area_highlight", "HSlider", grab)
+	var sbg := StyleBoxFlat.new()
+	sbg.bg_color = Color(0, 0, 0, 0.25)
+	sbg.set_corner_radius_all(6)
+	var sgr := StyleBoxFlat.new()
+	sgr.bg_color = MUTED
+	sgr.set_corner_radius_all(6)
+	for cls in ["VScrollBar", "HScrollBar"]:
+		t.set_stylebox("scroll", cls, sbg)
+		t.set_stylebox("grabber", cls, sgr)
+		t.set_stylebox("grabber_highlight", cls, sgr)
+		t.set_stylebox("grabber_pressed", cls, sgr)
+	return t

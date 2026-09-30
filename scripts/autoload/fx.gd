@@ -57,7 +57,7 @@ func burst(layer: Control, at: Vector2, color: Color, count_n: int = 14) -> void
 
 ## Fichas voando de um ponto a outro (posições globais), em arco, escalonadas. Cada ficha que
 ## pousa toca um "chip". `on_done` roda quando a última chega.
-func fly_chips(layer: Control, from: Vector2, to: Vector2, n: int = 5, color: Color = Color("#FFC933"), on_done: Callable = Callable()) -> void:
+func fly_chips(layer: Control, from: Vector2, to: Vector2, n: int = 5, color: Color = UIKit.MONEY, on_done: Callable = Callable()) -> void:
 	if layer == null or not layer.is_inside_tree() or GameState.anim(1.0) <= 0.01:
 		if on_done.is_valid():
 			on_done.call()
@@ -65,13 +65,7 @@ func fly_chips(layer: Control, from: Vector2, to: Vector2, n: int = 5, color: Co
 	var origin := layer.global_position
 	var count_n := clampi(n, 1, 8)
 	for i in range(count_n):
-		var chip := Label.new()
-		chip.text = "◎"
-		chip.add_theme_font_size_override("font_size", 40)
-		chip.add_theme_color_override("font_color", color)
-		chip.add_theme_constant_override("outline_size", 6)
-		chip.add_theme_color_override("font_outline_color", Color("#0B0626"))
-		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var chip := UIKit.label("◎", 40, color)
 		chip.pivot_offset = Vector2(20, 20)
 		layer.add_child(chip)
 		var a := from - origin + Vector2(randf_range(-14, 14), randf_range(-14, 14))
@@ -99,13 +93,7 @@ func fly_chips(layer: Control, from: Vector2, to: Vector2, n: int = 5, color: Co
 func float_text(layer: Control, at: Vector2, text: String, color: Color, size: int = 40) -> void:
 	if layer == null or not layer.is_inside_tree():
 		return
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", color)
-	l.add_theme_constant_override("outline_size", 8)
-	l.add_theme_color_override("font_outline_color", Color("#0B0626"))
-	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var l := UIKit.label(text, size, color)
 	layer.add_child(l)
 	l.position = at - layer.global_position - Vector2(60, 20)
 	l.pivot_offset = Vector2(60, 20)
@@ -123,13 +111,7 @@ func chip_rain(layer: Control, count_n: int = 28) -> void:
 		return
 	var w := layer.size.x
 	for i in range(count_n):
-		var chip := Label.new()
-		chip.text = "◎"
-		chip.add_theme_font_size_override("font_size", randi_range(34, 56))
-		chip.add_theme_color_override("font_color", Color("#FFC933") if i % 3 else Color("#FFE58A"))
-		chip.add_theme_constant_override("outline_size", 6)
-		chip.add_theme_color_override("font_outline_color", Color("#0B0626"))
-		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var chip := UIKit.label("◎", randi_range(34, 56), UIKit.MONEY if i % 3 else UIKit.GOLD_LIGHT)
 		layer.add_child(chip)
 		chip.position = Vector2(randf_range(0.0, w), -60.0)
 		var tw := chip.create_tween().set_parallel(true)
@@ -138,3 +120,23 @@ func chip_rain(layer: Control, count_n: int = 28) -> void:
 		tw.tween_property(chip, "position:y", layer.size.y + 40.0, dur).set_delay(delay).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		tw.tween_property(chip, "rotation", randf_range(-6.0, 6.0), dur).set_delay(delay)
 		tw.chain().tween_callback(chip.queue_free)
+
+
+## Pulsa um nó (ex.: avatar da vez) em loop enquanto `alive` devolver verdadeiro.
+func pulse_while(node: Control, amount: float, alive: Callable) -> void:
+	node.pivot_offset = node.size / 2.0
+	while is_instance_valid(node) and node.is_inside_tree() and alive.call():
+		var tw := node.create_tween()
+		tw.tween_property(node, "scale", Vector2(amount, amount), 0.5).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(node, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_SINE)
+		await tw.finished
+	if is_instance_valid(node):
+		node.scale = Vector2.ONE
+
+
+## Destaque da carta vencedora na mesa (cresce e assenta) em torno da escala de mesa.
+func win_pulse(view: Control, base_scale: float) -> void:
+	view.z_index = 5
+	var tw := view.create_tween()
+	tw.tween_property(view, "scale", Vector2(base_scale, base_scale) * 1.18, GameState.anim(0.12))
+	tw.tween_property(view, "scale", Vector2(base_scale, base_scale) * 1.08, GameState.anim(0.12))

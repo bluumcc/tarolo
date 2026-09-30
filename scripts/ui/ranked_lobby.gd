@@ -17,7 +17,7 @@ func _ready() -> void:
 
 	# Cabeçalho fixo: voltar + título.
 	var head := PanelContainer.new()
-	var hsb := UIKit.box(Color("#1B1258"), UIKit.BLACK, 3, 0, 12)
+	var hsb := UIKit.box(UIKit.SURFACE, UIKit.BLACK, 3, 0, 12)
 	hsb.set_corner_radius_all(0)
 	hsb.corner_radius_bottom_left = 28
 	hsb.corner_radius_bottom_right = 28
@@ -82,7 +82,7 @@ func _render() -> void:
 	bv.add_child(UIKit.label(str(t["label"]).to_upper(), 56, color, HORIZONTAL_ALIGNMENT_CENTER))
 	var bar := MeterBar.new()
 	bar.custom_minimum_size = Vector2(0, 34)
-	bar.set_colors(color, Color("#0B0626"))
+	bar.set_colors(color, UIKit.OUTLINE)
 	bar.set_values(float(t["progress"]), 1.0, false)
 	bv.add_child(bar)
 	bv.add_child(UIKit.label("%d LP  ·  MMR %s" % [int(t["lp"]), UIKit.fmt_int(int(rk["mmr"]))], 28, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
@@ -98,12 +98,7 @@ func _render() -> void:
 		var reached := i <= int(t["tier"])
 		var dot := Panel.new()
 		dot.custom_minimum_size = Vector2(40, 40)
-		var dsb := StyleBoxFlat.new()
-		dsb.bg_color = Color(Ranked.TIER_COLORS[i]) if reached else Color("#241A70")
-		dsb.border_color = Color("#0B0626")
-		dsb.set_border_width_all(3)
-		dsb.set_corner_radius_all(20)
-		dot.add_theme_stylebox_override("panel", dsb)
+		dot.add_theme_stylebox_override("panel", UIKit.dot_style(Color(Ranked.TIER_COLORS[i]) if reached else UIKit.PURPLE_DEEP, UIKit.OUTLINE, 20))
 		ladder.add_child(dot)
 	content.add_child(ladder)
 
@@ -147,7 +142,7 @@ func _search() -> void:
 	for o in lobby:
 		names.append("%s (%d)" % [o["name"], int(o["mmr"])])
 	status.text = "Partida encontrada: " + ", ".join(names)
-	status.add_theme_color_override("font_color", UIKit.GOLD)
+	status.add_theme_color_override("font_color", UIKit.BRAND)
 	Sfx.play("combo")
 	await get_tree().create_timer(GameState.anim(1.0)).timeout
 	if not is_inside_tree():

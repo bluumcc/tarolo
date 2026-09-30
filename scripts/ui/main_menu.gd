@@ -56,7 +56,7 @@ func _ready() -> void:
 	col.add_child(grid)
 	var h := 150 if wide else 132
 	var cards := [
-		Widgets.mode_card("VANILLA", "Tarot clássico: 78 cartas, trunfo e O Louco.", UIKit.GOLD.darkened(0.12), h, "♛", func():
+		Widgets.mode_card("VANILLA", "Tarot clássico: 78 cartas, trunfo e O Louco.", UIKit.BRAND.darkened(0.12), h, "♛", func():
 			GameState.mode = GameState.Mode.CLASSIC
 			GameState.leave_table()
 			get_tree().change_scene_to_file("res://scenes/GameScene.tscn"), 34),
@@ -108,10 +108,10 @@ func _hero() -> Control:
 		fan.add_child(cv)
 		cv.position = Vector2(cx + sp[3] * (sc / 0.62) - CardView.SIZE.x / 2.0, 10.0 - abs(sp[2]) * 1.2)
 	var title := UIKit.label("TAROLO", 88, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	title.add_theme_color_override("font_outline_color", Color("#3A1FA0"))
+	title.add_theme_color_override("font_outline_color", UIKit.TITLE_OUTLINE)
 	title.add_theme_constant_override("outline_size", 14)
 	box.add_child(title)
-	var sub := UIKit.label("JOGO DE RODADAS", 26, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	var sub := UIKit.label("JOGO DE RODADAS", 26, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER)
 	box.add_child(sub)
 	return box
 
@@ -157,12 +157,12 @@ func _spawn_stars() -> void:
 func _modal(title: String) -> VBoxContainer:
 	var ov := UIKit.overlay()
 	overlay_layer.add_child(ov)
-	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 24)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 24)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
 	v.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 96.0, 580.0), 0)
 	box.add_child(v)
-	v.add_child(UIKit.label(title, 38, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label(title, 38, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	var scroll := ScrollContainer.new()
 	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -193,7 +193,7 @@ func _open_settings() -> void:
 	name_edit.max_length = 16
 	name_edit.custom_minimum_size = Vector2(0, 40)
 	name_edit.add_theme_stylebox_override("normal", UIKit.box(UIKit.PURPLE_DEEP, UIKit.MUTED, 2, 6, 10))
-	name_edit.add_theme_stylebox_override("focus", UIKit.box(UIKit.PURPLE_DEEP, UIKit.GOLD, 2, 6, 10))
+	name_edit.add_theme_stylebox_override("focus", UIKit.box(UIKit.PURPLE_DEEP, UIKit.BRAND, 2, 6, 10))
 	name_edit.add_theme_color_override("font_color", UIKit.INK)
 	name_edit.add_theme_color_override("font_placeholder_color", UIKit.MUTED)
 	name_edit.placeholder_text = "Arcanista"
@@ -298,7 +298,7 @@ func _open_cosmetics() -> void:
 		row.add_theme_constant_override("separation", 10)
 		var swatch := Panel.new()
 		swatch.custom_minimum_size = Vector2(36, 50)
-		swatch.add_theme_stylebox_override("panel", UIKit.box(Color(back["color"]), UIKit.GOLD.darkened(0.35), 3, 4, 0))
+		swatch.add_theme_stylebox_override("panel", UIKit.box(Color(back["color"]), UIKit.BRAND.darkened(0.35), 3, 4, 0))
 		row.add_child(swatch)
 		var name_l := UIKit.label(str(back["name"]), 22)
 		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -316,7 +316,7 @@ func _open_cosmetics() -> void:
 				_reopen_cosmetics())
 		elif back.has("requires_tier"):
 			var req := int(back["requires_tier"])
-			btn = UIKit.button("DESBLOQUEAR" if peak_tier >= req else "REQ. %s" % Ranked.TIERS[req].to_upper(), UIKit.GOLD, 18)
+			btn = UIKit.button("DESBLOQUEAR" if peak_tier >= req else "REQ. %s" % Ranked.TIERS[req].to_upper(), UIKit.ACTION, 18)
 			btn.disabled = peak_tier < req
 			btn.pressed.connect(func():
 				owned.append(id)
@@ -325,7 +325,7 @@ func _open_cosmetics() -> void:
 				_reopen_cosmetics())
 		else:
 			var price := int(back["price"])
-			btn = UIKit.button("◆ %d" % price, UIKit.GOLD, 18)
+			btn = UIKit.button("◆ %d" % price, UIKit.ACTION, 18)
 			btn.disabled = int(prof["fragments"]) < price
 			btn.pressed.connect(func():
 				prof["fragments"] = int(prof["fragments"]) - price

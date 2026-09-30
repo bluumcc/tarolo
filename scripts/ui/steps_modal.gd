@@ -40,7 +40,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	var ov := UIKit.overlay()
 	add_child(ov)
-	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 24)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 24)
 	var vw := get_viewport_rect().size.x
 	box.custom_minimum_size = Vector2(minf(vw - 40.0, 640.0), 0)
 	var v := VBoxContainer.new()
@@ -48,9 +48,9 @@ func _ready() -> void:
 	box.add_child(v)
 	_kicker_l = UIKit.label("", 24, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(_kicker_l)
-	_icon = UIKit.label("", 64, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	_icon = UIKit.label("", 64, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(_icon)
-	_title = UIKit.label("", 40, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	_title = UIKit.label("", 40, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER)
 	_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(_title)
 	_scroll = ScrollContainer.new()
@@ -98,7 +98,7 @@ func _go(i: int) -> void:
 
 func _render() -> void:
 	var st: Dictionary = steps[index]
-	var col: Color = st.get("color", UIKit.GOLD)
+	var col: Color = st.get("color", UIKit.BRAND)
 	_kicker_l.text = "%s  ·  %d/%d" % [kicker, index + 1, steps.size()]
 	_icon.text = str(st.get("icon", ""))
 	_icon.add_theme_color_override("font_color", col)

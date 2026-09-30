@@ -102,7 +102,7 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_on_resize)
 	_refresh_hud()
 	_rebuild_hand()
-	_banner.call_deferred("LICITAÇÃO", UIKit.GOLD)
+	_banner.call_deferred("LICITAÇÃO", UIKit.BRAND)
 	if tutorial:
 		await _tutorial_modal("BEM-VINDO AO TUTORIAL", "Essa mão foi montada pra você aprender as regras principais. Antes de cada decisão nova tem uma explicação curta. Não tem pressa: a tela só avança quando você toca em ENTENDI. Olhe sua mão (embaixo da tela) e continue.")
 		if not is_inside_tree():
@@ -138,7 +138,7 @@ func _banner(text: String, color: Color) -> void:
 	if GameState.autoplay or not is_inside_tree():
 		return
 	var strip := ColorRect.new()
-	strip.color = Color(0.04, 0.03, 0.06, 0.88)
+	strip.color = UIKit.SCRIM_SOFT
 	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	popup_layer.add_child(strip)
 	strip.size = Vector2(popup_layer.size.x, 120)
@@ -206,7 +206,7 @@ func _build_ui() -> void:
 	_build_arena()
 	_build_bid_panel()
 
-	trick_label = UIKit.label("", 22, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	trick_label = UIKit.label("", 22, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER)
 	center_col.add_child(trick_label)
 	status_label = UIKit.label("", 25, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -255,7 +255,7 @@ func _build_topbar() -> void:
 	info_label = UIKit.label("", 22, UIKit.INK)
 	info_box.add_child(info_label)
 	topbar.add_child(info_box)
-	var help_btn := UIKit.button("?", UIKit.GOLD, 25)
+	var help_btn := UIKit.button("?", UIKit.ACTION, 25)
 	help_btn.custom_minimum_size = Vector2(52, 52)
 	help_btn.pressed.connect(_open_help)
 	topbar.add_child(help_btn)
@@ -269,7 +269,7 @@ func _build_topbar() -> void:
 ## vida dele — os pontos que a Defesa ainda precisa somar pra derrubar o contrato. Se o
 ## Atacante é você, a mesma barra vira o progresso da sua meta.
 func _build_boss_panel() -> void:
-	boss_panel = UIKit.panel(Color(0.20, 0.07, 0.08, 0.9), UIKit.BOSS, 12)
+	boss_panel = UIKit.panel(UIKit.BOSS_BG, UIKit.BOSS, 12)
 	boss_panel.visible = false
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 14)
@@ -298,7 +298,7 @@ func _build_boss_panel() -> void:
 	lab_row.add_child(boss_bar_label)
 	boss_bar_value = UIKit.label("", 21, UIKit.INK)
 	lab_row.add_child(boss_bar_value)
-	boss_meta = UIKit.label("", 19, Color("#f0c7c2"))
+	boss_meta = UIKit.label("", 19, UIKit.BOSS_META_TEXT)
 	boss_meta.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(boss_meta)
 	side_col.add_child(boss_panel)
@@ -315,7 +315,7 @@ func _build_seat_strip() -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		badge.add_child(row)
-		var por := Portrait.new().setup(p, Color(0, 0, 0, 0), 50.0)
+		var por := Portrait.new().setup(p, UIKit.CLEAR, 50.0)
 		row.add_child(por)
 		var col := VBoxContainer.new()
 		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -362,7 +362,7 @@ func _build_arena() -> void:
 	pot_box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	pot_box.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	pot_box.grow_vertical = Control.GROW_DIRECTION_BOTH
-	pot_label = UIKit.label("", 42, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	pot_label = UIKit.label("", 42, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
 	pot_box.add_child(pot_label)
 	pot_sub = UIKit.label("", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	pot_box.add_child(pot_sub)
@@ -377,7 +377,7 @@ func _build_arena() -> void:
 func _draw_arena() -> void:
 	# Mesa oval, igual à do Caos: mesmo feltro e mesma borda, pra as duas telas parecerem
 	# do mesmo jogo.
-	var sb := UIKit.box(Color(0.10, 0.08, 0.30, 0.85), Color("#5B4FC9"), 3, 200, 0)
+	var sb := UIKit.box(UIKit.TABLE_FILL, UIKit.TABLE_EDGE, 3, 200, 0)
 	arena.draw_style_box(sb, Rect2(Vector2.ZERO, arena.size))
 
 
@@ -388,7 +388,7 @@ func _build_bid_panel() -> void:
 	bid_panel.add_theme_constant_override("separation", 12)
 	bid_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	center_col.add_child(bid_panel)
-	bid_panel.add_child(UIKit.label("QUEM JOGA SOZINHO?", 38, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	bid_panel.add_child(UIKit.label("QUEM JOGA SOZINHO?", 38, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	var sub := UIKit.label("Quem dá o lance mais alto joga sozinho contra os outros três.", 21, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bid_panel.add_child(sub)
@@ -409,7 +409,7 @@ func _build_bid_panel() -> void:
 		var h := HBoxContainer.new()
 		h.add_theme_constant_override("separation", 10)
 		row.add_child(h)
-		h.add_child(Portrait.new().setup(p, UIKit.GOLD if p == 0 else Color(0, 0, 0, 0), 64.0))
+		h.add_child(Portrait.new().setup(p, UIKit.ME if p == 0 else UIKit.CLEAR, 64.0))
 		var col := VBoxContainer.new()
 		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		col.add_theme_constant_override("separation", 4)
@@ -452,7 +452,7 @@ func _build_bid_panel() -> void:
 ## Dica da licitação: quão forte é a sua mão e qual contrato ela sugere, com os limiares
 ## de cada contrato marcados na barra. Sugestão, não regra: o lance é decisão sua.
 func _build_hand_hint() -> void:
-	var box := UIKit.panel(Color(0.10, 0.08, 0.14, 0.9), UIKit.GOLD.darkened(0.4), 8)
+	var box := UIKit.panel(UIKit.HINT_BG, UIKit.BRAND.darkened(0.4), 8)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 4)
 	box.add_child(v)
@@ -461,12 +461,12 @@ func _build_hand_hint() -> void:
 	hint_strength = UIKit.label("", 20, UIKit.INK)
 	hint_strength.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(hint_strength)
-	hint_suggest = UIKit.label("", 20, UIKit.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
+	hint_suggest = UIKit.label("", 20, UIKit.BRAND, HORIZONTAL_ALIGNMENT_RIGHT)
 	hint_suggest.autowrap_mode = TextServer.AUTOWRAP_OFF
 	top.add_child(hint_suggest)
 	hint_bar = MeterBar.new()
 	hint_bar.custom_minimum_size = Vector2(0, 14)
-	hint_bar.set_colors(UIKit.GOLD, Color("#2b2413"))
+	hint_bar.set_colors(UIKit.BRAND, UIKit.ME_TRACK)
 	hint_bar.marks = [BotAI.STRENGTH_PETITE, BotAI.STRENGTH_GARDE, BotAI.STRENGTH_GARDE_SANS, BotAI.STRENGTH_GARDE_CONTRE]
 	v.add_child(hint_bar)
 	var bottom := HBoxContainer.new()
@@ -476,7 +476,7 @@ func _build_hand_hint() -> void:
 	hint_counts.custom_minimum_size = Vector2(120, 0)
 	hint_counts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bottom.add_child(hint_counts)
-	var what := UIKit.button("O QUE É BOUT?", UIKit.GOLD, 16)
+	var what := UIKit.button("O QUE É BOUT?", UIKit.ACTION, 16)
 	what.custom_minimum_size = Vector2(0, 56)
 	what.pressed.connect(_open_bout_help)
 	bottom.add_child(what)
@@ -521,11 +521,11 @@ func _open_bout_help() -> void:
 
 ## Seu rodapé: retrato, pontos e, na sua vez, a dica de como jogar (tocar, tocar de novo).
 func _build_my_footer() -> void:
-	var my_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 8)
+	var my_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 8)
 	var my_row := HBoxContainer.new()
 	my_row.add_theme_constant_override("separation", 14)
 	my_box.add_child(my_row)
-	my_portrait = Portrait.new().setup(0, UIKit.GOLD, 60.0)
+	my_portrait = Portrait.new().setup(0, UIKit.BRAND, 60.0)
 	my_row.add_child(my_portrait)
 	var my_left := VBoxContainer.new()
 	my_left.add_theme_constant_override("separation", 0)
@@ -537,7 +537,7 @@ func _build_my_footer() -> void:
 	my_left.add_child(my_pts)
 	var my_tr := UIKit.label("0 rodadas", 16, UIKit.MUTED)
 	my_left.add_child(my_tr)
-	turn_hint = UIKit.label("Toque numa carta pra subir.\nToque de novo pra jogar.", 19, UIKit.GOLD, HORIZONTAL_ALIGNMENT_RIGHT)
+	turn_hint = UIKit.label("Toque numa carta pra subir.\nToque de novo pra jogar.", 19, UIKit.BRAND, HORIZONTAL_ALIGNMENT_RIGHT)
 	turn_hint.visible = false
 	my_row.add_child(turn_hint)
 	root_box.add_child(my_box)
@@ -710,7 +710,7 @@ func _refresh_hud() -> void:
 		(hud_points[p] as Label).text = "%s pts" % UIKit.fmt_dec(engine.points_of(p), 1)
 		(hud_tricks[p] as Label).text = "%d rodadas" % trick_wins[p]
 		var turn := p == turn_player
-		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 1) if turn else Color(0.8, 0.78, 0.86, 1)
+		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 1) if turn else UIKit.HUD_DIM
 		if p > 0:
 			(hud_cards[p] as Label).text = "%d cartas" % (engine.hands[p] as Array).size()
 	_update_turn_highlight(turn_player)
@@ -770,7 +770,7 @@ func _refresh_boss(animate: bool = false) -> void:
 	boss_chip.text = "%s ×%d" % [str(Scoring.CONTRACT_NAMES[engine.contract]).to_upper(), int(Scoring.CONTRACT_MULT[engine.contract])]
 	boss_portrait.seat = engine.taker
 	boss_portrait.queue_redraw()
-	boss_bar.set_colors(UIKit.GOLD if mine else UIKit.BOSS, Color("#2b2413") if mine else Color("#2a1715"))
+	boss_bar.set_colors(UIKit.ME if mine else UIKit.BOSS, UIKit.ME_TRACK if mine else UIKit.BOSS_TRACK)
 	boss_bar.set_values(minf(n["current"], n["target"]), n["target"], animate)
 	boss_bar_label.text = "Sua meta" if mine else "Meta do chefe"
 	boss_bar_value.text = "%s / %s pts" % [UIKit.fmt_dec(n["current"], 1), UIKit.fmt_dec(n["target"], 1)]
@@ -796,18 +796,7 @@ func _update_turn_highlight(turn_player: int) -> void:
 		if not active:
 			avatar.scale = Vector2.ONE
 	if turn_player > 0:
-		_pulse_avatar(seat_avatars[turn_player], my_token)
-
-
-func _pulse_avatar(avatar: PanelContainer, token: int) -> void:
-	avatar.pivot_offset = avatar.size / 2.0
-	while token == turn_pulse_token and is_inside_tree():
-		var tw := create_tween()
-		tw.tween_property(avatar, "scale", Vector2(1.06, 1.06), 0.5).set_trans(Tween.TRANS_SINE)
-		tw.tween_property(avatar, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_SINE)
-		await tw.finished
-		if not is_inside_tree():
-			return
+		FX.pulse_while(seat_avatars[turn_player], 1.06, func(): return my_token == turn_pulse_token)
 
 
 ## Balão de texto curto acima do avatar de `player` (ou perto da mão, se for o humano) —
@@ -819,7 +808,7 @@ func _speech_bubble(player: int, text: String) -> void:
 	var anchor_pos: Vector2 = avatar.global_position - popup_layer.global_position + avatar.size / 2.0
 	var l := UIKit.label(text, 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	var box := PanelContainer.new()
-	box.add_theme_stylebox_override("panel", UIKit.box(Color(0.03, 0.03, 0.07, 0.92), UIKit.GOLD, 2, 8, 8))
+	box.add_theme_stylebox_override("panel", UIKit.box(UIKit.TOAST_BG, UIKit.BRAND, 2, 8, 8))
 	box.add_child(l)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	popup_layer.add_child(box)
@@ -846,8 +835,8 @@ func _update_taker_badge() -> void:
 			title.text = tag.text
 			title.add_theme_color_override("font_color", UIKit.BOSS_TEXT if is_taker else UIKit.MUTED)
 	if engine.taker != -1:
-		boss_portrait.set_ring(UIKit.GOLD if engine.taker == 0 else UIKit.BOSS)
-		boss_panel.add_theme_stylebox_override("panel", UIKit.box(Color(0.24, 0.20, 0.08, 0.9) if engine.taker == 0 else Color(0.20, 0.07, 0.08, 0.9), UIKit.GOLD if engine.taker == 0 else UIKit.BOSS, 3, 12, 12))
+		boss_portrait.set_ring(UIKit.ME if engine.taker == 0 else UIKit.BOSS)
+		boss_panel.add_theme_stylebox_override("panel", UIKit.box(UIKit.ME_BG if engine.taker == 0 else UIKit.BOSS_BG, UIKit.ME if engine.taker == 0 else UIKit.BOSS, 3, 12, 12))
 
 
 # ------------------------------------------------------------------ licitação (tela)
@@ -873,7 +862,7 @@ func _set_bubble(p: int, text: String, kind: String) -> void:
 		"wait":
 			fg = UIKit.TURN
 		"bid":
-			bg = UIKit.GOLD
+			bg = UIKit.BRAND
 			fg = UIKit.BLACK
 		"top":
 			bg = UIKit.BOSS
@@ -936,26 +925,26 @@ func _show_intro() -> void:
 	var mine := t == 0
 	var n := _boss_numbers()
 	var ov := UIKit.overlay()
-	ov.color = Color(0.04, 0.03, 0.06, 1.0)
+	ov.color = UIKit.SCRIM
 	overlay_layer.add_child(ov)
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_theme_constant_override("separation", 10)
 	v.custom_minimum_size = Vector2(640, 0)
-	v.add_child(UIKit.label("VOCÊ É O ATACANTE" if mine else "O CHEFE DO NÍVEL", 19, UIKit.GOLD if mine else UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("VOCÊ É O ATACANTE" if mine else "O CHEFE DO NÍVEL", 19, UIKit.ME if mine else UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	var hero_box := CenterContainer.new()
-	hero_box.add_child(Portrait.new().setup(t, UIKit.GOLD if mine else UIKit.BOSS, 220.0))
+	hero_box.add_child(Portrait.new().setup(t, UIKit.ME if mine else UIKit.BOSS, 220.0))
 	v.add_child(hero_box)
 	var seal_box := CenterContainer.new()
-	var seal := UIKit.panel(UIKit.GOLD if mine else UIKit.BOSS, UIKit.GOLD if mine else UIKit.BOSS, 6)
+	var seal := UIKit.panel(UIKit.ME if mine else UIKit.BOSS, UIKit.ME if mine else UIKit.BOSS, 6)
 	seal.add_child(UIKit.label("%s ×%d" % [str(Scoring.CONTRACT_NAMES[engine.contract]).to_upper(), int(Scoring.CONTRACT_MULT[engine.contract])], 20, UIKit.BLACK))
 	seal_box.add_child(seal)
 	v.add_child(seal_box)
 	v.add_child(UIKit.label(_taker_display_name().to_upper(), 58, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("JOGA CONTRA OS OUTROS 3", 18, UIKit.GOLD if mine else UIKit.BOSS_TEXT, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("JOGA CONTRA OS OUTROS 3", 18, UIKit.ME if mine else UIKit.BOSS_TEXT, HORIZONTAL_ALIGNMENT_CENTER))
 	var bar := MeterBar.new()
 	bar.custom_minimum_size = Vector2(0, 28)
-	bar.set_colors(UIKit.GOLD if mine else UIKit.BOSS, Color("#2b2413") if mine else Color("#2a1715"))
+	bar.set_colors(UIKit.ME if mine else UIKit.BOSS, UIKit.ME_TRACK if mine else UIKit.BOSS_TRACK)
 	bar.set_values(0.0, n["target"], false)
 	v.add_child(bar)
 	var bar_row := HBoxContainer.new()
@@ -969,7 +958,7 @@ func _show_intro() -> void:
 		rule_text = "Você precisa de %s pontos (a meta cai com cada Bout que você tiver). Encha a barra: se bater, cada um dos outros 3 te paga ×%d." % [UIKit.fmt_dec(n["target"], 1), int(Scoring.CONTRACT_MULT[engine.contract])]
 	else:
 		rule_text = "Precisa de %s pontos. A barra começa vazia e enche a cada rodada dele. Se a Defesa não deixar encher, o contrato cai e cada um da Defesa ganha ×%d." % [UIKit.fmt_dec(n["target"], 1), int(Scoring.CONTRACT_MULT[engine.contract])]
-	var rl := UIKit.label(rule_text, 20, Color("#d6cbbb"), HORIZONTAL_ALIGNMENT_CENTER)
+	var rl := UIKit.label(rule_text, 20, UIKit.RULE_TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 	rl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(rl)
 	v.add_child(UIKit.label("VS", 32, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
@@ -983,7 +972,7 @@ func _show_intro() -> void:
 		var col := VBoxContainer.new()
 		col.add_theme_constant_override("separation", 4)
 		var pc := CenterContainer.new()
-		pc.add_child(Portrait.new().setup(p, UIKit.GOLD if p == 0 else UIKit.DEF, 84.0))
+		pc.add_child(Portrait.new().setup(p, UIKit.ME if p == 0 else UIKit.DEF, 84.0))
 		col.add_child(pc)
 		col.add_child(UIKit.label("Você" if p == 0 else str(config["names"][p]), 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 		col.add_child(UIKit.label("DEFESA", 14, UIKit.DEF, HORIZONTAL_ALIGNMENT_CENTER))
@@ -1134,12 +1123,12 @@ func _wait_human_discard() -> Array:
 	var legal: Array = engine.legal_discards(hand)
 	status_label.text = "Escolha 6 cartas da sua mão pra devolver ao monte"
 	var selected: Array = []
-	var panel := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 14)
+	var panel := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 14)
 	panel.name = "DiscardPrompt"
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	panel.add_child(v)
-	v.add_child(UIKit.label("DEVOLVA 6 CARTAS AO MONTE", 19, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("DEVOLVA 6 CARTAS AO MONTE", 19, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	var sub_hint := "Elas contam como pontos seus no final. Reis e Bouts (em cinza) não podem ir."
 	if tutorial:
 		sub_hint += " As marcadas \"monte\" são as 6 que acabaram de entrar na sua mão."
@@ -1160,7 +1149,7 @@ func _wait_human_discard() -> Array:
 		var from_chien: bool = tutorial and (chien_ref as Array).any(func(l: CardData) -> bool: return l.equals(card))
 		var col := VBoxContainer.new()
 		col.add_theme_constant_override("separation", 1)
-		var b := UIKit.button("%s%s" % [card.rank_label(), card.suit_symbol()], UIKit.GOLD if is_legal else UIKit.MUTED, 16)
+		var b := UIKit.button("%s%s" % [card.rank_label(), card.suit_symbol()], UIKit.ACTION if is_legal else UIKit.MUTED, 16)
 		b.custom_minimum_size = Vector2(52, 52)
 		b.disabled = not is_legal
 		b.toggle_mode = true
@@ -1244,12 +1233,12 @@ func _announce_toast(text: String) -> void:
 
 
 func _ask_yes_no(title: String, body: String) -> bool:
-	var panel := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 14)
+	var panel := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 14)
 	panel.name = "YesNoPrompt"
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	panel.add_child(v)
-	v.add_child(UIKit.label(title, 40, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label(title, 40, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	var body_label := UIKit.label(body, 32, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body_label.custom_minimum_size = Vector2(620, 0)
@@ -1286,7 +1275,7 @@ func _run_round() -> void:
 		_refresh_hud()
 		if engine.plays.is_empty() and engine.trick_number == engine.total_tricks - 1 and not last_banner_done:
 			last_banner_done = true
-			_banner("ÚLTIMA RODADA", UIKit.GOLD)
+			_banner("ÚLTIMA RODADA", UIKit.BRAND)
 		var card: CardData
 		if p == 0 and not GameState.autoplay:
 			card = await _wait_human()
@@ -1502,10 +1491,7 @@ func _resolve_trick(result: Dictionary) -> void:
 	if not is_inside_tree():
 		return
 	if win_view:
-		win_view.z_index = 5
-		var pulse := create_tween()
-		pulse.tween_property(win_view, "scale", Vector2(ARENA_SCALE, ARENA_SCALE) * 1.18, GameState.anim(0.12))
-		pulse.tween_property(win_view, "scale", Vector2(ARENA_SCALE, ARENA_SCALE) * 1.08, GameState.anim(0.12))
+		FX.win_pulse(win_view, ARENA_SCALE)
 
 	trick_label.text = "%s venceu a rodada · +%s pts" % [str(config["names"][winner]).to_upper(), UIKit.fmt_dec(points, 1)]
 	Sfx.play("chip")
@@ -1561,7 +1547,7 @@ func _float_points(winner: int, points: float) -> void:
 	var l := UIKit.label("+%s" % UIKit.fmt_dec(points, 1), 70, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	var outline := UIKit.DEF
 	if to_boss:
-		outline = UIKit.GOLD.darkened(0.3) if winner == 0 else UIKit.BOSS
+		outline = UIKit.BRAND.darkened(0.3) if winner == 0 else UIKit.BOSS
 	l.add_theme_constant_override("outline_size", 12)
 	l.add_theme_color_override("font_outline_color", outline)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1607,7 +1593,7 @@ func _finish_match() -> void:
 func _show_results(summary: Dictionary, r: Dictionary) -> void:
 	var ov := UIKit.overlay()
 	overlay_layer.add_child(ov)
-	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD if summary["won"] else UIKit.DANGER, 24)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND if summary["won"] else UIKit.DANGER, 24)
 	box.custom_minimum_size = Vector2(664, 0)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
@@ -1617,7 +1603,7 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 		title = "VOCÊ BATEU A META" if r["success"] else "VOCÊ NÃO BATEU A META"
 	if GameState.mode == GameState.Mode.RANKED:
 		title = "%dº LUGAR" % (int(summary["placement"]) + 1)
-	v.add_child(UIKit.label(title, 32, UIKit.GOLD if r["success"] else UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label(title, 32, UIKit.BRAND if r["success"] else UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(UIKit.label("%s · %s · %s / %s pts (%s%s)" % [
 		str(config["names"][r["taker"]]),
 		Scoring.CONTRACT_NAMES[r["contract"]],
@@ -1644,23 +1630,23 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 		bonus_lines.append("✦ Petit na última rodada: ponto pra Defesa (%d)" % int(petit))
 	if not bonus_lines.is_empty():
 		for line in bonus_lines:
-			v.add_child(UIKit.label(str(line), 28, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+			v.add_child(UIKit.label(str(line), 28, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	for p in engine.standings():
 		var delta := int(r["deltas"][p])
 		var line := "%s%s  %s%d" % ["♛ " if p == r["taker"] else "", str(config["names"][p]).to_upper(), "+" if delta >= 0 else "", delta]
-		v.add_child(UIKit.label(line, 34, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label(line, 34, UIKit.ME if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	for line in summary["lines"]:
 		v.add_child(UIKit.label(str(line), 30, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	if not GameState.table.is_empty() and GameState.mode == GameState.Mode.CLASSIC and not tutorial:
 		v.add_child(HSeparator.new())
-		v.add_child(UIKit.label("PLACAR DA MESA · %d mão(s)" % int(GameState.table["hands"]), 30, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label("PLACAR DA MESA · %d mão(s)" % int(GameState.table["hands"]), 30, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 		var order: Array = range(engine.num_players)
 		order.sort_custom(func(a: int, b: int) -> bool: return float(GameState.table["totals"][a]) > float(GameState.table["totals"][b]))
 		for p in order:
 			var tot := int(GameState.table["totals"][p])
-			v.add_child(UIKit.label("%s  %s%d" % [str(config["names"][p]).to_upper(), "+" if tot >= 0 else "", tot], 32, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+			v.add_child(UIKit.label("%s  %s%d" % [str(config["names"][p]).to_upper(), "+" if tot >= 0 else "", tot], 32, UIKit.ME if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	if tutorial:
 		v.add_child(HSeparator.new())
 		var tut_close := UIKit.label("Tutorial concluído! Isso não afeta suas Fragmentos nem seu elo — quando quiser, jogue de verdade no Vanilla ou Ranqueado.", 30, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
@@ -1729,12 +1715,12 @@ func _open_pause() -> void:
 		return
 	var ov := UIKit.overlay()
 	overlay_layer.add_child(ov)
-	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 24)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 24)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
 	v.custom_minimum_size = Vector2(620, 0)
 	box.add_child(v)
-	v.add_child(UIKit.label("PAUSA", 40, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("PAUSA", 40, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar, ou arraste-a pra cima e solte na mesa. Segure / botão direito = zoom.", 30, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	paused = true
 	ov.tree_exited.connect(func(): paused = false)

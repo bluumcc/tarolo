@@ -14,7 +14,6 @@ const CARD_SCENE := preload("res://scenes/Card.tscn")
 
 ## As cartas da mão têm o tamanho cheio; as da mesa ficam menores pra caber 4 lado a lado.
 const TABLE_SCALE := 0.70
-const SEAT_COLORS := [Color("#F0C879"), Color("#7FD1AE"), Color("#FF7A9C"), Color("#8FA0FF")]
 const TURN_SECONDS := 10.0   # tempo pra jogar; estourou, joga a carta mais fraca
 
 var engine := ChaosEngine.new()
@@ -27,8 +26,6 @@ var paused := false
 var hud_badges: Array = []
 var hud_titles: Array = []
 var hud_totals: Array = []
-var hud_round_pts: Array = []
-var hud_cards: Array = []
 var seat_avatars: Array = []
 var turn_pulse_token := 0
 var table_center: Panel
@@ -150,8 +147,6 @@ func _build_ui() -> void:
 	hud_badges.resize(engine.num_players)
 	hud_titles.resize(engine.num_players)
 	hud_totals.resize(engine.num_players)
-	hud_round_pts.resize(engine.num_players)
-	hud_cards.resize(engine.num_players)
 	seat_avatars.resize(engine.num_players)
 	bet_tags.resize(engine.num_players)
 	prog_tags.resize(engine.num_players)
@@ -168,7 +163,7 @@ func _build_ui() -> void:
 	var menu_btn := Widgets.icon_button("☰")
 	menu_btn.pressed.connect(_open_pause)
 	topbar.add_child(menu_btn)
-	var info_box := UIKit.panel(Color("#1B1258"), UIKit.BLACK, 8)
+	var info_box := UIKit.panel(UIKit.SURFACE, UIKit.BLACK, 8)
 	info_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var info_v := VBoxContainer.new()
 	info_v.add_theme_constant_override("separation", 4)
@@ -180,7 +175,7 @@ func _build_ui() -> void:
 	trick_dots.add_theme_constant_override("separation", 8)
 	info_v.add_child(trick_dots)
 	topbar.add_child(info_box)
-	var help_btn := Widgets.icon_button("?", UIKit.GOLD.darkened(0.1))
+	var help_btn := Widgets.icon_button("?", UIKit.ACTION.darkened(0.1))
 	help_btn.pressed.connect(_open_help)
 	topbar.add_child(help_btn)
 
@@ -227,7 +222,7 @@ func _build_ui() -> void:
 	bv.alignment = BoxContainer.ALIGNMENT_CENTER
 	bv.add_theme_constant_override("separation", 2)
 	banner_box.add_child(bv)
-	banner_title = UIKit.label("", 26, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	banner_title = UIKit.label("", 26, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER)
 	banner_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bv.add_child(banner_title)
 	banner_sub = UIKit.label("", 17, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
@@ -240,7 +235,7 @@ func _build_ui() -> void:
 	table_center.name = "TableCenter"
 	table_center.custom_minimum_size = Vector2(0, 340)
 	table_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	table_center.add_theme_stylebox_override("panel", UIKit.box(Color(0.10, 0.08, 0.30, 0.85), Color("#5B4FC9"), 3, 40, 0))
+	table_center.add_theme_stylebox_override("panel", UIKit.box(UIKit.TABLE_FILL, UIKit.TABLE_EDGE, 3, 40, 0))
 	table_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center_col.add_child(table_center)
 	_build_pot()
@@ -260,7 +255,7 @@ func _build_ui() -> void:
 	turn_bar.custom_minimum_size = Vector2(0, 18)
 	turn_bar.modulate.a = 0.0
 	turn_bar.add_theme_stylebox_override("background", UIKit.box(UIKit.PURPLE_DEEP, UIKit.PURPLE, 2, 7, 0))
-	turn_bar.add_theme_stylebox_override("fill", UIKit.box(UIKit.GOLD, UIKit.GOLD, 0, 7, 0))
+	turn_bar.add_theme_stylebox_override("fill", UIKit.box(UIKit.BRAND, UIKit.BRAND, 0, 7, 0))
 	center_col.add_child(turn_bar)
 
 	# Mão — cartas sempre no tamanho real (nunca encolhidas pra caber); quando não cabem
@@ -338,7 +333,7 @@ func _build_seats() -> HBoxContainer:
 		ring.position = Vector2(8, 10)
 		ring.pivot_offset = Vector2(42, 42)
 		ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var face := Portrait.new().setup(p, Color(0, 0, 0, 0), 68.0)
+		var face := Portrait.new().setup(p, UIKit.CLEAR, 68.0)
 		face.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		face.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		ring.add_child(face)
@@ -355,13 +350,13 @@ func _build_seats() -> HBoxContainer:
 		name_l.autowrap_mode = TextServer.AUTOWRAP_OFF
 		name_l.clip_text = true
 		seat.add_child(name_l)
-		var stack_l := UIKit.label("◎ 0", 28, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+		var stack_l := UIKit.label("◎ 0", 28, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
 		seat.add_child(stack_l)
 		var gap := Control.new()
 		gap.custom_minimum_size = Vector2(0, 10)
 		gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		seat.add_child(gap)
-		var pill := UIKit.panel(Color("#0F0A33"), UIKit.MONEY, 6)
+		var pill := UIKit.panel(UIKit.SURFACE_DEEP, UIKit.MONEY, 6)
 		pill.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var pv := VBoxContainer.new()
@@ -390,8 +385,6 @@ func _build_seats() -> HBoxContainer:
 		prog_tags[p] = status_l
 		order_badges[p] = ord
 		dealer_badges[p] = dl
-		hud_round_pts[p] = Label.new()
-		hud_cards[p] = Label.new()
 		seat_avatars[p] = ring
 	return seat_row
 
@@ -412,14 +405,14 @@ func _badge(text: String, fill: Color, border: Color) -> PanelContainer:
 
 ## Pote da rodada no centro da mesa.
 func _build_pot() -> void:
-	pot_box = UIKit.panel(Color("#2A1B4D"), UIKit.GOLD, 8)
+	pot_box = UIKit.panel(UIKit.SURFACE_POT, UIKit.MONEY, 8)
 	pot_box.custom_minimum_size = Vector2(POT_W, 0)
 	pot_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var pv := VBoxContainer.new()
 	pv.add_theme_constant_override("separation", 0)
 	pv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pot_box.add_child(pv)
-	pot_label = UIKit.label("POTE ◎ 0", 34, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	pot_label = UIKit.label("POTE ◎ 0", 34, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
 	pot_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	pv.add_child(pot_label)
 	pot_sub = UIKit.label("", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
@@ -507,23 +500,13 @@ func _apply_modifier_badge(cv: CardView, card: CardData, player: int = 0) -> voi
 	var boosted := eff > base
 	cv.points_label.text = "%s %s pts" % ["▲" if boosted else "▼", UIKit.fmt_dec(eff, 1)]
 	var dark_face := card.is_trunfo() or card.is_louco()
-	var good := UIKit.OK if dark_face else Color("#1E8A5C")
-	var bad := UIKit.LOSS if dark_face else Color("#D42A3C")
+	var good := UIKit.OK if dark_face else UIKit.GOOD_ON_LIGHT
+	var bad := UIKit.LOSS if dark_face else UIKit.BAD_ON_LIGHT
 	cv.points_label.add_theme_color_override("font_color", good if boosted else bad)
 
 
 func _plural(n: int, one: String, many: String) -> String:
 	return "%d %s" % [n, one if n == 1 else many]
-
-
-func _pulse_avatar(avatar: PanelContainer, token: int) -> void:
-	while token == turn_pulse_token and is_inside_tree():
-		var tw := create_tween()
-		tw.tween_property(avatar, "scale", Vector2(1.1, 1.1), 0.5).set_trans(Tween.TRANS_SINE)
-		tw.tween_property(avatar, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_SINE)
-		await tw.finished
-		if not is_inside_tree():
-			return
 
 
 # ------------------------------------------------------------------ níveis / modificador
@@ -537,7 +520,7 @@ func _announce_round() -> void:
 	var lines: Array = []
 	lines.append(_intro_block())
 	if engine.round_index == 0:
-		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "BLIND ◎%d" % engine.blind, "text": "Todo mundo paga o blind a cada rodada. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.GOLD})
+		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "BLIND ◎%d" % engine.blind, "text": "Todo mundo paga o blind a cada rodada. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.MONEY})
 	await _transition(kicker, lines, 3.4 if not first_round_done else 3.0)
 	first_round_done = true
 	modifier_revealed = false
@@ -577,7 +560,7 @@ func _transition(kicker: String, blocks: Array, hold: float) -> void:
 		await _wait(0.05)
 		return
 	var ov := ColorRect.new()
-	ov.color = Color(0.03, 0.02, 0.07, 0.97)
+	ov.color = UIKit.SCRIM
 	ov.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	ov.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay_layer.add_child(ov)
@@ -586,7 +569,7 @@ func _transition(kicker: String, blocks: Array, hold: float) -> void:
 	v.add_theme_constant_override("separation", 18)
 	var width := minf(get_viewport_rect().size.x - 80.0, 680.0)
 	v.custom_minimum_size = Vector2(width, 0)
-	v.add_child(UIKit.label(kicker, 46, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label(kicker, 46, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	var spins: Array = []  # [título, texto] dos blocos com caça-níquel: o texto só aparece quando ele trava
 	for b in blocks:
 		var card := UIKit.panel(UIKit.PURPLE_DEEP, b["color"], 18)
@@ -697,12 +680,12 @@ func _modal_choice(title: String, sub: String, opts: Array, cancel := false) -> 
 	modal_open = true
 	var ov := UIKit.overlay()
 	overlay_layer.add_child(ov)
-	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 24)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 24)
 	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 40.0, 600.0), 0)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
 	box.add_child(v)
-	v.add_child(UIKit.label(title, 32, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label(title, 32, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	var sl := UIKit.label(sub, 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	sl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(sl)
@@ -762,7 +745,7 @@ func _process(delta: float) -> void:
 	turn_left -= delta
 	turn_bar.value = maxf(turn_left, 0.0)
 	var urgent := turn_left <= 3.0
-	turn_bar.add_theme_stylebox_override("fill", UIKit.box(UIKit.LOSS if urgent else UIKit.GOLD, UIKit.GOLD, 0, 7, 0))
+	turn_bar.add_theme_stylebox_override("fill", UIKit.box(UIKit.LOSS if urgent else UIKit.BRAND, UIKit.BRAND, 0, 7, 0))
 	if turn_left <= 0.0:
 		var legal := engine.legal_for(0)
 		if legal.is_empty():
@@ -902,12 +885,12 @@ func _open_pause() -> void:
 		return
 	var ov := UIKit.overlay()
 	overlay_layer.add_child(ov)
-	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 24)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 24)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
 	v.custom_minimum_size = Vector2(620, 0)
 	box.add_child(v)
-	v.add_child(UIKit.label("PAUSA", 40, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("PAUSA", 40, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	var ph := UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar, ou arraste-a pra cima e solte na mesa. Segure / botão direito = zoom. Sair da mesa devolve suas fichas da stack pra carteira.", 28, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	ph.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(ph)
@@ -1075,7 +1058,7 @@ func _human_bet() -> Dictionary:
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	holder.add_theme_constant_override("margin_top", int(seat_row.global_position.y + seat_row.size.y + 6.0))
 	overlay_layer.add_child(holder)
-	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 20)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 20)
 	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	box.custom_minimum_size = Vector2(minf(vw - 32.0, 660.0), 0)
@@ -1083,7 +1066,7 @@ func _human_bet() -> Dictionary:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	box.add_child(v)
-	v.add_child(UIKit.label("SUA VEZ DE APOSTAR", 32, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("SUA VEZ DE APOSTAR", 32, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	var stack := int(engine.stacks[0])
 	var call_amt := int(opt["call"])
 	var info := "Pote ◎%d  ·  Sua stack ◎%d  ·  Sua mão: %s" % [int(engine.pot), stack, _hand_label()]
@@ -1114,7 +1097,7 @@ func _human_bet() -> Dictionary:
 		main.pressed.connect(func(): done.call({"action": "check" if bool(opt["can_check"]) else "call"}))
 		row.add_child(main)
 		if bool(opt["can_raise"]) and not bool(st["raising"]):
-			var rb := UIKit.button("AUMENTAR", UIKit.GOLD, 30)
+			var rb := UIKit.button("AUMENTAR", UIKit.MONEY, 30)
 			rb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			rb.pressed.connect(func():
 				st["raising"] = true
@@ -1139,7 +1122,7 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 	var pot_now := int(opt["pot"])
 	var level := int(engine.bet_level)
 	st["to"] = clampi(int(st["to"]), lo, hi)
-	body.add_child(UIKit.label("QUANTO AUMENTAR?", 24, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	body.add_child(UIKit.label("QUANTO AUMENTAR?", 24, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	var shortcuts := HBoxContainer.new()
 	shortcuts.add_theme_constant_override("separation", 6)
 	body.add_child(shortcuts)
@@ -1169,7 +1152,7 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 		st["to"] = maxi(int(st["to"]) - blind, lo)
 		(st["render"] as Callable).call())
 	row.add_child(minus)
-	var num := UIKit.label("◎ %d" % int(st["to"]), 52, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	var num := UIKit.label("◎ %d" % int(st["to"]), 52, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
 	num.custom_minimum_size = Vector2(190, 0)
 	row.add_child(num)
 	var plus := UIKit.button("+", UIKit.MUTED, 40)
@@ -1179,7 +1162,7 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 		st["to"] = mini(int(st["to"]) + blind, hi)
 		(st["render"] as Callable).call())
 	row.add_child(plus)
-	var ok := UIKit.button("AUMENTAR PARA ◎%d" % int(st["to"]) + (" (ALL-IN)" if int(st["to"]) >= hi else ""), UIKit.GOLD, 30)
+	var ok := UIKit.button("AUMENTAR PARA ◎%d" % int(st["to"]) + (" (ALL-IN)" if int(st["to"]) >= hi else ""), UIKit.MONEY, 30)
 	ok.pressed.connect(func(): done.call({"action": "raise", "to": float(st["to"])}))
 	body.add_child(ok)
 	var back := UIKit.button("VOLTAR", UIKit.MUTED, 26)
@@ -1204,10 +1187,7 @@ func _resolve_trick(result: Dictionary) -> void:
 	if not is_inside_tree():
 		return
 	if win_view:
-		win_view.z_index = 5
-		var pulse := create_tween()
-		pulse.tween_property(win_view, "scale", Vector2(TABLE_SCALE, TABLE_SCALE) * 1.18, GameState.anim(0.12))
-		pulse.tween_property(win_view, "scale", Vector2(TABLE_SCALE, TABLE_SCALE) * 1.08, GameState.anim(0.12))
+		FX.win_pulse(win_view, TABLE_SCALE)
 
 	var pot_amt := float(result["pot"])
 	var prize := float(result["prize"])
@@ -1233,12 +1213,12 @@ func _resolve_trick(result: Dictionary) -> void:
 		sub += "  (×%s)" % UIKit.fmt_dec(float(result["mult"]), 2)
 	if not notes.is_empty():
 		sub += "  (%s)" % ", ".join(notes)
-	_banner("%s venceu!" % wname, sub, UIKit.GOLD if winner == 0 else UIKit.INK)
+	_banner("%s venceu!" % wname, sub, UIKit.ME if winner == 0 else UIKit.INK)
 	Sfx.play("chip")
 	var punch := clampf((pot_amt + prize) / (float(engine.blind) * 16.0), 0.0, 1.0)
 	if punch > 0.25:
 		FX.shake(main_area, punch)
-	FX.burst(popup_layer, table_center.global_position - popup_layer.global_position + table_center.size / 2.0, UIKit.GOLD if winner == 0 else UIKit.CHIPS, 8 + int(punch * 20))
+	FX.burst(popup_layer, table_center.global_position - popup_layer.global_position + table_center.size / 2.0, UIKit.ME if winner == 0 else UIKit.CHIPS, 8 + int(punch * 20))
 	await _wait(1.0)
 	if not is_inside_tree():
 		return
@@ -1292,12 +1272,12 @@ func _show_round_summary() -> String:
 	var r := engine.round_result
 	var ov := UIKit.overlay()
 	overlay_layer.add_child(ov)
-	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 24)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 24)
 	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 40.0, 664.0), 0)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	box.add_child(v)
-	v.add_child(UIKit.label("FIM DO NÍVEL %d" % (int(r["round"]) + 1), 30, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("FIM DO NÍVEL %d" % (int(r["round"]) + 1), 30, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(UIKit.label(ChaosModifiers.label(int(r["modifier"]), int(r["weak_suit"])), 28, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	var stacks: Array = r["stacks"]
@@ -1308,7 +1288,7 @@ func _show_round_summary() -> String:
 	for p in order:
 		var d := int(deltas[p])
 		var line := "%s%s  ◎%d  (%s◎%d)  ·  %d rodadas" % ["♛ " if p == order[0] else "", str(config["names"][p]).to_upper(), int(stacks[p]), "+" if d >= 0 else "−", absi(d), int(won[p])]
-		var lab := UIKit.label(line, 28, (UIKit.GOLD if p == 0 else UIKit.INK), HORIZONTAL_ALIGNMENT_CENTER)
+		var lab := UIKit.label(line, 28, (UIKit.ME if p == 0 else UIKit.INK), HORIZONTAL_ALIGNMENT_CENTER)
 		lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(lab)
 	var result := {"choice": "continue"}
@@ -1363,21 +1343,21 @@ func _finish_match() -> void:
 func _show_results(summary: Dictionary) -> void:
 	var ov := UIKit.overlay()
 	overlay_layer.add_child(ov)
-	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD if summary["won"] else UIKit.LOSS, 24)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND if summary["won"] else UIKit.LOSS, 24)
 	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 40.0, 664.0), 0)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	box.add_child(v)
 	var net := int(summary["net_fichas"])
 	var title := "VOCÊ SAIU NO LUCRO!" if summary["won"] else ("VOCÊ SAIU DA MESA" if net == 0 else "VOCÊ SAIU NO PREJUÍZO")
-	v.add_child(UIKit.label(title, 32, UIKit.GOLD if summary["won"] else UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label(title, 32, UIKit.BRAND if summary["won"] else UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	var order: Array = engine.match_result["standings"]
 	var stacks: Array = engine.match_result["stacks"]
 	for i in range(order.size()):
 		var p: int = order[i]
 		var line := "%d. %s%s — ◎%d" % [i + 1, "♛ " if i == 0 else "", str(config["names"][p]).to_upper(), int(stacks[p])]
-		v.add_child(UIKit.label(line, 32, UIKit.GOLD if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label(line, 32, UIKit.ME if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	var st: Dictionary = engine.session_stats[0]
 	var stat := "%d rodadas na mesa · %d potes ganhos · %d blefes vencidos · %d desistências" % [engine.hand_no, int(st["pots"]), int(st["bluffs"]), int(st["folds"])]
@@ -1385,7 +1365,7 @@ func _show_results(summary: Dictionary) -> void:
 	stat_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(stat_l)
 	if best_gain > 0.0:
-		v.add_child(UIKit.label("★ Maior pote seu: +◎%d" % int(best_gain), 30, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label("★ Maior pote seu: +◎%d" % int(best_gain), 30, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
 	if engine.human_rake >= 1.0:
 		v.add_child(UIKit.label("Taxa da casa nos seus potes: ◎%d" % int(engine.human_rake), 24, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	for line in summary["lines"]:
@@ -1488,7 +1468,7 @@ func _refresh_bet_tags(p: int, idx: int) -> void:
 	var pile := float(engine.contrib[p]) if not bets_gathered and phase != "idle" else 0.0
 	var pill := bet_pills[p] as PanelContainer
 	(bet_tags[p] as Label).text = "◎ %d" % int(pile)
-	(bet_tags[p] as Label).add_theme_color_override("font_color", UIKit.LOSS if engine.folded[p] else UIKit.GOLD)
+	(bet_tags[p] as Label).add_theme_color_override("font_color", UIKit.LOSS if engine.folded[p] else UIKit.BRAND)
 	pill.modulate.a = 1.0 if pile > 0.0 else 0.0
 	var status := ""
 	var col := UIKit.MUTED
@@ -1567,7 +1547,7 @@ func _update_turn_highlight(turn_player: int) -> void:
 		if not active:
 			avatar.scale = Vector2.ONE
 	if turn_player >= 0:
-		_pulse_avatar(seat_avatars[turn_player], my_token)
+		FX.pulse_while(seat_avatars[turn_player], 1.1, func(): return my_token == turn_pulse_token)
 
 
 # ------------------------------------------------------------------ apostas
@@ -1579,7 +1559,7 @@ func _betting_phase() -> void:
 	pot_locked = false
 	shown_pot = 0.0
 	var first := engine.bet_actor()
-	_banner("APOSTAS", "Todos pagaram o blind (◎%d). Fala primeiro: %s. A ordem está nos números acima dos avatares." % [engine.blind, str(config["names"][first]).to_upper()], UIKit.GOLD)
+	_banner("APOSTAS", "Todos pagaram o blind (◎%d). Fala primeiro: %s. A ordem está nos números acima dos avatares." % [engine.blind, str(config["names"][first]).to_upper()], UIKit.MONEY)
 	_refresh_hud()
 	if not GameState.autoplay:
 		Sfx.play("chip")
@@ -1657,7 +1637,7 @@ func _show_bet_action(p: int, r: Dictionary) -> void:
 		_pot_to(engine.pot)
 		if str(r["action"]) == "raise":
 			FX.shake(main_area, 0.35)
-			FX.burst(popup_layer, _seat_center(p) - popup_layer.global_position, UIKit.GOLD, 14)
+			FX.burst(popup_layer, _seat_center(p) - popup_layer.global_position, UIKit.BRAND, 14)
 	elif str(r.get("action", "")) == "fold":
 		Sfx.play("lose")
 	await _wait(0.75 if p != 0 else 0.45)
@@ -1670,9 +1650,9 @@ func _gather_bets() -> void:
 		for p in range(engine.num_players):
 			if engine.contrib[p] > 0.0:
 				any = true
-				FX.fly_chips(popup_layer, _pill_center(p), _global_center(pot_box), _chips_for(float(engine.contrib[p])), UIKit.LOSS if engine.folded[p] else UIKit.GOLD)
+				FX.fly_chips(popup_layer, _pill_center(p), _global_center(pot_box), _chips_for(float(engine.contrib[p])), UIKit.LOSS if engine.folded[p] else UIKit.MONEY)
 		if any:
-			_banner("APOSTAS FECHADAS", "Todas as fichas vão pro pote.", UIKit.GOLD)
+			_banner("APOSTAS FECHADAS", "Todas as fichas vão pro pote.", UIKit.MONEY)
 			Sfx.play("combo")
 	await _wait(0.6)
 	bets_gathered = true
@@ -1688,13 +1668,13 @@ func _gather_bets() -> void:
 ## Fichas do pote voam pro vencedor; o pote zera.
 func _collect_pot(winner: int, total: float, gain: float) -> void:
 	var seat_at := _seat_center(winner)
-	FX.fly_chips(popup_layer, _global_center(pot_box), seat_at, _chips_for(total), UIKit.OK if winner == 0 else UIKit.GOLD)
+	FX.fly_chips(popup_layer, _global_center(pot_box), seat_at, _chips_for(total), UIKit.OK if winner == 0 else UIKit.MONEY)
 	Sfx.play("win" if winner == 0 else "chip")
 	await _wait(0.55)
 	if not is_inside_tree():
 		return
 	FX.float_text(popup_layer, seat_at, "%s◎ %d" % ["+" if gain >= 0.0 else "−", absi(int(gain))], UIKit.OK if gain >= 0.0 else UIKit.LOSS)
-	FX.burst(popup_layer, seat_at - popup_layer.global_position, UIKit.OK if winner == 0 else UIKit.GOLD, 16)
+	FX.burst(popup_layer, seat_at - popup_layer.global_position, UIKit.OK if winner == 0 else UIKit.BRAND, 16)
 	if winner == 0:
 		FX.shake(main_area, clampf(total / (float(engine.blind) * 20.0), 0.3, 0.9))
 		if total >= float(engine.blind) * 12.0:
@@ -1710,7 +1690,7 @@ func _collect_pot(winner: int, total: float, gain: float) -> void:
 func _resolve_walkover(result: Dictionary) -> void:
 	var winner: int = result["winner"]
 	var wname := str(config["names"][winner]).to_upper()
-	_banner("%s LEVOU SEM JOGAR!" % wname, "Todo mundo desistiu. O pote é dele e ninguém viu as cartas.", UIKit.GOLD if winner == 0 else UIKit.INK)
+	_banner("%s LEVOU SEM JOGAR!" % wname, "Todo mundo desistiu. O pote é dele e ninguém viu as cartas.", UIKit.ME if winner == 0 else UIKit.INK)
 	if winner == 0:
 		_rebuild_hand()
 	if winner == 0 and float(result.get("gain", 0.0)) > best_gain:

@@ -21,6 +21,7 @@ func _init() -> void:
 	_test_chaos()
 	_test_colors()
 	_test_economy()
+	_test_standards()
 	_test_bot_strategy()
 	print("\n%d ok, %d falhas" % [passed, failures])
 	quit(1 if failures > 0 else 0)
@@ -712,3 +713,40 @@ func _test_economy() -> void:
 		total1 += float(st)
 	check(is_equal_approx(total0, total1 + ec.house_rake), "fichas se conservam: mesa + taxa da casa = total inicial (taxa %.0f)" % ec.house_rake)
 	check(ec.house_rake > 0.0, "a casa cobra taxa nas rodadas disputadas")
+
+
+## Padronização da interface: telas só criam botões, rótulos, estilos e cores pelo UIKit.
+## (card_view e portrait são arte das cartas e dos avatares, com paleta própria.)
+func _test_standards() -> void:
+	var art := ["card_view.gd", "portrait.gd", "ui_kit.gd"]
+	var files: Array = []
+	for dir in ["res://scripts/ui/", "res://scripts/autoload/"]:
+		for f in DirAccess.get_files_at(dir):
+			if f.ends_with(".gd") and not art.has(f):
+				files.append(dir + f)
+	var banned := {
+		"Button.new()": "botão fora do UIKit (use UIKit.button / icon_button / nav_button)",
+		"StyleBoxFlat.new()": "estilo fora do UIKit (use UIKit.box / chunky / dot_style / bar_style)",
+		"Label.new()": "rótulo fora do UIKit (use UIKit.label)",
+		"Color(\"#": "cor solta (use um token do UIKit)",
+		"UIKit.GOLD": "dourado cru (use BRAND, MONEY ou ME conforme o papel)",
+	}
+	var re := RegEx.new()
+	re.compile("(^|[^A-Za-z_])Button\\.new\\(\\)")
+	for path in files:
+		var f := FileAccess.open(path, FileAccess.READ)
+		var lines := f.get_as_text().split("\n")
+		var bad := 0
+		for line in lines:
+			var l: String = line
+			if l.strip_edges().begins_with("#") or l.strip_edges().begins_with("##"):
+				continue
+			for pat in banned:
+				var hit: bool = re.search(l) != null if pat == "Button.new()" else l.contains(pat)
+				# UIKit.GOLD_LIGHT é um token legítimo.
+				if pat == "UIKit.GOLD" and not l.replace("UIKit.GOLD_LIGHT", "").contains("UIKit.GOLD"):
+					hit = false
+				if hit:
+					bad += 1
+					printerr("  %s: %s -> %s" % [path.get_file(), banned[pat], l.strip_edges()])
+		check(bad == 0, "%s segue o padrão do UIKit (%d desvios)" % [path.get_file(), bad])

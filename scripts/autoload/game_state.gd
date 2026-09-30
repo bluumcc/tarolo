@@ -42,6 +42,7 @@ func table_add(deltas: Array) -> void:
 
 func _ready() -> void:
 	_install_symbol_font()
+	get_tree().root.theme = UIKit.build_theme()
 	apply_settings()
 	get_tree().root.size_changed.connect(_update_content_scale)
 	_update_content_scale()

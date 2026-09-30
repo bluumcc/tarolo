@@ -5,23 +5,17 @@ extends Control
 
 var value := 0.0
 var max_value := 1.0
-var fill_color := Color("#E2463B")
-var track_color := Color("#2a1715")
+var fill_color := UIKit.BOSS
+var track_color := UIKit.BOSS_TRACK
 var marks: Array = []   # valores onde desenhar um traço (ex.: limiares de contrato)
 var _tween: Tween
-var _fill_sb := StyleBoxFlat.new()
-var _track_sb := StyleBoxFlat.new()
+var _fill_sb := UIKit.bar_style(UIKit.BOSS)
+var _track_sb := UIKit.bar_style(UIKit.BOSS_TRACK)
 
 
 func _init() -> void:
 	custom_minimum_size = Vector2(0, 32)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_fill_sb.set_corner_radius_all(16)
-	_track_sb.set_corner_radius_all(16)
-	_track_sb.border_color = Color("#0B0626")
-	_track_sb.set_border_width_all(4)
-	_fill_sb.border_color = Color("#0B0626")
-	_fill_sb.set_border_width_all(4)
 
 
 func set_colors(fill: Color, track: Color) -> void:

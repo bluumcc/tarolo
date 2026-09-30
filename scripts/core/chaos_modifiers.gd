@@ -131,10 +131,10 @@ static func is_secret(modifier: int) -> bool:
 
 static func color_of(modifier: int) -> Color:
 	if modifier in [Modifier.SAQUE, Modifier.VAZA_MALDITA, Modifier.ASSALTO_LIDER]:
-		return Color("#FF6F86")   # perda / perigo
+		return UIKit.LOSS         # perda / perigo
 	if scope_of(modifier) == Scope.TRICK:
-		return Color("#FF9A3D")   # efeito de uma rodada só
-	return Color("#C792EA")       # modificador de nível inteiro
+		return UIKit.COMBO        # efeito de uma rodada só
+	return UIKit.MODIFIER     # modificador de nível inteiro
 
 
 static func random_modifier(rng: RandomNumberGenerator) -> int:

@@ -73,3 +73,10 @@ Componentes: `StepsModal` (popup em passos) e `HelpContent` (textos das ajudas).
 
 ### Vanilla e Ranqueado (aplicado)
 Vanilla: anel/linha do jogador da vez e bolha "aguardando" em ciano (`TURN`), dicas do tutorial em azul (`INFO`), texto do chefe em `BOSS_TEXT` (o vermelho `BOSS` fica só em bordas e preenchimentos), botões de lance e confirmação em violeta (`ACTION`), título de derrota em `LOSS`. O Ranqueado já usava a cor da liga como identidade e ficou como está.
+
+## 7. Padronização global (aplicada)
+- **Tema global** (`UIKit.build_theme()`, aplicado à raiz em `GameState`): botões, menu de opções, caixas de seleção, campos de texto, menus suspensos, sliders e barras de rolagem já saem no padrão sem código extra.
+- **Componentes únicos no `UIKit`:** `button`, `icon_button`, `nav_button`, `panel`, `label`, `dot_style`, `bar_style`, `box`/`box_cached`, `pop_in`. `Widgets` só compõe.
+- **Papéis de cor:** todo azulejo de tela usa tokens (`SURFACE`, `TABLE_FILL`, `BOSS_BG`, `SCRIM`…), sem hexadecimal solto. Dourado por papel: `BRAND` (títulos e molduras), `MONEY` (fichas), `ME` (você).
+- **Efeitos:** `FX.pulse_while` (avatar da vez) e `FX.win_pulse` (carta vencedora) substituem as cópias em cada tela.
+- **Trava automática:** `_test_standards` no `test_runner` falha se uma tela criar `Button.new()`, `StyleBoxFlat.new()`, `Label.new()`, cor `Color("#...")` ou `UIKit.GOLD` cru. (`card_view` e `portrait` são arte das cartas e avatares, com paleta própria.)

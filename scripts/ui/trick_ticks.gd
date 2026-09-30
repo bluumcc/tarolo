@@ -5,8 +5,8 @@ extends Control
 
 var total := 18
 var winners: Array = []   # 1 = Ataque levou, 0 = Defesa levou
-var attack_color := Color("#E2463B")
-var defense_color := Color("#5AA9FF")
+var attack_color := UIKit.BOSS
+var defense_color := UIKit.DEF
 
 
 func _init() -> void:
@@ -24,9 +24,9 @@ func _draw() -> void:
 	var gap := 4.0
 	var w := (size.x - gap * float(total - 1)) / float(total)
 	for i in range(total):
-		var col := Color("#2a2320")
+		var col := UIKit.TICK_EMPTY
 		if i < winners.size():
 			col = attack_color if int(winners[i]) == 1 else defense_color
 		elif i == winners.size():
-			col = Color("#f3ece0")
+			col = UIKit.PAPER
 		draw_rect(Rect2(float(i) * (w + gap), 0.0, w, size.y), col)

@@ -7,7 +7,7 @@ extends RefCounted
 static func open(host: Control, on_change: Callable = Callable()) -> Control:
 	var ov := UIKit.overlay()
 	host.add_child(ov)
-	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 16)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 16)
 	var vp := host.get_viewport_rect().size
 	box.custom_minimum_size = Vector2(minf(vp.x - 32.0, 660.0), 0)
 	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -17,7 +17,7 @@ static func open(host: Control, on_change: Callable = Callable()) -> Control:
 	box.add_child(v)
 	var head := HBoxContainer.new()
 	v.add_child(head)
-	var title := UIKit.label("FICHAS", 40, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	var title := UIKit.label("FICHAS", 40, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title)
 	var x := Widgets.icon_button("✕", UIKit.MUTED)
