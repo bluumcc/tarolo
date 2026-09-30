@@ -1,58 +1,131 @@
-# Plano: o jogo do Blitz atender bem aos critérios competitivos
+# Plano: Blitz competitivo — singleplayer contra bots
 
-Foco só nas **regras do jogo**. Ranking, vitrine, tops, compartilhar, tutorial e UI ficam pra
-depois (fim do documento). Cada mudança tem que passar na simulação antes de entrar
-(`tests/blitz_skill_sim.gd`): vantagem de habilidade não pode cair e a mesa espelho tem que ficar ≈ 0.
+Escopo: **só o jogo, só contra bots.** Fora do escopo (fica pra depois): PvP, integridade/anti-fraude,
+ranking, tops, vitrine, compartilhar, tutorial/UI. Este documento tem três partes: (1) o que
+medimos, (2) o plano em fases, (3) a **reavaliação** do plano anterior e o que foi corrigido.
 
-## Onde estamos (nota 1–5, avaliação nossa)
-| Critério | Hoje | Meta | Como |
-|---|---|---|---|
-| Teto de habilidade | 3 | 4 | 1, 2 |
-| Peso da sorte (menor = melhor) | 3 | 4 | 2, 4 |
-| Informação escondida / blefe | 1 | 4 | 1 |
-| Decisão em cada turno | 4 | 4 | (manter) |
-| Fácil de aprender | 3 | 4 | 3 |
-| Sessão curta e viciante | 4 | 4 | (manter) |
-| Integridade PvP (regras) | 2 | 3 | 1, 4 |
+Regra de ouro: nenhuma mudança de regra entra sem passar pela simulação, e toda mudança nasce
+atrás de uma chave (flag) pra poder ser desligada.
 
-## Mudanças de regra (ordem de prioridade)
+---------------------------------------------------------------------------------------------
 
-### 1. Palpite oculto até o fim do nível (showdown)
-Hoje todos veem o palpite de todos (não há o que esconder nem ler). Novo: cada um vê só o próprio
-palpite; os rivais mostram apenas quantas rodadas já ganharam. No fim do nível, todos revelam
-(o "showdown"). **Dobrar = aumentar a aposta, cobrir = pagar pra ver, deixar = desistir do peso**:
-o mesmo raciocínio do poker (o rival dobrou: ele acha que acerta?). Blefe = dobrar sem estar
-seguro. Leitura = deduzir o palpite de quem joga de um jeito estranho. Também fica MAIS simples de
-aprender: menos coisa na mesa pra acompanhar. Custo de implementação: pequeno (a engine já guarda
-os palpites; só muda o que é mostrado) + bots deixam de ler o palpite dos outros (passam a
-estimar pelo placar).
+## 1. Diagnóstico (medido, não chutado)
 
-### 2. Troca de 1 carta antes do palpite
-Cada jogador recebe 1 carta aberta do monte e pode trocá-la por qualquer carta da própria mão
-(ou recusar). É uma decisão barata, clara e que dá controle sobre a sorte da mão (sobe o teto de
-habilidade e reduz o peso da sorte). Custo: ~5 s por nível.
+Scripts: `tests/blitz_skill_sim.gd` (vantagem de habilidade), `tests/blitz_diag_sim.gd`
+(estratégias degeneradas, uso de dobrar/cobrir, ruído). Bot×bot, sem taxa, ~60 sessões × 30 níveis.
 
-### 3. Enxugar regras que não pagam o preço
-- **Sem triplicar**: só dobrar (1 vez por nível). A 3ª camada de aposta quase não muda decisões e
-  ocupa espaço de regra.
-- **Peso do palpite** (×1 / ×1,5 / ×2): manter só se a simulação mostrar que ele equilibra a
-  dificuldade dos palpites; se não, dividir o pote igualmente entre quem acertou.
-- **Modificadores**: o conjunto (9) é sempre o mesmo, só a ordem das 8 rodadas muda — o jogador
-  aprende a lista uma vez e planeja em cima dela.
-
-### 4. Teto de prêmio por rodada
-As fichas das cartas (e Saque/Assalto/Maldita) têm teto por rodada (ex.: 2 blinds). Duas razões:
-diminuem o peso da sorte de uma rodada rica e limitam "passar fichas de propósito" entre dois
-jogadores combinados (dump), hoje possível jogando carta cara na rodada de um parceiro.
-
-## Como validar cada mudança
-| Mudança | Simulação | Passa se |
+| # | Fato medido | Leitura |
 |---|---|---|
-| 1 | bots com estimativa de palpite alheio pelo placar vs bots que ignoram | quem estima ganha ≥ quem ignora; espelho ≈ 0 |
-| 2 | bot que usa a troca vs bot que recusa | troca dá ≥ +0,3 blind/nível e reduz a variância |
-| 3 | com e sem triplicar; com e sem peso | vantagem de habilidade não cai |
-| 4 | teto 1, 2, 3 blinds | vantagem de habilidade ≥ 80% da atual e dump rende menos que hoje |
+| F1 | Espelho (4 bots iguais) ≈ 0 (−0,06 ± 0,13 blind/nível) | a mesa é justa, nenhum assento tem vantagem |
+| F2 | Bot que joga os pontos das cartas ganha ≈ +1,0 blind/nível do bot antigo; sem pontos (fator 0) ≈ +0,7 | a maior parte da habilidade está em **conduzir as vazas**, os pontos somam ≈ +0,3–0,4 |
+| F3 | Nenhuma estratégia degenerada é positiva: palpite fixo 0 → −1,41; 1 → −0,43; 2 → −0,65; 3 → −0,66; 4 → −1,76; 5+ → −2,2 a −3,5 | não existe "truque" de palpite; o valor de **ler a mão** (vs. palpite fixo bom) é só ≈ 0,4–0,6 blind/nível |
+| F4 | Desvio por nível ≈ 6,4–7,0 blinds (entrada = 4). Pra distinguir com 2σ uma vantagem de 1 blind/nível: **~150–180 níveis** | a sorte por nível é grande; no poker costuma ser pior (milhares de mãos), então é aceitável, mas o jogador nunca "sente" habilidade só pelo resultado |
+| F5 | Dobrar: usado em 36% dos níveis-jogador, acerta 71% (base ≈ 30%). Triplicar: 19%, acerta **88%**. Cobrir: acerta 72% | triplicar é quase automático (no alvo + mão fraca): decisão de baixa qualidade que só ocupa regra |
+| F6 | Os bots hoje **não usam o palpite dos outros** pra nada (só o próprio) | esconder os palpites hoje só prejudicaria o humano; o palpite alheio só vira decisão se os bots tiverem estilos que o revelem |
+| F7 | Pote proporcional à proximidade (exato 1,0 / ±1 0,35 / ±2 0,1): desvio/nível 7,0 → 3,9 (−44%), mas a vantagem cai 1,05 → 0,65 (−38%); níveis pra 2σ: 177 → 147 | **rejeitado**: quase não melhora o sinal e tira a clareza "acertou = leva o pote" e o jackpot |
 
-## Depois (não agora)
-Ranking por habilidade (lucro/nível), tops, jogadores, vitrine, compartilhar momentos, Mão do
-Dia, tutorial guiado, registro de mão (`hand_log`), detecção de fraude, matchmaking, duelo 1v1.
+Consequências pra design (SP vs bots):
+- A "habilidade" do humano é o quanto ele passa do bot. **A régua é o bot.** Se o Difícil for fraco, o
+  teto é baixo; se for perfeito, o jogo é injusto. Precisamos de uma escada de bots calibrada.
+- Bots previsíveis viram farm de fichas (o jogador aprende o padrão e nunca compra fichas).
+  Precisa de estilos + aleatoriedade controlada + economia calibrada.
+
+---------------------------------------------------------------------------------------------
+
+## 2. Plano em fases
+
+Cada fase: regra exata → motor → bots → testes → simulação → critério de aceite → risco/reversão.
+
+### Fase 0 — Régua e instrumentos (antes de mexer em regra)
+- **Bot Oráculo** (teto): joga com amostragem (Monte Carlo) das mãos ocultas dos rivais pra escolher
+  palpite e carta. Serve só de régua: quanto o melhor jogador possível ganha do Difícil.
+- **Curva de EV por palpite** (quanto rende cada palpite dado o quão "esperado" ele era) → decide se
+  os pesos ×1 / ×1,5 / ×2 equilibram a dificuldade.
+- **Painel de gate** `tests/blitz_gate.gd`: roda o conjunto de simulações e falha se sair dos
+  limites (espelho |x| < 0,25; vantagem do bom ≥ 0,6; sem estratégia degenerada positiva).
+- Aceite: Oráculo > Difícil por margem conhecida (esperado +0,5 a +1,5 blind/nível). Se for ≈ 0,
+  o Difícil já é quase o teto e o problema é de regra, não de bot.
+
+### Fase 1 — Bots com estilo e escada de dificuldade (base de tudo)
+- 3 **estilos** por bot (persistem enquanto ele estiver na mesa; o jogador aprende quem é quem):
+  *Cauteloso* (só dobra com quase certeza, palpite conservador), *Agressivo* (dobra e cobre mais,
+  às vezes dobra sem estar no alvo = **blefe**), *Calculista* (equilibrado, joga pelos pontos).
+- 3 **dificuldades** (Fácil / Normal / Difícil) ortogonais ao estilo; ruído de palpite e de carta
+  calibrado; o Difícil nunca é o Oráculo.
+- Aleatoriedade controlada: nenhuma decisão de bot 100% determinística (evita farm).
+- Aceite (simulação): espelho por estilo ≈ 0; Difícil > Normal > Fácil com margens ≥ 0,4 blind/nível
+  entre degraus; nenhum estilo domina os outros dois (cada um perde de pelo menos um).
+- Risco: bots "agressivos" quebram a economia (pagam demais). Gate: fluxo de fichas por bot.
+
+### Fase 2 — Enxugar regras (aprendizado + qualidade de decisão)
+- **Sem triplicar** (F5: decisão quase automática). Só dobrar, 1× por nível (chave `max_doubles`).
+- **Pesos do palpite**: manter, ajustar ou remover conforme a curva de EV da Fase 0.
+- **Camadas de regra** pra quem está começando (SP): níveis 1–3 sem dobrar/cobrir/modificadores;
+  dobrar entra no nível 4; modificadores no nível 6. Vale por conta (contador de níveis).
+- Aceite: vantagem de habilidade não cai > 15%; % de sessões que passam do nível 5 sobe (medido
+  depois, com telemetria) — aqui só validamos a vantagem por simulação.
+
+### Fase 3 — Informação escondida (palpite oculto + showdown)
+- Cada jogador vê só o próprio palpite; os rivais mostram só as rodadas já ganhas. Revelação no
+  fim do nível. **Dobrar = aumentar (raise), cobrir = pagar pra ver (call), deixar = desistir do
+  peso (fold).** Blefe = dobrar sem estar seguro; leitura = deduzir o alvo do rival pelo placar,
+  pelo estilo e pelo momento em que dobrou.
+- Bots: passam a **inferir** o alvo dos rivais (P(alvo | rodadas ganhas, rodadas que faltam,
+  estilo)) e a usar isso ao cobrir/sabotar; bots Agressivos blefam.
+- Dependência: **só entra com a Fase 1** (sem estilos e tells não há o que ler: seria só um
+  handicap pro humano — F6).
+- Aceite: bot que infere ≥ bot que ignora por ≥ +0,15 blind/nível; espelho ≈ 0; humano-proxy
+  (Oráculo com informação parcial) > Difícil.
+- Risco: excesso de incerteza deixa o jogo "cego". Reversão: chave `reveal_at` (revela na rodada N,
+  0 = sempre visível, como hoje).
+
+### Fase 4 — Troca de 1 carta
+- Antes do palpite, cada jogador recebe 1 carta aberta do monte e pode trocá-la por uma da mão ou
+  recusar. Bots decidem por poder da carta vs. a pior da mão.
+- Aceite: bot que troca bem ≥ +0,3 blind/nível sobre o que recusa; a média de níveis com palpite
+  exato não cai; sessão ≤ +8 s por nível.
+- Risco: aumenta a força média das mãos (e portanto os acertos) → recalibrar bots.
+
+### Fase 5 — Economia contra bots (fecha o ciclo)
+- Problema: quem joga bem ganha dos bots e nunca compra fichas (fichas dos bots são "criadas").
+  Medida: simular jornadas de 500 níveis com perfis novato / médio / forte / oráculo.
+- Ajustes possíveis (nessa ordem): força dos bots por mesa (mesa cara = bots mais difíceis), taxa
+  (rake) por mesa, valor do buy-in dos bots, teto de ganho por sessão.
+- Meta: novato quebra em ≈ N níveis (compra ou recarga diária), médio perde ≈ 0,2–0,4 blind/nível
+  (rake), forte ≈ 0 a +0,3, oráculo ≈ +0,7 no topo. Ninguém "farma" indefinidamente.
+- Aceite: as trajetórias simuladas batem essas metas.
+
+### Fase 6 — Fechamento
+- Atualizar ajuda/texto (`help_content.gd`), `docs/BLITZ.md`, `docs/ECONOMIA.md`; congelar as
+  chaves nos valores finais; rodar `blitz_gate.gd` e a suíte completa.
+
+---------------------------------------------------------------------------------------------
+
+## 3. Reavaliação do plano anterior e correções
+
+Plano anterior (versão "regras do jogo"): 1) palpite oculto, 2) troca de carta, 3) enxugar regras,
+4) teto de prêmio por rodada. O que a medição mostrou:
+
+| Item anterior | Veredito | Correção |
+|---|---|---|
+| Palpite oculto sozinho | **Errado como estava.** Os bots não usam o palpite alheio (F6): só prejudicaria o humano | Depende de bots com estilo e inferência; vira **Fase 3**, depois da Fase 1 |
+| Teto de prêmio por rodada (anti-dump) | **Removido.** Dump é problema de PvP; no SP só reduziria a vantagem que vem dos pontos (F2) | fora do plano |
+| Trocar carta pra reduzir a sorte | **Hipótese não provada.** A sorte por nível (F4) é dominada pelo pote; troca de carta muda a mão, não o pote | Mantida como **Fase 4**, avaliada por vantagem de habilidade, não por "menos sorte" |
+| "Sorte 3 → 4" como meta | **Meta mal posta.** Poker costuma precisar de milhares de mãos; ~150 níveis pra sentir habilidade é aceitável. Reduzir variância pelo pote custa vantagem (F7) | Nota de sorte mantida; o foco passa a ser **qualidade de decisão** |
+| Sem triplicar | **Confirmado pelos dados** (F5: 88%, quase automático) | Fase 2 |
+| Nota de "integridade PvP" | **Fora do escopo** (SP) | removida da tabela |
+| (faltava) escada de bots | **Lacuna grave**: a habilidade do humano só existe em relação aos bots | Fase 0 (Oráculo) + Fase 1 |
+| (faltava) economia vs bots | **Lacuna grave**: farm de fichas | Fase 5 |
+| (faltava) aprendizado | Regras demais pro "arcade viral" | camadas de regra, Fase 2 |
+
+### Pontos que ainda são incertos (e como resolver)
+1. **Quanto vale o teto real?** Depende do Oráculo (Fase 0). Se Oráculo ≈ Difícil, o gargalo é a regra.
+2. **Palpite oculto pode não melhorar nada** se os bots não tiverem bons tells. Só vale com a Fase 1.
+3. **Simulação usa bots como humano**: comportamento real difere. Mitigação: só decidir por regra
+   com margem ≥ 0,3 blind/nível (acima do ruído) e manter chaves pra reverter.
+4. **Retenção** (viciante) não se mede em simulação. Depende de telemetria com jogadores reais
+   (depois).
+
+### Fora do escopo agora
+PvP, matchmaking, anti-fraude, `hand_log` de produção, ranking/tops/vitrine, compartilhar, Mão do Dia,
+tutorial guiado, cosméticos, torneios, novos modificadores.
