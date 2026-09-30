@@ -148,6 +148,7 @@ const CHAOS_TABLES := [
 	{"name": "Alta", "blind": 100, "bots": [2, 2, 2]},       # Difícil x3
 ]
 var chaos_table := 0
+var chaos_mode := "chaos"     # "chaos" (aposta por rodada) ou "blitz" (palpite de vitórias por nível)
 
 
 func chaos_buy_in(table: int = -1) -> int:
@@ -176,6 +177,7 @@ func chaos_config() -> Dictionary:
 		"blind": blind,
 		"buy_in": buy_in,
 		"table_name": str(t["name"]),
+		"mode": chaos_mode,
 		"levels": 3 if autoplay else 0,
 		"entered": entered,
 	}

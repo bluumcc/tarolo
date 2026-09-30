@@ -51,13 +51,15 @@ func _play(mode: int) -> Dictionary:
 	return summary
 
 
-func _play_chaos() -> Dictionary:
+func _play_chaos(mode := "chaos") -> Dictionary:
+	GameState.chaos_mode = mode
 	# A mesa cobra o buy-in: sem saldo ela nem abre (e o teste ficaria esperando pra sempre).
 	SaveManager.section("profile")["fichas"] = maxi(int(SaveManager.section("profile")["fichas"]), 2000)
 	var g: Node = CHAOS.instantiate()
 	add_child(g)
 	var summary: Dictionary = await g.match_finished
-	check(g.engine.hand_no >= 1, "mesa de Caos rodou (%d rodadas de aposta)" % g.engine.hand_no)
+	check(g.engine.hand_no >= 1, "mesa de %s rodou (%d rodadas)" % [mode, g.engine.hand_no])
+	check(g.engine.blitz == (mode == "blitz"), "modo da mesa respeitado")
 	check(not g.engine.match_result.is_empty(), "match_result preenchido no fim")
 	await get_tree().process_frame
 	g.queue_free()
@@ -91,3 +93,8 @@ func _run() -> void:
 	for i in range(4):
 		var s := await _play_chaos()
 		print("Caos %d: %dº lugar | %s" % [i + 1, int(s["placement"]) + 1, " | ".join(s["lines"])])
+
+	for i in range(4):
+		var s := await _play_chaos("blitz")
+		print("Blitz %d: %dº lugar | %s" % [i + 1, int(s["placement"]) + 1, " | ".join(s["lines"])])
+	GameState.chaos_mode = "chaos"

@@ -22,6 +22,16 @@ static func choose(engine: ChaosEngine, player: int, difficulty: int, rng: Rando
 	var high_stakes := ev in [mods.VAZA_DOURADA, mods.ULTIMA_TRIPLO, mods.PRIMEIRA_DOBRO, mods.SAQUE] \
 		or (ev == mods.ASSALTO_LIDER and player == engine._highest_player()) \
 		or engine.pot > float(engine.blind) * 8.0
+	var blitz_win := false
+	if engine.blitz:
+		# Blitz: joga pra fechar o palpite. Já no alvo (ou estourou) foge das rodadas; se falta,
+		# tenta ganhar na proporção do que falta pelas rodadas que restam.
+		high_stakes = false
+		var need := int(engine.predicts[player]) - int(engine.wins[player])
+		var left := engine.tricks_left()
+		blitz_win = need > 0 and (need >= left or rng.randf() < float(need) / float(left))
+		want_lose = not blitz_win
+		high_stakes = blitz_win and need >= left
 
 	var is_last := engine.plays.size() == engine.active_count() - 1
 	var winners: Array = legal.filter(func(c: CardData) -> bool: return engine.would_win(c, player))
@@ -29,6 +39,10 @@ static func choose(engine: ChaosEngine, player: int, difficulty: int, rng: Rando
 
 	if want_lose:
 		if not losers.is_empty():
+			# Blitz: perder com a carta mais forte que ainda perde (descarta força embaixo de uma
+			# carta maior) evita ser obrigado a vencer mais tarde.
+			if engine.blitz and not engine.plays.is_empty() and (difficulty == BotAI.Difficulty.HARD or rng.randf() < 0.4):
+				return _strongest_loser(losers)
 			return _cheapest(engine, losers, player)
 		return _cheapest(engine, winners, player)
 
@@ -42,7 +56,16 @@ static func choose(engine: ChaosEngine, player: int, difficulty: int, rng: Rando
 			return pool[0]
 		return pool[0] if inverted else pool[pool.size() - 1]
 
-	if engine.plays.is_empty() and not inverted and engine.pot > float(engine.blind) * float(engine.active_count()) * 1.2:
+	if engine.blitz and blitz_win and engine.plays.is_empty() and not inverted:
+		var strong: Array = legal.filter(func(c: CardData) -> bool: return not c.is_louco())
+		if not strong.is_empty():
+			strong.sort_custom(func(a: CardData, b: CardData) -> bool:
+				if a.is_trunfo() != b.is_trunfo():
+					return a.is_trunfo()
+				return a.rank > b.rank)
+			return strong[0]
+
+	if not engine.blitz and engine.plays.is_empty() and not inverted and engine.pot > float(engine.blind) * float(engine.active_count()) * 1.2:
 		# Rodada aumentada: abre com a carta mais forte pra defender o pote.
 		var power: Array = legal.filter(func(c: CardData) -> bool: return not c.is_louco() and engine.card_value(c, player) >= 0.0)
 		if not power.is_empty():
@@ -76,6 +99,17 @@ static func _trick_value(engine: ChaosEngine) -> float:
 	return v
 
 
+static func _strongest_loser(cards: Array) -> CardData:
+	var pool: Array = cards.filter(func(c: CardData) -> bool: return not c.is_louco())
+	if pool.is_empty():
+		pool = cards
+	pool.sort_custom(func(a: CardData, b: CardData) -> bool:
+		if a.is_trunfo() != b.is_trunfo():
+			return a.is_trunfo()
+		return a.rank > b.rank)
+	return pool[0]
+
+
 ## Carta mais barata de perder: menor valor (naipe maldito = -1 sai primeiro), sem Bouts.
 static func _cheapest(engine: ChaosEngine, cards: Array, player: int) -> CardData:
 	var pool: Array = cards.filter(func(c: CardData) -> bool: return not c.is_bout())
@@ -97,33 +131,32 @@ static func hand_strength(engine: ChaosEngine, player: int) -> float:
 	var inverted := ev == ChaosModifiers.Modifier.MUNDO_CONTRARIO or ev == ChaosModifiers.Modifier.VAZA_INVERTIDA
 	var powers: Array = []
 	for c in engine.hands[player]:
-		var card: CardData = c
-		var pw := 0.0
-		if card.is_louco():
-			pw = 0.85 if engine.louco_can_win() else 0.05
-			if inverted:
-				pw = 0.05
-		elif inverted:
-			pw = 0.1 if card.is_trunfo() else 1.0 - float(card.rank) / 14.0 * 0.85
-		elif card.is_trunfo():
-			pw = 0.5 + 0.5 * float(card.rank) / 21.0
-		elif card.rank == 14:
-			pw = 0.55
-		elif card.rank == 13:
-			pw = 0.4
-		elif card.rank == 12:
-			pw = 0.3
-		elif card.rank == 11:
-			pw = 0.25
-		else:
-			pw = float(card.rank) / 14.0 * 0.2
-		powers.append(pw)
+		powers.append(_card_power(engine, c, inverted))
 	if powers.is_empty():
 		return 0.0
 	powers.sort()
 	powers.reverse()
 	var second: float = powers[1] if powers.size() > 1 else powers[0]
 	return 0.6 * float(powers[0]) + 0.4 * second
+
+
+## Poder de uma carta (0 a 1) considerando as regras do nível.
+static func _card_power(engine: ChaosEngine, card: CardData, inverted: bool) -> float:
+	if card.is_louco():
+		return 0.05 if inverted else (0.85 if engine.louco_can_win() else 0.05)
+	if inverted:
+		return 0.1 if card.is_trunfo() else 1.0 - float(card.rank) / 14.0 * 0.85
+	if card.is_trunfo():
+		return 0.5 + 0.5 * float(card.rank) / 21.0
+	if card.rank == 14:
+		return 0.55
+	if card.rank == 13:
+		return 0.4
+	if card.rank == 12:
+		return 0.3
+	if card.rank == 11:
+		return 0.25
+	return float(card.rank) / 14.0 * 0.2
 
 
 ## Chance estimada de levar a rodada (0 a 1).
@@ -179,3 +212,52 @@ static func bet_decision(engine: ChaosEngine, player: int, difficulty: int, rng:
 	if pwin > odds * call_margin or (bluffing and rng.randf() < 0.5):
 		return {"action": "call", "to": 0.0, "bluff": false}
 	return {"action": "fold", "to": 0.0, "bluff": false}
+
+
+# ------------------------------------------------------------------ Blitz
+
+const EXPECT_SCALE := 1.48   # calibrado por simulação (tests/blitz_sim.gd)
+
+
+## Quantas rodadas a mão deve ganhar no nível (soma da chance de cada carta).
+static func expected_wins(engine: ChaosEngine, player: int) -> float:
+	var ev := engine.modifier
+	var inverted := ev == ChaosModifiers.Modifier.MUNDO_CONTRARIO
+	var total := 0.0
+	for c in engine.hands[player]:
+		var pw := _card_power(engine, c, inverted)
+		total += 0.04 + 0.62 * pw * pw
+	return total * EXPECT_SCALE
+
+
+## Palpite sugerido (0 a 8) — também alimenta a dica pro jogador.
+static func suggested_predict(engine: ChaosEngine, player: int) -> int:
+	return clampi(int(round(expected_wins(engine, player))), 0, ChaosEngine.HAND_SIZE)
+
+
+## Palpite do bot (0 a 8). Difícil lê melhor a mão; fácil erra bastante.
+static func blitz_pick(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> int:
+	var noise := 0.9 if difficulty == BotAI.Difficulty.EASY else (0.45 if difficulty == BotAI.Difficulty.NORMAL else 0.15)
+	var ex := expected_wins(engine, player) + rng.randf_range(-noise, noise)
+	return clampi(int(round(ex)), 0, ChaosEngine.HAND_SIZE)
+
+
+## Vitórias que a mão que sobrou ainda deve render.
+static func expected_left(engine: ChaosEngine, player: int) -> float:
+	return expected_wins(engine, player)
+
+
+## Dobra quando a chance de acertar é alta: já no alvo e com a mão que sobrou fraca demais pra
+## ganhar mais (na simulação acerta ~90%), ou faltando 1 rodada e uma carta certeira. Fácil nunca
+## dobra; normal só com muita certeza.
+static func wants_double(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> bool:
+	if difficulty == BotAI.Difficulty.EASY or not engine.can_double(player):
+		return false
+	var need := engine.blitz_need(player)
+	var left := expected_left(engine, player)
+	var ok := false
+	if need == 0:
+		ok = left < (0.3 if difficulty == BotAI.Difficulty.HARD else 0.15)
+	elif difficulty == BotAI.Difficulty.HARD and engine.tricks_left() == 1:
+		ok = absf(left - float(need)) < 0.15
+	return ok and rng.randf() < 0.85

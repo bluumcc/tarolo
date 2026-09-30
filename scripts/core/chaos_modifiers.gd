@@ -29,6 +29,10 @@ const ALL := [
 	Modifier.TRUNFO_DOBRO, Modifier.REIS_DOBRO, Modifier.LOUCO_VENCE, Modifier.MUNDO_CONTRARIO,
 	Modifier.VAZA_DOURADA, Modifier.VAZA_INVERTIDA, Modifier.VAZA_MALDITA, Modifier.SAQUE,
 ]
+## Pool do Blitz: só regras que mudam QUEM vence ou quantas vitórias contam (nada de prêmio em pontos).
+const BLITZ_POOL := [
+	Modifier.LOUCO_VENCE, Modifier.MUNDO_CONTRARIO, Modifier.VAZA_INVERTIDA, Modifier.VAZA_DOURADA,
+]
 ## Modificadores que sorteiam um naipe.
 const SUIT_MODS := [Modifier.NAIPE_FRACO, Modifier.NAIPE_FORTE, Modifier.NAIPE_MALDITO]
 
@@ -96,6 +100,11 @@ const TIPS := {
 	Modifier.ULTIMA_TRIPLO: "A última rodada vale TRIPLO: segure suas melhores cartas até o fim.",
 }
 
+## No Blitz a Rodada Dourada conta 2 vitórias (não vale pontos).
+const BLITZ_NAMES := {Modifier.VAZA_DOURADA: "Rodada Dobrada"}
+const BLITZ_DESCRIPTIONS := {Modifier.VAZA_DOURADA: "Quem vencer essa rodada conta 2 vitórias no palpite, em vez de 1."}
+const BLITZ_TIPS := {Modifier.VAZA_DOURADA: "Muda a conta do palpite: se você quer 2 vitórias, basta ganhar só essa. Se não quer, fuja dela."}
+
 const COMBO_NAMES := {
 	"MAO_QUENTE": "MÃO QUENTE",
 	"CORTADO": "CORTADO",
@@ -125,7 +134,9 @@ static func has_suit(modifier: int) -> bool:
 
 ## Verdadeiro se a rodada sorteada é surpresa (só revelada quando começa). A 1ª e a última
 ## têm posição fixa e conhecida, então são anunciadas já no início do nível.
-static func is_secret(modifier: int) -> bool:
+static func is_secret(modifier: int, blitz := false) -> bool:
+	if blitz:
+		return false     # no Blitz tudo é anunciado: o palpite precisa de informação
 	return scope_of(modifier) == Scope.TRICK and modifier != Modifier.PRIMEIRA_DOBRO and modifier != Modifier.ULTIMA_TRIPLO
 
 
@@ -146,3 +157,16 @@ static func label(modifier: int, weak_suit: int) -> String:
 	if has_suit(modifier) and weak_suit != -1:
 		return "%s (%s)" % [NAMES[modifier], CardData.SUIT_NAMES[weak_suit]]
 	return NAMES[modifier]
+
+
+## Texto do modificador conforme o modo (Blitz reescreve a Rodada Dourada).
+static func name_of(modifier: int, blitz := false) -> String:
+	return str(BLITZ_NAMES[modifier]) if blitz and BLITZ_NAMES.has(modifier) else str(NAMES[modifier])
+
+
+static func desc_of(modifier: int, blitz := false) -> String:
+	return str(BLITZ_DESCRIPTIONS[modifier]) if blitz and BLITZ_DESCRIPTIONS.has(modifier) else str(DESCRIPTIONS[modifier])
+
+
+static func tip_of(modifier: int, blitz := false) -> String:
+	return str(BLITZ_TIPS[modifier]) if blitz and BLITZ_TIPS.has(modifier) else str(TIPS[modifier])

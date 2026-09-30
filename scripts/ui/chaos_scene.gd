@@ -68,6 +68,10 @@ var pot_label: Label
 var pot_sub: Label
 var bet_tags: Array = []       # "◎25 · 3" por assento
 var prog_tags: Array = []      # "1/3 ♨×1,5" ao vivo por assento
+var hold_stacks: Array = []      # Blitz: stacks de antes da liquidação (a tela só muda depois da animação)
+var hold_pot := -1.0
+var blitz_revealed: Array = []  # Blitz: palpite de cada um já revelado na mesa
+var double_btn: Button
 var shown_pot := 0.0
 var pot_locked := false        # contador do pote rolando: o refresh não sobrescreve
 
@@ -90,6 +94,7 @@ func _ready() -> void:
 	engine.setup_match(config)
 	total_in = int(config["buy_in"])
 	for p in range(engine.num_players):
+		blitz_revealed.append(false)
 		action_text.append("")
 		action_color.append(UIKit.MUTED)
 		shown_totals.append(engine.stacks[p])
@@ -97,9 +102,10 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_on_resize)
 	_refresh_hud()
 	_rebuild_hand()
-	if not GameState.autoplay and not bool(SaveManager.section("tips").get("chaos_intro", false)):
+	var intro_key := "blitz_intro" if engine.blitz else "chaos_intro"
+	if not GameState.autoplay and not bool(SaveManager.section("tips").get(intro_key, false)):
 		await _intro_slides()
-		SaveManager.section("tips")["chaos_intro"] = true
+		SaveManager.section("tips")[intro_key] = true
 		SaveManager.save_game()
 		if not is_inside_tree():
 			return
@@ -118,7 +124,7 @@ func _show_insufficient_fichas() -> void:
 	v.add_theme_constant_override("separation", 12)
 	box.add_child(v)
 	v.add_child(UIKit.label("FICHAS INSUFICIENTES", 28, UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER))
-	var l := UIKit.label("Você precisa de %d fichas pra sentar na Mesa Caos. Jogue Vanilla ou Ranqueado, ou volte ao menu e peça um empréstimo da casa." % int(config["buy_in"]), 32, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var l := UIKit.label("Você precisa de %d fichas pra sentar na Mesa %s. Jogue Vanilla ou Ranqueado, ou volte ao menu e peça um empréstimo da casa." % [int(config["buy_in"]), "Blitz" if str(config.get("mode", "chaos")) == "blitz" else "Caos"], 32, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(620, 0)
 	v.add_child(l)
@@ -241,11 +247,21 @@ func _build_ui() -> void:
 	_build_pot()
 	table_center.resized.connect(_layout_table)
 
+	var status_row := HBoxContainer.new()
+	status_row.add_theme_constant_override("separation", 10)
+	status_row.custom_minimum_size = Vector2(0, 52)
+	center_col.add_child(status_row)
 	status_label = UIKit.label("", 21, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status_label.custom_minimum_size = Vector2(0, 44)
+	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	center_col.add_child(status_label)
+	status_row.add_child(status_label)
+	double_btn = UIKit.button("DOBRAR", UIKit.MONEY, 24)
+	double_btn.custom_minimum_size = Vector2(190, 52)
+	double_btn.visible = false
+	double_btn.pressed.connect(_on_double_pressed)
+	status_row.add_child(double_btn)
 
 	# Relógio da jogada: barra que esvazia — some fora da sua vez.
 	turn_bar = ProgressBar.new()
@@ -362,7 +378,7 @@ func _build_seats() -> HBoxContainer:
 		var pv := VBoxContainer.new()
 		pv.add_theme_constant_override("separation", -2)
 		pv.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var cap_l := UIKit.label("APOSTA", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		var cap_l := UIKit.label("PALPITE" if engine.blitz else "APOSTA", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 		cap_l.autowrap_mode = TextServer.AUTOWRAP_OFF
 		pv.add_child(cap_l)
 		var bet_l := UIKit.label("", 28, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
@@ -519,7 +535,9 @@ func _announce_round() -> void:
 	var kicker := "NÍVEL %d%s" % [engine.round_index + 1, (" DE %d" % engine.levels) if engine.levels > 0 else ""]
 	var lines: Array = []
 	lines.append(_intro_block())
-	if engine.round_index == 0:
+	if engine.round_index == 0 and engine.blitz:
+		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "ENTRADA ◎%d" % int(engine.blitz_entry()), "text": "Em cada nível você palpita quantas rodadas vai ganhar e paga a entrada. Acertou o número exato, leva o pote. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.MONEY})
+	elif engine.round_index == 0:
 		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "BLIND ◎%d" % engine.blind, "text": "Todo mundo paga o blind a cada rodada. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.MONEY})
 	await _transition(kicker, lines, 3.4 if not first_round_done else 3.0)
 	first_round_done = true
@@ -532,10 +550,10 @@ func _announce_round() -> void:
 func _intro_block() -> Dictionary:
 	var m := engine.modifier
 	if ChaosModifiers.scope_of(m) == ChaosModifiers.Scope.ROUND:
-		return {"spin": true, "head": "MODIFICADOR · NÍVEL INTEIRO", "title": "✦ %s" % ChaosModifiers.label(m, engine.weak_suit), "text": "%s %s" % [ChaosModifiers.DESCRIPTIONS[m], ChaosModifiers.TIPS[m]], "color": UIKit.MODIFIER}
-	if ChaosModifiers.is_secret(m):
+		return {"spin": true, "head": "MODIFICADOR · NÍVEL INTEIRO", "title": "✦ %s" % ChaosModifiers.label(m, engine.weak_suit), "text": "%s %s" % [ChaosModifiers.desc_of(m, engine.blitz), ChaosModifiers.tip_of(m, engine.blitz)], "color": UIKit.MODIFIER}
+	if ChaosModifiers.is_secret(m, engine.blitz):
 		return {"head": "MODIFICADOR · SURPRESA", "title": "? EM ALGUMA RODADA", "text": "Uma regra especial vai valer só em UMA rodada desse nível. Você só descobre qual e quando ela começar.", "color": UIKit.LOSS}
-	return {"head": "MODIFICADOR · RODADA %d" % (engine.modifier_trick + 1), "title": "%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.NAMES[m]], "text": "%s %s" % [ChaosModifiers.DESCRIPTIONS[m], ChaosModifiers.TIPS[m]], "color": ChaosModifiers.color_of(m)}
+	return {"head": "MODIFICADOR · RODADA %d" % (engine.modifier_trick + 1), "title": "%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.name_of(m, engine.blitz)], "text": "%s %s" % [ChaosModifiers.desc_of(m, engine.blitz), ChaosModifiers.tip_of(m, engine.blitz)], "color": ChaosModifiers.color_of(m)}
 
 
 ## Texto da faixa em repouso (nenhuma mensagem ativa): lembra o modificador do nível sem
@@ -543,14 +561,14 @@ func _intro_block() -> Dictionary:
 func _rest_banner() -> Array:
 	var m := engine.modifier
 	if ChaosModifiers.scope_of(m) == ChaosModifiers.Scope.ROUND:
-		return ["✦ %s" % ChaosModifiers.label(m, engine.weak_suit), str(ChaosModifiers.DESCRIPTIONS[m]), UIKit.MODIFIER]
-	var known := modifier_revealed or not ChaosModifiers.is_secret(m)
+		return ["✦ %s" % ChaosModifiers.label(m, engine.weak_suit), str(ChaosModifiers.desc_of(m, engine.blitz)), UIKit.MODIFIER]
+	var known := modifier_revealed or not ChaosModifiers.is_secret(m, engine.blitz)
 	if not known:
 		return ["? Surpresa em alguma rodada", "Uma regra especial vale em uma rodada só. Você descobre quando ela começar.", UIKit.LOSS]
 	var when := "rodada %d" % (engine.modifier_trick + 1)
 	var done := engine.trick_number > engine.modifier_trick
-	var sub := "já aconteceu · %s" % when if done else "%s · %s" % [ChaosModifiers.DESCRIPTIONS[m], when]
-	return ["%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.NAMES[m]], sub, ChaosModifiers.color_of(m)]
+	var sub := "já aconteceu · %s" % when if done else "%s · %s" % [ChaosModifiers.desc_of(m, engine.blitz), when]
+	return ["%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.name_of(m, engine.blitz)], sub, ChaosModifiers.color_of(m)]
 
 
 ## Tela cheia de transição. `blocks`: [{head, title, text, color}]. Fecha ao tocar ou
@@ -624,7 +642,7 @@ func _reveal_after_spin(title_lbl: Label, text_lbl: Label, final_text: String, g
 
 ## Caça-níquel do modificador: os nomes giram, desaceleram e travam no sorteado.
 func _spin_label(lbl: Label, final_text: String) -> void:
-	var names: Array = ChaosModifiers.ALL.map(func(m): return "✦ %s" % ChaosModifiers.NAMES[m])
+	var names: Array = (ChaosModifiers.BLITZ_POOL if engine.blitz else ChaosModifiers.ALL).map(func(m): return "✦ %s" % ChaosModifiers.name_of(m, engine.blitz))
 	var steps := 14
 	for i in range(steps):
 		if not is_instance_valid(lbl):
@@ -667,11 +685,11 @@ func _trick_start() -> void:
 	if m == -1 or ChaosModifiers.scope_of(m) == ChaosModifiers.Scope.ROUND:
 		return
 	var color := ChaosModifiers.color_of(m)
-	if ChaosModifiers.is_secret(m) and not modifier_revealed:
-		await _transition("PLOT TWIST!", [{"head": "RODADA %d" % (engine.trick_number + 1), "title": "%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.NAMES[m]], "text": "%s %s" % [ChaosModifiers.DESCRIPTIONS[m], ChaosModifiers.TIPS[m]], "color": color}], 2.6)
+	if ChaosModifiers.is_secret(m, engine.blitz) and not modifier_revealed:
+		await _transition("PLOT TWIST!", [{"head": "RODADA %d" % (engine.trick_number + 1), "title": "%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.name_of(m, engine.blitz)], "text": "%s %s" % [ChaosModifiers.desc_of(m, engine.blitz), ChaosModifiers.tip_of(m, engine.blitz)], "color": color}], 2.6)
 	modifier_revealed = true
 	if is_inside_tree():
-		_banner("%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.NAMES[m]], str(ChaosModifiers.DESCRIPTIONS[m]), color)
+		_banner("%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.name_of(m, engine.blitz)], str(ChaosModifiers.desc_of(m, engine.blitz)), color)
 
 
 ## Modal genérico de escolha: `opts` = [{label, desc, color}]. Devolve o índice tocado,
@@ -722,6 +740,8 @@ func _wait(seconds: float) -> void:
 func _wait_human() -> CardData:
 	human_turn = true
 	await _tip("turn", "SUA VEZ!", "Toque numa carta pra selecioná-la (ela sobe) e toque de novo pra jogar. Você tem 10 segundos por jogada.")
+	if engine.blitz and engine.can_double(0):
+		await _tip("double", "PODE DOBRAR!", "A partir da 4ª rodada, o botão DOBRAR paga mais uma entrada e dobra o peso do seu palpite no pote. Vale a pena quando você já está no alvo e a mão que sobrou é fraca demais pra ganhar mais uma rodada. Só dá pra dobrar uma vez por nível.")
 	var ls := TrickRules.lead_suit(engine.plays)
 	if ls == -1:
 		status_label.text = "Sua vez — abra a rodada com qualquer carta"
@@ -871,13 +891,16 @@ func _tip(key: String, title: String, text: String) -> void:
 ## Tutorial de 3 passos: mostrado na primeira partida e sempre que tocar em "?".
 func _intro_slides() -> void:
 	modal_open = true
-	var m := StepsModal.open(overlay_layer, "MESA CAOS", HelpContent.chaos_intro(), "VAMOS JOGAR!")
+	var m := StepsModal.open(overlay_layer, "MESA BLITZ" if engine.blitz else "MESA CAOS", HelpContent.blitz_intro() if engine.blitz else HelpContent.chaos_intro(), "VAMOS JOGAR!")
 	await m.closed
 	modal_open = false
 
 
 func _open_help() -> void:
-	StepsModal.open(overlay_layer, "COMO FUNCIONA O CAOS", HelpContent.chaos(), "ENTENDI", false)
+	if engine.blitz:
+		StepsModal.open(overlay_layer, "COMO FUNCIONA O BLITZ", HelpContent.blitz(), "ENTENDI", false)
+	else:
+		StepsModal.open(overlay_layer, "COMO FUNCIONA O CAOS", HelpContent.chaos(), "ENTENDI", false)
 
 
 func _open_pause() -> void:
@@ -927,28 +950,36 @@ func _unhandled_input(event: InputEvent) -> void:
 # ------------------------------------------------------------------ loop de rodadas
 
 func _run_round() -> void:
+	if engine.blitz:
+		if not await _blitz_open_level():
+			return
 	while not engine.is_round_over():
 		if not is_inside_tree() or finished:
 			return
 		await _trick_start()
 		if not is_inside_tree() or finished:
 			return
-		if not await _ensure_solvent():
-			return
-		for q in engine.refill_bots():
-			await _new_player_sits(q)
-		engine.begin_trick()
-		_reset_actions()
-		_refresh_hud()
-		await _betting_phase()
-		if not is_inside_tree() or finished:
-			return
-		if engine.walkover_player() != -1:
-			await _resolve_walkover(engine.resolve_walkover())
-			continue
+		if not engine.blitz:
+			if not await _ensure_solvent():
+				return
+			for q in engine.refill_bots():
+				await _new_player_sits(q)
+			engine.begin_trick()
+			_reset_actions()
+			_refresh_hud()
+			await _betting_phase()
+			if not is_inside_tree() or finished:
+				return
+			if engine.walkover_player() != -1:
+				await _resolve_walkover(engine.resolve_walkover())
+				continue
 		await _play_cards()
 	if not is_inside_tree() or finished:
 		return
+	if engine.blitz:
+		await _blitz_settlement()
+		if not is_inside_tree() or finished:
+			return
 	var choice := await _show_round_summary()
 	if not is_inside_tree() or finished:
 		return
@@ -968,6 +999,10 @@ func _play_cards() -> void:
 			return
 		var p := engine.current
 		_refresh_hud()
+		if engine.blitz and (p != 0 or GameState.autoplay) and ChaosBot.wants_double(engine, p, int(config["difficulty"][p]), bot_rng):
+			await _apply_double(p)
+			if not is_inside_tree() or finished:
+				return
 		var card: CardData
 		if p == 0 and not GameState.autoplay:
 			card = await _wait_human()
@@ -1178,6 +1213,9 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 # ------------------------------------------------------------------ rodada resolvida
 
 func _resolve_trick(result: Dictionary) -> void:
+	if engine.blitz:
+		await _resolve_trick_blitz(result)
+		return
 	var winner: int = result["winner"]
 	var win_view: CardView
 	for v in table_views:
@@ -1288,9 +1326,22 @@ func _show_round_summary() -> String:
 	for p in order:
 		var d := int(deltas[p])
 		var line := "%s%s  ◎%d  (%s◎%d)  ·  %d rodadas" % ["♛ " if p == order[0] else "", str(config["names"][p]).to_upper(), int(stacks[p]), "+" if d >= 0 else "−", absi(d), int(won[p])]
+		if r.has("blitz"):
+			line = "%s%s  ◎%d  (%s◎%d)" % ["♛ " if p == order[0] else "", str(config["names"][p]).to_upper(), int(stacks[p]), "+" if d >= 0 else "−", absi(d)]
 		var lab := UIKit.label(line, 28, (UIKit.ME if p == 0 else UIKit.INK), HORIZONTAL_ALIGNMENT_CENTER)
 		lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(lab)
+		if r.has("blitz"):
+			var b: Dictionary = r["blitz"]
+			var hit: bool = (b["hits"] as Array).has(p)
+			var near: bool = (b["near"] as Array).has(p)
+			var verdict := "ACERTOU ✓" if hit else ("ERROU POR 1" if near else "ERROU ✕")
+			var sub_l := UIKit.label("palpite %d · fez %d · %s%s" % [int(b["predicts"][p]), int(b["wins"][p]), verdict, " · dobrou" if bool(b["doubled"][p]) else ""], 22, UIKit.OK if hit else (UIKit.MUTED if near else UIKit.LOSS), HORIZONTAL_ALIGNMENT_CENTER)
+			v.add_child(sub_l)
+	if r.has("blitz") and float(r["blitz"]["carry_out"]) > 0.0:
+		var cl := UIKit.label("Ninguém acertou: ◎%d acumulam pro próximo nível" % int(r["blitz"]["carry_out"]), 24, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+		cl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(cl)
 	var result := {"choice": "continue"}
 	var next := UIKit.button("PRÓXIMO NÍVEL")
 	next.pressed.connect(func(): item_chosen.emit(1))
@@ -1361,6 +1412,8 @@ func _show_results(summary: Dictionary) -> void:
 	v.add_child(HSeparator.new())
 	var st: Dictionary = engine.session_stats[0]
 	var stat := "%d rodadas na mesa · %d potes ganhos · %d blefes vencidos · %d desistências" % [engine.hand_no, int(st["pots"]), int(st["bluffs"]), int(st["folds"])]
+	if engine.blitz:
+		stat = "%d níveis · %d palpites certos · %d por 1 de diferença" % [int(st["levels"]), int(st["hits"]), int(st["near"])]
 	var stat_l := UIKit.label(stat, 26, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	stat_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(stat_l)
@@ -1413,6 +1466,8 @@ func _fmt_chips(v: float) -> String:
 
 
 func _pot_text(v: float) -> String:
+	if engine.blitz:
+		return "POTE ◎ %d" % int(v)
 	return ("POTE ◎ %d" if bets_gathered else "EM JOGO ◎ %d") % int(v)
 
 
@@ -1421,7 +1476,7 @@ func _refresh_hud() -> void:
 	var order := _order_now()
 	for p in range(engine.num_players):
 		var total_lbl := hud_totals[p] as Label
-		var new_total: float = engine.stacks[p]
+		var new_total: float = float(hold_stacks[p]) if not hold_stacks.is_empty() else float(engine.stacks[p])
 		while shown_totals.size() <= p:
 			shown_totals.append(new_total)
 		if is_equal_approx(new_total, float(shown_totals[p])):
@@ -1434,7 +1489,7 @@ func _refresh_hud() -> void:
 		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 0.45 if out else 1.0)
 		(hud_titles[p] as Label).text = "VOCÊ" if p == 0 else str(config["names"][p]).to_upper()
 		(hud_titles[p] as Label).add_theme_color_override("font_color", UIKit.TURN if p == turn_player else UIKit.INK)
-		(dealer_badges[p] as Control).visible = engine.hand_no > 0 and engine.button == p
+		(dealer_badges[p] as Control).visible = not engine.blitz and engine.hand_no > 0 and engine.button == p
 		# Ordem: 1 = age agora, 2 = próximo...
 		var idx := order.find(p)
 		var ob := order_badges[p] as PanelContainer
@@ -1444,12 +1499,13 @@ func _refresh_hud() -> void:
 			ob.add_theme_stylebox_override("panel", UIKit.box_cached(UIKit.TURN if idx == 0 else UIKit.PURPLE_DEEP, UIKit.TURN if idx == 0 else UIKit.MUTED, 3, 15, 0))
 			(ob.get_child(0) as Label).add_theme_color_override("font_color", UIKit.TEXT_ON_LIGHT if idx == 0 else UIKit.INK)
 		_refresh_bet_tags(p, idx)
-	info_label.text = "NÍVEL %d%s · BLIND ◎%d" % [engine.round_index + 1, ("/%d" % engine.levels) if engine.levels > 0 else "", engine.blind]
+	info_label.text = "NÍVEL %d%s · %s ◎%d" % [engine.round_index + 1, ("/%d" % engine.levels) if engine.levels > 0 else "", "ENTRADA" if engine.blitz else "BLIND", int(engine.blitz_entry()) if engine.blitz else engine.blind]
 	Widgets.progress_dots(trick_dots, ChaosEngine.HAND_SIZE, engine.trick_number)
 	var rest := _rest_banner()
 	modifier_label.text = "%s — %s" % [rest[0], rest[1]] if modifier_expanded else str(rest[0])
 	_refresh_pot()
 	_update_turn_highlight(turn_player)
+	_refresh_double_button()
 
 
 func _reset_actions() -> void:
@@ -1461,6 +1517,9 @@ func _reset_actions() -> void:
 ## Fichas na frente do jogador (até juntar no pote) e a linha de situação: É A VEZ / PRÓXIMO /
 ## última ação / chamas da sequência.
 func _refresh_bet_tags(p: int, idx: int) -> void:
+	if engine.blitz:
+		_refresh_blitz_tag(p, idx)
+		return
 	var streak: int = engine.streak[p] if p < engine.streak.size() else 0
 	var flames := ""
 	if streak >= 2:
@@ -1494,6 +1553,9 @@ func _refresh_bet_tags(p: int, idx: int) -> void:
 
 
 func _refresh_pot() -> void:
+	if engine.blitz:
+		_refresh_pot_blitz()
+		return
 	if not pot_locked:
 		shown_pot = engine.pot if phase != "idle" or bets_gathered else 0.0
 		pot_label.text = _pot_text(shown_pot)
@@ -1698,3 +1760,345 @@ func _resolve_walkover(result: Dictionary) -> void:
 	await _collect_pot(winner, float(result["pot"]), float(result.get("gain", 0.0)))
 	_banner_clear()
 	_refresh_hud()
+
+
+# ------------------------------------------------------------------ Blitz
+
+## Começo do nível no Blitz: garante saldo, troca bots quebrados, coleta os palpites (o seu e os
+## dos bots), revela todos juntos e joga as entradas no pote. Devolve false se a mesa acabou.
+func _blitz_open_level() -> bool:
+	_reset_actions()
+	hold_stacks = []
+	hold_pot = -1.0
+	for p in range(engine.num_players):
+		blitz_revealed[p] = false
+	if not await _ensure_solvent():
+		return false
+	for q in engine.refill_bots():
+		await _new_player_sits(q)
+	phase = "predict"
+	bets_gathered = true
+	pot_locked = true
+	shown_pot = engine.carry
+	pot_label.text = _pot_text(shown_pot)
+	var carry_txt := "  Pote acumulado: ◎%d." % int(engine.carry) if engine.carry > 0.0 else ""
+	_banner("PALPITES", "Quantas rodadas cada um vai ganhar?%s Todos revelam juntos." % carry_txt, UIKit.MONEY)
+	_refresh_hud()
+	var pick: int
+	if GameState.autoplay:
+		pick = ChaosBot.blitz_pick(engine, 0, int(config["difficulty"][0]), bot_rng)
+	else:
+		await _tip("predict", "SEU PALPITE", "Todo nível você diz quantas rodadas vai ganhar (de 0 a 8) e paga a entrada. Quem acertar o número exato leva o pote. Errou por 1? Recebe metade da entrada de volta. A estrela ★ marca o palpite que combina com a sua mão.")
+		pick = await _human_predict()
+		if not is_inside_tree() or finished:
+			return false
+	engine.blitz_place(0, pick)
+	for p in range(1, engine.num_players):
+		engine.blitz_place(p, ChaosBot.blitz_pick(engine, p, int(config["difficulty"][p]), bot_rng))
+	await _blitz_reveal()
+	if not is_inside_tree() or finished:
+		return false
+	phase = "play"
+	pot_locked = false
+	_banner_clear()
+	_refresh_hud()
+	return true
+
+
+## Revela os palpites um a um: a entrada voa pro pote e o palpite aparece na frente do jogador.
+func _blitz_reveal() -> void:
+	var running := engine.carry
+	for p in range(engine.num_players):
+		blitz_revealed[p] = true
+		var stake := float(engine.stakes[p])
+		running += stake
+		if not GameState.autoplay:
+			Sfx.play("chip")
+			FX.fly_chips(popup_layer, _seat_center(p), _global_center(pot_box), _chips_for(stake))
+			FX.count(pot_label, shown_pot, running, _pot_text, 0.3)
+			FX.pop(pot_box, 1.1)
+			FX.pop(bet_pills[p], 1.3)
+		shown_pot = running
+		_refresh_hud()
+		await _wait(0.45)
+		if not is_inside_tree():
+			return
+	pot_label.text = _pot_text(engine.pot)
+	shown_pot = engine.pot
+	if not GameState.autoplay:
+		Sfx.play("combo")
+		_banner("PALPITES REVELADOS", "Quem fizer exatamente o palpite leva o pote. Bora jogar!", UIKit.MONEY)
+	await _wait(0.8)
+
+
+## Painel do palpite (fica abaixo dos avatares; a sua mão continua à vista). Devolve 0..8.
+func _human_predict() -> int:
+	modal_open = true
+	var vw := get_viewport_rect().size.x
+	var holder := MarginContainer.new()
+	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.add_theme_constant_override("margin_top", int(seat_row.global_position.y + seat_row.size.y + 6.0))
+	overlay_layer.add_child(holder)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 20)
+	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	box.custom_minimum_size = Vector2(minf(vw - 32.0, 660.0), 0)
+	holder.add_child(box)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	box.add_child(v)
+	v.add_child(UIKit.label("QUANTAS RODADAS VOCÊ VAI GANHAR?", 28, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
+	var hint := ChaosBot.suggested_predict(engine, 0)
+	var info := "Entrada ◎%d  ·  Pote ◎%d  ·  Sua mão: %s" % [int(engine.blitz_entry()), int(engine.carry), _hand_label_blitz()]
+	var info_l := UIKit.label(info, 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	info_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(info_l)
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 8)
+	v.add_child(body)
+	var st := {"pick": hint}
+	st["render"] = func():
+		for c in body.get_children():
+			c.queue_free()
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 6)
+		body.add_child(row)
+		for n in range(ChaosEngine.HAND_SIZE + 1):
+			var chosen: bool = int(st["pick"]) == n
+			var b := UIKit.button("%d%s" % [n, "★" if n == hint else ""], UIKit.ACTION if chosen else UIKit.BUTTON_MUTED, 28)
+			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			b.custom_minimum_size = Vector2(0, 68)
+			b.pressed.connect(func():
+				st["pick"] = n
+				(st["render"] as Callable).call())
+			row.add_child(b)
+		var w := ChaosEngine.blitz_weight(int(st["pick"]))
+		var legend := UIKit.label("Peso do seu palpite no pote: ×%s   (0–2 ×1 · 3–4 ×1,5 · 5+ ×2)" % UIKit.fmt_dec(w, 1), 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body.add_child(legend)
+		var go := UIKit.button("CONFIRMAR: %d %s" % [int(st["pick"]), "RODADA" if int(st["pick"]) == 1 else "RODADAS"], UIKit.OK, 30)
+		go.pressed.connect(func(): item_chosen.emit(1))
+		body.add_child(go)
+	(st["render"] as Callable).call()
+	UIKit.pop_in(box, GameState.anim(0.15))
+	await item_chosen
+	modal_open = false
+	if is_inside_tree():
+		holder.queue_free()
+	return int(st["pick"])
+
+
+func _hand_label_blitz() -> String:
+	var ex := ChaosBot.expected_wins(engine, 0)
+	if ex >= 3.5:
+		return "MUITO FORTE ★★★"
+	if ex >= 2.5:
+		return "FORTE ★★☆"
+	if ex >= 1.5:
+		return "MÉDIA ★☆☆"
+	return "FRACA ☆☆☆"
+
+
+## Dobrar: paga mais uma entrada (peso do palpite dobra). Serve pra bots e pro botão.
+func _apply_double(p: int) -> void:
+	if not engine.double_down(p):
+		return
+	var amt := engine.blitz_entry()
+	action_text[p] = "▲ DOBROU"
+	action_color[p] = UIKit.MONEY
+	if GameState.autoplay:
+		_refresh_hud()
+		return
+	var pname := "VOCÊ" if p == 0 else str(config["names"][p]).to_upper()
+	_banner("%s DOBROU!" % pname, "Pôs mais ◎%d no pote. Se acertar o palpite leva o dobro do peso; se errar, perde mais." % int(amt), UIKit.MONEY)
+	Sfx.play("combo")
+	FX.fly_chips(popup_layer, _seat_center(p), _global_center(pot_box), 3)
+	FX.burst(popup_layer, _seat_center(p) - popup_layer.global_position, UIKit.MONEY, 14)
+	FX.shake(main_area, 0.3)
+	_pot_to(engine.pot)
+	_refresh_hud()
+	await _wait(0.9 if p != 0 else 0.5)
+
+
+func _on_double_pressed() -> void:
+	if engine.blitz and phase == "play" and not finished:
+		_apply_double(0)
+
+
+func _refresh_double_button() -> void:
+	if double_btn == null:
+		return
+	var show := engine.blitz and phase == "play" and not finished and not modal_open and engine.can_double(0)
+	double_btn.visible = show
+	if show:
+		double_btn.text = "DOBRAR ◎%d" % int(engine.blitz_entry())
+
+
+## Palpite na frente do jogador, com o progresso ao vivo: verde no alvo, vermelho estourou ou
+## sem tempo de chegar lá, neutro enquanto ainda dá.
+func _refresh_blitz_tag(p: int, idx: int) -> void:
+	var pill := bet_pills[p] as PanelContainer
+	var lbl := bet_tags[p] as Label
+	var cap := (pill.get_child(0) as VBoxContainer).get_child(0) as Label
+	var shown := bool(blitz_revealed[p])
+	pill.modulate.a = 1.0 if shown else 0.0
+	if shown:
+		var need := engine.blitz_need(p)
+		lbl.text = "%d/%d" % [int(engine.wins[p]), int(engine.predicts[p])]
+		var col := UIKit.INK
+		if need == 0:
+			col = UIKit.OK
+		elif need < 0 or need > engine.tricks_left():
+			col = UIKit.LOSS
+		lbl.add_theme_color_override("font_color", col)
+		cap.text = "PALPITE ×2" if bool(engine.doubled[p]) else "PALPITE"
+	var status := ""
+	var col2 := UIKit.MUTED
+	if idx == 0:
+		status = "▶ É A VEZ" if p != 0 else "▶ SUA VEZ"
+		col2 = UIKit.TURN
+	elif idx == 1:
+		status = "PRÓXIMO"
+		col2 = UIKit.INK
+	elif str(action_text[p]) != "":
+		status = str(action_text[p])
+		col2 = action_color[p]
+	elif phase == "play" and engine.plays.any(func(pl): return int(pl["player"]) == p):
+		status = "✓ JOGOU"
+	var st := prog_tags[p] as Label
+	st.text = status
+	st.add_theme_color_override("font_color", col2)
+
+
+func _refresh_pot_blitz() -> void:
+	if not pot_locked:
+		if hold_pot >= 0.0:
+			shown_pot = hold_pot
+		else:
+			shown_pot = engine.pot if engine.pot > 0.0 else engine.carry
+		pot_label.text = _pot_text(shown_pot)
+	var sub := ""
+	if phase == "predict":
+		sub = "quem acertar leva"
+	elif phase == "play" and engine.carry > 0.0:
+		sub = "inclui ◎ %d acumulado" % int(engine.carry)
+	elif phase == "play":
+		sub = "quem acertar leva"
+	elif engine.carry > 0.0:
+		sub = "acumulado pro próximo nível"
+	pot_sub.text = sub
+	pot_sub.visible = sub != ""
+	pot_box.reset_size.call_deferred()
+	_layout_table.call_deferred()
+
+
+## Fim de uma rodada no Blitz: a carta vencedora pulsa, o palpite de quem venceu sobe um e a
+## faixa avisa se chegou no alvo ou estourou.
+func _resolve_trick_blitz(result: Dictionary) -> void:
+	var winner: int = result["winner"]
+	var win_view: CardView
+	for v in table_views:
+		if int(v["player"]) == winner:
+			win_view = v["view"]
+	if engine.is_round_over() and not engine.blitz_result.is_empty():
+		# O nível acabou e o motor já liquidou o pote: a tela segura os números antigos até a animação.
+		var br := engine.blitz_result
+		hold_stacks = []
+		for p in range(engine.num_players):
+			hold_stacks.append(float(engine.stacks[p]) - float(br["payouts"][p]) - float(br["refunds"][p]))
+		hold_pot = float(br["pool"]) + _sum(br["refunds"])
+	await _wait(0.2)
+	if not is_inside_tree():
+		return
+	if win_view:
+		FX.win_pulse(win_view, TABLE_SCALE)
+	var wname := str(config["names"][winner]).to_upper()
+	var sub := "Palpite: %d de %d" % [int(engine.wins[winner]), int(engine.predicts[winner])]
+	if int(result.get("value", 1)) == 2:
+		sub += "  ·  Rodada Dobrada: conta 2 vitórias"
+	_banner("%s venceu a rodada!" % wname, sub, UIKit.ME if winner == 0 else UIKit.INK)
+	Sfx.play("chip")
+	FX.burst(popup_layer, _seat_center(winner) - popup_layer.global_position, UIKit.ME if winner == 0 else UIKit.CHIPS, 10)
+	_refresh_hud()
+	FX.pop(bet_pills[winner], 1.35)
+	var need := engine.blitz_need(winner)
+	if need == 0:
+		Sfx.play("combo")
+		FX.float_text(popup_layer, _seat_center(winner), "NO ALVO!", UIKit.OK, 34)
+	elif need < 0:
+		Sfx.play("lose")
+		FX.float_text(popup_layer, _seat_center(winner), "ESTOUROU", UIKit.LOSS, 34)
+	await _wait(1.1)
+	if not is_inside_tree():
+		return
+	var target := _slot_pos(winner) + (_slot_pos(winner) - table_center.size / 2.0 + CardView.SIZE / 2.0) * 0.8
+	var tw := create_tween().set_parallel(true)
+	for v in table_views:
+		var cv: CardView = v["view"]
+		tw.tween_property(cv, "position", target, GameState.anim(0.3))
+		tw.tween_property(cv, "modulate:a", 0.0, GameState.anim(0.3))
+	await tw.finished
+	for v in table_views:
+		(v["view"] as CardView).queue_free()
+	table_views.clear()
+	_banner_clear()
+	_refresh_hud()
+
+
+func _sum(a: Array) -> float:
+	var t := 0.0
+	for x in a:
+		t += float(x)
+	return t
+
+
+## Resultado do nível: quem acertou leva o pote (fichas voam até a stack), quem errou vê as
+## fichas irem embora, e sem acertos o pote fica acumulado.
+func _blitz_settlement() -> void:
+	var br := engine.blitz_result
+	var hits: Array = br["hits"]
+	hold_stacks = []
+	hold_pot = -1.0
+	if GameState.autoplay:
+		phase = "idle"
+		_refresh_hud()
+		return
+	var title := ""
+	var sub := ""
+	var col := UIKit.MONEY
+	if hits.is_empty():
+		title = "NINGUÉM ACERTOU!"
+		sub = "O pote de ◎%d fica acumulado pro próximo nível." % int(br["carry_out"])
+		col = UIKit.COMBO
+	else:
+		var names: Array = hits.map(func(q): return "VOCÊ" if int(q) == 0 else str(config["names"][q]).to_upper())
+		title = "%s ACERTOU!" % names[0] if names.size() == 1 else "ACERTARAM: %s" % " E ".join(names)
+		sub = "Pote de ◎%d dividido pelo peso: entrada × dificuldade do palpite." % int(br["pool"])
+		if float(br["rake"]) >= 1.0:
+			sub += "  Taxa da casa ◎%d." % int(br["rake"])
+		col = UIKit.OK if hits.has(0) else UIKit.INK
+	_banner(title, sub, col)
+	Sfx.play("win" if hits.has(0) else ("lose" if hits.is_empty() else "chip"))
+	var pot_at := _global_center(pot_box)
+	for p in range(engine.num_players):
+		var payout := float(br["payouts"][p])
+		var net := float(br["net"][p])
+		if payout > 0.0:
+			FX.fly_chips(popup_layer, pot_at, _seat_center(p), _chips_for(payout), UIKit.OK if p == 0 else UIKit.MONEY)
+			FX.burst(popup_layer, _seat_center(p) - popup_layer.global_position, UIKit.OK if p == 0 else UIKit.BRAND, 16)
+			FX.float_text(popup_layer, _seat_center(p), "+◎ %d" % int(net), UIKit.OK)
+			if p == 0:
+				FX.shake(main_area, clampf(payout / (float(engine.blind) * 20.0), 0.3, 0.9))
+				if float(br["carry_in"]) > 0.0:
+					Sfx.play("jackpot")
+					FX.chip_rain(popup_layer, 22)
+			await _wait(0.5)
+		elif net < 0.0:
+			FX.float_text(popup_layer, _seat_center(p), "−◎ %d" % absi(int(net)), UIKit.LOSS)
+	if float(br["net"][0]) > best_gain:
+		best_gain = float(br["net"][0])
+	_pot_to(engine.carry)
+	phase = "idle"
+	_refresh_hud()
+	await _wait(1.3)

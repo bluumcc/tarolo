@@ -48,6 +48,8 @@ func _ready() -> void:
 	var tier := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
 	var chaos := Widgets.mode_card("MODO CAOS", "Poker de rodadas: aposte, blefe e leve o pote. Com modificadores e combos!", UIKit.DANGER, 176 if get_viewport_rect().size.y > get_viewport_rect().size.x else 150, "⚡", _open_chaos_confirm, 46)
 	col.add_child(chaos)
+	var blitz := Widgets.mode_card("MODO BLITZ", "Dê o palpite: quantas rodadas você vai ganhar? Acertou, leva o pote!", UIKit.INFO, 150 if get_viewport_rect().size.y > get_viewport_rect().size.x else 132, "❖", _open_blitz_confirm, 40)
+	col.add_child(blitz)
 	var wide := get_viewport_rect().size.x > get_viewport_rect().size.y
 	var grid := GridContainer.new()
 	grid.columns = 3 if wide else 1
@@ -347,11 +349,22 @@ func _reopen_cosmetics() -> void:
 
 
 func _open_chaos_confirm() -> void:
-	var v := _modal("MESA CAOS")
+	_open_table_select("chaos")
+
+
+func _open_blitz_confirm() -> void:
+	_open_table_select("blitz")
+
+
+## Escolha da mesa (blind + entrada) pros dois modos de mesa: Caos e Blitz.
+func _open_table_select(mode: String) -> void:
+	var blitz := mode == "blitz"
+	var v := _modal("MESA BLITZ" if blitz else "MESA CAOS")
 	var profile := SaveManager.section("profile")
 	var fichas := int(profile["fichas"])
 	v.add_child(UIKit.label("Você tem %d fichas" % fichas, 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-	var info := UIKit.label("Escolha a mesa. Você senta com uma stack de 40 blinds, aposta a cada rodada (passar, aumentar, pagar ou desistir) e leva de volta a stack quando sair.", 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var txt := "Escolha a mesa. Você senta com uma stack de 40 blinds, palpita quantas rodadas vai ganhar em cada nível (acertou o número exato, leva o pote) e leva de volta a stack quando sair." if blitz else "Escolha a mesa. Você senta com uma stack de 40 blinds, aposta a cada rodada (passar, aumentar, pagar ou desistir) e leva de volta a stack quando sair."
+	var info := UIKit.label(txt, 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info.custom_minimum_size = Vector2(620, 0)
 	v.add_child(info)
@@ -368,10 +381,12 @@ func _open_chaos_confirm() -> void:
 	for i in range(GameState.CHAOS_TABLES.size()):
 		var t: Dictionary = GameState.CHAOS_TABLES[i]
 		var cost := GameState.chaos_buy_in(i)
-		var b := UIKit.button("%s · blind ◎%d · entrada ◎%d" % [str(t["name"]).to_upper(), int(t["blind"]), cost], UIKit.DANGER if i == 0 else UIKit.PURPLE, 26)
+		var entry_txt := "entrada ◎%d" % (int(t["blind"]) * 2) if blitz else "blind ◎%d" % int(t["blind"])
+		var b := UIKit.button("%s · %s · stack ◎%d" % [str(t["name"]).to_upper(), entry_txt, cost], (UIKit.INFO if blitz else UIKit.DANGER) if i == 0 else UIKit.PURPLE, 26)
 		b.disabled = fichas < cost
 		b.pressed.connect(func():
 			GameState.chaos_table = i
+			GameState.chaos_mode = mode
 			get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn"))
 		v.add_child(b)
 	_close_button(v)

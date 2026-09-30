@@ -60,6 +60,17 @@ var rake_on := true            # taxa da casa (desligável nos testes de lógica
 var house_rake := 0.0          # total cobrado pela casa na mesa
 var human_rake := 0.0          # quanto do total saiu de fichas do jogador 0   # {player, card} do último descarte por desistência
 
+# Modo Blitz: palpite de vitórias por nível (em vez de aposta por rodada).
+const BLITZ_ENTRY_BLINDS := 2                      # entrada fixa de cada nível, em blinds
+const BLITZ_DOUBLE_FROM := 3                       # dá pra dobrar a partir da 4ª rodada
+var blitz := false
+var doubled: Array = []       # quem já dobrou a entrada nesse nível
+var predicts: Array = []      # palpite de cada um (-1 = ainda não fez)
+var stakes: Array = []        # fichas que cada um pôs no pote do nível
+var wins: Array = []          # vitórias contadas no nível (Rodada Dobrada conta 2)
+var carry := 0.0              # pote acumulado quando ninguém acerta
+var blitz_result: Dictionary = {}
+
 var hands: Array = []
 var plays: Array = []
 var captured: Array = []
@@ -78,6 +89,8 @@ func setup_match(config: Dictionary) -> void:
 	blind = int(config.get("blind", BLIND))
 	buy_in = int(config.get("buy_in", blind * BUY_IN_BLINDS))
 	levels = int(config.get("levels", 0))
+	blitz = str(config.get("mode", "chaos")) == "blitz"
+	carry = 0.0
 	if config.has("seed"):
 		rng.seed = int(config["seed"])
 	else:
@@ -86,11 +99,11 @@ func setup_match(config: Dictionary) -> void:
 	session_stats = []
 	for p in range(num_players):
 		stacks.append(float((config.get("stacks", []) as Array)[p]) if (config.get("stacks", []) as Array).size() > p else float(buy_in))
-		session_stats.append({"pots": 0, "bluffs": 0, "folds": 0})
+		session_stats.append({"pots": 0, "bluffs": 0, "folds": 0, "hits": 0, "near": 0, "levels": 0})
 	round_index = 0
 	hand_no = 0
 	match_result = {}
-	modifier_sequence = ChaosModifiers.ALL.duplicate()
+	modifier_sequence = (ChaosModifiers.BLITZ_POOL if blitz else ChaosModifiers.ALL).duplicate()
 	Deck.shuffle(modifier_sequence, rng)
 	_setup_round()
 
@@ -136,6 +149,18 @@ func _setup_round() -> void:
 	for p in range(num_players):
 		contrib.append(0.0)
 		folded.append(false)
+	predicts = []
+	stakes = []
+	wins = []
+	doubled = []
+	blitz_result = {}
+	for p in range(num_players):
+		predicts.append(-1)
+		stakes.append(0.0)
+		wins.append(0)
+		doubled.append(false)
+	if blitz:
+		pot = carry
 
 
 func _highest_player() -> int:
@@ -454,6 +479,8 @@ func _resolve_trick() -> Dictionary:
 	var winner: int = plays[idx]["player"]
 	var cards: Array = plays.map(func(p): return p["card"])
 	captured[winner].append_array(cards)
+	if blitz:
+		return _resolve_trick_blitz(idx, winner, ev)
 	var base_points := 0.0
 	for c in cards:
 		base_points += card_value(c, winner)
@@ -587,6 +614,175 @@ func _finish_trick(result: Dictionary, winner: int) -> Dictionary:
 			match_result = make_standings()
 			match_finished.emit(match_result)
 	return result
+
+
+# ------------------------------------------------------------------ Blitz
+
+## Peso do palpite no pote: palpites altos são mais difíceis e valem mais.
+static func blitz_weight(predict: int) -> float:
+	if predict >= 5:
+		return 2.0
+	if predict >= 3:
+		return 1.5
+	return 1.0
+
+
+func blitz_entry() -> float:
+	return float(BLITZ_ENTRY_BLINDS * blind)
+
+
+## Palpite (0 a 8) de um jogador; a entrada sai da stack e vai pro pote do nível. Todos os
+## palpites são revelados juntos depois.
+func blitz_place(player: int, predict: int) -> bool:
+	if not blitz or predicts[player] != -1:
+		return false
+	var amount := minf(blitz_entry(), stacks[player])
+	stacks[player] -= amount
+	stakes[player] = amount
+	pot += amount
+	predicts[player] = clampi(predict, 0, HAND_SIZE)
+	return true
+
+
+## Quantas vitórias ainda faltam pro palpite (negativo = já estourou).
+func blitz_need(player: int) -> int:
+	return int(predicts[player]) - int(wins[player])
+
+
+## Dobrar: a partir da 4ª rodada, uma vez por nível, só se ainda dá pra acertar. Paga mais uma
+## entrada (o peso no pote dobra junto).
+func can_double(player: int) -> bool:
+	if not blitz or is_round_over() or doubled[player] or trick_number < BLITZ_DOUBLE_FROM:
+		return false
+	var need := blitz_need(player)
+	return need >= 0 and need <= tricks_left() and stacks[player] >= blitz_entry()
+
+
+func double_down(player: int) -> bool:
+	if not can_double(player):
+		return false
+	stacks[player] -= blitz_entry()
+	stakes[player] += blitz_entry()
+	pot += blitz_entry()
+	doubled[player] = true
+	return true
+
+
+func blitz_ready() -> bool:
+	for p in range(num_players):
+		if predicts[p] == -1:
+			return false
+	return true
+
+
+## Situação do palpite de alguém agora: "hit" (no alvo), "short" (falta), "over" (estourou).
+func blitz_status(player: int) -> String:
+	if wins[player] == predicts[player]:
+		return "hit"
+	return "short" if wins[player] < predicts[player] else "over"
+
+
+func _resolve_trick_blitz(idx: int, winner: int, ev: int) -> Dictionary:
+	var value := 2 if ev == ChaosModifiers.Modifier.VAZA_DOURADA else 1
+	wins[winner] += value
+	var result := {
+		"winner": winner, "winning_index": idx, "plays": plays.duplicate(), "points": 0.0,
+		"base_points": 0.0, "mult": 1.0, "prize": 0.0, "pot": pot, "combos": [], "streak": 0,
+		"streak_mult": 1.0, "bonus": 0.0, "saque_amount": 0.0, "assalto_amount": 0.0,
+		"walkover": false, "trick_number": trick_number, "modifier": ev, "value": value,
+		"wins": wins.duplicate(), "rake": 0.0, "gain": 0.0,
+	}
+	return _finish_trick_blitz(result, winner)
+
+
+func _finish_trick_blitz(result: Dictionary, winner: int) -> Dictionary:
+	last_winner = winner
+	result["stacks"] = stacks.duplicate()
+	history.append(result)
+	plays = []
+	trick_number += 1
+	hand_no += 1
+	leader = winner
+	current = winner
+	if is_round_over():
+		blitz_result = _settle_blitz()
+		var deltas: Array = []
+		for p in range(num_players):
+			deltas.append(stacks[p] - level_start_stacks[p])
+		round_result = {
+			"round": round_index, "modifier": modifier, "weak_suit": weak_suit,
+			"modifier_trick": modifier_trick, "stacks": stacks.duplicate(), "deltas": deltas,
+			"tricks_won": tricks_won(), "wins": wins.duplicate(), "blitz": blitz_result,
+		}
+	trick_resolved.emit(result)
+	if is_round_over():
+		round_finished.emit(round_result)
+		if is_match_over():
+			match_result = make_standings()
+			match_finished.emit(match_result)
+	return result
+
+
+## Fim do nível: acertou o número exato leva o pote (dividido por entrada × dificuldade),
+## errou por 1 recebe metade da entrada de volta, errou por 2 ou mais perde a entrada.
+## Ninguém acertou: o pote inteiro acumula pro próximo nível.
+func _settle_blitz() -> Dictionary:
+	var payouts: Array = []
+	var refunds: Array = []
+	var hits: Array = []
+	var near: Array = []
+	var weights: Array = []
+	var total_w := 0.0
+	var pool := pot
+	for p in range(num_players):
+		payouts.append(0.0)
+		refunds.append(0.0)
+		weights.append(0.0)
+		session_stats[p]["levels"] += 1
+		var diff := absi(int(wins[p]) - int(predicts[p]))
+		if diff == 0:
+			hits.append(p)
+			weights[p] = float(stakes[p]) * blitz_weight(int(predicts[p]))
+			total_w += float(weights[p])
+			session_stats[p]["hits"] += 1
+		elif diff == 1:
+			near.append(p)
+			refunds[p] = floorf(float(stakes[p]) / 2.0)
+			pool -= float(refunds[p])
+			session_stats[p]["near"] += 1
+	var rake := 0.0
+	var carry_out := 0.0
+	if hits.is_empty():
+		carry_out = pool
+	else:
+		if rake_on:
+			rake = ChaosEconomy.rake_of(pool, blind)
+		var dist := pool - rake
+		var paid := 0.0
+		var top: int = hits[0]
+		for p in hits:
+			payouts[p] = floorf(dist * float(weights[p]) / total_w)
+			paid += float(payouts[p])
+			if float(weights[p]) > float(weights[top]):
+				top = p
+		payouts[top] += dist - paid
+		var total_stakes := 0.0
+		for p in range(num_players):
+			total_stakes += float(stakes[p])
+		house_rake += rake
+		human_rake += rake * float(stakes[0]) / maxf(total_stakes, 1.0)
+	var net: Array = []
+	for p in range(num_players):
+		stacks[p] += float(payouts[p]) + float(refunds[p])
+		net.append(float(payouts[p]) + float(refunds[p]) - float(stakes[p]))
+	var res := {
+		"predicts": predicts.duplicate(), "stakes": stakes.duplicate(), "wins": wins.duplicate(), "doubled": doubled.duplicate(),
+		"hits": hits, "near": near, "payouts": payouts, "refunds": refunds, "net": net,
+		"pool": pool, "rake": rake, "carry_in": carry, "carry_out": carry_out,
+	}
+	carry = carry_out
+	pot = 0.0
+	return res
 
 
 func make_standings() -> Dictionary:
