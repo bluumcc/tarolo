@@ -2141,7 +2141,10 @@ func _resolve_trick_blitz(result: Dictionary) -> void:
 	elif need < 0:
 		Sfx.play("lose")
 		FX.float_text(popup_layer, _seat_center(winner), "ESTOUROU", UIKit.LOSS, 34)
-	await _wait(0.8)
+	# Segura o vencedor e o movimento de fichas na tela: a próxima vaza já abre uma tela cheia
+	# de modificador, e sem esse respiro o resultado desta some antes de dar pra ler.
+	var moved := saque_amt + assalto_amt + curse_amt > 0.0
+	await _wait(2.0 if moved else 1.6)
 	if not is_inside_tree():
 		return
 	var target := _slot_pos(winner) + (_slot_pos(winner) - table_center.size / 2.0 + CardView.SIZE / 2.0) * 0.8
@@ -2156,6 +2159,7 @@ func _resolve_trick_blitz(result: Dictionary) -> void:
 	table_views.clear()
 	_banner_clear()
 	_refresh_hud()
+	await _wait(0.5)
 
 
 func _sum(a: Array) -> float:
@@ -2221,4 +2225,4 @@ func _blitz_settlement() -> void:
 	_pot_to(engine.carry)
 	phase = "idle"
 	_refresh_hud()
-	await _wait(1.3)
+	await _wait(2.2)
