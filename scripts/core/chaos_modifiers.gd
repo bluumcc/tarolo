@@ -10,10 +10,10 @@ enum Modifier {
 	VAZA_MAIS_UM, PEQUENAS_IMPORTAM, VAZA_DOURADA, SAQUE, ASSALTO_LIDER, VAZA_MALDITA,
 }
 
-## Os 12 modificadores ativos — todo nível embaralha esta lista e usa 8, um por vaza.
+## Os 11 modificadores ativos (Cada Rodada Vale +1 foi removido; o enum mantém o valor só por compatibilidade) — todo nível embaralha esta lista e usa 8, um por vaza.
 const ALL := [
 	Modifier.TRUNFO_DOBRO, Modifier.FIGURAS_DOBRO, Modifier.LOUCO_VENCE, Modifier.NAIPE_FRACO,
-	Modifier.NAIPE_FORTE, Modifier.VAZA_INVERTIDA, Modifier.VAZA_MAIS_UM, Modifier.PEQUENAS_IMPORTAM,
+	Modifier.NAIPE_FORTE, Modifier.VAZA_INVERTIDA, Modifier.PEQUENAS_IMPORTAM,
 	Modifier.VAZA_DOURADA, Modifier.SAQUE, Modifier.ASSALTO_LIDER, Modifier.VAZA_MALDITA,
 ]
 ## Modificadores que sorteiam um naipe-alvo.
@@ -80,7 +80,7 @@ const TIPS := {
 
 ## No Blitz, Rodada Dourada não multiplica pontos (o Blitz não tem prêmio em pontos): conta
 ## como 2 vitórias no palpite. Saque/Assalto/Maldita continuam mexendo em fichas (efeito à
-## parte do palpite); os demais 6 não têm efeito nenhum no Blitz — só valem no Caos.
+## parte do palpite); os demais 5 não têm efeito nenhum no Blitz — só valem no Caos.
 const BLITZ_NAMES := {Modifier.VAZA_DOURADA: "Rodada Dobrada"}
 const BLITZ_DESCRIPTIONS := {
 	Modifier.VAZA_DOURADA: "Quem vencer essa rodada conta 2 vitórias no palpite, em vez de 1.",
@@ -94,7 +94,7 @@ const BLITZ_TIPS := {
 	Modifier.ASSALTO_LIDER: "Rouba de quem tem mais fichas na mesa, não necessariamente de quem está por perto no palpite.",
 	Modifier.VAZA_MALDITA: "Vencer aqui custa fichas de verdade, não só a conta do palpite. Pense bem antes de forçar essa vitória.",
 }
-## Efeito genérico mostrado quando o modificador não move fichas no Blitz (os outros 6).
+## Efeito genérico mostrado quando o modificador não move fichas no Blitz (os outros 5).
 const BLITZ_NO_EFFECT_NOTE := "No Blitz isso só vale no Caos: aqui não muda nenhuma ficha, só quem vence a rodada conta pro seu palpite."
 
 const COMBO_NAMES := {

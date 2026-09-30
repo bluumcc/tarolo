@@ -36,7 +36,7 @@ var levels := 0               # 0 = sem fim
 var stacks: Array = []        # fichas de cada jogador na mesa
 var level_start_stacks: Array = []
 var round_index := 0          # nível atual (0-based)
-var modifier_sequence: Array = []  # ordem embaralhada dos 12 modificadores pra esse nível: 1 por vaza
+var modifier_sequence: Array = []  # ordem embaralhada dos 11 modificadores pra esse nível: 1 por vaza
 var modifier := -1            # modificador da vaza atual (-1 = ainda não sorteado pra essa vaza)
 var weak_suit := -1
 var streak: Array = []
@@ -126,7 +126,7 @@ func _setup_round() -> void:
 		streak.append(0)
 		captured.append([])
 		combo_count.append(0)
-	# Embaralha os 12 modificadores: as 8 vazas do nível usam os 8 primeiros, sem repetir.
+	# Embaralha os 11 modificadores: as 8 vazas do nível usam os 8 primeiros, sem repetir.
 	modifier_sequence = ChaosModifiers.ALL.duplicate()
 	Deck.shuffle(modifier_sequence, rng)
 	modifier = -1
@@ -700,7 +700,7 @@ func blitz_status(player: int) -> String:
 
 ## No Blitz, só o que muda QUEM vence (Louco Vence/Rodada Invertida, já aplicados antes de
 ## chegar aqui) e a contagem (Rodada Dourada→Dobrada) importam pro palpite. Saque, Assalto ao
-## Líder e Rodada Maldita ainda mexem em fichas de verdade, à parte do palpite — os outros 6
+## Líder e Rodada Maldita ainda mexem em fichas de verdade, à parte do palpite — os outros 5
 ## modificadores não têm efeito nenhum aqui (só valem no Caos).
 func _resolve_trick_blitz(idx: int, winner: int, ev: int) -> Dictionary:
 	var value := 2 if ev == ChaosModifiers.Modifier.VAZA_DOURADA else 1

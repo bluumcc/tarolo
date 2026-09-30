@@ -540,7 +540,7 @@ func _test_chaos() -> void:
 		if ChaosModifiers.has_suit(e8.modifier):
 			check(e8.weak_suit != -1, "modificador de naipe sorteia o naipe")
 	check(seen.size() == ChaosEngine.HAND_SIZE, "as 8 vazas do nível usam 8 modificadores diferentes")
-	check(ChaosModifiers.ALL.size() == 12, "são 12 modificadores ao todo")
+	check(ChaosModifiers.ALL.size() == 11, "são 11 modificadores ao todo")
 
 
 ## Bots estratégicos: só fazem jogadas legais em qualquer nível e, na defesa, seguram muito
@@ -646,7 +646,7 @@ func _test_blitz() -> void:
 	e.bonus_on = false
 	e.trick_number = 0
 	e.draw_trick_modifier()
-	check(e.blitz and ChaosModifiers.ALL.has(e.modifier), "Blitz: sorteia dos mesmos 12 modificadores do Caos")
+	check(e.blitz and ChaosModifiers.ALL.has(e.modifier), "Blitz: sorteia dos mesmos 11 modificadores do Caos")
 	var start_total := 0.0
 	for x in e.stacks:
 		start_total += float(x)

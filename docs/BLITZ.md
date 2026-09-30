@@ -28,10 +28,10 @@ Código: `ChaosEngine` com `blitz = true` (config `"mode": "blitz"`), `ChaosBot.
 5. **Cobrir:** quando um rival dobra ou triplica, todo mundo tem uma janela curta pra **COBRIR**
    (paga 1 entrada, iguala o peso dele) ou **DEIXAR** (de graça, mas fica com peso menor no rateio).
    Cobrir também usa um dos seus 2 lances do nível. É a mesma decisão de dobrar, só que em resposta.
-6. **Modificadores**: toda rodada sorteia 1 dos 12 (ver `docs/MODIFICADORES.md`), sempre anunciado em
+6. **Modificadores**: toda rodada sorteia 1 dos 11 (ver `docs/MODIFICADORES.md`), sempre anunciado em
    tela cheia antes das apostas. No Blitz, O Louco Vence e Rodada Invertida mudam quem vence, Rodada
    Dourada conta 2 vitórias ("Rodada Dobrada"), Saque/Assalto/Maldita roubam ou pagam fichas de
-   verdade (além da vitória), e os outros 6 só valem no Caos.
+   verdade (além da vitória), e os outros 5 só valem no Caos.
 
 ## Economia: de onde vem e pra onde vai a ficha
 Sem taxa, o Blitz é soma zero entre os jogadores: fichas só trocam de mão. A casa não cria ficha —
