@@ -29,6 +29,7 @@ static func open(host: Control, on_change: Callable = Callable()) -> Control:
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.custom_minimum_size = Vector2(0, clampf(vp.y * 0.55, 260.0, 720.0))
 	v.add_child(scroll)
+	UIKit.suppress_click_on_scroll(scroll)
 	var body := VBoxContainer.new()
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", 10)

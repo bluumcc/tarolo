@@ -32,6 +32,7 @@ func _ready() -> void:
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	page.add_child(scroll)
+	UIKit.suppress_click_on_scroll(scroll)
 	var center := CenterContainer.new()
 	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -177,6 +178,7 @@ func _modal(title: String) -> VBoxContainer:
 	scroll.custom_minimum_size = Vector2(0, clampf(get_viewport_rect().size.y * 0.42, 220.0, 480.0))
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	outer.add_child(scroll)
+	UIKit.suppress_click_on_scroll(scroll)
 	var body := VBoxContainer.new()
 	body.add_theme_constant_override("separation", 12)
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
