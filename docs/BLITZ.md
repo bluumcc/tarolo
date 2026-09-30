@@ -220,3 +220,15 @@ Um jogador nível Oráculo lucra em média mesmo com a taxa ligada, mas pouco (+
 amostra pequena e ruidosa — `tests/blitz_economy_check.gd`). Não farma sem fim; calibração fina
 fica pra quando houver amostra maior.
 `var blitz_showdown` (`chaos_scene.gd`) controla a revelação; sem UI nova além da pílula existente.
+
+## Modo Caos removido
+O modo Caos (aposta por rodada, sem palpite) foi tirado do jogo: sumiu do menu, do Smoke test e
+da sua documentação própria (`docs/ECONOMIA.md`, `docs/MESA_CAOS.md`, `tests/economy_sim.gd` —
+removidos). O Blitz é o único modo de mesa daqui pra frente.
+
+**O que NÃO foi removido, de propósito:** o motor (`ChaosEngine`) e a cena (`chaos_scene.gd`)
+continuam compartilhados entre os dois modos por baixo do capô — ainda têm `if engine.blitz else
+...` para o Caos em alguns pontos (textos de intro, título do popup). Como `engine.blitz` nunca
+mais é `false` (nada no menu cria uma mesa sem ser Blitz), esse código fica morto, mas inofensivo.
+Não arranquei linha a linha porque é um arquivo de ~2200 linhas compartilhado com o Blitz ativo —
+fazer isso com segurança é um corte à parte, não uma linha de continuação desta sessão.

@@ -47,9 +47,7 @@ func _ready() -> void:
 
 	var rk := GameState.ranked()
 	var tier := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
-	var chaos := Widgets.mode_card("MODO CAOS", "Poker de rodadas: aposte, blefe e leve o pote. Com modificadores e combos!", UIKit.DANGER, 176 if get_viewport_rect().size.y > get_viewport_rect().size.x else 150, "⚡", _open_chaos_confirm, 46)
-	col.add_child(chaos)
-	var blitz := Widgets.mode_card("MODO BLITZ", "Dê o palpite: quantas rodadas você vai ganhar? Acertou, leva o pote!", UIKit.INFO, 150 if get_viewport_rect().size.y > get_viewport_rect().size.x else 132, "❖", _open_blitz_confirm, 40)
+	var blitz := Widgets.mode_card("MODO BLITZ", "Dê o palpite: quantas rodadas você vai ganhar? Acertou, leva o pote! Com modificadores, dobra e combos.", UIKit.DANGER, 176 if get_viewport_rect().size.y > get_viewport_rect().size.x else 150, "❖", _open_blitz_confirm, 46)
 	col.add_child(blitz)
 	var wide := get_viewport_rect().size.x > get_viewport_rect().size.y
 	var grid := GridContainer.new()
@@ -76,7 +74,7 @@ func _ready() -> void:
 	var nav := Widgets.bottom_nav([
 		{"icon": "★", "label": "Cosméticos", "cb": _open_cosmetics},
 		{"icon": "?", "label": "Como jogar", "cb": _open_rules},
-		{"icon": "⚡", "label": "CAOS", "cb": _open_chaos_confirm, "center": true},
+		{"icon": "❖", "label": "BLITZ", "cb": _open_blitz_confirm, "center": true},
 		{"icon": "⚙", "label": "Ajustes", "cb": _open_settings},
 		{"icon": "♚", "label": "Ranking", "cb": func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn")},
 	])
@@ -87,7 +85,7 @@ func _ready() -> void:
 	overlay_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(overlay_layer)
-	chaos.grab_focus.call_deferred()
+	blitz.grab_focus.call_deferred()
 
 
 ## Logo do jogo com três cartas em leque (as mesmas do jogo, só de enfeite).
@@ -359,22 +357,17 @@ func _reopen_cosmetics() -> void:
 	_open_cosmetics()
 
 
-func _open_chaos_confirm() -> void:
-	_open_table_select("chaos")
-
-
 func _open_blitz_confirm() -> void:
-	_open_table_select("blitz")
+	_open_table_select()
 
 
-## Escolha da mesa (blind + entrada) pros dois modos de mesa: Caos e Blitz.
-func _open_table_select(mode: String) -> void:
-	var blitz := mode == "blitz"
-	var v := _modal("MESA BLITZ" if blitz else "MESA CAOS")
+## Escolha da mesa (blind + entrada) da Mesa Blitz.
+func _open_table_select() -> void:
+	var v := _modal("MESA BLITZ")
 	var profile := SaveManager.section("profile")
 	var fichas := int(profile["fichas"])
 	v.add_child(UIKit.label("Você tem %d fichas" % fichas, 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-	var txt := "Escolha a mesa. Você senta com uma stack de 40 blinds, palpita quantas rodadas vai ganhar em cada nível (acertou o número exato, leva o pote) e leva de volta a stack quando sair." if blitz else "Escolha a mesa. Você senta com uma stack de 40 blinds, aposta a cada rodada (passar, aumentar, pagar ou desistir) e leva de volta a stack quando sair."
+	var txt := "Escolha a mesa. Você senta com uma stack de 40 blinds, palpita quantas rodadas vai ganhar em cada nível (acertou o número exato, leva o pote) e leva de volta a stack quando sair."
 	var info := UIKit.label(txt, 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info.custom_minimum_size = Vector2(620, 0)
@@ -392,12 +385,12 @@ func _open_table_select(mode: String) -> void:
 	for i in range(GameState.CHAOS_TABLES.size()):
 		var t: Dictionary = GameState.CHAOS_TABLES[i]
 		var cost := GameState.chaos_buy_in(i)
-		var entry_txt := "entrada ◎%d" % (int(t["blind"]) * 2) if blitz else "blind ◎%d" % int(t["blind"])
-		var b := UIKit.button("%s · %s · stack ◎%d" % [str(t["name"]).to_upper(), entry_txt, cost], (UIKit.INFO if blitz else UIKit.DANGER) if i == 0 else UIKit.PURPLE, 26)
+		var entry_txt := "entrada ◎%d" % (int(t["blind"]) * 2)
+		var b := UIKit.button("%s · %s · stack ◎%d" % [str(t["name"]).to_upper(), entry_txt, cost], UIKit.INFO if i == 0 else UIKit.PURPLE, 26)
 		b.disabled = fichas < cost
 		b.pressed.connect(func():
 			GameState.chaos_table = i
-			GameState.chaos_mode = mode
+			GameState.chaos_mode = "blitz"
 			get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn"))
 		v.add_child(b)
 	_close_button(v)

@@ -148,7 +148,7 @@ const CHAOS_TABLES := [
 	{"name": "Alta", "blind": 200, "bots": [2, 2, 2]},       # Difícil x3
 ]
 var chaos_table := 0
-var chaos_mode := "chaos"     # "chaos" (aposta por rodada) ou "blitz" (palpite de vitórias por nível)
+var chaos_mode := "blitz"    # só "blitz" existe hoje (Caos removido); campo mantido por compatibilidade de save
 
 
 func chaos_buy_in(table: int = -1) -> int:
