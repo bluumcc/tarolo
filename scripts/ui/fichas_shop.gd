@@ -37,10 +37,7 @@ static func open(host: Control, on_change: Callable = Callable()) -> Control:
 	close.custom_minimum_size = Vector2(0, 72)
 	close.pressed.connect(func(): ov.queue_free())
 	v.add_child(close)
-	var wrap := CenterContainer.new()
-	wrap.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	wrap.add_child(box)
-	ov.add_child(wrap)
+	ov.add_child(UIKit.centered(box))
 	var state := {"bal": bal_holder}
 	state["render"] = func():
 		for c in body.get_children():

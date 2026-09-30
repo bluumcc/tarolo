@@ -344,12 +344,25 @@ static func overlay() -> ColorRect:
 	return o
 
 
-## Centraliza um popup na tela. Rola quando o conteúdo passa da altura (celular) e, em
+## Toda janela de popup usa essas margens (nunca 0): sem elas o popup encosta na borda física
+## da tela, onde ficam a barra de endereço do navegador, o notch ou a barra de gestos — foi o que
+## deixava o topo (nome editável) inacessível e o rodapé (botão de fechar) cortado.
+const POPUP_MARGIN_SIDE := 16.0
+const POPUP_MARGIN_TOP := 40.0
+const POPUP_MARGIN_BOTTOM := 48.0
+
+## Centraliza um popup na tela, com folga fixa das bordas. Rola quando o conteúdo passa da
+## altura disponível (celular) — NUNCA deixa o popup vazar pra fora da tela sem rolagem — e, em
 ## retrato, amplia os textos e botões do popup (BOOST) — no celular 720 px virtuais viram
 ## ~390 pt e o tamanho de desktop fica pequeno.
 static func centered(child: Control) -> Control:
 	var scroll := ScrollContainer.new()
-	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scroll.anchor_right = 1.0
+	scroll.anchor_bottom = 1.0
+	scroll.offset_left = POPUP_MARGIN_SIDE
+	scroll.offset_top = POPUP_MARGIN_TOP
+	scroll.offset_right = -POPUP_MARGIN_SIDE
+	scroll.offset_bottom = -POPUP_MARGIN_BOTTOM
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	var c := CenterContainer.new()
 	c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -463,15 +476,7 @@ static func modal(overlay_layer: Control, title: String, width: float = 660.0) -
 	v.custom_minimum_size = Vector2(width, 0)
 	box_p.add_child(v)
 	v.add_child(label(title, 44, GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	var scroll := ScrollContainer.new()
-	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	var center := CenterContainer.new()
-	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	center.add_child(box_p)
-	scroll.add_child(center)
-	ov.add_child(scroll)
+	ov.add_child(centered(box_p))
 	boost.call_deferred(box_p)
 	fit.call_deferred(box_p)
 	return v

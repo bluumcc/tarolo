@@ -165,15 +165,7 @@ func _modal(title: String) -> VBoxContainer:
 	v.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 96.0, 580.0), 0)
 	box.add_child(v)
 	v.add_child(UIKit.label(title, 38, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
-	var scroll := ScrollContainer.new()
-	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	var center := CenterContainer.new()
-	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	center.add_child(box)
-	scroll.add_child(center)
-	ov.add_child(scroll)
+	ov.add_child(UIKit.centered(box))
 	UIKit.fit.call_deferred(box)
 	return v
 
