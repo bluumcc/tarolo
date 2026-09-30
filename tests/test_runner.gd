@@ -791,15 +791,15 @@ func _test_blitz() -> void:
 
 	# Rodada Dourada não entra no sorteio do Blitz (confundiria com as vitórias do palpite).
 	var pool := ChaosModifiers.blitz_pool()
-	check(pool.size() == 10 and not pool.has(ChaosModifiers.Modifier.VAZA_DOURADA), "Blitz: sorteio sem a Rodada Dourada (10 modificadores)")
+	check(pool.size() == 9 and pool.has(ChaosModifiers.Modifier.VAZA_DOURADA) and not pool.has(ChaosModifiers.Modifier.TRUNFO_DOBRO) and not pool.has(ChaosModifiers.Modifier.FIGURAS_DOBRO), "Blitz: sorteio de 9 (Rodada Dobrada fica; Trunfo/Figuras em Dobro saem)")
 	var gp := ChaosEngine.new()
-	var dourada_seen := false
+	var dobro_seen := false
 	for lv in range(12):
 		gp.setup_match({"seed": 100 + lv, "mode": "blitz", "blind": 10})
-		if (gp.modifier_sequence as Array).has(ChaosModifiers.Modifier.VAZA_DOURADA):
-			dourada_seen = true
-	check(not dourada_seen, "Blitz: nenhum nível sorteia Rodada Dourada")
-	check(ChaosModifiers.has_blitz_effect(ChaosModifiers.Modifier.TRUNFO_DOBRO) and not ChaosModifiers.has_blitz_effect(ChaosModifiers.Modifier.VAZA_DOURADA), "Blitz: Trunfo em Dobro vale, Dourada não")
+		var sq: Array = gp.modifier_sequence
+		if sq.has(ChaosModifiers.Modifier.TRUNFO_DOBRO) or sq.has(ChaosModifiers.Modifier.FIGURAS_DOBRO):
+			dobro_seen = true
+	check(not dobro_seen, "Blitz: nenhum nível sorteia modificador que dobra pontos")
 
 	# Pontos das cartas viram fichas, pagas pelos rivais: 4,5 + 3×0,5 = 6 pts → 6×0,25×10×0,5 = 7,5 → 8, 3 cada.
 	var g2 := ChaosEngine.new()
@@ -823,10 +823,10 @@ func _test_blitz() -> void:
 	check(is_equal_approx(float(g2.stacks[0]), float(g2.buy_in) + 9.0) and is_equal_approx(float(g2.stacks[1]), float(g2.buy_in) - 3.0), "Blitz: pontos das cartas pagam fichas do vencedor (rivais dividem)")
 	check(is_equal_approx(g2_total, total0), "Blitz: fichas das cartas são soma zero")
 
-	# Trunfo em Dobro: 4,5×2 + 1,5 = 10,5 pts → 13,1 → 13 fichas, 5 de cada rival.
+	# Rodada Dobrada: conta 2 vitórias e NÃO multiplica os pontos (mesmo prêmio de fichas de antes).
 	var g3 := ChaosEngine.new()
 	g3.setup_match({"seed": 9, "mode": "blitz", "blind": 10})
-	g3.modifier = ChaosModifiers.Modifier.TRUNFO_DOBRO
+	g3.modifier = ChaosModifiers.Modifier.VAZA_DOURADA
 	g3.hands[0] = [c(CardData.Suit.TRUNFO, 21)]
 	g3.hands[1] = [c(CardData.Suit.PAUS, 3)]
 	g3.hands[2] = [c(CardData.Suit.PAUS, 4)]
@@ -835,7 +835,8 @@ func _test_blitz() -> void:
 	g3.current = 0
 	for pl in range(4):
 		g3.play(pl, (g3.hands[pl] as Array)[0])
-	check(is_equal_approx(float(g3.stacks[0]), float(g3.buy_in) + 15.0), "Blitz: Trunfo em Dobro dobra o que o Trunfo paga")
+	check(int(g3.wins[0]) == 2, "Blitz: Rodada Dobrada conta 2 vitórias")
+	check(is_equal_approx(float(g3.stacks[0]), float(g3.buy_in) + 9.0), "Blitz: Rodada Dobrada não multiplica o prêmio das cartas")
 
 	# Fator 0 desliga o prêmio das cartas (isola os efeitos de fichas dos outros modificadores).
 	var g0 := ChaosEngine.new()

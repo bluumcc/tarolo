@@ -307,9 +307,13 @@ static func _blitz_choose(engine: ChaosEngine, player: int, difficulty: int, rng
 	var left := engine.tricks_left()
 	# Valor de VENCER essa rodada pro palpite (negativo = vencer atrapalha).
 	var dv := 0.0
-	if need > 0:
-		var pneed := 1.0 if need >= left else float(need) / float(left)
-		dv = HIT_VALUE_BLINDS * pneed
+	# Rodada Dobrada: vencer conta 2 (falta 1 → estoura; falta 2 → fecha o palpite de uma vez).
+	var step := 2 if engine.active_modifier() == ChaosModifiers.Modifier.VAZA_DOURADA else 1
+	if need > 0 and step > need:
+		dv = -HIT_VALUE_BLINDS
+	elif need > 0:
+		var pneed := 1.0 if need >= left * step else float(need) / float(left * step)
+		dv = HIT_VALUE_BLINDS * minf(pneed, 1.0)
 	elif need == 0:
 		dv = -HIT_VALUE_BLINDS
 	# Efeitos de fichas do modificador (em blinds): Saque/Assalto rendem a quem vence, Maldita custa.

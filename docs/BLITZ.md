@@ -32,10 +32,10 @@ Código: `ChaosEngine` com `blitz = true` (config `"mode": "blitz"`), `ChaosBot.
    (1 ponto = 0,25 blind × `BLITZ_POINT_FACTOR`, pago em partes iguais pelos rivais). Soma zero, sem
    taxa. Cria a tensão de estratégia: vencer uma rodada rica rende fichas mas pode estourar o palpite;
    perder uma rodada rica custa fichas mas protege o palpite.
-7. **Modificadores**: toda rodada sorteia 1 dos 10 (ver `docs/MODIFICADORES.md`), sempre anunciado em
-   tela cheia antes das apostas. A Rodada Dourada não entra no Blitz (multiplicar pontos se
-   confundiria com as vitórias do palpite). Os de pontos (Trunfo/Figuras em Dobro, Naipe Fraco/Forte,
-   Cartas Pequenas) mudam quanto as cartas pagam; O Louco Vence e Rodada Invertida mudam quem vence;
+7. **Modificadores**: toda rodada sorteia 1 dos 9 (ver `docs/MODIFICADORES.md`), sempre anunciado em
+   tela cheia antes das apostas. O único "dobro" é a Rodada Dobrada (2 vitórias no palpite, sem
+   multiplicar pontos); Trunfo em Dobro e Figuras em Dobro ficam de fora (se confundiriam com as
+   vitórias). Naipe Fraco/Forte e Cartas Pequenas mudam quanto as cartas pagam; O Louco Vence e Rodada Invertida mudam quem vence;
    Saque/Assalto/Maldita movem fichas à parte.
 
 ## Economia: de onde vem e pra onde vai a ficha

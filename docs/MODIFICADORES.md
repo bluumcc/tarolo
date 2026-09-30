@@ -1,6 +1,6 @@
 # Modificadores do modo Caos/Blitz
 
-Todo nível embaralha os modificadores (11 no Caos, 10 no Blitz — sem a Rodada Dourada) e usa 8, um por rodada, sem repetir dentro do
+Todo nível embaralha os modificadores (11 no Caos, 9 no Blitz — sem Trunfo/Figuras em Dobro) e usa 8, um por rodada, sem repetir dentro do
 nível. Sempre por UMA rodada só — não existe mais modificador de nível inteiro. Antes de cada
 rodada, uma tela cheia explica a regra com objetividade (sem distrações) e uma contagem visível
 até começar (~3s; toca em "ENTENDI, CONTINUAR" pra pular). Nenhum é surpresa: o jogador sempre
@@ -9,18 +9,18 @@ sabe a regra antes de decidir, e no Blitz o palpite pode contar com essa informa
 Código: `scripts/core/chaos_modifiers.gd` (lista, textos), `ChaosEngine.draw_trick_modifier()`
 (sorteio), `ChaosScene._trick_start()` (tela cheia + contagem).
 
-## Os 11 (o Blitz sorteia 10)
+## Os 11 (o Blitz sorteia 9)
 
 | Modificador | O que muda | No Blitz |
 |---|---|---|
-| Trunfo em Dobro | Todo Trunfo vale o dobro de pontos | Trunfo paga o dobro de fichas |
-| Figuras em Dobro | Valete, Cavaleiro, Dama e Rei valem o dobro | figuras pagam o dobro de fichas |
+| Trunfo em Dobro | Todo Trunfo vale o dobro de pontos | não entra no sorteio (dobrar pontos se confunde com vitórias) |
+| Figuras em Dobro | Valete, Cavaleiro, Dama e Rei valem o dobro | não entra no sorteio (idem) |
 | O Louco Vence | O Louco pode vencer, como um Trunfo fraquinho | muda quem vence |
 | Naipe Fraco | Um naipe sorteado vale metade dos pontos | o naipe sorteado paga metade |
 | Naipe Forte | Um naipe sorteado vale 1,5× os pontos | o naipe sorteado paga 1,5× |
 | Rodada Invertida | Vence a MENOR carta do naipe; Trunfo não corta | muda quem vence |
 | Cartas Pequenas Importam | As cartas de 0,5 ponto valem 1,0 | cartas de 0,5 pt pagam como 1,0 |
-| Rodada Dourada | Os pontos valem ×3 | não entra no sorteio (confundiria com as vitórias do palpite) |
+| Rodada Dourada | Os pontos valem ×3 | vira "Rodada Dobrada": conta 2 vitórias, sem multiplicar pontos |
 | Saque | Quem vencer rouba 2 pontos de cada rival | rouba fichas de verdade, além da vitória |
 | Assalto ao Líder | Quem vencer rouba 4 pontos de quem lidera o placar | rouba fichas de quem lidera a stack, além da vitória |
 | Rodada Maldita | Quem vencer PERDE 3 pontos | paga fichas aos rivais, além da vitória |

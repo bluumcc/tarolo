@@ -2114,6 +2114,8 @@ func _resolve_trick_blitz(result: Dictionary) -> void:
 		FX.win_pulse(win_view, TABLE_SCALE)
 	var wname := str(config["names"][winner]).to_upper()
 	var sub := "Palpite: %d de %d" % [int(engine.wins[winner]), int(engine.predicts[winner])]
+	if int(result.get("value", 1)) == 2:
+		sub += "  ·  Rodada Dobrada: conta 2 vitórias"
 	var prize_amt := float(result.get("prize", 0.0))
 	if prize_amt > 0.0:
 		sub += "  ·  cartas +◎%d" % int(prize_amt)

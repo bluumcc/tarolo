@@ -71,14 +71,14 @@ const TIPS := {
 	Modifier.VAZA_MALDITA: "Vencer essa rodada custa pontos. Tente perder essa uma!",
 }
 
-## No Blitz os pontos das cartas viram fichas (pagas pelos rivais, num fator menor que no Caos),
-## então quase todos os modificadores valem lá. A Rodada Dourada NÃO entra no sorteio do Blitz:
-## multiplicar pontos ali se confundiria com as vitórias do palpite. Textos próprios trocam
-## "pontos" por "fichas das cartas" pra não confundir com a contagem de vitórias.
-const BLITZ_EXCLUDED := [Modifier.VAZA_DOURADA]
+## No Blitz os pontos das cartas viram fichas (pagas pelos rivais, num fator menor que no Caos).
+## O único "dobro" que vale lá é a Rodada Dobrada: a rodada conta 2 VITÓRIAS no palpite. Os
+## modificadores que dobram pontos (Trunfo em Dobro, Figuras em Dobro) ficam de fora do Blitz —
+## se confundiriam com as vitórias. Textos próprios trocam "pontos" por "fichas das cartas".
+const BLITZ_EXCLUDED := [Modifier.TRUNFO_DOBRO, Modifier.FIGURAS_DOBRO]
+const BLITZ_NAMES := {Modifier.VAZA_DOURADA: "Rodada Dobrada"}
 const BLITZ_DESCRIPTIONS := {
-	Modifier.TRUNFO_DOBRO: "Cada Trunfo capturado paga o DOBRO de fichas nessa rodada.",
-	Modifier.FIGURAS_DOBRO: "Valete, Cavaleiro, Dama e Rei pagam o DOBRO de fichas nessa rodada.",
+	Modifier.VAZA_DOURADA: "Quem vencer essa rodada conta 2 vitórias no palpite, em vez de 1.",
 	Modifier.NAIPE_FRACO: "Um naipe sorteado paga só METADE das fichas nessa rodada.",
 	Modifier.NAIPE_FORTE: "Um naipe sorteado paga 1,5× as fichas nessa rodada.",
 	Modifier.PEQUENAS_IMPORTAM: "Nessa rodada, as cartas de 0,5 pt pagam como se valessem 1,0.",
@@ -87,8 +87,7 @@ const BLITZ_DESCRIPTIONS := {
 	Modifier.VAZA_MALDITA: "Quem vencer essa rodada PAGA fichas aos rivais, além de contar a vitória.",
 }
 const BLITZ_TIPS := {
-	Modifier.TRUNFO_DOBRO: "Trunfo na mesa vale ouro agora, mas só ganha fichas quem vence a rodada — e a vitória também conta pro seu palpite.",
-	Modifier.FIGURAS_DOBRO: "Figuras pagam o dobro: vale a pena disputar se a vitória também servir ao seu palpite.",
+	Modifier.VAZA_DOURADA: "Muda a conta do palpite: se você quer 2 vitórias, basta ganhar só essa. Se não quer, fuja dela.",
 	Modifier.NAIPE_FRACO: "As cartas desse naipe quase não pagam: bom momento pra descartá-las sem pagar caro se perder.",
 	Modifier.NAIPE_FORTE: "As cartas desse naipe pagam mais: quem perder com uma delas na mesa paga a mais.",
 	Modifier.PEQUENAS_IMPORTAM: "Até as cartas fracas pagam agora: a rodada fica mais cara pra quem perde.",
@@ -144,8 +143,8 @@ static func label(modifier: int, weak_suit: int) -> String:
 
 
 ## Texto do modificador conforme o modo (Blitz reescreve alguns).
-static func name_of(modifier: int, _blitz := false) -> String:
-	return str(NAMES[modifier])
+static func name_of(modifier: int, blitz := false) -> String:
+	return str(BLITZ_NAMES[modifier]) if blitz and BLITZ_NAMES.has(modifier) else str(NAMES[modifier])
 
 
 static func desc_of(modifier: int, blitz := false) -> String:

@@ -77,7 +77,11 @@ func _init() -> void:
 	var Nm := BotAI.Difficulty.NORMAL
 	var Ez := BotAI.Difficulty.EASY
 	var L := ChaosBot.LEGACY
-	for f in [0.0, 0.25, 0.5, 1.0]:
+	var factors: Array = [0.0, 0.25, 0.5, 1.0]
+	var args := OS.get_cmdline_user_args()
+	if args.size() > 0:
+		factors = [float(args[0])]
+	for f in factors:
 		run("espelho: difícil-antigo vs 3 difíceis-antigos", L, L, f)
 		run("difícil-NOVO (pontos) vs 3 difíceis-antigos", H, L, f)
 		run("difícil-antigo vs 3 difíceis-NOVOS", L, H, f)

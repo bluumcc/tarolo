@@ -70,7 +70,7 @@ var blitz := false
 var doubles: Array = []       # quantas vezes cada um dobrou a entrada nesse nível (0 a 2)
 var predicts: Array = []      # palpite de cada um (-1 = ainda não fez)
 var stakes: Array = []        # fichas que cada um pôs no pote do nível
-var wins: Array = []          # vitórias contadas no nível
+var wins: Array = []          # vitórias contadas no nível (Rodada Dobrada conta 2)
 var carry := 0.0              # pote acumulado quando ninguém acerta
 var bonus_on := true          # prêmio especial de sequência (desligável nos testes)
 var hit_streak := 0           # acertos seguidos do jogador 0
@@ -706,7 +706,9 @@ func blitz_status(player: int) -> String:
 ## Líder e Rodada Maldita ainda mexem em fichas de verdade, à parte do palpite — os outros 5
 ## modificadores não têm efeito nenhum aqui (só valem no Caos).
 func _resolve_trick_blitz(idx: int, winner: int, ev: int) -> Dictionary:
-	wins[winner] += 1
+	# Rodada Dobrada (Dourada no Blitz) conta 2 vitórias; os pontos NÃO são multiplicados.
+	var value := 2 if ev == ChaosModifiers.Modifier.VAZA_DOURADA else 1
+	wins[winner] += value
 	# Pontos das cartas (já com o modificador) viram fichas pagas pelos rivais, como no Caos, só
 	# que num fator menor: o palpite continua sendo o prêmio principal, os pontos são o tempero.
 	var base_points := 0.0
@@ -753,7 +755,7 @@ func _resolve_trick_blitz(idx: int, winner: int, ev: int) -> Dictionary:
 		"base_points": base_points, "mult": 1.0, "prize": prize, "pot": pot, "combos": [], "streak": 0,
 		"streak_mult": 1.0, "bonus": 0.0, "saque_amount": saque_amount, "assalto_amount": assalto_amount,
 		"curse_amount": curse_amount, "walkover": false, "trick_number": trick_number, "modifier": ev,
-		"value": 1, "wins": wins.duplicate(), "rake": 0.0,
+		"value": value, "wins": wins.duplicate(), "rake": 0.0,
 		"gain": prize + saque_amount + assalto_amount - curse_amount,
 	}
 	return _finish_trick_blitz(result, winner)
