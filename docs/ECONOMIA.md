@@ -69,3 +69,11 @@ Controle de inflação: a economia é fechada (soma zero menos a taxa); as únic
 
 ## 7. Aviso
 Fichas compradas com dinheiro real que não podem ser sacadas caem no modelo de "jogo social" (cassino social) e algumas regiões têm regras próprias (classificação etária, loot boxes, tributos). Antes de cobrar de verdade, vale validar com a loja (Apple/Google) e com jurídico.
+
+
+## 6. Ajuste de ritmo (blinds ×2)
+Ganhar fichas era lento demais (~+90 em 15 min). Mudanças:
+- Blinds das mesas dobraram: Iniciante 10, Regular 50, Alta 200 (stack de 40 blinds: 400, 2.000 e 8.000).
+- Saldo inicial 1.500 (3 entradas Iniciante); recarga diária abaixo de 400, de 500 fichas.
+- Pacotes ×1,5 (750, 3.600, 9.750, 21.000) mantendo os mesmos preços.
+- Blitz: prêmio da casa por acerto exato (ver `docs/BLITZ.md`) e ritmo dos bots mais rápido.

@@ -78,6 +78,8 @@ func _init() -> void:
 	var H := BotAI.Difficulty.HARD
 	var Nm := BotAI.Difficulty.NORMAL
 	var Ez := BotAI.Difficulty.EASY
+	report("seat0 difícil vs 3 fáceis", [H, Ez, Ez, Ez], 10)
+	report("seat0 normal vs 3 fáceis", [Nm, Ez, Ez, Ez], 10)
 	report("todos difíceis (seat0 difícil)", [H, H, H, H], 30)
 	report("todos normais", [Nm, Nm, Nm, Nm], 30)
 	report("seat0 difícil vs fáceis", [H, Ez, Ez, Nm], 30)

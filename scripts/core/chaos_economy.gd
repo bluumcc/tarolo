@@ -6,9 +6,9 @@ extends RefCounted
 ## - Fontes: saldo inicial, recarga diária, compra de pacotes, vitórias contra os bots.
 ## - Ralos: taxa da casa em cada pote e o que os jogadores perdem pros bots.
 
-const START_FICHAS := 1000        # 5 entradas da mesa Iniciante (ou 1 da Regular)
-const DAILY_MIN := 200            # abaixo disso (não paga nem a entrada mais barata) libera a recarga
-const DAILY_AMOUNT := 300         # 1,5 entrada Iniciante
+const START_FICHAS := 1500        # 3 entradas da mesa Iniciante (blind 10, stack 400)
+const DAILY_MIN := 400            # abaixo disso (não paga nem a entrada mais barata) libera a recarga
+const DAILY_AMOUNT := 500         # 1 entrada Iniciante + folga
 const RAKE_PCT := 0.03            # taxa da casa sobre o pote quando há disputa de cartas
 const RAKE_CAP_BLINDS := 1.5      # teto da taxa por rodada, em blinds
 const BOT_STACK_BLINDS := [30, 60]  # bot novo senta com 30 a 60 blinds
@@ -16,10 +16,10 @@ const BUY_IN_BLINDS := 40           # stack padrão: 40 blinds (20 blinds quebra
 
 ## price_cents em centavos de real. Compras são SIMULADAS por enquanto.
 const PACKS := [
-	{"id": "punhado", "name": "Punhado", "price_cents": 490, "fichas": 500, "tag": ""},
-	{"id": "cofre", "name": "Cofre", "price_cents": 1990, "fichas": 2400, "tag": "POPULAR"},
-	{"id": "bau", "name": "Baú", "price_cents": 4990, "fichas": 6500, "tag": ""},
-	{"id": "tesouro", "name": "Tesouro", "price_cents": 9990, "fichas": 14000, "tag": "MELHOR CUSTO"},
+	{"id": "punhado", "name": "Punhado", "price_cents": 490, "fichas": 750, "tag": ""},
+	{"id": "cofre", "name": "Cofre", "price_cents": 1990, "fichas": 3600, "tag": "POPULAR"},
+	{"id": "bau", "name": "Baú", "price_cents": 4990, "fichas": 9750, "tag": ""},
+	{"id": "tesouro", "name": "Tesouro", "price_cents": 9990, "fichas": 21000, "tag": "MELHOR CUSTO"},
 ]
 
 

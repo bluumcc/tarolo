@@ -62,6 +62,7 @@ var human_rake := 0.0          # quanto do total saiu de fichas do jogador 0   #
 
 # Modo Blitz: palpite de vitórias por nível (em vez de aposta por rodada).
 const BLITZ_ENTRY_BLINDS := 2                      # entrada fixa de cada nível, em blinds
+const BLITZ_BONUS_BLINDS := 3                     # prêmio da casa por acerto (só pra você), × peso × sequência
 const BLITZ_DOUBLE_FROM := 3                       # dá pra dobrar a partir da 4ª rodada
 var blitz := false
 var doubled: Array = []       # quem já dobrou a entrada nesse nível
@@ -69,6 +70,9 @@ var predicts: Array = []      # palpite de cada um (-1 = ainda não fez)
 var stakes: Array = []        # fichas que cada um pôs no pote do nível
 var wins: Array = []          # vitórias contadas no nível (Rodada Dobrada conta 2)
 var carry := 0.0              # pote acumulado quando ninguém acerta
+var bonus_on := true          # prêmio da casa por acerto (desligável nos testes)
+var hit_streak := 0           # acertos seguidos do jogador 0
+var human_bonus := 0.0        # total de prêmios da casa recebidos pelo jogador 0
 var blitz_result: Dictionary = {}
 
 var hands: Array = []
@@ -91,6 +95,8 @@ func setup_match(config: Dictionary) -> void:
 	levels = int(config.get("levels", 0))
 	blitz = str(config.get("mode", "chaos")) == "blitz"
 	carry = 0.0
+	hit_streak = 0
+	human_bonus = 0.0
 	if config.has("seed"):
 		rng.seed = int(config["seed"])
 	else:
@@ -771,14 +777,29 @@ func _settle_blitz() -> Dictionary:
 			total_stakes += float(stakes[p])
 		house_rake += rake
 		human_rake += rake * float(stakes[0]) / maxf(total_stakes, 1.0)
+	# Prêmio da casa: quem (você) acerta o número exato ganha um extra, maior com palpite difícil,
+	# dobrando e em sequência de acertos. Recompensa a habilidade sem tirar dos bots.
+	var bonus := 0.0
+	if hits.has(0):
+		hit_streak += 1
+		if bonus_on:
+			var streak_mult := minf(1.0 + 0.5 * float(hit_streak - 1), 2.0)
+			bonus = float(BLITZ_BONUS_BLINDS * blind) * blitz_weight(int(predicts[0])) * streak_mult * (2.0 if doubled[0] else 1.0)
+			bonus = roundf(bonus)
+			human_bonus += bonus
+	else:
+		hit_streak = 0
 	var net: Array = []
 	for p in range(num_players):
 		stacks[p] += float(payouts[p]) + float(refunds[p])
 		net.append(float(payouts[p]) + float(refunds[p]) - float(stakes[p]))
+	stacks[0] += bonus
+	net[0] += bonus
 	var res := {
 		"predicts": predicts.duplicate(), "stakes": stakes.duplicate(), "wins": wins.duplicate(), "doubled": doubled.duplicate(),
 		"hits": hits, "near": near, "payouts": payouts, "refunds": refunds, "net": net,
 		"pool": pool, "rake": rake, "carry_in": carry, "carry_out": carry_out,
+		"bonus": bonus, "streak": hit_streak,
 	}
 	carry = carry_out
 	pot = 0.0

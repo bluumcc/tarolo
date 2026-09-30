@@ -1007,7 +1007,7 @@ func _play_cards() -> void:
 		if p == 0 and not GameState.autoplay:
 			card = await _wait_human()
 		else:
-			await _wait(0.9 if p == 0 else bot_rng.randf_range(0.9, 1.5))
+			await _wait(0.9 if p == 0 else (bot_rng.randf_range(0.55, 0.95) if engine.blitz else bot_rng.randf_range(0.9, 1.5)))
 			if not is_inside_tree():
 				return
 			card = ChaosBot.choose(engine, p, int(config["difficulty"][p]), bot_rng)
@@ -1338,6 +1338,10 @@ func _show_round_summary() -> String:
 			var verdict := "ACERTOU ✓" if hit else ("ERROU POR 1" if near else "ERROU ✕")
 			var sub_l := UIKit.label("palpite %d · fez %d · %s%s" % [int(b["predicts"][p]), int(b["wins"][p]), verdict, " · dobrou" if bool(b["doubled"][p]) else ""], 22, UIKit.OK if hit else (UIKit.MUTED if near else UIKit.LOSS), HORIZONTAL_ALIGNMENT_CENTER)
 			v.add_child(sub_l)
+	if r.has("blitz") and float(r["blitz"]["bonus"]) > 0.0:
+		var bl := UIKit.label("Prêmio da casa: +◎%d (sequência de %d acerto%s)" % [int(r["blitz"]["bonus"]), int(r["blitz"]["streak"]), "" if int(r["blitz"]["streak"]) == 1 else "s"], 24, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+		bl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(bl)
 	if r.has("blitz") and float(r["blitz"]["carry_out"]) > 0.0:
 		var cl := UIKit.label("Ninguém acertou: ◎%d acumulam pro próximo nível" % int(r["blitz"]["carry_out"]), 24, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
 		cl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1419,6 +1423,8 @@ func _show_results(summary: Dictionary) -> void:
 	v.add_child(stat_l)
 	if best_gain > 0.0:
 		v.add_child(UIKit.label("★ Maior pote seu: +◎%d" % int(best_gain), 30, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
+	if engine.blitz and engine.human_bonus >= 1.0:
+		v.add_child(UIKit.label("Prêmios da casa por acertos: +◎%d" % int(engine.human_bonus), 26, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
 	if engine.human_rake >= 1.0:
 		v.add_child(UIKit.label("Taxa da casa nos seus potes: ◎%d" % int(engine.human_rake), 24, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	for line in summary["lines"]:
@@ -2006,7 +2012,7 @@ func _resolve_trick_blitz(result: Dictionary) -> void:
 		var br := engine.blitz_result
 		hold_stacks = []
 		for p in range(engine.num_players):
-			hold_stacks.append(float(engine.stacks[p]) - float(br["payouts"][p]) - float(br["refunds"][p]))
+			hold_stacks.append(float(engine.stacks[p]) - float(br["payouts"][p]) - float(br["refunds"][p]) - (float(br["bonus"]) if p == 0 else 0.0))
 		hold_pot = float(br["pool"]) + _sum(br["refunds"])
 	await _wait(0.2)
 	if not is_inside_tree():
@@ -2029,7 +2035,7 @@ func _resolve_trick_blitz(result: Dictionary) -> void:
 	elif need < 0:
 		Sfx.play("lose")
 		FX.float_text(popup_layer, _seat_center(winner), "ESTOUROU", UIKit.LOSS, 34)
-	await _wait(1.1)
+	await _wait(0.8)
 	if not is_inside_tree():
 		return
 	var target := _slot_pos(winner) + (_slot_pos(winner) - table_center.size / 2.0 + CardView.SIZE / 2.0) * 0.8
@@ -2098,6 +2104,15 @@ func _blitz_settlement() -> void:
 			FX.float_text(popup_layer, _seat_center(p), "−◎ %d" % absi(int(net)), UIKit.LOSS)
 	if float(br["net"][0]) > best_gain:
 		best_gain = float(br["net"][0])
+	if float(br["bonus"]) > 0.0:
+		await _wait(0.4)
+		var streak_txt := "  ·  sequência de %d acertos" % int(br["streak"]) if int(br["streak"]) >= 2 else ""
+		_banner("PRÊMIO DA CASA +◎%d" % int(br["bonus"]), "Você acertou o palpite exato%s. Palpite alto, dobrar e sequência aumentam o prêmio." % streak_txt, UIKit.MONEY)
+		Sfx.play("jackpot")
+		FX.chip_rain(popup_layer, 26)
+		FX.float_text(popup_layer, _seat_center(0), "+◎ %d" % int(br["bonus"]), UIKit.MONEY, 44)
+		FX.burst(popup_layer, _seat_center(0) - popup_layer.global_position, UIKit.MONEY, 22)
+		await _wait(0.9)
 	_pot_to(engine.carry)
 	phase = "idle"
 	_refresh_hud()

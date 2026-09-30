@@ -659,6 +659,7 @@ func _test_blitz() -> void:
 	var e := ChaosEngine.new()
 	e.setup_match({"seed": 11, "mode": "blitz", "blind": 10, "levels": 0})
 	e.rake_on = false
+	e.bonus_on = false
 	check(e.blitz and ChaosModifiers.BLITZ_POOL.has(e.modifier), "Blitz: só sorteia modificadores do pool do Blitz")
 	var start_total := 0.0
 	for x in e.stacks:
@@ -686,6 +687,7 @@ func _test_blitz() -> void:
 	var f := ChaosEngine.new()
 	f.setup_match({"seed": 1, "mode": "blitz", "blind": 10})
 	f.rake_on = false
+	f.bonus_on = false
 	f.carry = 0.0
 	f.pot = 80.0
 	f.stakes = [20.0, 20.0, 20.0, 20.0]
@@ -701,6 +703,7 @@ func _test_blitz() -> void:
 	var f2 := ChaosEngine.new()
 	f2.setup_match({"seed": 1, "mode": "blitz", "blind": 10})
 	f2.rake_on = false
+	f2.bonus_on = false
 	f2.pot = 80.0
 	f2.stakes = [20.0, 20.0, 20.0, 20.0]
 	f2.predicts = [1, 3, 5, 0]
@@ -715,6 +718,28 @@ func _test_blitz() -> void:
 	var r3 := f2._settle_blitz()
 	check(is_equal_approx(float(r3["payouts"][0]) + float(r3["payouts"][1]), carried - float(r3["refunds"][3]) - float(r3["refunds"][2]) - float(r3["refunds"][0]) - float(r3["refunds"][1])), "Blitz: acertos dividem o pote inteiro (incluindo o acumulado)")
 	check(float(r3["payouts"][1]) > float(r3["payouts"][0]), "Blitz: palpite mais alto pesa mais no pote")
+
+	# Prêmio da casa: só pra você, cresce com o peso do palpite, dobrar e sequência.
+	var bn := ChaosEngine.new()
+	bn.setup_match({"seed": 1, "mode": "blitz", "blind": 10})
+	bn.rake_on = false
+	bn.pot = 80.0
+	bn.stakes = [20.0, 20.0, 20.0, 20.0]
+	bn.predicts = [3, 0, 0, 0]
+	bn.wins = [3, 1, 1, 1]
+	var rb1 := bn._settle_blitz()
+	check(is_equal_approx(float(rb1["bonus"]), 3.0 * 10.0 * 1.5), "Blitz: prêmio da casa = 3 blinds × peso do palpite")
+	bn.pot = 80.0
+	bn.stakes = [20.0, 20.0, 20.0, 20.0]
+	bn.predicts = [3, 0, 0, 0]
+	bn.wins = [3, 1, 1, 1]
+	var rb2 := bn._settle_blitz()
+	check(is_equal_approx(float(rb2["bonus"]), roundf(3.0 * 10.0 * 1.5 * 1.5)) and int(rb2["streak"]) == 2, "Blitz: sequência de acertos aumenta o prêmio")
+	bn.pot = 80.0
+	bn.predicts = [3, 0, 0, 0]
+	bn.wins = [2, 1, 1, 1]
+	var rb3 := bn._settle_blitz()
+	check(is_equal_approx(float(rb3["bonus"]), 0.0) and bn.hit_streak == 0, "Blitz: errar zera a sequência e não dá prêmio")
 
 	# Taxa da casa só quando o pote é pago.
 	var f3 := ChaosEngine.new()
@@ -804,7 +829,8 @@ func _test_economy() -> void:
 		check(rate >= prev, "pacote %s não dá menos fichas por real que o menor (%.0f/R$)" % [pk["name"], rate])
 		prev = rate
 	check(ChaosEconomy.bonus_pct(ChaosEconomy.PACKS[0]) == 0 and ChaosEconomy.bonus_pct(ChaosEconomy.PACKS[3]) >= 30, "bônus cresce com o tamanho do pacote")
-	check(ChaosEconomy.START_FICHAS >= ChaosEconomy.DAILY_MIN * 5, "saldo inicial paga 5 entradas mínimas")
+	check(ChaosEconomy.START_FICHAS >= 10 * ChaosEngine.BUY_IN_BLINDS * 3, "saldo inicial paga 3 entradas mínimas")
+	check(ChaosEconomy.DAILY_MIN >= 10 * ChaosEngine.BUY_IN_BLINDS, "recarga libera quando não dá pra pagar a entrada mais barata")
 	var prof := {"fichas": 100}
 	check(ChaosEconomy.daily_available(prof), "recarga liberada abaixo do mínimo")
 	check(ChaosEconomy.claim_daily(prof) == ChaosEconomy.DAILY_AMOUNT and int(prof["fichas"]) == 100 + ChaosEconomy.DAILY_AMOUNT, "coletar credita a recarga")
@@ -813,7 +839,7 @@ func _test_economy() -> void:
 	prof = {"fichas": 900}
 	check(not ChaosEconomy.daily_available(prof), "sem recarga com saldo acima do mínimo")
 	prof = {"fichas": 10}
-	check(ChaosEconomy.PACKS.size() == 4 and ChaosEconomy.buy_simulated(prof, "cofre") == 2400 and int(prof["fichas"]) == 2410 and int(prof["spent_cents"]) == 1990, "compra simulada credita fichas e registra o gasto")
+	check(ChaosEconomy.PACKS.size() == 4 and ChaosEconomy.buy_simulated(prof, "cofre") == 3600 and int(prof["fichas"]) == 3610 and int(prof["spent_cents"]) == 1990, "compra simulada credita fichas e registra o gasto")
 	check(ChaosEconomy.buy_simulated(prof, "nada") == 0, "pacote inexistente não credita")
 	check(is_equal_approx(ChaosEconomy.rake_of(100.0, 10), 3.0) and is_equal_approx(ChaosEconomy.rake_of(2000.0, 10), 15.0), "taxa é 3% do pote com teto de 1,5 blinds")
 	check(ChaosEconomy.price_text(1990) == "R$ 19,90", "preço em reais")

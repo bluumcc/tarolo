@@ -23,6 +23,20 @@ Código: `ChaosEngine` com `blitz = true` (config `"mode": "blitz"`), `ChaosBot.
 5. **Modificadores** (todos anunciados, nenhuma surpresa): O Louco Vence, Mundo ao Contrário, Rodada
    Invertida e Rodada Dobrada (quem vence conta 2 vitórias). Sem prêmio em pontos/combos.
 
+## Prêmio da casa (ritmo de ganho)
+Zero-sum contra bots rendia quase nada (~0,0 blind por nível mesmo jogando bem). Por isso quem **você** acerta o
+número exato leva um prêmio extra pago pela casa: `3 blinds × peso do palpite (×1 / ×1,5 / ×2) × 2 se dobrou ×
+sequência (×1, ×1,5, ×2 com 1, 2, 3+ acertos seguidos)`. Só o jogador humano recebe (os bots não ganham do nada,
+o placar da mesa segue justo). Simulação (blind 10, ~55 s por nível, ~16 níveis em 15 min):
+
+| Nível de jogo | Ganho médio por nível | Em 15 min (mesa Iniciante) |
+|---|---|---|
+| Difícil (habilidade alta) | ~+2,0 blinds | ~+320 fichas |
+| Normal | ~+1,4 blinds | ~+220 fichas |
+| Fácil (palpite e jogo ruins) | ~+0,65 blinds | ~+100 fichas |
+
+O ganho depende da taxa de acertos, então melhorar o jogo rende ~3× mais. Constante: `BLITZ_BONUS_BLINDS`.
+
 ## Por que é simples e tem estratégia
 - Uma decisão de dinheiro por nível (o palpite, com sugestão) e uma opcional (dobrar).
 - A estratégia real está em **jogar pra fechar a conta**: já no alvo, perder as rodadas que sobram

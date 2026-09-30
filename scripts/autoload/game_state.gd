@@ -143,9 +143,9 @@ func player_name() -> String:
 
 ## Mesas do Caos: blind, com buy-in de 20 blinds (a stack com que você senta).
 const CHAOS_TABLES := [
-	{"name": "Iniciante", "blind": 5, "bots": [0, 0, 1]},    # Fácil, Fácil, Normal
-	{"name": "Regular", "blind": 25, "bots": [1, 1, 2]},     # Normal, Normal, Difícil
-	{"name": "Alta", "blind": 100, "bots": [2, 2, 2]},       # Difícil x3
+	{"name": "Iniciante", "blind": 10, "bots": [0, 0, 1]},   # Fácil, Fácil, Normal
+	{"name": "Regular", "blind": 50, "bots": [1, 1, 2]},     # Normal, Normal, Difícil
+	{"name": "Alta", "blind": 200, "bots": [2, 2, 2]},       # Difícil x3
 ]
 var chaos_table := 0
 var chaos_mode := "chaos"     # "chaos" (aposta por rodada) ou "blitz" (palpite de vitórias por nível)
