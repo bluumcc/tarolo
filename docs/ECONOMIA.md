@@ -46,13 +46,11 @@ Base: pacote pequeno ≈ 100 fichas por R$ 1. Preços em degraus de loja de apli
 | Pacote | Preço | Fichas | Fichas por R$ | Bônus | R$ por 1.000 fichas |
 |---|---|---|---|---|---|
 | Punhado | R$ 4,90 | 500 | 102 | +0% | 9,80 |
-| Saco | R$ 9,90 | 1.100 | 111 | +9% | 9,00 |
 | Cofre | R$ 19,90 | 2.400 | 121 | +18% | 8,29 |
 | Baú | R$ 49,90 | 6.500 | 130 | +28% | 7,68 |
 | Tesouro | R$ 99,90 | 14.000 | 140 | +37% | 7,14 |
-| Reserva Real | R$ 199,90 | 30.000 | 150 | +47% | 6,66 |
 
-O que cada pacote representa: Punhado = 2,5 entradas Iniciante ou meia Regular; Cofre = 2 entradas Regular; Tesouro = 3,5 entradas Alta; Reserva Real = 7 entradas Alta.
+O que cada pacote representa: Punhado = 2,5 entradas Iniciante ou meia Regular; Cofre = 2 entradas Regular; Baú = 6 entradas Regular ou 1,5 Alta; Tesouro = 3,5 entradas Alta.
 Custo de jogar (com o Punhado): jogador médio no Regular ≈ R$ 1,2 por buy-in; fraco ≈ R$ 8,6; no Iniciante quase de graça.
 
 ## 5. Como a casa ganha

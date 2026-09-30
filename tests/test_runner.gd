@@ -671,7 +671,7 @@ func _test_economy() -> void:
 		var rate := ChaosEconomy.fichas_per_real(pk)
 		check(rate >= prev, "pacote %s não dá menos fichas por real que o menor (%.0f/R$)" % [pk["name"], rate])
 		prev = rate
-	check(ChaosEconomy.bonus_pct(ChaosEconomy.PACKS[0]) == 0 and ChaosEconomy.bonus_pct(ChaosEconomy.PACKS[5]) >= 40, "bônus cresce com o tamanho do pacote")
+	check(ChaosEconomy.bonus_pct(ChaosEconomy.PACKS[0]) == 0 and ChaosEconomy.bonus_pct(ChaosEconomy.PACKS[3]) >= 30, "bônus cresce com o tamanho do pacote")
 	check(ChaosEconomy.START_FICHAS >= ChaosEconomy.DAILY_MIN * 5, "saldo inicial paga 5 entradas mínimas")
 	var prof := {"fichas": 100}
 	check(ChaosEconomy.daily_available(prof), "recarga liberada abaixo do mínimo")
@@ -681,7 +681,7 @@ func _test_economy() -> void:
 	prof = {"fichas": 900}
 	check(not ChaosEconomy.daily_available(prof), "sem recarga com saldo acima do mínimo")
 	prof = {"fichas": 10}
-	check(ChaosEconomy.buy_simulated(prof, "cofre") == 2400 and int(prof["fichas"]) == 2410 and int(prof["spent_cents"]) == 1990, "compra simulada credita fichas e registra o gasto")
+	check(ChaosEconomy.PACKS.size() == 4 and ChaosEconomy.buy_simulated(prof, "cofre") == 2400 and int(prof["fichas"]) == 2410 and int(prof["spent_cents"]) == 1990, "compra simulada credita fichas e registra o gasto")
 	check(ChaosEconomy.buy_simulated(prof, "nada") == 0, "pacote inexistente não credita")
 	check(is_equal_approx(ChaosEconomy.rake_of(100.0, 10), 3.0) and is_equal_approx(ChaosEconomy.rake_of(2000.0, 10), 15.0), "taxa é 3% do pote com teto de 1,5 blinds")
 	check(ChaosEconomy.price_text(1990) == "R$ 19,90", "preço em reais")

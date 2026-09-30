@@ -17,11 +17,9 @@ const BUY_IN_BLINDS := 40           # stack padrão: 40 blinds (20 blinds quebra
 ## price_cents em centavos de real. Compras são SIMULADAS por enquanto.
 const PACKS := [
 	{"id": "punhado", "name": "Punhado", "price_cents": 490, "fichas": 500, "tag": ""},
-	{"id": "saco", "name": "Saco", "price_cents": 990, "fichas": 1100, "tag": ""},
 	{"id": "cofre", "name": "Cofre", "price_cents": 1990, "fichas": 2400, "tag": "POPULAR"},
 	{"id": "bau", "name": "Baú", "price_cents": 4990, "fichas": 6500, "tag": ""},
 	{"id": "tesouro", "name": "Tesouro", "price_cents": 9990, "fichas": 14000, "tag": "MELHOR CUSTO"},
-	{"id": "reserva", "name": "Reserva Real", "price_cents": 19990, "fichas": 30000, "tag": ""},
 ]
 
 
