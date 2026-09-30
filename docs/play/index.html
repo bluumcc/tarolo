@@ -98,6 +98,30 @@ if (window.visualViewport) {
 		get: function () { return Math.round(window.visualViewport.width); },
 	});
 }
+
+// Teclado virtual no celular: o navegador só abre o teclado se o campo receber foco DENTRO do
+// toque do usuário. O Godot só foca o campo dele no quadro seguinte (fora do toque), então nada
+// aparece. Truque: o jogo avisa (window.__vk) que o dedo está sobre um campo de texto; no
+// touchend, ainda dentro do gesto, focamos um <input> nosso — o teclado abre e, quando o Godot
+// focar o dele, o teclado continua aberto.
+(function () {
+	var helper = null;
+	function make() {
+		helper = document.createElement('input');
+		helper.type = 'text';
+		helper.setAttribute('autocomplete', 'off');
+		helper.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;border:0;padding:0;font-size:16px;z-index:-1;';
+		document.body.appendChild(helper);
+	}
+	function onEnd() {
+		if (!window.__vk) { return; }
+		window.__vk = false;
+		if (!helper) { make(); }
+		helper.focus();
+		setTimeout(function () { if (document.activeElement === helper) { helper.blur(); } }, 600);
+	}
+	document.addEventListener('touchend', onEnd, true);
+})();
 		</script>
 	</head>
 	<body>
@@ -117,7 +141,7 @@ if (window.visualViewport) {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":true,"fileSizes":{"index.pck":803872,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":true,"fileSizes":{"index.pck":804320,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 

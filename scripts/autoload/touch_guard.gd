@@ -74,6 +74,7 @@ func _input(event: InputEvent) -> void:
 
 	match kind:
 		"down":
+			_flag_keyboard(pos)
 			if _scroll != null:
 				# Duplicata (toque + mouse emulado) do mesmo pressionar.
 				get_viewport().set_input_as_handled()
@@ -200,3 +201,17 @@ func _over_range(s: Control, pos: Vector2) -> bool:
 				and r.get_global_rect().grow(8.0).has_point(pos):
 			return true
 	return false
+
+
+## Web/celular: avisa o JS (web_shell.html) que este toque começou sobre um campo de texto, pra ele
+## abrir o teclado virtual dentro do gesto (o navegador exige).
+func _flag_keyboard(pos: Vector2) -> void:
+	if not OS.has_feature("web"):
+		return
+	var over := false
+	for n in get_tree().root.find_children("*", "LineEdit", true, false):
+		var le := n as LineEdit
+		if le.is_visible_in_tree() and le.editable and le.get_global_rect().has_point(pos):
+			over = true
+			break
+	JavaScriptBridge.eval("window.__vk=%s" % ("true" if over else "false"), true)
