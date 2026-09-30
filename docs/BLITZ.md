@@ -181,4 +181,23 @@ só aparece no fim do nível (showdown), junto do resultado. Dobrar/cobrir conti
 Como os bots nunca leram o palpite dos rivais pra decidir nada (só o próprio, ver `chaos_bot.gd`),
 esconder da tela não desequilibra nada: não são bots ficando "mais burros" nem "mais espertos",
 é só o jogador humano ganhando (e perdendo) a informação que os bots nunca tiveram de graça.
+
+## Fase 4: carta aberta trocável antes do palpite
+Antes do palpite, cada jogador recebe 1 carta virada do monte (`Deck.deal`'s `rest`, nunca usado
+no Blitz até aqui) e pode trocá-la por qualquer carta da mão, ou recusar — uma decisão só, antes
+de ver o palpite dos outros. `engine.can_swap/apply_swap/decline_swap`, bot em
+`ChaosBot.wants_swap` (troca a carta mais fraca quando a oferecida ajuda de verdade, por
+`_card_power`), UI em `_human_swap_choice()`.
+
+## Onboarding: camadas de regra pros primeiros níveis
+Conta nova, primeiras `GameState.ONBOARDING_LEVELS` (3) mesas de Blitz: sem modificador (a tela
+cheia nem abre), sem dobrar/cobrir, sem carta aberta — só o palpite puro, pra aprender a mecânica
+central antes de mais uma camada. Contado por `profile.blitz_levels` (save), passado como
+`onboarding_levels` no config do motor. `_test_blitz_phase4` (`test_runner.gd`) cobre o
+comportamento.
+
+## Fase 5: economia vs bots (medida, ver `docs/PLANO_COMPETITIVO.md`)
+Um jogador nível Oráculo lucra em média mesmo com a taxa ligada, mas pouco (+0,39 blind/nível,
+amostra pequena e ruidosa — `tests/blitz_economy_check.gd`). Não farma sem fim; calibração fina
+fica pra quando houver amostra maior.
 `var blitz_showdown` (`chaos_scene.gd`) controla a revelação; sem UI nova além da pílula existente.

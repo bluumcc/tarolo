@@ -136,10 +136,26 @@ tutorial guiado, cosméticos, torneios, novos modificadores.
   Difícil por +0,66 blind/nível — confirma que existe teto de habilidade acima do bot atual.
 - **Fase 1 (estilos):** feito. 3 estilos (Calculista/Cauteloso/Agressivo, `ChaosBot.Style`),
   calibrados até nenhum ficar dominado (`tests/blitz_gate.gd`). Sorteados ao sentar/trocar
-  (`refill_bots`), nunca mostrados na tela — só percebidos jogando.
+  (`refill_bots`), nunca mostrados na tela — só percebidos jogando. Timing de dobrar/cobrir varia
+  por estilo (`ChaosBot.style_delay_mult`) — o único "tell" visível, já que o palpite é segredo
+  (Fase 3).
 - **Fase 2 (enxugar regras):** parcialmente revertida — ver `docs/BLITZ.md`. Tirar o triplicar
-  quebrou a escada de dificuldade (Difícil passou a perder de Normal); mantido como estava. Os
-  pesos do palpite (×1/×1,5/×2) e as camadas de regra por nível ficam pendentes.
+  quebrou a escada de dificuldade (Difícil passou a perder de Normal); mantido como estava.
+  Pesos do palpite (×1/×1,5/×2) revalidados com o código atual (pontos + estilos): nenhum
+  palpite fixo é lucrativo, sem mudança necessária (`tests/blitz_diag_sim.gd`). Camadas de regra
+  pros primeiros níveis: feito (ver "Onboarding" abaixo).
 - **Fase 3 (palpite oculto):** feito. Rivais em segredo até o showdown; sem mudança nos bots
   (eles já não liam o palpite alheio).
-- **Fases 4 (troca de carta) e 5 (economia vs bots):** pendentes.
+- **Fase 4 (troca de 1 carta):** feito. `engine.swap_cards`/`can_swap`/`apply_swap`/
+  `decline_swap`; bot em `ChaosBot.wants_swap`; UI em `_human_swap_choice()`.
+- **Onboarding (camadas de regra):** feito, fora do plano original de 6 fases, junto da Fase 2.
+  `ChaosEngine.onboarding_levels` (config, contado por `GameState.ONBOARDING_LEVELS = 3`, salvo
+  em `profile.blitz_levels`): as primeiras mesas de Blitz de uma conta nova não sorteiam
+  modificador nem liberam dobrar/cobrir/carta aberta — só o palpite puro.
+- **Fase 5 (economia vs bots):** medida, não calibrada. `tests/blitz_economy_check.gd`: um
+  jogador nível Oráculo, mesmo com a taxa da casa ligada (4%), ainda lucra em média — mas pouco
+  (+0,39 blind/nível, 6 sessões de 10 níveis, bem ruidoso: de −2,2 a +1,75 por sessão; o Oráculo
+  é lento demais pra medir com precisão numa sessão). Não é o "farm infinito" que eu temi antes de
+  medir direito: um erro meu de rótulo no primeiro teste tinha inflado o número em ~10×.
+  Calibração fina (ajustar taxa/dificuldade por mesa) fica pra quando houver amostra maior ou
+  telemetria real — mexer sem medir bem de novo é o mesmo erro do triplicar.
