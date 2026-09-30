@@ -88,27 +88,25 @@ body {
 // window.visualViewport.height/width já refletem a área realmente visível. Só troca a MEDIDA
 // (sem escutar evento nenhum, pra nunca competir com um arrasto em andamento): a própria engine
 // já releria isso sozinha a cada quadro.
-// Enquanto o teclado virtual está aberto, congelamos a medida: senão o visualViewport encolhe, o
-// canvas é redimensionado pra área que sobrou e o jogo inteiro fica espremido/minúsculo.
-var __kbFrozen = null;
+// Teclado virtual: quando ele abre, o visualViewport encolhe (>150px de uma vez) e o canvas era
+// redimensionado pra área que sobrou — o jogo inteiro espremia, e voltava ao fechar. Detectamos o
+// teclado só pelo tamanho (nada de eventos de foco, que ficam trocando a cada toque): se a altura
+// visível é bem menor que a maior já vista com a mesma largura, seguimos reportando a maior.
+// Mudanças pequenas (barra de endereço do Safari) continuam sendo seguidas normalmente.
+var __fullH = 0, __lastW = 0;
 function __vvSize() {
-	if (__kbFrozen) { return __kbFrozen; }
-	return { w: Math.round(window.visualViewport.width), h: Math.round(window.visualViewport.height) };
+	var w = Math.round(window.visualViewport.width);
+	var h = Math.round(window.visualViewport.height);
+	if (w !== __lastW) { __lastW = w; __fullH = h; }
+	else if (__fullH - h > 150) { return { w: w, h: __fullH }; }
+	else { __fullH = h; }
+	return { w: w, h: h };
 }
-document.addEventListener('focusin', function (e) {
-	var t = e.target && e.target.tagName;
-	if (t === 'INPUT' || t === 'TEXTAREA') {
-		if (!__kbFrozen) { __kbFrozen = __vvSize(); }
-	}
-}, true);
 document.addEventListener('focusout', function () {
 	setTimeout(function () {
 		var a = document.activeElement && document.activeElement.tagName;
-		if (a !== 'INPUT' && a !== 'TEXTAREA') {
-			__kbFrozen = null;
-			window.scrollTo(0, 0);
-		}
-	}, 50);
+		if (a !== 'INPUT' && a !== 'TEXTAREA') { window.scrollTo(0, 0); }
+	}, 80);
 }, true);
 if (window.visualViewport) {
 	Object.defineProperty(window, 'innerHeight', {
@@ -163,7 +161,7 @@ if (window.visualViewport) {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":true,"fileSizes":{"index.pck":804288,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":true,"fileSizes":{"index.pck":804304,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
