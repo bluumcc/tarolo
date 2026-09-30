@@ -156,25 +156,40 @@ func _spawn_stars() -> void:
 		tw.tween_property(s, "position:y", s.position.y, rng.randf_range(3.0, 6.0)).set_trans(Tween.TRANS_SINE)
 
 
+## Popup com cabeçalho (título) e rodapé fixos; só o meio rola, como o popup de Fichas e o de
+## Ajuda em passos — nunca deixa o popup crescer sem fim. Devolve o corpo (rolável): tudo que o
+## chamador adiciona nele fica dentro da área que rola. Pra um botão fixo no rodapé (ex.: FECHAR),
+## use `_close_button` ou pegue o rodapé com `body.get_meta("modal_footer")`.
 func _modal(title: String) -> VBoxContainer:
 	var ov := UIKit.overlay()
 	overlay_layer.add_child(ov)
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 24)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 12)
-	v.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 96.0, 580.0), 0)
-	box.add_child(v)
-	v.add_child(UIKit.label(title, 38, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
+	var outer := VBoxContainer.new()
+	outer.add_theme_constant_override("separation", 12)
+	outer.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 96.0, 580.0), 0)
+	box.add_child(outer)
+	outer.add_child(UIKit.label(title, 38, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size = Vector2(0, clampf(get_viewport_rect().size.y * 0.5, 280.0, 640.0))
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	outer.add_child(scroll)
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 12)
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(body)
+	body.set_meta("modal_footer", outer)
 	ov.add_child(UIKit.centered(box))
 	UIKit.fit.call_deferred(box)
-	return v
+	return body
 
 
-func _close_button(v: VBoxContainer) -> void:
+func _close_button(body: VBoxContainer) -> void:
+	var footer: Node = body.get_meta("modal_footer", body)
 	var close := UIKit.button("FECHAR", UIKit.MUTED)
 	close.pressed.connect(func():
 		overlay_layer.get_child(overlay_layer.get_child_count() - 1).queue_free())
-	v.add_child(close)
+	footer.add_child(close)
 	close.grab_focus.call_deferred()
 
 
@@ -261,16 +276,17 @@ func _open_settings() -> void:
 			s["fullscreen"] = on
 			GameState.apply_settings())
 		v.add_child(fs)
+	var footer: Node = v.get_meta("modal_footer", v)
 	var reset := UIKit.button("APAGAR PROGRESSO", UIKit.DANGER, 18)
 	reset.pressed.connect(func():
 		SaveManager.reset()
 		get_tree().reload_current_scene())
-	v.add_child(reset)
+	footer.add_child(reset)
 	var close := UIKit.button("SALVAR E FECHAR")
 	close.pressed.connect(func():
 		SaveManager.save_game()
 		overlay_layer.get_child(overlay_layer.get_child_count() - 1).queue_free())
-	v.add_child(close)
+	footer.add_child(close)
 
 
 func _reopen_settings() -> void:
