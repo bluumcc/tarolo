@@ -77,6 +77,7 @@ var hit_streak := 0           # acertos seguidos do jogador 0
 var human_bonus := 0.0        # total de prêmios da casa recebidos pelo jogador 0
 var blitz_result: Dictionary = {}
 var point_factor := BLITZ_POINT_FACTOR   # ajustável (simulação)
+var styles: Array = []                  # estilo de cada bot (ChaosBot.Style), fixo enquanto ele estiver na mesa
 
 var hands: Array = []
 var plays: Array = []
@@ -105,6 +106,10 @@ func setup_match(config: Dictionary) -> void:
 		rng.seed = int(config["seed"])
 	else:
 		rng.randomize()
+	styles = []
+	var cfg_styles: Array = config.get("styles", [])
+	for p in range(num_players):
+		styles.append(int(cfg_styles[p]) if cfg_styles.size() > p else rng.randi_range(0, 2))
 	stacks = []
 	session_stats = []
 	for p in range(num_players):
@@ -614,6 +619,58 @@ func _finish_trick(result: Dictionary, winner: int) -> Dictionary:
 			match_result = make_standings()
 			match_finished.emit(match_result)
 	return result
+
+
+## Cópia leve do estado do Blitz pra simulação (bots/Oráculo): sem histórico, rng novo.
+## As cartas são compartilhadas (imutáveis); os arrays são copiados.
+func clone_for_sim() -> ChaosEngine:
+	var c := ChaosEngine.new()
+	c.num_players = num_players
+	c.blind = blind
+	c.buy_in = buy_in
+	c.levels = levels
+	c.blitz = blitz
+	c.point_factor = point_factor
+	c.styles = styles.duplicate()
+	c.rake_on = rake_on
+	c.bonus_on = bonus_on
+	c.stacks = stacks.duplicate()
+	c.level_start_stacks = level_start_stacks.duplicate()
+	c.round_index = round_index
+	c.modifier_sequence = modifier_sequence.duplicate()
+	c.modifier = modifier
+	c.weak_suit = weak_suit
+	c.streak = streak.duplicate()
+	c.last_winner = last_winner
+	c.combo_count = combo_count.duplicate()
+	c.hand_no = hand_no
+	c.pot = pot
+	c.contrib = contrib.duplicate()
+	c.folded = folded.duplicate()
+	c.doubles = doubles.duplicate()
+	c.predicts = predicts.duplicate()
+	c.stakes = stakes.duplicate()
+	c.wins = wins.duplicate()
+	c.carry = carry
+	c.hit_streak = hit_streak
+	c.human_bonus = human_bonus
+	c.house_rake = house_rake
+	c.human_rake = human_rake
+	c.hands = []
+	for h in hands:
+		c.hands.append((h as Array).duplicate())
+	c.plays = plays.duplicate()
+	c.captured = []
+	for cp in captured:
+		c.captured.append((cp as Array).duplicate())
+	c.leader = leader
+	c.current = current
+	c.trick_number = trick_number
+	c.session_stats = []
+	for st in session_stats:
+		c.session_stats.append((st as Dictionary).duplicate())
+	c.rng.seed = rng.randi()
+	return c
 
 
 # ------------------------------------------------------------------ Blitz

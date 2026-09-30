@@ -7,6 +7,19 @@ extends RefCounted
 ## Dificuldade só de simulação: o Difícil ANTIGO do Blitz (joga só pelo palpite, ignora os pontos
 ## das cartas) — serve de régua pra medir quanto jogar os pontos rende.
 const LEGACY := 99
+
+## Estilo do bot (fixo enquanto ele estiver na mesa; o jogador aprende quem é quem):
+## Calculista joga equilibrado; Cauteloso prioriza o palpite e só dobra com quase certeza;
+## Agressivo persegue os pontos, cobre mais e às vezes dobra sem estar no alvo (blefe).
+enum Style { CALC, CAUTELOSO, AGRESSIVO }
+const STYLE_NAMES := ["Calculista", "Cauteloso", "Agressivo"]
+const STYLE_ICONS := ["◆", "◇", "▲"]
+## Chance de um Agressivo dobrar sem estar no alvo (blefe), por decisão de dobrar disponível.
+const BLUFF_CHANCE := 0.05
+
+
+static func style_of(engine: ChaosEngine, player: int) -> int:
+	return int(engine.styles[player]) if player < engine.styles.size() else Style.CALC
 ## Quanto vale, em blinds, fechar o palpite exato (aproximado: fatia esperada do pote).
 const HIT_VALUE_BLINDS := 6.0
 ## Pontos médios de uma carta que ainda vai cair na mesa (pra estimar o tamanho do prêmio).
@@ -252,6 +265,11 @@ static func suggested_predict(engine: ChaosEngine, player: int) -> int:
 static func blitz_pick(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> int:
 	var noise := 0.9 if difficulty == BotAI.Difficulty.EASY else (0.45 if difficulty == BotAI.Difficulty.NORMAL else 0.15)
 	var ex := expected_wins(engine, player) + rng.randf_range(-noise, noise)
+	match style_of(engine, player):
+		Style.CAUTELOSO:
+			ex -= 0.3
+		Style.AGRESSIVO:
+			ex += 0.3
 	return clampi(int(round(ex)), 0, ChaosEngine.HAND_SIZE)
 
 
@@ -272,17 +290,23 @@ static func _double_worth_it(engine: ChaosEngine, player: int, difficulty: int) 
 	if int(engine.doubles[player]) >= 1:
 		# Triplicar (ou cobrir a 2ª vez): só com o palpite praticamente fechado.
 		return difficulty == BotAI.Difficulty.HARD and need == 0 and left < 0.15
+	var st := style_of(engine, player)
+	var mult := 0.6 if st == Style.CAUTELOSO else (1.25 if st == Style.AGRESSIVO else 1.0)
 	if need == 0:
-		return left < (0.3 if difficulty == BotAI.Difficulty.HARD else 0.15)
+		return left < (0.3 if difficulty == BotAI.Difficulty.HARD else 0.15) * mult
 	if difficulty == BotAI.Difficulty.HARD and engine.tricks_left() == 1:
-		return absf(left - float(need)) < 0.15
+		return absf(left - float(need)) < 0.15 * mult
 	return false
 
 
 static func wants_double(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> bool:
 	if not engine.can_double(player):
 		return false
-	return _double_worth_it(engine, player, difficulty) and rng.randf() < 0.85
+	if _double_worth_it(engine, player, difficulty) and rng.randf() < 0.85:
+		return true
+	# Blefe do Agressivo: dobra sem estar no alvo (ainda dá pra chegar lá).
+	return style_of(engine, player) == Style.AGRESSIVO and difficulty != BotAI.Difficulty.EASY \
+		and engine.blitz_need(player) > 0 and rng.randf() < BLUFF_CHANCE
 
 
 ## Cobrir a dobra/triplicada de um rival: mesma conta de valer a pena, mas sem esperar a rodada
@@ -290,7 +314,9 @@ static func wants_double(engine: ChaosEngine, player: int, difficulty: int, rng:
 static func wants_cover(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> bool:
 	if not engine.can_cover(player):
 		return false
-	return _double_worth_it(engine, player, difficulty) and rng.randf() < 0.7
+	var st := style_of(engine, player)
+	var p := 0.5 if st == Style.CAUTELOSO else (0.9 if st == Style.AGRESSIVO else 0.7)
+	return _double_worth_it(engine, player, difficulty) and rng.randf() < p
 
 
 ## Blitz: joga cada carta pela conta de fichas esperadas — palpite (vencer ajuda ou atrapalha) +
@@ -326,7 +352,8 @@ static func _blitz_choose(engine: ChaosEngine, player: int, difficulty: int, rng
 				dv += engine.chips_of(ChaosEngine.ASSALTO_AMOUNT) / blind
 		ChaosModifiers.Modifier.VAZA_MALDITA:
 			dv -= engine.chips_of(ChaosEngine.CURSE_PENALTY) / blind
-	var k := ChaosEngine.PRIZE_PER_POINT * engine.point_factor
+	var greed := 0.75 if style_of(engine, player) == Style.CAUTELOSO else (1.15 if style_of(engine, player) == Style.AGRESSIVO else 1.0)
+	var k := ChaosEngine.PRIZE_PER_POINT * engine.point_factor * greed
 	var n_active := engine.active_count()
 	var unseen := n_active - engine.plays.size() - 1
 	var table := 0.0

@@ -119,3 +119,43 @@ casa (4%, teto de 2 blinds por pote pago); (3) os pontos aumentam a vantagem de 
 Fator 0,5 escolhido: vantagem clara sem deixar os pontos dominarem o prêmio do pote. Ajuste em
 `ChaosEngine.BLITZ_POINT_FACTOR`. Limite: bots, não humanos — a vantagem real contra jogadores humanos
 só se mede em PvP.
+
+
+## Habilidade e teto do jogo (Fase 0 / Fase 1 do plano competitivo, ver `docs/PLANO_COMPETITIVO.md`)
+
+### Oráculo: existe teto acima do bot Difícil
+`scripts/core/chaos_oracle.gd` é um jogador quase perfeito (só de medição, nunca senta como bot do
+jogo — é lento): sorteia mãos compatíveis com o que ele vê e escolhe palpite/carta pela maior ficha
+esperada em várias simulações. `tests/blitz_arena.gd` mede confrontos:
+
+| Confronto | Líquido bruto (blinds/nível) |
+|---|---|
+| Difícil vs 3× Difícil (espelho) | +0,31 (±0,28), ≈ 0 |
+| **Oráculo vs 3× Difícil** | **+0,66 (±0,26)**, acerto de palpite 43% vs. ~30% do Difícil |
+| Difícil vs 3× Oráculo | −0,64 (±0,68, amostra menor) |
+
+Confirma que o Difícil não é o teto: um jogador melhor bate ele por margem real, não só ruído.
+
+### Estilos dos bots (Fase 1)
+3 estilos fixos por bot enquanto ele estiver na mesa (`ChaosBot.Style`, `engine.styles`):
+**Calculista** (padrão, equilibrado), **Cauteloso** (só dobra/cobre com bastante certeza, foge
+mais de fichas de carta) e **Agressivo** (persegue mais os pontos, cobre mais, e às vezes dobra
+sem estar no alvo — blefe, `BLUFF_CHANCE`). O jogador aprende o padrão de cada rival com o tempo
+e usa isso pra decidir cobrir ou não.
+
+Calibração (bot×bot, sem taxa): o primeiro ajuste deixou o Agressivo perdendo até do espelho dele
+mesmo (−0,61 blind/nível): não era custo do blefe, era calibração ruim. Reduzido
+(`BLUFF_CHANCE` 0,12→0,05; multiplicador de "vale a pena dobrar" 1,6→1,25; ganância pelos pontos
+1,4→1,15) até nenhum estilo ficar dominado pelos outros dois:
+
+| Confronto | Líquido |
+|---|---|
+| Cauteloso espelho | +0,01 |
+| Agressivo espelho | −0,24 (±0,41, dentro do ruído de 0) |
+| Cauteloso vs 3× Calculista | +0,23 |
+| Agressivo vs 3× Calculista | −0,26 (±0,41) |
+
+### Gate de equilíbrio (regressão automática)
+`tests/blitz_gate.gd` — versão rápida (bots só, sem Oráculo) que roda sempre: espelho por
+dificuldade ≈ 0, escada Difícil > Normal > Fácil com folga, e nenhum estilo dominado pelos
+outros dois. 0 falhas na versão atual.
