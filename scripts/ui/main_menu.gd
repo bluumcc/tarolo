@@ -189,6 +189,7 @@ func _modal(title: String) -> VBoxContainer:
 	center.add_child(box)
 	scroll.add_child(center)
 	ov.add_child(scroll)
+	UIKit.fit.call_deferred(box)
 	return v
 
 

@@ -207,6 +207,40 @@ static func boost(node: Node) -> void:
 
 static func boost_later(node: Node) -> void:
 	node.ready.connect(func(): boost.call_deferred(node), CONNECT_ONE_SHOT)
+	node.ready.connect(func(): fit.call_deferred(node), CONNECT_ONE_SHOT)
+
+
+## Garante que um popup nunca passe da largura da tela (celular): reduz larguras mínimas
+## fixas e faz botões e textos longos quebrarem linha. O que passar da altura rola.
+static func fit(node: Node) -> void:
+	if node == null or not is_instance_valid(node) or not node.is_inside_tree() or not node is Control:
+		return
+	var vw := node.get_viewport().get_visible_rect().size.x
+	var root := node as Control
+	var avail := vw - 32.0
+	_fit_rec(root, avail - 64.0, false)
+	if root.custom_minimum_size.x > avail or root.custom_minimum_size.x == 0.0:
+		root.custom_minimum_size.x = minf(maxf(root.custom_minimum_size.x, 560.0), avail)
+	root.reset_size()
+
+
+static func _fit_rec(n: Node, max_inner: float, in_row: bool) -> void:
+	if n is Control:
+		var c := n as Control
+		if c.custom_minimum_size.x > max_inner:
+			c.custom_minimum_size.x = max_inner
+		if n is Button:
+			(n as Button).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			(n as Button).clip_text = false
+		elif n is Label and not in_row:
+			var l := n as Label
+			if l.autowrap_mode == TextServer.AUTOWRAP_OFF and l.text.length() > 18:
+				l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				if l.custom_minimum_size.x == 0.0:
+					l.custom_minimum_size.x = minf(max_inner, 200.0)
+	var row := n is HBoxContainer or n is GridContainer
+	for ch in n.get_children():
+		_fit_rec(ch, max_inner, row)
 
 
 static func _boost_rec(n: Node) -> void:
@@ -272,6 +306,7 @@ static func modal(overlay_layer: Control, title: String, width: float = 660.0) -
 	scroll.add_child(center)
 	ov.add_child(scroll)
 	boost.call_deferred(box_p)
+	fit.call_deferred(box_p)
 	return v
 
 

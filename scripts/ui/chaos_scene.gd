@@ -594,6 +594,7 @@ func _transition(kicker: String, blocks: Array, hold: float) -> void:
 		go.disabled = true
 		go.modulate.a = 0.0
 	ov.add_child(UIKit.centered(v))
+	UIKit.fit.call_deferred(v)
 	go.grab_focus.call_deferred()
 	ov.modulate.a = 0.0
 	create_tween().tween_property(ov, "modulate:a", 1.0, GameState.anim(0.18))
