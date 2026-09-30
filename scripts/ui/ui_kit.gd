@@ -344,25 +344,32 @@ static func overlay() -> ColorRect:
 	return o
 
 
-## Toda janela de popup usa essas margens (nunca 0): sem elas o popup encosta na borda física
-## da tela, onde ficam a barra de endereço do navegador, o notch ou a barra de gestos — foi o que
-## deixava o topo (nome editável) inacessível e o rodapé (botão de fechar) cortado.
+## Toda janela de popup usa essas margens/limites (nunca 0 de margem, nunca mais que o teto de
+## altura): sem eles o popup encosta na borda física da tela — onde ficam a barra de endereço do
+## navegador, o notch ou a barra de gestos, ou simplesmente ocupa a tela toda num celular alto —
+## e isso é o que deixava o topo (nome editável) inacessível e o rodapé (botão de fechar) cortado.
 const POPUP_MARGIN_SIDE := 16.0
-const POPUP_MARGIN_TOP := 40.0
-const POPUP_MARGIN_BOTTOM := 48.0
+## Teto de altura: NENHUM popup passa disso, em fração da tela. Anchors (não pixels), então vale
+## pra qualquer tamanho de tela sem precisar consultar o viewport.
+const POPUP_MAX_HEIGHT_FRAC := 0.75
 
-## Centraliza um popup na tela, com folga fixa das bordas. Rola quando o conteúdo passa da
-## altura disponível (celular) — NUNCA deixa o popup vazar pra fora da tela sem rolagem — e, em
-## retrato, amplia os textos e botões do popup (BOOST) — no celular 720 px virtuais viram
-## ~390 pt e o tamanho de desktop fica pequeno.
+## Centraliza um popup na tela, sem nunca passar de `POPUP_MAX_HEIGHT_FRAC` da altura da tela —
+## sobra sempre pelo menos (1 - fração)/2 de folga em cima e embaixo, então nunca encosta na
+## borda física (notch, barra de gestos, chrome do navegador). Rola quando o conteúdo passa desse
+## teto — NUNCA deixa o popup vazar pra fora da tela sem rolagem — e, em retrato, amplia os
+## textos e botões do popup (BOOST) — no celular 720 px virtuais viram ~390 pt e o tamanho de
+## desktop fica pequeno.
 static func centered(child: Control) -> Control:
 	var scroll := ScrollContainer.new()
+	var side_frac := 0.5 * (1.0 - POPUP_MAX_HEIGHT_FRAC)
+	scroll.anchor_left = 0.0
 	scroll.anchor_right = 1.0
-	scroll.anchor_bottom = 1.0
+	scroll.anchor_top = side_frac
+	scroll.anchor_bottom = 1.0 - side_frac
 	scroll.offset_left = POPUP_MARGIN_SIDE
-	scroll.offset_top = POPUP_MARGIN_TOP
 	scroll.offset_right = -POPUP_MARGIN_SIDE
-	scroll.offset_bottom = -POPUP_MARGIN_BOTTOM
+	scroll.offset_top = 0.0
+	scroll.offset_bottom = 0.0
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	var c := CenterContainer.new()
 	c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
