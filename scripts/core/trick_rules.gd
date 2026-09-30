@@ -32,7 +32,9 @@ static func highest_trunfo(plays: Array) -> int:
 
 
 ## Cartas que o jogador pode jogar agora.
-static func legal_cards(hand: Array, plays: Array) -> Array:
+## `must_cover` = false (Mesa Caos): quem pode cobrir NÃO é obrigado a jogar Trunfo maior;
+## qualquer Trunfo serve quando o naipe (ou o corte) pede Trunfo.
+static func legal_cards(hand: Array, plays: Array, must_cover: bool = true) -> Array:
 	var louco := hand.filter(func(c: CardData) -> bool: return c.is_louco())
 	var rest := hand.filter(func(c: CardData) -> bool: return not c.is_louco())
 	var ls := lead_suit(plays)
@@ -43,7 +45,7 @@ static func legal_cards(hand: Array, plays: Array) -> Array:
 	var matching := rest.filter(func(c: CardData) -> bool: return c.suit == ls)
 	if not matching.is_empty():
 		if ls == CardData.Suit.TRUNFO:
-			var cover := _cover_options(matching, plays)
+			var cover := _cover_options(matching, plays) if must_cover else []
 			if not cover.is_empty():
 				return cover + louco
 		return matching + louco
@@ -51,7 +53,7 @@ static func legal_cards(hand: Array, plays: Array) -> Array:
 	# Sem o naipe líder: obrigado a cortar com Trunfo, se tiver.
 	var trunfos := rest.filter(func(c: CardData) -> bool: return c.is_trunfo())
 	if not trunfos.is_empty():
-		var cover := _cover_options(trunfos, plays)
+		var cover := _cover_options(trunfos, plays) if must_cover else []
 		if not cover.is_empty():
 			return cover + louco
 		return trunfos + louco  # não consegue cobrir, mas é obrigado a cortar mesmo assim
@@ -66,8 +68,8 @@ static func _cover_options(trunfos: Array, plays: Array) -> Array:
 	return trunfos.filter(func(c: CardData) -> bool: return c.rank > highest)
 
 
-static func is_legal(card: CardData, hand: Array, plays: Array) -> bool:
-	for c in legal_cards(hand, plays):
+static func is_legal(card: CardData, hand: Array, plays: Array, must_cover: bool = true) -> bool:
+	for c in legal_cards(hand, plays, must_cover):
 		if c.equals(card):
 			return true
 	return false

@@ -16,6 +16,9 @@ Vocabulário: **Partida → Nível → Rodada → Vez**. Um nível são 8 rodada
 5. Quem vence a rodada leva o pote. Se todos desistem, o último leva sem jogar (blefe vencido).
 6. Quem vence abre a próxima rodada de cartas.
 
+## Regras de carta
+Como no Vanilla (seguir naipe, cortar com Trunfo), mas **sem obrigação de cobrir**: qualquer Trunfo é válido, mesmo mais fraco que o da mesa.
+
 ## Prêmio da banca
 Os pontos das cartas da rodada (com modificadores, sequência e combos) viram fichas pagas pela banca ao vencedor: 1 ponto = ¼ do blind. Saque e Assalto ao Líder tiram fichas dos rivais; Rodada Maldita faz o vencedor pagar à banca.
 

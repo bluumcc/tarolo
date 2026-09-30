@@ -292,6 +292,17 @@ func _test_chaos() -> void:
 	var louco_vs_trunfo := louco_plays + [{"player": 0, "card": c(4, 3)}]
 	check(TrickRules.winning_index(louco_vs_trunfo, true) == 4, "O Louco perde pra um Trunfo de verdade mesmo com o modificador ativo")
 
+	# Sem obrigação de cobrir no Caos (o Vanilla continua com ela).
+	var lg := ChaosEngine.new()
+	lg.setup_match({"seed": 2})
+	lg.hands[0] = [c(CardData.Suit.TRUNFO, 9), c(CardData.Suit.TRUNFO, 19), c(CardData.Suit.PAUS, 3)]
+	lg.plays = [{"player": 3, "card": c(CardData.Suit.TRUNFO, 18)}]
+	check(lg.legal_for(0).size() == 2 and TrickRules.legal_cards(lg.hands[0], lg.plays).size() == 1, "Caos: pode jogar Trunfo mais fraco; Vanilla obriga a cobrir")
+	lg.plays = [{"player": 3, "card": c(CardData.Suit.PAUS, 8)}]
+	lg.hands[0] = [c(CardData.Suit.TRUNFO, 2), c(CardData.Suit.TRUNFO, 19), c(CardData.Suit.COPAS, 3)]
+	lg.plays.append({"player": 2, "card": c(CardData.Suit.TRUNFO, 15)})
+	check(lg.legal_for(0).size() == 2, "Caos: sem naipe, corta com qualquer Trunfo (mesmo menor que o cortado)")
+
 	# ---- Aposta estilo poker
 	var p1 := ChaosEngine.new()
 	p1.setup_match({"seed": 3})

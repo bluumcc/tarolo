@@ -729,7 +729,7 @@ func _wait_human() -> CardData:
 	if ls == -1:
 		status_label.text = "Sua vez — abra a rodada com qualquer carta"
 	elif ls == CardData.Suit.TRUNFO:
-		status_label.text = "Sua vez — cubra com um Trunfo maior, se tiver"
+		status_label.text = "Sua vez — jogue um Trunfo (qualquer um; um maior vence)"
 	else:
 		status_label.text = "Sua vez — siga %s (ou corte com Trunfo, ou jogue O Louco)" % CardData.SUIT_NAMES[ls]
 	turn_left = TURN_SECONDS
@@ -964,7 +964,7 @@ RELÓGIO
 • Você tem 10 segundos pra jogar a carta (a barra embaixo da mesa esvazia). Estourou, jogamos sua carta mais fraca.
 
 CARTAS
-• Mesmas regras de rodada do Vanilla: seguir naipe, cortar com Trunfo se não tiver, cobrir com Trunfo maior se alguém já cortou. O Louco nunca vence, a não ser no modificador "O Louco Vence"."""
+• Regras de rodada do Vanilla: seguir naipe e cortar com Trunfo se não tiver. No Caos você NÃO é obrigado a cobrir com Trunfo maior: qualquer Trunfo vale, e você decide se quer ganhar a rodada ou não. O Louco nunca vence, a não ser no modificador "O Louco Vence"."""
 	var l := UIKit.label(text, 30, UIKit.INK)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(620, 0)

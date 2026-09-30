@@ -160,7 +160,8 @@ func is_active(mod: int) -> bool:
 
 
 func legal_for(player: int) -> Array:
-	return TrickRules.legal_cards(hands[player], plays)
+	# No Caos não existe a obrigação de cobrir: qualquer Trunfo serve.
+	return TrickRules.legal_cards(hands[player], plays, false)
 
 
 func is_round_over() -> bool:
@@ -373,7 +374,7 @@ func play(player: int, card: CardData) -> Dictionary:
 	if betting or player != current or is_round_over() or folded[player]:
 		return {"ok": false, "error": "fora de turno"}
 	var hand: Array = hands[player]
-	if not TrickRules.is_legal(card, hand, plays):
+	if not TrickRules.is_legal(card, hand, plays, false):
 		return {"ok": false, "error": "jogada ilegal"}
 	hand.erase(card)
 	plays.append({"player": player, "card": card})
