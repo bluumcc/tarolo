@@ -238,7 +238,7 @@ func _build_ui() -> void:
 	# Mesa de jogo — só a rodada atual, cada carta numa vaga fixa por assento.
 	table_center = Panel.new()
 	table_center.name = "TableCenter"
-	table_center.custom_minimum_size = Vector2(0, 300)
+	table_center.custom_minimum_size = Vector2(0, 340)
 	table_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	table_center.add_theme_stylebox_override("panel", UIKit.box(Color(0.10, 0.08, 0.30, 0.85), Color("#5B4FC9"), 3, 40, 0))
 	table_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -306,7 +306,7 @@ func _apply_orientation() -> void:
 	side_col.visible = false  # a regra do nível já fica na faixa de avisos, em repouso
 	modifier_expanded = wide
 	_refresh_hud()
-	table_center.custom_minimum_size.y = 230 if wide else 300
+	table_center.custom_minimum_size.y = 250 if wide else 340
 	_layout_table()
 
 
@@ -357,12 +357,23 @@ func _build_seats() -> HBoxContainer:
 		seat.add_child(name_l)
 		var stack_l := UIKit.label("◎ 0", 28, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 		seat.add_child(stack_l)
-		var pill := UIKit.panel(Color("#2A1B4D"), UIKit.GOLD, 8)
+		var gap := Control.new()
+		gap.custom_minimum_size = Vector2(0, 10)
+		gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		seat.add_child(gap)
+		var pill := UIKit.panel(Color("#0F0A33"), UIKit.MONEY, 6)
 		pill.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var bet_l := UIKit.label("", 24, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+		var pv := VBoxContainer.new()
+		pv.add_theme_constant_override("separation", -2)
+		pv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var cap_l := UIKit.label("APOSTA", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		cap_l.autowrap_mode = TextServer.AUTOWRAP_OFF
+		pv.add_child(cap_l)
+		var bet_l := UIKit.label("", 28, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
 		bet_l.autowrap_mode = TextServer.AUTOWRAP_OFF
-		pill.add_child(bet_l)
+		pv.add_child(bet_l)
+		pill.add_child(pv)
 		pill.modulate.a = 0.0
 		seat.add_child(pill)
 		var status_l := UIKit.label("", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
@@ -424,10 +435,13 @@ func _layout_table() -> void:
 	if table_center == null:
 		return
 	if pot_box:
-		if table_center.size.y >= 270.0:
-			pot_box.position = Vector2((table_center.size.x - pot_box.size.x) / 2.0, 8.0)
+		var card_top := _slot_pos(0).y + CardView.SIZE.y * (1.0 - TABLE_SCALE) / 2.0
+		var px := (table_center.size.x - pot_box.size.x) / 2.0
+		if table_center.size.y >= 300.0:
+			# Pote centralizado no espaço livre acima das cartas.
+			pot_box.position = Vector2(px, maxf((card_top - pot_box.size.y) / 2.0, 8.0))
 		else:
-			pot_box.position = Vector2((table_center.size.x - pot_box.size.x) / 2.0, table_center.size.y / 2.0 - pot_box.size.y / 2.0)
+			pot_box.position = Vector2(px, table_center.size.y / 2.0 - pot_box.size.y / 2.0)
 	for v in table_views:
 		var cv: CardView = v["view"]
 		cv.position = _slot_pos(int(v["player"]))
@@ -438,7 +452,8 @@ func _slot_pos(player: int) -> Vector2:
 	var n := maxi(engine.num_players, 1)
 	var col_w := table_center.size.x / float(n)
 	var cx := col_w * (float(player) + 0.5)
-	var y := maxf(table_center.size.y - CardView.SIZE.y * TABLE_SCALE - 10.0, 4.0)
+	# A carta escala em torno do centro: a base visual fica em y + (altura + altura*escala)/2.
+	var y := table_center.size.y - 12.0 - CardView.SIZE.y * (1.0 + TABLE_SCALE) / 2.0
 	return Vector2(cx - CardView.SIZE.x / 2.0, y)
 
 

@@ -52,6 +52,8 @@ func _play(mode: int) -> Dictionary:
 
 
 func _play_chaos() -> Dictionary:
+	# A mesa cobra o buy-in: sem saldo ela nem abre (e o teste ficaria esperando pra sempre).
+	SaveManager.section("profile")["fichas"] = maxi(int(SaveManager.section("profile")["fichas"]), 2000)
 	var g: Node = CHAOS.instantiate()
 	add_child(g)
 	var summary: Dictionary = await g.match_finished

@@ -188,16 +188,20 @@ static func icon_button(text: String, color: Color = Color("#6B6BC4")) -> Button
 
 ## Fileira de bolinhas de progresso (ex.: rodada 3 de 8): feitas, atual e pendentes.
 static func progress_dots(row: HBoxContainer, total: int, done: int) -> void:
-	for c in row.get_children():
-		c.queue_free()
-	for i in range(total):
+	# Reaproveita os pontos existentes (o HUD atualiza várias vezes por rodada).
+	while row.get_child_count() > total:
+		var extra := row.get_child(row.get_child_count() - 1)
+		row.remove_child(extra)
+		extra.queue_free()
+	while row.get_child_count() < total:
 		var d := Panel.new()
 		d.custom_minimum_size = Vector2(22, 22)
+		row.add_child(d)
+	for i in range(total):
 		var col := UIKit.GOLD if i < done else (UIKit.INK if i == done else Color("#4A3FA0"))
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = col if i <= done else Color("#241A70")
 		sb.border_color = Color("#0B0626") if i < done else col
 		sb.set_border_width_all(3)
 		sb.set_corner_radius_all(11)
-		d.add_theme_stylebox_override("panel", sb)
-		row.add_child(d)
+		(row.get_child(i) as Panel).add_theme_stylebox_override("panel", sb)

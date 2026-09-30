@@ -178,8 +178,8 @@ func _build_ui() -> void:
 	_build_topbar()
 
 	if tutorial:
-		var tut_box := UIKit.panel(UIKit.OK.darkened(0.75), UIKit.OK, 10)
-		tutorial_label = UIKit.label("", 16, UIKit.OK)
+		var tut_box := UIKit.panel(UIKit.INFO.darkened(0.75), UIKit.INFO, 10)
+		tutorial_label = UIKit.label("", 16, UIKit.INFO)
 		tutorial_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		tutorial_label.custom_minimum_size = Vector2(0, 0)
 		tut_box.add_child(tutorial_label)
@@ -434,7 +434,7 @@ func _build_bid_panel() -> void:
 	ladder.add_child(pass_btn)
 	bid_buttons[-1] = pass_btn
 	for c in range(4):
-		var b := UIKit.button("%s ×%d  ·  %s" % [Scoring.CONTRACT_NAMES[c], Scoring.CONTRACT_MULT[c], BID_SHORT[c]], UIKit.GOLD, 22)
+		var b := UIKit.button("%s ×%d  ·  %s" % [Scoring.CONTRACT_NAMES[c], Scoring.CONTRACT_MULT[c], BID_SHORT[c]], UIKit.ACTION, 22)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.custom_minimum_size.y = 60
 		b.disabled = true
@@ -792,7 +792,7 @@ func _update_turn_highlight(turn_player: int) -> void:
 		var avatar: PanelContainer = seat_avatars[p]
 		var active := p == turn_player
 		var base := UIKit.BOSS if p == engine.taker else UIKit.MUTED
-		avatar.add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, UIKit.GOLD if active else base, 4 if active else 2, 10, 8))
+		avatar.add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, UIKit.TURN if active else base, 4 if active else 2, 10, 8))
 		if not active:
 			avatar.scale = Vector2.ONE
 	if turn_player > 0:
@@ -840,11 +840,11 @@ func _update_taker_badge() -> void:
 		var is_taker := p == engine.taker
 		var tag: Label = arena_tags[p]
 		tag.text = ("♛ " if is_taker else "") + str(config["names"][p]).to_upper()
-		tag.add_theme_color_override("font_color", UIKit.BOSS if is_taker else UIKit.MUTED)
+		tag.add_theme_color_override("font_color", UIKit.BOSS_TEXT if is_taker else UIKit.MUTED)
 		if p > 0:
 			var title: Label = hud_titles[p]
 			title.text = tag.text
-			title.add_theme_color_override("font_color", UIKit.BOSS if is_taker else UIKit.MUTED)
+			title.add_theme_color_override("font_color", UIKit.BOSS_TEXT if is_taker else UIKit.MUTED)
 	if engine.taker != -1:
 		boss_portrait.set_ring(UIKit.GOLD if engine.taker == 0 else UIKit.BOSS)
 		boss_panel.add_theme_stylebox_override("panel", UIKit.box(Color(0.24, 0.20, 0.08, 0.9) if engine.taker == 0 else Color(0.20, 0.07, 0.08, 0.9), UIKit.GOLD if engine.taker == 0 else UIKit.BOSS, 3, 12, 12))
@@ -871,7 +871,7 @@ func _set_bubble(p: int, text: String, kind: String) -> void:
 	var fg := UIKit.MUTED
 	match kind:
 		"wait":
-			fg = UIKit.GOLD
+			fg = UIKit.TURN
 		"bid":
 			bg = UIKit.GOLD
 			fg = UIKit.BLACK
@@ -889,7 +889,7 @@ func _set_bubble(p: int, text: String, kind: String) -> void:
 
 func _bid_set_turn(p: int) -> void:
 	for q in range(engine.num_players):
-		(bid_rows[q] as PanelContainer).add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, UIKit.GOLD if q == p else UIKit.PURPLE, 3 if q == p else 2, 10, 8))
+		(bid_rows[q] as PanelContainer).add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, UIKit.TURN if q == p else UIKit.PURPLE, 3 if q == p else 2, 10, 8))
 	if bid_states[p] == "idle":
 		_set_bubble(p, "SUA VEZ" if p == 0 else "pensando…", "wait")
 
@@ -952,7 +952,7 @@ func _show_intro() -> void:
 	seal_box.add_child(seal)
 	v.add_child(seal_box)
 	v.add_child(UIKit.label(_taker_display_name().to_upper(), 58, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("JOGA CONTRA OS OUTROS 3", 18, UIKit.GOLD if mine else UIKit.BOSS, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("JOGA CONTRA OS OUTROS 3", 18, UIKit.GOLD if mine else UIKit.BOSS_TEXT, HORIZONTAL_ALIGNMENT_CENTER))
 	var bar := MeterBar.new()
 	bar.custom_minimum_size = Vector2(0, 28)
 	bar.set_colors(UIKit.GOLD if mine else UIKit.BOSS, Color("#2b2413") if mine else Color("#2a1715"))
@@ -988,7 +988,7 @@ func _show_intro() -> void:
 		col.add_child(UIKit.label("Você" if p == 0 else str(config["names"][p]), 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 		col.add_child(UIKit.label("DEFESA", 14, UIKit.DEF, HORIZONTAL_ALIGNMENT_CENTER))
 		team.add_child(col)
-	var btn := UIKit.button("COMEÇAR O NÍVEL", UIKit.GOLD, 28)
+	var btn := UIKit.button("COMEÇAR O NÍVEL", UIKit.ACTION, 28)
 	btn.custom_minimum_size = Vector2(0, 64)
 	v.add_child(btn)
 	ov.add_child(UIKit.centered(v))
@@ -1151,7 +1151,7 @@ func _wait_human_discard() -> Array:
 	flow.add_theme_constant_override("v_separation", 6)
 	flow.custom_minimum_size = Vector2(420, 0)
 	v.add_child(flow)
-	var confirm := UIKit.button("CONFIRMAR", UIKit.GOLD, 18)
+	var confirm := UIKit.button("CONFIRMAR", UIKit.ACTION, 18)
 	confirm.disabled = true
 	var chien_ref: Array = engine.chien
 	for c in hand:
@@ -1262,7 +1262,7 @@ func _ask_yes_no(title: String, body: String) -> bool:
 		panel.queue_free()
 		human_yesno_chosen.emit(false))
 	row.add_child(no_btn)
-	var yes_btn := UIKit.button("SIM", UIKit.GOLD, 18)
+	var yes_btn := UIKit.button("SIM", UIKit.ACTION, 18)
 	yes_btn.pressed.connect(func():
 		panel.queue_free()
 		human_yesno_chosen.emit(true))
@@ -1617,7 +1617,7 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 		title = "VOCÊ BATEU A META" if r["success"] else "VOCÊ NÃO BATEU A META"
 	if GameState.mode == GameState.Mode.RANKED:
 		title = "%dº LUGAR" % (int(summary["placement"]) + 1)
-	v.add_child(UIKit.label(title, 32, UIKit.GOLD if r["success"] else UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label(title, 32, UIKit.GOLD if r["success"] else UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(UIKit.label("%s · %s · %s / %s pts (%s%s)" % [
 		str(config["names"][r["taker"]]),
 		Scoring.CONTRACT_NAMES[r["contract"]],

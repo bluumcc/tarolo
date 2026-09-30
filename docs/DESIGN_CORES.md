@@ -70,3 +70,6 @@ Regras:
 Feito: papéis de cor em `UIKit` (`ACTION`, `MONEY`, `TURN`, `GAIN`, `LOSS`, `INFO`, `COMBO`, `MODIFIER`, `TEXT_ON_LIGHT`), texto escuro automático em botões e cards claros (`UIKit.text_on`), botão primário em violeta, ciano para vez e ordem na Mesa Caos, status dos assentos com ícone (▶ ▲ ✓ – ✕), dealer branco, cores dos modificadores por função, estilos em cache no HUD (`UIKit.box_cached`), animação padrão de popup (`UIKit.pop_in`), feedback de toque nos botões, teste de contraste no `test_runner`.
 Mantido de propósito: títulos de popup em dourado (identidade da marca).
 Componentes: `StepsModal` (popup em passos) e `HelpContent` (textos das ajudas). Ver `scripts/ui/steps_modal.gd` e `scripts/ui/help_content.gd`.
+
+### Vanilla e Ranqueado (aplicado)
+Vanilla: anel/linha do jogador da vez e bolha "aguardando" em ciano (`TURN`), dicas do tutorial em azul (`INFO`), texto do chefe em `BOSS_TEXT` (o vermelho `BOSS` fica só em bordas e preenchimentos), botões de lance e confirmação em violeta (`ACTION`), título de derrota em `LOSS`. O Ranqueado já usava a cor da liga como identidade e ficou como está.
