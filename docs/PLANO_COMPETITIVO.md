@@ -129,3 +129,17 @@ Plano anterior (versão "regras do jogo"): 1) palpite oculto, 2) troca de carta,
 ### Fora do escopo agora
 PvP, matchmaking, anti-fraude, `hand_log` de produção, ranking/tops/vitrine, compartilhar, Mão do Dia,
 tutorial guiado, cosméticos, torneios, novos modificadores.
+
+
+## Status (atualizado)
+- **Fase 0 (Oráculo/régua):** feito. `chaos_oracle.gd`, `tests/blitz_arena.gd`. Oráculo bate
+  Difícil por +0,66 blind/nível — confirma que existe teto de habilidade acima do bot atual.
+- **Fase 1 (estilos):** feito. 3 estilos (Calculista/Cauteloso/Agressivo, `ChaosBot.Style`),
+  calibrados até nenhum ficar dominado (`tests/blitz_gate.gd`). Sorteados ao sentar/trocar
+  (`refill_bots`), nunca mostrados na tela — só percebidos jogando.
+- **Fase 2 (enxugar regras):** parcialmente revertida — ver `docs/BLITZ.md`. Tirar o triplicar
+  quebrou a escada de dificuldade (Difícil passou a perder de Normal); mantido como estava. Os
+  pesos do palpite (×1/×1,5/×2) e as camadas de regra por nível ficam pendentes.
+- **Fase 3 (palpite oculto):** feito. Rivais em segredo até o showdown; sem mudança nos bots
+  (eles já não liam o palpite alheio).
+- **Fases 4 (troca de carta) e 5 (economia vs bots):** pendentes.

@@ -159,3 +159,26 @@ mesmo (−0,61 blind/nível): não era custo do blefe, era calibração ruim. Re
 `tests/blitz_gate.gd` — versão rápida (bots só, sem Oráculo) que roda sempre: espelho por
 dificuldade ≈ 0, escada Difícil > Normal > Fácil com folga, e nenhum estilo dominado pelos
 outros dois. 0 falhas na versão atual.
+
+
+## Fase 2 (Plano Competitivo): tentativa de tirar o triplicar — revertida
+Testei remover o 2º lance (triplicar), por ele acertar 88% quando usado (parecia decisão quase
+automática, ver diagnóstico anterior). Simulação A/B (`tests/blitz_arena.gd`, n=800, mesmo
+código, só essa mudança) mostrou que era ao contrário: o triplicar (liberado só pro Difícil) era
+a MAIOR fonte da vantagem do Difícil sobre o Normal. Sem ele, Difícil passou a PERDER de Normal
+(−0,26 blind/nível). Revertido: triplicar continua. Corrigido nessa mesma passada: quando um bot
+quebra e outro senta no lugar, o estilo agora é sorteado de novo (antes ficava preso ao assento
+antigo). `tests/blitz_gate.gd` volta a passar 100%.
+
+## Fase 3 (Plano Competitivo): palpite dos rivais em segredo até o fim do nível
+Antes, todo mundo revelava o palpite junto, no início do nível — não havia o que ler ou blefar.
+Agora: você só vê o seu palpite (a pílula mostra "X/seu-alvo" como sempre); a dos rivais mostra só
+quantas rodadas eles já venceram, com a legenda "EM SEGREDO" no lugar do alvo. O alvo de todos
+só aparece no fim do nível (showdown), junto do resultado. Dobrar/cobrir continuam visíveis (a
+única pista que sobra sobre a confiança do rival, como um aumento no poker) — o Agressivo (Fase 1)
+às vezes dobra sem estar no alvo, então nem "vi ele dobrar" é garantia.
+
+Como os bots nunca leram o palpite dos rivais pra decidir nada (só o próprio, ver `chaos_bot.gd`),
+esconder da tela não desequilibra nada: não são bots ficando "mais burros" nem "mais espertos",
+é só o jogador humano ganhando (e perdendo) a informação que os bots nunca tiveram de graça.
+`var blitz_showdown` (`chaos_scene.gd`) controla a revelação; sem UI nova além da pílula existente.

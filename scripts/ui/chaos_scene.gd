@@ -69,7 +69,8 @@ var bet_tags: Array = []       # "◎25 · 3" por assento
 var prog_tags: Array = []      # "1/3 ♨×1,5" ao vivo por assento
 var hold_stacks: Array = []      # Blitz: stacks de antes da liquidação (a tela só muda depois da animação)
 var hold_pot := -1.0
-var blitz_revealed: Array = []  # Blitz: palpite de cada um já revelado na mesa
+var blitz_revealed: Array = []  # Blitz: entrada de cada um já paga (pote), pill visível na mesa
+var blitz_showdown := false     # Blitz: fim do nível — só aí o alvo dos rivais aparece pra você
 var double_btn: Button
 var shown_pot := 0.0
 var pot_locked := false        # contador do pote rolando: o refresh não sobrescreve
@@ -1792,6 +1793,7 @@ func _blitz_open_level() -> bool:
 	hold_pot = -1.0
 	for p in range(engine.num_players):
 		blitz_revealed[p] = false
+	blitz_showdown = false
 	if not await _ensure_solvent():
 		return false
 	for q in engine.refill_bots():
@@ -1802,7 +1804,7 @@ func _blitz_open_level() -> bool:
 	shown_pot = engine.carry
 	pot_label.text = _pot_text(shown_pot)
 	var carry_txt := "  Pote acumulado: ◎%d." % int(engine.carry) if engine.carry > 0.0 else ""
-	_banner("PALPITES", "Quantas rodadas cada um vai ganhar?%s Todos revelam juntos." % carry_txt, UIKit.MONEY)
+	_banner("PALPITES", "Quantas rodadas cada um vai ganhar?%s Cada um sabe só o seu — os rivais ficam em segredo até o fim do nível." % carry_txt, UIKit.MONEY)
 	_refresh_hud()
 	var pick: int
 	if GameState.autoplay:
@@ -1847,7 +1849,7 @@ func _blitz_reveal() -> void:
 	shown_pot = engine.pot
 	if not GameState.autoplay:
 		Sfx.play("combo")
-		_banner("PALPITES REVELADOS", "Quem fizer exatamente o palpite leva o pote. Bora jogar!", UIKit.MONEY)
+		_banner("ENTRADAS PAGAS", "Os palpites ficam em segredo até o fim do nível. Bora jogar!", UIKit.MONEY)
 	await _wait(0.8)
 
 
@@ -2043,15 +2045,24 @@ func _refresh_blitz_tag(p: int, idx: int) -> void:
 	var shown := bool(blitz_revealed[p])
 	pill.modulate.a = 1.0 if shown else 0.0
 	if shown:
-		var need := engine.blitz_need(p)
-		lbl.text = "%d/%d" % [int(engine.wins[p]), int(engine.predicts[p])]
-		var col := UIKit.INK
-		if need == 0:
-			col = UIKit.OK
-		elif need < 0 or need > engine.tricks_left():
-			col = UIKit.LOSS
-		lbl.add_theme_color_override("font_color", col)
-		cap.text = "PALPITE ×%d" % (1 + int(engine.doubles[p])) if int(engine.doubles[p]) > 0 else "PALPITE"
+		var mine := p == 0
+		var open_book := mine or blitz_showdown
+		var tag := " ×%d" % (1 + int(engine.doubles[p])) if int(engine.doubles[p]) > 0 else ""
+		if open_book:
+			var need := engine.blitz_need(p)
+			lbl.text = "%d/%d" % [int(engine.wins[p]), int(engine.predicts[p])]
+			var col := UIKit.INK
+			if need == 0:
+				col = UIKit.OK
+			elif need < 0 or need > engine.tricks_left():
+				col = UIKit.LOSS
+			lbl.add_theme_color_override("font_color", col)
+			cap.text = "PALPITE" + tag
+		else:
+			# Rival: só as vitórias já feitas aparecem — o alvo dele é segredo até o fim do nível.
+			lbl.text = "%d rodada%s" % [int(engine.wins[p]), "" if int(engine.wins[p]) == 1 else "s"]
+			lbl.add_theme_color_override("font_color", UIKit.INK)
+			cap.text = "EM SEGREDO" + tag
 	var status := ""
 	var col2 := UIKit.MUTED
 	if idx == 0:
@@ -2175,6 +2186,7 @@ func _sum(a: Array) -> float:
 ## Resultado do nível: quem acertou leva o pote (fichas voam até a stack), quem errou vê as
 ## fichas irem embora, e sem acertos o pote fica acumulado.
 func _blitz_settlement() -> void:
+	blitz_showdown = true
 	var br := engine.blitz_result
 	var hits: Array = br["hits"]
 	hold_stacks = []

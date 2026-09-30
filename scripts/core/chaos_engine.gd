@@ -64,7 +64,7 @@ const BLITZ_ENTRY_BLINDS := 4                      # entrada fixa de cada nível
 const BLITZ_STREAK_BONUS_BLINDS := 3              # prêmio especial da casa: 3+ acertos seguidos (só você)
 const BLITZ_BONUS_VAULT_SHARE := 0.5              # o prêmio só sai de até 50% da taxa que a casa já cobrou de você
 const BLITZ_DOUBLE_FROM := 3                       # 1º dobrar a partir da 4ª rodada; o 2º, da 6ª
-const BLITZ_MAX_DOUBLES := 2
+const BLITZ_MAX_DOUBLES := 2   # dobrar + triplicar (testado remover: derrubava a escada Difícil>Normal — era a maior fonte de vantagem do Difícil, não um enfeite)
 const BLITZ_POINT_FACTOR := 0.5                    # pontos das cartas → fichas no Blitz, em relação ao Caos (1 pt = 0,25 blind × fator)
 var blitz := false
 var doubles: Array = []       # quantas vezes cada um dobrou a entrada nesse nível (0 a 2)
@@ -240,6 +240,7 @@ func refill_bots() -> Array:
 			stacks[p] = fresh
 			level_start_stacks[p] = fresh
 			streak[p] = 0
+			styles[p] = rng.randi_range(0, 2)   # jogador novo, estilo novo (sorteado, nunca mostrado)
 			swapped.append(p)
 	return swapped
 
