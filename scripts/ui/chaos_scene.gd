@@ -1807,6 +1807,21 @@ func _blitz_open_level() -> bool:
 		return false
 	for q in engine.refill_bots():
 		await _new_player_sits(q)
+	for p in range(engine.num_players):
+		if not engine.can_swap(p):
+			continue
+		if p == 0 and not GameState.autoplay:
+			await _tip("swap", "CARTA ABERTA", "Antes do palpite, você recebe 1 carta aberta do monte. Pode trocar por qualquer carta da sua mão, ou recusar — é sua escolha, uma vez por nível.")
+			await _human_swap_choice()
+			if not is_inside_tree() or finished:
+				return false
+			_rebuild_hand()
+		else:
+			var give: CardData = ChaosBot.wants_swap(engine, p, int(config["difficulty"][p]), bot_rng)
+			if give != null:
+				engine.apply_swap(p, give)
+			else:
+				engine.decline_swap(p)
 	phase = "predict"
 	bets_gathered = true
 	pot_locked = true
@@ -1860,6 +1875,59 @@ func _blitz_reveal() -> void:
 		Sfx.play("combo")
 		_banner("ENTRADAS PAGAS", "Os palpites ficam em segredo até o fim do nível. Bora jogar!", UIKit.MONEY)
 	await _wait(0.8)
+
+
+## Painel da carta aberta (Fase 4): mostra a carta oferecida e sua mão em botões — toque numa
+## carta pra trocar por ela, ou recuse. Some sozinho depois da escolha.
+func _human_swap_choice() -> void:
+	modal_open = true
+	var vw := get_viewport_rect().size.x
+	var holder := MarginContainer.new()
+	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.add_theme_constant_override("margin_top", int(seat_row.global_position.y + seat_row.size.y + 6.0))
+	overlay_layer.add_child(holder)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 20)
+	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	box.custom_minimum_size = Vector2(minf(vw - 32.0, 660.0), 0)
+	holder.add_child(box)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	box.add_child(v)
+	var offered: CardData = engine.swap_cards[0]
+	v.add_child(UIKit.label("CARTA ABERTA: %s" % offered.display_name(), 26, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
+	var info := UIKit.label("Toque numa carta da sua mão pra trocar por ela, ou recuse.", 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(info)
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 88)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	v.add_child(scroll)
+	UIKit.suppress_click_on_scroll(scroll)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	scroll.add_child(row)
+	for c in engine.hands[0]:
+		var card: CardData = c
+		var b := UIKit.button(card.display_name(), UIKit.BUTTON_MUTED, 20)
+		b.custom_minimum_size = Vector2(0, 68)
+		b.pressed.connect(func():
+			engine.apply_swap(0, card)
+			item_chosen.emit(1))
+		row.add_child(b)
+	var skip := UIKit.button("RECUSAR", UIKit.MUTED, 26)
+	skip.custom_minimum_size = Vector2(0, 64)
+	skip.pressed.connect(func():
+		engine.decline_swap(0)
+		item_chosen.emit(0))
+	v.add_child(skip)
+	UIKit.pop_in(box, GameState.anim(0.15))
+	await item_chosen
+	modal_open = false
+	if is_inside_tree():
+		holder.queue_free()
 
 
 ## Painel do palpite (fica abaixo dos avatares; a sua mão continua à vista). Devolve 0..8.

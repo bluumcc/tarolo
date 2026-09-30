@@ -197,6 +197,27 @@ static func _card_power(engine: ChaosEngine, card: CardData, inverted: bool) -> 
 	return float(card.rank) / 14.0 * 0.2
 
 
+## Troca (Fase 4): devolve a carta da mão a largar pela carta aberta, ou null se recusa. Fácil
+## às vezes nem avalia direito; Normal/Difícil trocam a mais fraca só quando a oferecida ajuda
+## de verdade (evita trocar à toa uma mão já equilibrada).
+static func wants_swap(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> CardData:
+	if not engine.can_swap(player):
+		return null
+	if difficulty == BotAI.Difficulty.EASY and rng.randf() < 0.5:
+		return null
+	var offered: CardData = engine.swap_cards[player]
+	var op := _card_power(engine, offered, false)
+	var hand: Array = engine.hands[player]
+	var worst: CardData = hand[0]
+	var wp := _card_power(engine, worst, false)
+	for c in hand:
+		var p := _card_power(engine, c, false)
+		if p < wp:
+			wp = p
+			worst = c
+	return worst if op > wp + 0.08 else null
+
+
 ## Chance estimada de levar a rodada (0 a 1).
 static func win_chance(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> float:
 	var s := hand_strength(engine, player)

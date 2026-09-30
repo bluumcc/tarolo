@@ -20,6 +20,7 @@ func _init() -> void:
 	_test_bonuses()
 	_test_chaos()
 	_test_blitz()
+	_test_blitz_phase4()
 	_test_colors()
 	_test_economy()
 	_test_standards()
@@ -917,6 +918,51 @@ func _test_blitz() -> void:
 	fb.plays = [{"player": 3, "card": c(CardData.Suit.PAUS, 10)}]
 	fb.current = 0
 	check(ChaosBot.choose(fb, 0, BotAI.Difficulty.HARD, brng).rank == 2, "Blitz: bot já no alvo evita vencer a rodada")
+
+
+func _test_blitz_phase4() -> void:
+	# Camadas de regra: conta nova não dobra nem sorteia modificador.
+	var ob := ChaosEngine.new()
+	ob.setup_match({"seed": 21, "mode": "blitz", "blind": 10, "onboarding_levels": 2})
+	for m in ob.modifier_sequence:
+		check(int(m) == -1, "Onboarding: nenhum modificador sorteia")
+	for p in range(4):
+		ob.blitz_place(p, 2)
+	ob.trick_number = 6
+	ob.wins[0] = 2
+	check(not ob.can_double(0), "Onboarding: não dobra")
+	check(ob.swap_cards.all(func(c): return c == null), "Onboarding: sem carta aberta")
+	ob.advance_round()
+	check(ob.onboarding_levels == 1, "Onboarding: contador desce 1 por nível")
+	for m in ob.modifier_sequence:
+		check(int(m) == -1, "Onboarding: ainda sem modificador no 2º nível")
+	ob.advance_round()
+	check(ob.onboarding_levels == 0, "Onboarding: acaba depois de 2 níveis")
+	check(ob.modifier_sequence.any(func(m): return int(m) != -1), "Onboarding: modificadores voltam a sortear")
+
+	# Carta aberta: troca válida, recusa, e proteções (só antes do palpite, 1x por nível).
+	var sw := ChaosEngine.new()
+	sw.setup_match({"seed": 22, "mode": "blitz", "blind": 10})
+	check(sw.swap_cards.size() == 4 and sw.swap_cards[0] != null, "Troca: carta aberta oferecida a todos")
+	check(sw.can_swap(0), "Troca: pode decidir antes do palpite")
+	var offered: CardData = sw.swap_cards[0]
+	var kept: CardData = sw.hands[0][0]
+	check(sw.apply_swap(0, kept) and (sw.hands[0] as Array).any(func(c): return (c as CardData).equals(offered)) and not (sw.hands[0] as Array).any(func(c): return (c as CardData).equals(kept)), "Troca: a carta oferecida entra, a escolhida sai da mão")
+	check(not sw.can_swap(0), "Troca: só 1 vez por nível")
+	check(not sw.apply_swap(0, offered), "Troca: não troca de novo depois de decidir")
+
+	var sw2 := ChaosEngine.new()
+	sw2.setup_match({"seed": 23, "mode": "blitz", "blind": 10})
+	var hand_before: Array = (sw2.hands[1] as Array).duplicate()
+	sw2.decline_swap(1)
+	check(not sw2.can_swap(1) and (sw2.hands[1] as Array) == hand_before, "Troca: recusar mantém a mão")
+
+	var sw3 := ChaosEngine.new()
+	sw3.setup_match({"seed": 24, "mode": "blitz", "blind": 10})
+	sw3.blitz_place(2, 3)
+	check(not sw3.can_swap(2), "Troca: não dá mais depois de palpitar")
+	# A própria carta oferecida não está (ainda) na mão: trocar por ela mesma tem que falhar.
+	check(not sw3.apply_swap(0, sw3.swap_cards[0]), "Troca: carta que não está na mão não troca")
 
 
 func _test_colors() -> void:
