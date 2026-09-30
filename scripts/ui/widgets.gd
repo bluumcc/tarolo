@@ -69,7 +69,7 @@ static func top_bar(name_text: String, level_text: String, chips: String, frags:
 static func mode_card(title: String, caption: String, color: Color, height: int, icon: String, on_press: Callable, title_size: int = 40) -> PanelContainer:
 	var p := PanelContainer.new()
 	p.custom_minimum_size = Vector2(0, height)
-	p.mouse_filter = Control.MOUSE_FILTER_STOP
+	p.mouse_filter = Control.MOUSE_FILTER_PASS  # não engole o arrasto de quem quer rolar a lista
 	p.focus_mode = Control.FOCUS_ALL
 	p.add_theme_stylebox_override("panel", UIKit.chunky(color))
 	var row := HBoxContainer.new()

@@ -233,7 +233,6 @@ func _open_settings() -> void:
 		SaveManager.save_game()
 		_reopen_settings())
 	hand_row.add_child(hand_fan_btn)
-	v.add_child(_caption("Fileira: cartas em linha reta, rola de lado se não couber tudo. Leque: cartas em arco, como segurar um baralho de verdade."))
 	v.add_child(UIKit.label("Dificuldade dos bots", 20))
 	var diff_row := HBoxContainer.new()
 	diff_row.add_theme_constant_override("separation", 10)
@@ -246,7 +245,6 @@ func _open_settings() -> void:
 			SaveManager.save_game()
 			_reopen_settings())
 		diff_row.add_child(db)
-	v.add_child(_caption("Fácil: os bots jogam a regra simples e não se ajudam. Normal: se ajudam, guardam as cartas boas e só escorregam de vez em quando. Difícil: contam as cartas que já saíram e jogam em equipe. Vale pro Vanilla; o Ranqueado usa o seu elo."))
 	for entry in [["Música", "music_volume"], ["Efeitos", "sfx_volume"]]:
 		v.add_child(UIKit.label(entry[0], 20))
 		var sl := HSlider.new()

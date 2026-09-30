@@ -77,36 +77,6 @@ body {
 }
 		</style>
 		$GODOT_HEAD_INCLUDE
-		<script>
-// A engine do Godot dimensiona o canvas com window.innerWidth/innerHeight, lidos a cada quadro.
-// No Safari do iPhone (e em outros navegadores móveis), esses valores representam a tela
-// "grande", como se a barra de endereço/gestos não existisse — ela só fica POR CIMA do conteúdo
-// sem mudar innerHeight. Resultado: o canvas (e qualquer coisa perto do topo/rodapé, como um
-// popup com rolagem) fica desenhado embaixo da barra, onde nenhum toque chega — por isso parecia
-// que nada rolava. window.visualViewport.height/width já refletem a área realmente visível e
-// encolhem/crescem certo quando a barra aparece/some, então substituímos o que innerWidth/
-// innerHeight devolvem por eles.
-if (window.visualViewport) {
-	Object.defineProperty(window, 'innerHeight', {
-		configurable: true,
-		get: function () { return Math.round(window.visualViewport.height); },
-	});
-	Object.defineProperty(window, 'innerWidth', {
-		configurable: true,
-		get: function () { return Math.round(window.visualViewport.width); },
-	});
-	// Se a engine só recalcula quando um "resize" dispara (em vez de todo quadro), garante que
-	// ela releia o valor certo depois que a barra do navegador termina de mudar (com um respiro
-	// pra não brigar com um arrasto em andamento).
-	var vvResizeTimer = null;
-	window.visualViewport.addEventListener('resize', function () {
-		clearTimeout(vvResizeTimer);
-		vvResizeTimer = setTimeout(function () {
-			window.dispatchEvent(new Event('resize'));
-		}, 120);
-	});
-}
-		</script>
 	</head>
 	<body>
 		<canvas id="canvas">

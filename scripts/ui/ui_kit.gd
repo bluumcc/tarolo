@@ -183,6 +183,7 @@ static func button(text: String, accent: Color = ACTION, size: int = 30) -> Butt
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_ALL
+	b.mouse_filter = Control.MOUSE_FILTER_PASS  # não engole o arrasto de quem quer rolar a lista
 	b.custom_minimum_size = Vector2(0, 84)
 	b.add_theme_font_size_override("font_size", size)
 	var face0 := accent if accent != MUTED else BUTTON_MUTED
@@ -214,6 +215,7 @@ static func icon_button(text: String, color: Color = BUTTON_MUTED) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
+	b.mouse_filter = Control.MOUSE_FILTER_PASS
 	b.custom_minimum_size = Vector2(68, 68)
 	b.add_theme_font_size_override("font_size", 32)
 	for cn in ["font_color", "font_hover_color", "font_pressed_color"]:
@@ -244,6 +246,7 @@ static func icon_button(text: String, color: Color = BUTTON_MUTED) -> Button:
 static func nav_button(icon: String, center: bool, face: Color = DANGER) -> Button:
 	var btn := Button.new()
 	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_filter = Control.MOUSE_FILTER_PASS
 	btn.text = icon
 	btn.custom_minimum_size = Vector2(96 if center else 72, 84 if center else 64)
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -315,7 +318,7 @@ static func panel(bg: Color = PURPLE_DEEP, border: Color = BLACK, pad: int = 20)
 ## Conecte o retorno de `on_tap` pra tratar o toque (recebe o próprio painel).
 static func tap_panel(bg: Color = PURPLE_DEEP, border: Color = MUTED, pad: int = 10, on_tap: Callable = Callable()) -> PanelContainer:
 	var p := panel(bg, border, pad)
-	p.mouse_filter = Control.MOUSE_FILTER_STOP
+	p.mouse_filter = Control.MOUSE_FILTER_PASS  # não engole o arrasto de quem quer rolar a lista
 	if on_tap.is_valid():
 		p.gui_input.connect(func(event: InputEvent):
 			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
