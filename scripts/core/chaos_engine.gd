@@ -78,7 +78,7 @@ var human_bonus := 0.0        # total de prêmios da casa recebidos pelo jogador
 var blitz_result: Dictionary = {}
 var point_factor := BLITZ_POINT_FACTOR   # ajustável (simulação)
 var styles: Array = []                  # estilo de cada bot (ChaosBot.Style), fixo enquanto ele estiver na mesa
-var onboarding_levels := 0              # níveis restantes sem dobrar/modificadores (Blitz, contas novas)
+var onboarding_levels := 0              # níveis restantes sem dobrar/cobrir (Blitz, contas novas — modificador sempre ativo)
 const BLITZ_DEAL_SIZE := 10             # recebe 10, descarta 2 (ver DISCARD_SIZE), fica com HAND_SIZE (8)
 const BLITZ_DISCARD_SIZE := 2
 

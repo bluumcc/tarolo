@@ -159,7 +159,7 @@ func chaos_buy_in(table: int = -1) -> int:
 ## Configuração da mesa pra ChaosScene / ChaosEngine — todo mundo joga pra si. Já cobra o
 ## buy-in das fichas do jogador (config["entered"] = false se não tinha saldo); ele volta
 ## como stack final quando você sai da mesa.
-const ONBOARDING_LEVELS := 3   # 1ª e 2ª mesas de Blitz: sem dobrar nem modificadores, pra aprender o palpite sozinho
+const ONBOARDING_LEVELS := 3   # 1ª, 2ª e 3ª mesas de Blitz: sem dobrar/cobrir, pra aprender o palpite sozinho (modificador continua ativo sempre)
 
 
 func chaos_config() -> Dictionary:
