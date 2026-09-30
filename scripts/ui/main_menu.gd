@@ -171,7 +171,10 @@ func _modal(title: String) -> VBoxContainer:
 	outer.add_child(UIKit.label(title, 38, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.custom_minimum_size = Vector2(0, clampf(get_viewport_rect().size.y * 0.5, 280.0, 640.0))
+	# Folga generosa: título + rodapé (até 2 botões) + esse teto sempre cabem dentro do teto de
+	# 75% do UIKit.centered() que envolve o popup — assim só existe UM scroll (esse aqui dentro),
+	# nunca dois competindo (o de fora nunca precisa entrar em ação).
+	scroll.custom_minimum_size = Vector2(0, clampf(get_viewport_rect().size.y * 0.42, 220.0, 480.0))
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	outer.add_child(scroll)
 	var body := VBoxContainer.new()

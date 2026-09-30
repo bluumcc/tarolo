@@ -79,6 +79,26 @@ body {
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
 
+		<script>
+// A engine do Godot mede window.innerWidth/innerHeight pra decidir o tamanho do canvas. No
+// Safari do iPhone esses dois valores representam a tela "grande", como se a barra de
+// endereço/gestos não existisse — ela fica só POR CIMA do conteúdo sem afetar innerHeight.
+// Resultado: o canvas nasce maior que a área que dá pra tocar de verdade, e qualquer coisa
+// perto da borda (como o rodapé de um popup) fica desenhada embaixo da barra, inalcançável.
+// window.visualViewport.height/width já refletem a área realmente visível. Só troca a MEDIDA
+// (sem escutar evento nenhum, pra nunca competir com um arrasto em andamento): a própria engine
+// já releria isso sozinha a cada quadro.
+if (window.visualViewport) {
+	Object.defineProperty(window, 'innerHeight', {
+		configurable: true,
+		get: function () { return Math.round(window.visualViewport.height); },
+	});
+	Object.defineProperty(window, 'innerWidth', {
+		configurable: true,
+		get: function () { return Math.round(window.visualViewport.width); },
+	});
+}
+		</script>
 	</head>
 	<body>
 		<canvas id="canvas">
@@ -97,7 +117,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":795584,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":795536,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
