@@ -903,6 +903,9 @@ func _test_blitz() -> void:
 	for i in range(60):
 		cal.advance_round()
 		for p in range(4):
+			if cal.can_discard(p):
+				cal.apply_discard(p, ChaosBot.wants_discard(cal, p, BotAI.Difficulty.HARD, brng))
+		for p in range(4):
 			var pick := ChaosBot.blitz_pick(cal, p, BotAI.Difficulty.HARD, brng)
 			check(pick >= 0 and pick <= ChaosEngine.HAND_SIZE, "Blitz: palpite do bot em 0..8")
 			sum_exp += ChaosBot.expected_wins(cal, p)
@@ -921,17 +924,18 @@ func _test_blitz() -> void:
 
 
 func _test_blitz_phase4() -> void:
-	# Camadas de regra: conta nova não dobra nem sorteia modificador.
+	# Camadas de regra: conta nova não dobra nem sorteia modificador (mas o descarte inicial
+	# continua acontecendo — "sempre", mesmo no onboarding).
 	var ob := ChaosEngine.new()
 	ob.setup_match({"seed": 21, "mode": "blitz", "blind": 10, "onboarding_levels": 2})
 	for m in ob.modifier_sequence:
 		check(int(m) == -1, "Onboarding: nenhum modificador sorteia")
+	check((ob.hands[0] as Array).size() == ChaosEngine.BLITZ_DEAL_SIZE and ob.can_discard(0), "Onboarding: ainda recebe 10 e descarta 2 (não some com o onboarding)")
 	for p in range(4):
 		ob.blitz_place(p, 2)
 	ob.trick_number = 6
 	ob.wins[0] = 2
 	check(not ob.can_double(0), "Onboarding: não dobra")
-	check(ob.swap_cards.all(func(c): return c == null), "Onboarding: sem carta aberta")
 	ob.advance_round()
 	check(ob.onboarding_levels == 1, "Onboarding: contador desce 1 por nível")
 	for m in ob.modifier_sequence:
@@ -940,29 +944,39 @@ func _test_blitz_phase4() -> void:
 	check(ob.onboarding_levels == 0, "Onboarding: acaba depois de 2 níveis")
 	check(ob.modifier_sequence.any(func(m): return int(m) != -1), "Onboarding: modificadores voltam a sortear")
 
-	# Carta aberta: troca válida, recusa, e proteções (só antes do palpite, 1x por nível).
-	var sw := ChaosEngine.new()
-	sw.setup_match({"seed": 22, "mode": "blitz", "blind": 10})
-	check(sw.swap_cards.size() == 4 and sw.swap_cards[0] != null, "Troca: carta aberta oferecida a todos")
-	check(sw.can_swap(0), "Troca: pode decidir antes do palpite")
-	var offered: CardData = sw.swap_cards[0]
-	var kept: CardData = sw.hands[0][0]
-	check(sw.apply_swap(0, kept) and (sw.hands[0] as Array).any(func(c): return (c as CardData).equals(offered)) and not (sw.hands[0] as Array).any(func(c): return (c as CardData).equals(kept)), "Troca: a carta oferecida entra, a escolhida sai da mão")
-	check(not sw.can_swap(0), "Troca: só 1 vez por nível")
-	check(not sw.apply_swap(0, offered), "Troca: não troca de novo depois de decidir")
+	# Descarte inicial: recebe 10, descarta 2, sempre a 1ª decisão do nível — antes de qualquer
+	# modificador ou palpite.
+	var d1 := ChaosEngine.new()
+	d1.setup_match({"seed": 22, "mode": "blitz", "blind": 10})
+	check((d1.hands[0] as Array).size() == ChaosEngine.BLITZ_DEAL_SIZE and d1.can_discard(0), "Descarte: recebe 10 cartas antes de descartar")
+	var hand10: Array = (d1.hands[0] as Array).duplicate()
+	var discard: Array = [hand10[0], hand10[1]]
+	check(d1.apply_discard(0, discard), "Descarte: descarta 2 válidas")
+	check((d1.hands[0] as Array).size() == ChaosEngine.HAND_SIZE and not d1.can_discard(0), "Descarte: fica com 8, não descarta de novo")
+	for c in discard:
+		check(not (d1.hands[0] as Array).any(func(h): return (h as CardData).equals(c)), "Descarte: a carta descartada sai da mão de verdade")
+	check(not d1.apply_discard(0, [hand10[2]]), "Descarte: precisa ser exatamente 2 cartas")
 
-	var sw2 := ChaosEngine.new()
-	sw2.setup_match({"seed": 23, "mode": "blitz", "blind": 10})
-	var hand_before: Array = (sw2.hands[1] as Array).duplicate()
-	sw2.decline_swap(1)
-	check(not sw2.can_swap(1) and (sw2.hands[1] as Array) == hand_before, "Troca: recusar mantém a mão")
+	var d2 := ChaosEngine.new()
+	d2.setup_match({"seed": 23, "mode": "blitz", "blind": 10})
+	var hand2: Array = (d2.hands[1] as Array).duplicate()
+	check(not d2.apply_discard(1, [hand2[0], hand2[0]]), "Descarte: não descarta a mesma carta 2x")
 
-	var sw3 := ChaosEngine.new()
-	sw3.setup_match({"seed": 24, "mode": "blitz", "blind": 10})
-	sw3.blitz_place(2, 3)
-	check(not sw3.can_swap(2), "Troca: não dá mais depois de palpitar")
-	# A própria carta oferecida não está (ainda) na mão: trocar por ela mesma tem que falhar.
-	check(not sw3.apply_swap(0, sw3.swap_cards[0]), "Troca: carta que não está na mão não troca")
+	var d3 := ChaosEngine.new()
+	d3.setup_match({"seed": 24, "mode": "blitz", "blind": 10})
+	var outside := CardData.louco()
+	if (d3.hands[2] as Array).any(func(c): return (c as CardData).equals(outside)):
+		outside = CardData.make(CardData.Suit.TRUNFO, 1)
+	check(not d3.apply_discard(2, [outside, (d3.hands[2] as Array)[0]]), "Descarte: carta que não está na mão não descarta")
+
+	# Bot: descarta as 2 mais fracas da mão (calibrado, sem estourar a mão em cartas boas).
+	var brng2 := RandomNumberGenerator.new()
+	brng2.seed = 8
+	var d4 := ChaosEngine.new()
+	d4.setup_match({"seed": 25, "mode": "blitz", "blind": 10})
+	var picks: Array = ChaosBot.wants_discard(d4, 0, BotAI.Difficulty.HARD, brng2)
+	check(picks.size() == 2, "Descarte do bot: sempre escolhe 2")
+	check(d4.apply_discard(0, picks), "Descarte do bot: a escolha do bot sempre é válida")
 
 
 func _test_colors() -> void:

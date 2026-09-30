@@ -23,6 +23,9 @@ func play(fixed: int, bots: int, seed_i: int, track := false) -> Dictionary:
 		for p in range(4):
 			if e.stacks[p] < e.blind * 6:
 				e.stacks[p] = 400.0
+		for p in range(4):
+			if e.can_discard(p):
+				e.apply_discard(p, ChaosBot.wants_discard(e, p, BotAI.Difficulty.HARD, rng))
 		var before: float = e.stacks[seat]
 		for p in range(4):
 			var pick := ChaosBot.blitz_pick(e, p, BotAI.Difficulty.HARD, rng)

@@ -64,6 +64,9 @@ func run_session(kinds: Array, seat: int, seed_i: int) -> Array:
 		for p in range(4):
 			if e.stacks[p] < e.blind * 6:
 				e.stacks[p] = 400.0
+		for p in range(4):
+			if e.can_discard(p):
+				e.apply_discard(p, ChaosBot.wants_discard(e, p, kind_diff(kinds[p]), rng))
 		var before: float = e.stacks[seat]
 		for p in range(4):
 			e.blitz_place(p, pick_predict(kinds[p], e, p, rng))

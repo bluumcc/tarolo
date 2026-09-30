@@ -1808,20 +1808,16 @@ func _blitz_open_level() -> bool:
 	for q in engine.refill_bots():
 		await _new_player_sits(q)
 	for p in range(engine.num_players):
-		if not engine.can_swap(p):
+		if not engine.can_discard(p):
 			continue
 		if p == 0 and not GameState.autoplay:
-			await _tip("swap", "CARTA ABERTA", "Antes do palpite, você recebe 1 carta aberta do monte. Pode trocar por qualquer carta da sua mão, ou recusar — é sua escolha, uma vez por nível.")
-			await _human_swap_choice()
+			await _tip("discard", "ESCOLHA 2 PRA DESCARTAR", "Você recebeu 10 cartas. Toque em 2 pra descartar antes de saber qualquer regra da rodada — sobram as 8 com que você joga o nível.")
+			await _human_discard_choice()
 			if not is_inside_tree() or finished:
 				return false
 			_rebuild_hand()
 		else:
-			var give: CardData = ChaosBot.wants_swap(engine, p, int(config["difficulty"][p]), bot_rng)
-			if give != null:
-				engine.apply_swap(p, give)
-			else:
-				engine.decline_swap(p)
+			engine.apply_discard(p, ChaosBot.wants_discard(engine, p, int(config["difficulty"][p]), bot_rng))
 	phase = "predict"
 	bets_gathered = true
 	pot_locked = true
@@ -1877,9 +1873,9 @@ func _blitz_reveal() -> void:
 	await _wait(0.8)
 
 
-## Painel da carta aberta (Fase 4): mostra a carta oferecida e sua mão em botões — toque numa
-## carta pra trocar por ela, ou recuse. Some sozinho depois da escolha.
-func _human_swap_choice() -> void:
+## Painel do descarte inicial: recebeu 10 cartas, toca em 2 pra descartar (toggle) — o CONFIRMAR
+## só libera com exatamente 2 marcadas. Some sozinho depois da escolha.
+func _human_discard_choice() -> void:
 	modal_open = true
 	var vw := get_viewport_rect().size.x
 	var holder := MarginContainer.new()
@@ -1895,34 +1891,49 @@ func _human_swap_choice() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	box.add_child(v)
-	var offered: CardData = engine.swap_cards[0]
-	v.add_child(UIKit.label("CARTA ABERTA: %s" % offered.display_name(), 26, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
-	var info := UIKit.label("Toque numa carta da sua mão pra trocar por ela, ou recuse.", 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(UIKit.label("DESCARTE 2 CARTAS", 26, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
+	var info := UIKit.label("Toque em 2 cartas pra descartar. Toque de novo pra desmarcar.", 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(info)
-	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 88)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	v.add_child(scroll)
-	UIKit.suppress_click_on_scroll(scroll)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
-	scroll.add_child(row)
-	for c in engine.hands[0]:
-		var card: CardData = c
-		var b := UIKit.button(card.display_name(), UIKit.BUTTON_MUTED, 20)
-		b.custom_minimum_size = Vector2(0, 68)
-		b.pressed.connect(func():
-			engine.apply_swap(0, card)
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 8)
+	v.add_child(body)
+	var hand: Array = (engine.hands[0] as Array).duplicate()
+	var st := {"picked": []}
+	st["render"] = func():
+		for c in body.get_children():
+			c.queue_free()
+		var scroll := ScrollContainer.new()
+		scroll.custom_minimum_size = Vector2(0, 88)
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		body.add_child(scroll)
+		UIKit.suppress_click_on_scroll(scroll)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 6)
+		scroll.add_child(row)
+		var picked: Array = st["picked"]
+		for c in hand:
+			var card: CardData = c
+			var chosen: bool = picked.any(func(p): return (p as CardData).equals(card))
+			var b := UIKit.button(card.display_name(), UIKit.DANGER if chosen else UIKit.BUTTON_MUTED, 18)
+			b.custom_minimum_size = Vector2(0, 68)
+			b.pressed.connect(func():
+				if chosen:
+					picked = picked.filter(func(p): return not (p as CardData).equals(card))
+				elif picked.size() < ChaosEngine.BLITZ_DISCARD_SIZE:
+					picked.append(card)
+				st["picked"] = picked
+				(st["render"] as Callable).call())
+			row.add_child(b)
+		var go := UIKit.button("CONFIRMAR DESCARTE", UIKit.OK if picked.size() == ChaosEngine.BLITZ_DISCARD_SIZE else UIKit.BUTTON_MUTED, 26)
+		go.disabled = picked.size() != ChaosEngine.BLITZ_DISCARD_SIZE
+		go.custom_minimum_size = Vector2(0, 64)
+		go.pressed.connect(func():
+			engine.apply_discard(0, picked)
 			item_chosen.emit(1))
-		row.add_child(b)
-	var skip := UIKit.button("RECUSAR", UIKit.MUTED, 26)
-	skip.custom_minimum_size = Vector2(0, 64)
-	skip.pressed.connect(func():
-		engine.decline_swap(0)
-		item_chosen.emit(0))
-	v.add_child(skip)
+		body.add_child(go)
+	(st["render"] as Callable).call()
 	UIKit.pop_in(box, GameState.anim(0.15))
 	await item_chosen
 	modal_open = false

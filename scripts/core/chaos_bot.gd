@@ -197,25 +197,17 @@ static func _card_power(engine: ChaosEngine, card: CardData, inverted: bool) -> 
 	return float(card.rank) / 14.0 * 0.2
 
 
-## Troca (Fase 4): devolve a carta da mão a largar pela carta aberta, ou null se recusa. Fácil
-## às vezes nem avalia direito; Normal/Difícil trocam a mais fraca só quando a oferecida ajuda
-## de verdade (evita trocar à toa uma mão já equilibrada).
-static func wants_swap(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> CardData:
-	if not engine.can_swap(player):
-		return null
-	if difficulty == BotAI.Difficulty.EASY and rng.randf() < 0.5:
-		return null
-	var offered: CardData = engine.swap_cards[player]
-	var op := _card_power(engine, offered, false)
-	var hand: Array = engine.hands[player]
-	var worst: CardData = hand[0]
-	var wp := _card_power(engine, worst, false)
-	for c in hand:
-		var p := _card_power(engine, c, false)
-		if p < wp:
-			wp = p
-			worst = c
-	return worst if op > wp + 0.08 else null
+## Descarte inicial: recebeu 10, escolhe as 2 mais fracas pra largar (sem modificador sorteado
+## ainda, então é só a força "crua" da carta — ver `_card_power`). Fácil erra o alvo às vezes.
+static func wants_discard(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> Array:
+	var hand: Array = (engine.hands[player] as Array).duplicate()
+	hand.sort_custom(func(a: CardData, b: CardData) -> bool: return _card_power(engine, a, false) < _card_power(engine, b, false))
+	var out: Array = [hand[0], hand[1]]
+	if difficulty == BotAI.Difficulty.EASY:
+		# Erra o alvo de vez em quando: descarta 1 aleatória em vez da 2ª mais fraca.
+		if rng.randf() < 0.5:
+			out[1] = hand[rng.randi_range(2, hand.size() - 1)]
+	return out
 
 
 ## Chance estimada de levar a rodada (0 a 1).

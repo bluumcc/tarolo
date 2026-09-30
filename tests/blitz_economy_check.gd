@@ -17,6 +17,9 @@ func _init():
 			for p in range(4):
 				if e.stacks[p] < e.blind*6: e.stacks[p] = 400.0
 			for p in range(4):
+				# Descarte: o Oráculo não tem avaliador próprio pra isso ainda, usa a heurística do bot.
+				if e.can_discard(p): e.apply_discard(p, ChaosBot.wants_discard(e, p, BotAI.Difficulty.HARD, rng))
+			for p in range(4):
 				var k = ChaosOracle.pick_predict(e, p, rng) if p==0 else ChaosBot.blitz_pick(e,p,BotAI.Difficulty.HARD,rng)
 				e.blitz_place(p,k)
 			while not e.is_round_over():

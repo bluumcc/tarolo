@@ -79,8 +79,8 @@ var blitz_result: Dictionary = {}
 var point_factor := BLITZ_POINT_FACTOR   # ajustável (simulação)
 var styles: Array = []                  # estilo de cada bot (ChaosBot.Style), fixo enquanto ele estiver na mesa
 var onboarding_levels := 0              # níveis restantes sem dobrar/modificadores (Blitz, contas novas)
-var swap_cards: Array = []              # Blitz: 1 carta aberta do monte por jogador, oferecida antes do palpite
-var swap_used: Array = []               # já decidiu (trocou ou recusou) a carta aberta nesse nível
+const BLITZ_DEAL_SIZE := 10             # recebe 10, descarta 2 (ver DISCARD_SIZE), fica com HAND_SIZE (8)
+const BLITZ_DISCARD_SIZE := 2
 
 var hands: Array = []
 var plays: Array = []
@@ -127,15 +127,11 @@ func setup_match(config: Dictionary) -> void:
 
 func _setup_round() -> void:
 	var deck := Deck.build(rng)
-	var dealt := Deck.deal(deck, num_players, HAND_SIZE)
+	# Blitz: recebe 10, descarta 2 antes de qualquer outra decisão (sempre, mesmo na conta nova) —
+	# o nível continua tendo HAND_SIZE (8) rodadas, só a mão inicial nasce maior pra escolher.
+	var deal_size := BLITZ_DEAL_SIZE if blitz else HAND_SIZE
+	var dealt := Deck.deal(deck, num_players, deal_size)
 	hands = dealt["hands"]
-	var rest: Array = dealt["rest"]
-	swap_cards = []
-	swap_used = []
-	for p in range(num_players):
-		# Só no Blitz, fora da conta nova: 1 carta aberta do monte por jogador, antes do palpite.
-		swap_cards.append(rest[p] if blitz and onboarding_levels == 0 and p < rest.size() else null)
-		swap_used.append(false)
 	captured = []
 	combo_count = []
 	streak = []
@@ -652,8 +648,6 @@ func clone_for_sim() -> ChaosEngine:
 	c.point_factor = point_factor
 	c.styles = styles.duplicate()
 	c.onboarding_levels = onboarding_levels
-	c.swap_cards = swap_cards.duplicate()
-	c.swap_used = swap_used.duplicate()
 	c.rake_on = rake_on
 	c.bonus_on = bonus_on
 	c.stacks = stacks.duplicate()
@@ -745,35 +739,35 @@ func can_cover(player: int) -> bool:
 	return need >= 0 and need <= tricks_left() and stacks[player] >= blitz_entry()
 
 
-## Verdadeiro se ainda pode decidir a carta aberta (trocar ou recusar) — só antes do palpite.
-func can_swap(player: int) -> bool:
-	return blitz and player < swap_cards.size() and swap_cards[player] != null and not swap_used[player] and predicts[player] == -1
+## Verdadeiro se a mão ainda tem cartas de sobra (recebeu 10, ainda não descartou até 8).
+func can_discard(player: int) -> bool:
+	return blitz and (hands[player] as Array).size() > HAND_SIZE
 
 
-## Troca `hand_card` (precisa estar na mão) pela carta aberta. Devolve false se a carta não
-## estava na mão ou a troca já não é mais possível.
-func apply_swap(player: int, hand_card: CardData) -> bool:
-	if not can_swap(player):
+## Descarta exatamente BLITZ_DISCARD_SIZE cartas (precisam estar na mão, sem repetir). Sempre a
+## primeira decisão do nível, antes do palpite e de qualquer modificador — todo mundo decide sem
+## ver o que os outros descartaram. Devolve false e não muda nada se a lista for inválida.
+func apply_discard(player: int, cards: Array) -> bool:
+	if not can_discard(player) or cards.size() != BLITZ_DISCARD_SIZE:
 		return false
 	var hand: Array = hands[player]
-	var idx := -1
-	for i in range(hand.size()):
-		if (hand[i] as CardData).equals(hand_card):
-			idx = i
-			break
-	if idx == -1:
-		return false
-	hand.remove_at(idx)
-	hand.append(swap_cards[player])
-	Deck.sort_hand(hand)
-	swap_used[player] = true
+	var idxs: Array = []
+	for c in cards:
+		var idx := -1
+		for i in range(hand.size()):
+			if idxs.has(i):
+				continue
+			if (hand[i] as CardData).equals(c):
+				idx = i
+				break
+		if idx == -1:
+			return false
+		idxs.append(idx)
+	idxs.sort()
+	idxs.reverse()
+	for i in idxs:
+		hand.remove_at(i)
 	return true
-
-
-## Recusa a carta aberta: mantém a mão como está.
-func decline_swap(player: int) -> void:
-	if can_swap(player):
-		swap_used[player] = true
 
 
 func _pay_double(player: int) -> void:

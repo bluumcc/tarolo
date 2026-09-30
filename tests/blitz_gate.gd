@@ -25,6 +25,10 @@ func net(kinds: Array, seat: int, seed_i: int) -> float:
 		for p in range(4):
 			if e.stacks[p] < e.blind * 6:
 				e.stacks[p] = 400.0
+		for p in range(4):
+			var dd := BotAI.Difficulty.HARD if kinds[p].begins_with("H") else (BotAI.Difficulty.NORMAL if kinds[p] == "N" else BotAI.Difficulty.EASY)
+			if e.can_discard(p):
+				e.apply_discard(p, ChaosBot.wants_discard(e, p, dd, rng))
 		var before: float = e.stacks[seat]
 		for p in range(4):
 			var d := BotAI.Difficulty.HARD if kinds[p].begins_with("H") else (BotAI.Difficulty.NORMAL if kinds[p] == "N" else BotAI.Difficulty.EASY)

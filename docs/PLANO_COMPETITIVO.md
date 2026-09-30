@@ -79,12 +79,12 @@ Cada fase: regra exata → motor → bots → testes → simulação → critér
 - Risco: excesso de incerteza deixa o jogo "cego". Reversão: chave `reveal_at` (revela na rodada N,
   0 = sempre visível, como hoje).
 
-### Fase 4 — Troca de 1 carta
-- Antes do palpite, cada jogador recebe 1 carta aberta do monte e pode trocá-la por uma da mão ou
-  recusar. Bots decidem por poder da carta vs. a pior da mão.
-- Aceite: bot que troca bem ≥ +0,3 blind/nível sobre o que recusa; a média de níveis com palpite
-  exato não cai; sessão ≤ +8 s por nível.
-- Risco: aumenta a força média das mãos (e portanto os acertos) → recalibrar bots.
+### Fase 4 — Recebe 10, descarta 2 (substituiu a 1ª versão, que era uma carta aberta trocável)
+- Todo mundo recebe 10 cartas; antes de saber a regra da 1ª rodada, cada um descarta 2 (decisão
+  simultânea, sem ver o que os outros descartaram). Sempre ativo, inclusive no onboarding.
+- Bots decidem pelas 2 cartas mais fracas da mão crua (`ChaosBot.wants_discard`).
+- Risco considerado: aumenta a força média das mãos (e portanto os acertos) → mitigar recalibrando
+  os bots se a simulação mostrar desvio.
 
 ### Fase 5 — Economia contra bots (fecha o ciclo)
 - Problema: quem joga bem ganha dos bots e nunca compra fichas (fichas dos bots são "criadas").
@@ -146,12 +146,15 @@ tutorial guiado, cosméticos, torneios, novos modificadores.
   pros primeiros níveis: feito (ver "Onboarding" abaixo).
 - **Fase 3 (palpite oculto):** feito. Rivais em segredo até o showdown; sem mudança nos bots
   (eles já não liam o palpite alheio).
-- **Fase 4 (troca de 1 carta):** feito. `engine.swap_cards`/`can_swap`/`apply_swap`/
-  `decline_swap`; bot em `ChaosBot.wants_swap`; UI em `_human_swap_choice()`.
+- **Fase 4 (recebe 10, descarta 2):** feito, refeito uma vez. A 1ª versão era uma carta aberta
+  trocável (`engine.swap_cards`); substituída por pedido: todo mundo recebe `BLITZ_DEAL_SIZE`
+  (10) e descarta `BLITZ_DISCARD_SIZE` (2) antes de saber a regra da 1ª rodada — sempre, inclusive
+  no onboarding. `engine.can_discard/apply_discard`, bot em `ChaosBot.wants_discard`, UI em
+  `_human_discard_choice()`.
 - **Onboarding (camadas de regra):** feito, fora do plano original de 6 fases, junto da Fase 2.
   `ChaosEngine.onboarding_levels` (config, contado por `GameState.ONBOARDING_LEVELS = 3`, salvo
   em `profile.blitz_levels`): as primeiras mesas de Blitz de uma conta nova não sorteiam
-  modificador nem liberam dobrar/cobrir/carta aberta — só o palpite puro.
+  modificador nem liberam dobrar/cobrir — só o palpite puro (o descarte inicial continua ativo).
 - **Fase 5 (economia vs bots):** medida, não calibrada. `tests/blitz_economy_check.gd`: um
   jogador nível Oráculo, mesmo com a taxa da casa ligada (4%), ainda lucra em média — mas pouco
   (+0,39 blind/nível, 6 sessões de 10 níveis, bem ruidoso: de −2,2 a +1,75 por sessão; o Oráculo

@@ -182,19 +182,27 @@ Como os bots nunca leram o palpite dos rivais pra decidir nada (só o próprio, 
 esconder da tela não desequilibra nada: não são bots ficando "mais burros" nem "mais espertos",
 é só o jogador humano ganhando (e perdendo) a informação que os bots nunca tiveram de graça.
 
-## Fase 4: carta aberta trocável antes do palpite
-Antes do palpite, cada jogador recebe 1 carta virada do monte (`Deck.deal`'s `rest`, nunca usado
-no Blitz até aqui) e pode trocá-la por qualquer carta da mão, ou recusar — uma decisão só, antes
-de ver o palpite dos outros. `engine.can_swap/apply_swap/decline_swap`, bot em
-`ChaosBot.wants_swap` (troca a carta mais fraca quando a oferecida ajuda de verdade, por
-`_card_power`), UI em `_human_swap_choice()`.
+## Fase 4: recebe 10, descarta 2 (substituiu a carta aberta)
+Primeira versão da Fase 4 era uma carta aberta trocável (1 carta oferecida, trocar ou recusar).
+Substituída: agora todo mundo recebe `BLITZ_DEAL_SIZE` (10) cartas em vez de `HAND_SIZE` (8), e
+a primeira decisão do nível — antes de saber a regra da 1ª rodada, antes do palpite — é escolher
+`BLITZ_DISCARD_SIZE` (2) pra descartar. As descartadas somem do jogo (não voltam pro monte). O
+nível continua com `HAND_SIZE` (8) rodadas; só a mão inicial nasce maior pra dar mais escolha.
+Conta do baralho: 78 cartas no total, 10×4=40 distribuídas (antes eram 32), sobram 38 sem uso —
+de sobra pro sorteio de naipe dos modificadores, que não consome carta nenhuma.
+
+`engine.can_discard/apply_discard` (motor), `ChaosBot.wants_discard` (bot: descarta as 2 mais
+fracas da mão crua, sem modificador — ainda não foi sorteado nesse ponto do nível), UI em
+`_human_discard_choice()` (toque pra marcar/desmarcar, confirma só com exatamente 2 marcadas).
+Sempre ativo, **inclusive no onboarding** — é a única etapa nova que não se esconde nas primeiras
+mesas de conta nova, porque molda a mão, não adiciona uma regra de aposta ou de rodada.
 
 ## Onboarding: camadas de regra pros primeiros níveis
 Conta nova, primeiras `GameState.ONBOARDING_LEVELS` (3) mesas de Blitz: sem modificador (a tela
-cheia nem abre), sem dobrar/cobrir, sem carta aberta — só o palpite puro, pra aprender a mecânica
-central antes de mais uma camada. Contado por `profile.blitz_levels` (save), passado como
-`onboarding_levels` no config do motor. `_test_blitz_phase4` (`test_runner.gd`) cobre o
-comportamento.
+cheia nem abre), sem dobrar/cobrir — só o palpite puro (mais o descarte inicial, que continua
+ativo) pra aprender a mecânica central antes de mais uma camada. Contado por `profile.blitz_levels`
+(save), passado como `onboarding_levels` no config do motor. `_test_blitz_phase4`
+(`test_runner.gd`) cobre o comportamento.
 
 ## Fase 5: economia vs bots (medida, ver `docs/PLANO_COMPETITIVO.md`)
 Um jogador nível Oráculo lucra em média mesmo com a taxa ligada, mas pouco (+0,39 blind/nível,

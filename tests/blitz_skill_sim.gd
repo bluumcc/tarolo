@@ -26,6 +26,9 @@ func play(diffs: Array, factor: float, seed_i: int, seat: int) -> Dictionary:
 		for p in range(4):
 			if e.stacks[p] < e.blind * 6:
 				e.stacks[p] = 400.0   # recompra de todos (mede só habilidade, sem quebrar)
+		for p in range(4):
+			if e.can_discard(p):
+				e.apply_discard(p, ChaosBot.wants_discard(e, p, BotAI.Difficulty.HARD, rng))
 		var before: float = e.stacks[seat]
 		for p in range(4):
 			e.blitz_place(p, ChaosBot.blitz_pick(e, p, BotAI.Difficulty.HARD, rng))
