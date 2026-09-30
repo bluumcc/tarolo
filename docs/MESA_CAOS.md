@@ -27,3 +27,10 @@ Estimam a força da mão (Trunfos altos e Reis; invertida no Mundo ao Contrário
 
 ## Fora de escopo por enquanto
 Torneio com blind crescente e eliminação (base para o Ranqueado), Deixar rolar e Torcida.
+
+## HUD
+- Cabeçalho fixo (menu, nível/blind, ajuda) e, logo abaixo, os 4 avatares redondos lado a lado, esticados na largura, na ordem de jogo (você primeiro).
+- Sob cada avatar: nome, stack, as fichas apostadas na frente dele e a situação (SUA VEZ / É A VEZ, PRÓXIMO, PASSOU, PAGOU, AUMENTOU, DESISTIU).
+- Números nos avatares mostram a ordem de fala (1 = age agora) e depois a ordem de jogada; (D) marca o botão.
+- As apostas ficam na frente de cada jogador até a rodada de apostas fechar; aí voam juntas pro pote.
+- As cartas na mesa ficam na coluna do avatar de quem jogou.

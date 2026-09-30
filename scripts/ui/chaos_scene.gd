@@ -45,6 +45,12 @@ var turn_left := 0.0
 var main_area: BoxContainer
 var side_col: VBoxContainer
 var seat_nodes: Array = []
+var seat_row: HBoxContainer
+var bet_pills: Array = []      # fichas apostadas na frente de cada jogador
+var order_badges: Array = []   # 1, 2, 3... = ordem de fala / de jogada
+var dealer_badges: Array = []
+var phase := "idle"            # "bet" | "play" | "idle"
+var bets_gathered := false     # apostas já juntadas no pote
 var first_round_done := false
 var modifier_revealed := false   # surpresa de rodada já foi revelada nesse nível
 var info_label: Label
@@ -65,7 +71,6 @@ var pot_label: Label
 var pot_sub: Label
 var bet_tags: Array = []       # "◎25 · 3" por assento
 var prog_tags: Array = []      # "1/3 ♨×1,5" ao vivo por assento
-var my_bet_label: Label
 var shown_pot := 0.0
 var pot_locked := false        # contador do pote rolando: o refresh não sobrescreve
 
@@ -150,6 +155,10 @@ func _build_ui() -> void:
 	seat_avatars.resize(engine.num_players)
 	bet_tags.resize(engine.num_players)
 	prog_tags.resize(engine.num_players)
+	bet_pills.resize(engine.num_players)
+	order_badges.resize(engine.num_players)
+	dealer_badges.resize(engine.num_players)
+	seat_nodes.resize(engine.num_players)
 
 	# Barra de topo — título + ações, uma linha só, sempre no mesmo lugar (como o topo
 	# de qualquer app) -------------------------------------------------
@@ -207,10 +216,13 @@ func _build_ui() -> void:
 	side_col.add_child(mod_box)
 
 
+	# Assentos: os 4 jogadores em fileira, na ordem de jogo, esticados na largura toda.
+	center_col.add_child(_build_seats())
+
 	# Faixa de avisos — espaço RESERVADO (nunca cobre carta nem placar): resultado da
 	# rodada, combos, evento surpresa. Uma mensagem por vez, sempre no mesmo lugar.
 	banner_box = UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MUTED, 12)
-	banner_box.custom_minimum_size = Vector2(0, 112)
+	banner_box.custom_minimum_size = Vector2(0, 88)
 	var bv := VBoxContainer.new()
 	bv.alignment = BoxContainer.ALIGNMENT_CENTER
 	bv.add_theme_constant_override("separation", 2)
@@ -226,12 +238,11 @@ func _build_ui() -> void:
 	# Mesa de jogo — só a rodada atual, cada carta numa vaga fixa por assento.
 	table_center = Panel.new()
 	table_center.name = "TableCenter"
-	table_center.custom_minimum_size = Vector2(0, 470)
+	table_center.custom_minimum_size = Vector2(0, 300)
 	table_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	table_center.add_theme_stylebox_override("panel", UIKit.box(Color(0.10, 0.08, 0.30, 0.85), Color("#5B4FC9"), 3, 200, 0))
+	table_center.add_theme_stylebox_override("panel", UIKit.box(Color(0.10, 0.08, 0.30, 0.85), Color("#5B4FC9"), 3, 40, 0))
 	table_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center_col.add_child(table_center)
-	_build_seats()
 	_build_pot()
 	table_center.resized.connect(_layout_table)
 
@@ -264,39 +275,6 @@ func _build_ui() -> void:
 	hand_container.mouse_filter = Control.MOUSE_FILTER_PASS
 	hand_scroll.set_content(hand_container)
 
-	# Meu rodapé — minhas informações (pontos, fichas, pote), embaixo da minha mão, onde
-	# o olho já está depois de escolher a carta — em vez de competir lá em cima com o
-	# placar dos outros 3.
-	var my_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 12)
-	var my_row := HBoxContainer.new()
-	my_row.add_theme_constant_override("separation", 16)
-	my_box.add_child(my_row)
-	my_row.add_child(Portrait.new().setup(0, UIKit.GOLD, 84.0))
-	var my_left := VBoxContainer.new()
-	my_left.add_theme_constant_override("separation", 1)
-	my_left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	my_row.add_child(my_left)
-	var my_title := UIKit.label(str(config["names"][0]).to_upper(), 20, UIKit.MUTED)
-	my_left.add_child(my_title)
-	var my_total := UIKit.label("◎ 0", 40, UIKit.GOLD)
-	my_left.add_child(my_total)
-	var my_rp := UIKit.label("+◎0 no nível", 20, UIKit.MUTED)
-	my_left.add_child(my_rp)
-	var my_right := VBoxContainer.new()
-	my_right.add_theme_constant_override("separation", 1)
-	my_right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	my_right.alignment = BoxContainer.ALIGNMENT_CENTER
-	my_row.add_child(my_right)
-	my_bet_label = UIKit.label("", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
-	my_bet_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	my_right.add_child(my_bet_label)
-	root.add_child(my_box)
-	hud_badges[0] = my_box
-	hud_titles[0] = my_title
-	hud_totals[0] = my_total
-	hud_round_pts[0] = my_rp
-	seat_avatars[0] = my_box
-
 	popup_layer = Control.new()
 	popup_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	popup_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -328,7 +306,7 @@ func _apply_orientation() -> void:
 	side_col.visible = false  # a regra do nível já fica na faixa de avisos, em repouso
 	modifier_expanded = wide
 	_refresh_hud()
-	table_center.custom_minimum_size.y = 240 if wide else 470
+	table_center.custom_minimum_size.y = 230 if wide else 300
 	_layout_table()
 
 
@@ -338,43 +316,87 @@ func _on_resize() -> void:
 	_layout_hand()
 
 
-## Rivais sentados ao redor da mesa: avatar redondo (inicial + cor), nome e pontos embaixo.
-func _build_seats() -> void:
-	seat_nodes.resize(engine.num_players)
-	for p in range(1, engine.num_players):
+## Fileira de assentos, na ordem de jogo, cada um numa coluna do mesmo tamanho: avatar
+## redondo, nome, stack, as fichas apostadas na frente e a situação (vez / próximo / ação).
+func _build_seats() -> HBoxContainer:
+	seat_row = HBoxContainer.new()
+	seat_row.add_theme_constant_override("separation", 0)
+	seat_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for p in range(engine.num_players):
 		var seat := VBoxContainer.new()
+		seat.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		seat.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		seat.add_theme_constant_override("separation", 2)
-		seat.alignment = BoxContainer.ALIGNMENT_CENTER
+		seat.add_theme_constant_override("separation", 1)
+		seat.alignment = BoxContainer.ALIGNMENT_BEGIN
+		var wrap := Control.new()
+		wrap.custom_minimum_size = Vector2(100, 96)
+		wrap.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var ring := PanelContainer.new()
 		ring.custom_minimum_size = Vector2(84, 84)
+		ring.size = Vector2(84, 84)
+		ring.position = Vector2(8, 10)
 		ring.pivot_offset = Vector2(42, 42)
-		ring.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var face := Portrait.new().setup(p, Color(0, 0, 0, 0), 68.0)
 		face.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		face.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		ring.add_child(face)
-		seat.add_child(ring)
+		wrap.add_child(ring)
+		var ord := _badge("", UIKit.PURPLE_DEEP, UIKit.MUTED)
+		ord.position = Vector2(0, 0)
+		wrap.add_child(ord)
+		var dl := _badge("D", UIKit.GOLD, UIKit.GOLD)
+		dl.position = Vector2(66, 62)
+		dl.visible = false
+		wrap.add_child(dl)
+		seat.add_child(wrap)
 		var name_l := UIKit.label("", 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+		name_l.autowrap_mode = TextServer.AUTOWRAP_OFF
+		name_l.clip_text = true
 		seat.add_child(name_l)
-		var pts_l := UIKit.label("◎ 0", 24, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-		seat.add_child(pts_l)
-		var bet_l := UIKit.label("", 20, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-		seat.add_child(bet_l)
-		var prog_l := UIKit.label("", 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-		seat.add_child(prog_l)
-		bet_tags[p] = bet_l
-		prog_tags[p] = prog_l
-		seat.custom_minimum_size = Vector2(SEAT_W, 0)
-		table_center.add_child(seat)
+		var stack_l := UIKit.label("◎ 0", 28, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+		seat.add_child(stack_l)
+		var pill := UIKit.panel(Color("#2A1B4D"), UIKit.GOLD, 8)
+		pill.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var bet_l := UIKit.label("", 24, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+		bet_l.autowrap_mode = TextServer.AUTOWRAP_OFF
+		pill.add_child(bet_l)
+		pill.modulate.a = 0.0
+		seat.add_child(pill)
+		var status_l := UIKit.label("", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		status_l.autowrap_mode = TextServer.AUTOWRAP_OFF
+		status_l.clip_text = true
+		seat.add_child(status_l)
+		seat_row.add_child(seat)
 		seat_nodes[p] = seat
 		hud_badges[p] = seat
 		hud_titles[p] = name_l
-		hud_totals[p] = pts_l
+		hud_totals[p] = stack_l
+		bet_tags[p] = bet_l
+		bet_pills[p] = pill
+		prog_tags[p] = status_l
+		order_badges[p] = ord
+		dealer_badges[p] = dl
 		hud_round_pts[p] = Label.new()
 		hud_cards[p] = Label.new()
 		seat_avatars[p] = ring
+	return seat_row
+
+
+## Bolinha com uma letra/número (ordem de fala, botão do dealer).
+func _badge(text: String, fill: Color, border: Color) -> PanelContainer:
+	var b := PanelContainer.new()
+	b.custom_minimum_size = Vector2(30, 30)
+	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := UIKit.box(fill, border, 3, 15, 0)
+	sb.set_corner_radius_all(15)
+	b.add_theme_stylebox_override("panel", sb)
+	var l := UIKit.label(text, 20, UIKit.INK if fill != UIKit.GOLD else UIKit.BLACK, HORIZONTAL_ALIGNMENT_CENTER)
+	l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	b.add_child(l)
+	return b
 
 
 ## Pote da rodada no centro da mesa.
@@ -397,46 +419,27 @@ func _build_pot() -> void:
 	pot_box.z_index = 2
 
 
-func _seat_pos(p: int) -> Vector2:
-	var sz := table_center.size
-	var seat: Control = seat_nodes[p]
-	var w := SEAT_W
-	match p:
-		1: return Vector2(26.0, sz.y * 0.14)
-		2: return Vector2((sz.x - w) / 2.0, 14.0)
-		_: return Vector2(sz.x - w - 26.0, sz.y * 0.14)
-
-
-## Reposiciona as cartas já em jogo quando a mesa muda de tamanho (ex.: virar o celular).
+## Reposiciona pote e cartas na mesa (ex.: ao virar o celular).
 func _layout_table() -> void:
 	if table_center == null:
 		return
-	for p in range(1, engine.num_players):
-		if seat_nodes.size() > p and seat_nodes[p] != null:
-			(seat_nodes[p] as Control).position = _seat_pos(p)
 	if pot_box:
-		if table_center.size.y >= 420.0:
-			pot_box.position = Vector2((table_center.size.x - POT_W) / 2.0, maxf(230.0, table_center.size.y * 0.42 - 30.0))
+		if table_center.size.y >= 270.0:
+			pot_box.position = Vector2((table_center.size.x - pot_box.size.x) / 2.0, 8.0)
 		else:
-			# Tela larga e baixa: o pote fica à esquerda das cartas da mesa.
-			pot_box.position = Vector2(maxf(_slot_pos(0).x - POT_W - 24.0, 4.0), table_center.size.y / 2.0 - 30.0)
+			pot_box.position = Vector2((table_center.size.x - pot_box.size.x) / 2.0, table_center.size.y / 2.0 - pot_box.size.y / 2.0)
 	for v in table_views:
 		var cv: CardView = v["view"]
 		cv.position = _slot_pos(int(v["player"]))
 
 
-## Uma vaga fixa por assento, em fileira — igual qualquer app de cartas mostra a rodada
-## atual, em vez de espalhar geometricamente numa mesa oval (isso é o que fazia o jogo
-## parecer preso a paisagem mesmo rodando em celular).
+## A carta de cada jogador fica na coluna do avatar dele (mesma ordem, lado a lado).
 func _slot_pos(player: int) -> Vector2:
 	var n := maxi(engine.num_players, 1)
-	var card_w := CardView.SIZE.x * TABLE_SCALE
-	var slot_w := card_w + 8.0
-	var start := (table_center.size.x - slot_w * n) / 2.0 + 7.0 - (CardView.SIZE.x - card_w) / 2.0
-	var y := table_center.size.y * 0.72 - CardView.SIZE.y / 2.0
-	if table_center.size.y >= 420.0:
-		y = table_center.size.y - CardView.SIZE.y * TABLE_SCALE - 14.0   # rente com a base da mesa
-	return Vector2(start + slot_w * player, y)
+	var col_w := table_center.size.x / float(n)
+	var cx := col_w * (float(player) + 0.5)
+	var y := maxf(table_center.size.y - CardView.SIZE.y * TABLE_SCALE - 10.0, 4.0)
+	return Vector2(cx - CardView.SIZE.x / 2.0, y)
 
 
 ## As cartas nunca encolhem: fileira reta ou leque, escolhido em Configurações — nos dois
@@ -1018,146 +1021,6 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # ------------------------------------------------------------------ HUD (stacks, pote, ações)
 
-func _current_turn_player() -> int:
-	if engine.betting:
-		return engine.bet_actor()
-	if engine.is_round_over() or engine.active_count() <= 1:
-		return -1
-	return engine.current
-
-
-func _fmt_chips(v: float) -> String:
-	return "◎ %d" % int(v)
-
-
-func _refresh_hud() -> void:
-	var turn_player := _current_turn_player()
-	for p in range(engine.num_players):
-		var total_lbl := hud_totals[p] as Label
-		var new_total: float = engine.stacks[p]
-		while shown_totals.size() <= p:
-			shown_totals.append(new_total)
-		if is_equal_approx(new_total, float(shown_totals[p])):
-			total_lbl.text = _fmt_chips(new_total)
-		else:
-			FX.count(total_lbl, float(shown_totals[p]), new_total, _fmt_chips)
-			FX.pop(total_lbl, 1.3)
-			shown_totals[p] = new_total
-		var delta: float = engine.stacks[p] - engine.level_start_stacks[p]
-		(hud_round_pts[p] as Label).text = "%s◎%d no nível" % ["+" if delta >= 0.0 else "−", absi(int(delta))]
-		if p == 0:
-			(hud_round_pts[p] as Label).text += "  ·  carteira ◎%d" % int(SaveManager.section("profile")["fichas"])
-		var out: bool = engine.folded[p] and (engine.betting or engine.plays.size() > 0 or engine.active_count() < engine.num_players)
-		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 1) if p == turn_player else Color(0.78, 0.76, 0.85, 0.45 if out else 1.0)
-		var dealer := "(D) " if engine.button == p else ""
-		(hud_titles[p] as Label).text = "%s%s" % [dealer, str(config["names"][p]).to_upper()]
-		(hud_titles[p] as Label).add_theme_color_override("font_color", UIKit.GOLD if engine.button == p else UIKit.MUTED)
-		_refresh_bet_tags(p)
-		if p > 0:
-			(hud_cards[p] as Label).text = "%d cartas" % (engine.hands[p] as Array).size()
-	info_label.text = "NÍVEL %d%s · BLIND ◎%d" % [engine.round_index + 1, ("/%d" % engine.levels) if engine.levels > 0 else "", engine.blind]
-	Widgets.progress_dots(trick_dots, ChaosEngine.HAND_SIZE, engine.trick_number)
-	var rest := _rest_banner()
-	modifier_label.text = "%s — %s" % [rest[0], rest[1]] if modifier_expanded else str(rest[0])
-	_refresh_pot()
-	_update_turn_highlight(turn_player)
-
-
-func _reset_actions() -> void:
-	for p in range(engine.num_players):
-		action_text[p] = ""
-		action_color[p] = UIKit.MUTED
-
-
-## Tag do assento: última ação da rodada (PASSOU / AUMENTOU / PAGOU / DESISTIU), quanto já pôs
-## e as chamas da sequência.
-func _refresh_bet_tags(p: int) -> void:
-	var streak: int = engine.streak[p] if p < engine.streak.size() else 0
-	var flames := ""
-	if streak >= 2:
-		flames = "%s ×%s" % ["♨".repeat(ChaosCombos.flame_level(streak)), UIKit.fmt_dec(ChaosCombos.streak_mult(streak), 2)]
-	var act: String = action_text[p]
-	var col: Color = action_color[p]
-	var put := ("◎%d no pote" % int(engine.contrib[p])) if engine.pot > 0.0 and not engine.folded[p] and not act.contains("◎") else ""
-	if p == 0:
-		var lines: Array = []
-		if act != "":
-			lines.append(act)
-		if put != "":
-			lines.append(put)
-		if flames != "":
-			lines.append(flames)
-		my_bet_label.text = "\n".join(lines)
-		my_bet_label.add_theme_color_override("font_color", col if act != "" else (FLAME if flames != "" else UIKit.MUTED))
-		return
-	(bet_tags[p] as Label).add_theme_color_override("font_color", col)
-	if p == 2:
-		# Assento do topo: tudo em uma linha pra não invadir o pote.
-		(bet_tags[p] as Label).text = (act + "  " + put).strip_edges()
-		(prog_tags[p] as Label).text = flames
-		(prog_tags[p] as Label).visible = flames != ""
-		(prog_tags[p] as Label).add_theme_color_override("font_color", FLAME)
-		return
-	(bet_tags[p] as Label).text = act
-	(prog_tags[p] as Label).text = (put + "  " + flames).strip_edges()
-	(prog_tags[p] as Label).add_theme_color_override("font_color", FLAME if put == "" else UIKit.MUTED)
-
-
-func _refresh_pot() -> void:
-	if not pot_locked:
-		shown_pot = engine.pot
-		pot_label.text = "POTE ◎ %d" % int(engine.pot)
-	var sub := ""
-	if engine.betting and engine.bet_level > float(engine.blind):
-		sub = "aposta em ◎ %d" % int(engine.bet_level)
-	elif engine.pot <= 0.0:
-		sub = "blind ◎ %d por rodada" % engine.blind
-	pot_sub.text = sub
-	pot_sub.visible = sub != ""
-	pot_box.reset_size.call_deferred()
-
-
-## Faz o pote rolar até o valor atual (pop dourado).
-func _pot_to(total: float) -> void:
-	var from := shown_pot
-	shown_pot = total
-	pot_locked = true
-	FX.count(pot_label, from, total, func(v: float): return "POTE ◎ %d" % int(v), 0.5)
-	FX.pop(pot_box, 1.18)
-	get_tree().create_timer(GameState.anim(0.55)).timeout.connect(func():
-		pot_locked = false
-		if is_inside_tree():
-			_refresh_pot())
-
-
-func _global_center(c: Control) -> Vector2:
-	return c.global_position + c.size / 2.0
-
-
-func _seat_center(p: int) -> Vector2:
-	return _global_center(seat_avatars[p] as Control)
-
-
-func _chips_for(amount: float) -> int:
-	return clampi(int(ceil(amount / float(engine.blind))), 1, 7)
-
-
-func _update_turn_highlight(turn_player: int) -> void:
-	turn_pulse_token += 1
-	var my_token := turn_pulse_token
-	for p in range(1, seat_avatars.size()):
-		var avatar: PanelContainer = seat_avatars[p]
-		var active := p == turn_player
-		var accent := UIKit.GOLD if active else UIKit.MUTED
-		var ring := UIKit.box(UIKit.PURPLE_DEEP, accent, 5 if active else 3, 60, 0)
-		ring.set_corner_radius_all(40)
-		avatar.add_theme_stylebox_override("panel", ring)
-		if not active:
-			avatar.scale = Vector2.ONE
-	if turn_player > 0:
-		_pulse_avatar(seat_avatars[turn_player], my_token)
-
-
 # ------------------------------------------------------------------ loop de rodadas
 
 func _run_round() -> void:
@@ -1270,87 +1133,6 @@ func _ensure_solvent() -> bool:
 
 # ------------------------------------------------------------------ apostas
 
-func _betting_phase() -> void:
-	human_turn = false
-	_banner("APOSTAS", "Blind ◎%d de cada um. Passe, aumente, pague ou desista." % engine.blind, UIKit.GOLD)
-	if not GameState.autoplay:
-		for p in range(engine.num_players):
-			FX.fly_chips(popup_layer, _seat_center(p), _global_center(pot_box), 1)
-		Sfx.play("chip")
-	_pot_to(engine.pot)
-	await _wait(0.6)
-	var guard := 0
-	while engine.betting and guard < 40:
-		guard += 1
-		if not is_inside_tree() or finished:
-			return
-		var p := engine.bet_actor()
-		_refresh_hud()
-		var act: Dictionary
-		if p == 0 and not GameState.autoplay:
-			await _tip("bet", "SUA VEZ DE APOSTAR", "Todo mundo já pagou o blind. Você pode PASSAR, AUMENTAR, PAGAR ou DESISTIR. Só quem fica na rodada joga carta, e quem vence leva o pote. Quem desiste descarta a carta mais fraca, virada.")
-			act = await _human_bet()
-			if not is_inside_tree() or finished:
-				return
-		else:
-			await _wait(bot_rng.randf_range(0.6, 1.1))
-			act = ChaosBot.bet_decision(engine, p, int(config["difficulty"][p]), bot_rng)
-		var r := engine.bet_act(p, str(act["action"]), float(act.get("to", 0.0)))
-		if not r.get("ok", false):
-			push_warning("Aposta rejeitada: %s" % r.get("error"))
-			r = engine.bet_act(p, "check")
-			if not r.get("ok", false):
-				r = engine.bet_act(p, "fold")
-		await _show_bet_action(p, r)
-	_banner_clear()
-	_refresh_hud()
-
-
-## Mostra o que cada um fez (passou, pagou, aumentou, desistiu) e move as fichas pro pote.
-func _show_bet_action(p: int, r: Dictionary) -> void:
-	var pname := str(config["names"][p]).to_upper()
-	var amount := float(r.get("amount", 0.0))
-	var title := ""
-	var sub := ""
-	var col := UIKit.MUTED
-	match str(r.get("action", "")):
-		"check":
-			action_text[p] = "PASSOU"
-			title = "%s PASSOU" % pname
-			sub = "Fica na rodada sem aumentar."
-		"call":
-			action_text[p] = "PAGOU"
-			title = "%s PAGOU" % pname
-			sub = "Pagou ◎ %d pra igualar em ◎ %d." % [int(amount), int(engine.bet_level)]
-			col = UIKit.OK
-		"raise":
-			action_text[p] = "AUMENTOU ◎%d" % int(r["to"])
-			title = "%s AUMENTOU!" % pname
-			sub = "Aposta agora em ◎ %d. Quem não pagar, desiste." % int(r["to"])
-			col = UIKit.GOLD
-		"fold":
-			action_text[p] = "DESISTIU"
-			title = "%s DESISTIU" % pname
-			sub = "Fora da rodada: perde o que pôs e descarta a carta mais fraca."
-			if p == 0 and not engine.last_discard.is_empty():
-				sub = "Você perdeu o que pôs e descartou %s, sua carta mais fraca." % (engine.last_discard["card"] as CardData).display_name()
-				_rebuild_hand()
-			col = UIKit.DANGER
-	action_color[p] = col
-	_banner(title, sub, col if col != UIKit.MUTED else UIKit.INK)
-	if amount > 0.0:
-		FX.fly_chips(popup_layer, _seat_center(p), _global_center(pot_box), _chips_for(amount))
-		Sfx.play("combo" if str(r["action"]) == "raise" else "chip")
-		_pot_to(engine.pot)
-		if str(r["action"]) == "raise":
-			FX.shake(main_area, 0.35)
-			FX.burst(popup_layer, _seat_center(p) - popup_layer.global_position, UIKit.GOLD, 14)
-	elif str(r.get("action", "")) == "fold":
-		Sfx.play("lose")
-	_refresh_hud()
-	await _wait(0.75 if p != 0 else 0.45)
-
-
 func _hand_label() -> String:
 	var s := ChaosBot.hand_strength(engine, 0)
 	if s >= 0.75:
@@ -1371,7 +1153,7 @@ func _human_bet() -> Dictionary:
 	var holder := MarginContainer.new()
 	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	holder.add_theme_constant_override("margin_top", 96 if not _is_wide() else 16)
+	holder.add_theme_constant_override("margin_top", int(seat_row.global_position.y + seat_row.size.y + 6.0))
 	overlay_layer.add_child(holder)
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.GOLD, 20)
 	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -1491,40 +1273,6 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 
 
 # ------------------------------------------------------------------ pote
-
-## Fichas do pote voam pro vencedor; o pote zera.
-func _collect_pot(winner: int, total: float, gain: float) -> void:
-	var seat_at := _seat_center(winner)
-	FX.fly_chips(popup_layer, _global_center(pot_box), seat_at, _chips_for(total), UIKit.OK if winner == 0 else UIKit.GOLD)
-	Sfx.play("win" if winner == 0 else "chip")
-	await _wait(0.55)
-	if not is_inside_tree():
-		return
-	FX.float_text(popup_layer, seat_at, "%s◎ %d" % ["+" if gain >= 0.0 else "−", absi(int(gain))], UIKit.OK if gain >= 0.0 else UIKit.DANGER)
-	FX.burst(popup_layer, seat_at - popup_layer.global_position, UIKit.OK if winner == 0 else UIKit.GOLD, 16)
-	if winner == 0:
-		FX.shake(main_area, clampf(total / (float(engine.blind) * 20.0), 0.3, 0.9))
-		if total >= float(engine.blind) * 12.0:
-			Sfx.play("jackpot")
-			FX.chip_rain(popup_layer, 22)
-	_pot_to(0.0)
-	_refresh_hud()
-	await _wait(0.5)
-
-
-## Todo mundo desistiu: o último leva o pote sem jogar carta (o blefe funcionou).
-func _resolve_walkover(result: Dictionary) -> void:
-	var winner: int = result["winner"]
-	var wname := str(config["names"][winner]).to_upper()
-	_banner("%s LEVOU SEM JOGAR!" % wname, "Todo mundo desistiu. O pote é dele e ninguém viu as cartas.", UIKit.GOLD if winner == 0 else UIKit.INK)
-	if winner == 0:
-		_rebuild_hand()
-	if winner == 0 and float(result.get("gain", 0.0)) > best_gain:
-		best_gain = float(result["gain"])
-	await _collect_pot(winner, float(result["pot"]), float(result.get("gain", 0.0)))
-	_banner_clear()
-	_refresh_hud()
-
 
 # ------------------------------------------------------------------ rodada resolvida
 
@@ -1734,3 +1482,325 @@ func _show_results(summary: Dictionary) -> void:
 	box.pivot_offset = box.custom_minimum_size / 2.0
 	create_tween().tween_property(box, "scale", Vector2.ONE, GameState.anim(0.25)).set_trans(Tween.TRANS_BACK)
 	btn.grab_focus.call_deferred()
+
+
+# ------------------------------------------------------------------ HUD: ordem, vez e apostas na frente
+
+func _current_turn_player() -> int:
+	if phase == "bet":
+		return engine.bet_actor()
+	if phase == "play" and not engine.is_round_over() and engine.active_count() > 1:
+		return engine.current
+	return -1
+
+
+## Quem ainda vai falar (aposta) ou jogar carta (cartas), em ordem: o 1º é quem age agora.
+func _order_now() -> Array:
+	if phase == "bet":
+		return engine.to_act.duplicate()
+	if phase == "play" and engine.plays.size() < engine.active_count():
+		var out: Array = []
+		var remaining := engine.active_count() - engine.plays.size()
+		for i in range(engine.num_players):
+			var q := (engine.current + i) % engine.num_players
+			if not engine.folded[q] and out.size() < remaining:
+				out.append(q)
+		return out
+	return []
+
+
+func _fmt_chips(v: float) -> String:
+	return "◎ %d" % int(v)
+
+
+func _pot_text(v: float) -> String:
+	return ("POTE ◎ %d" if bets_gathered else "EM JOGO ◎ %d") % int(v)
+
+
+func _refresh_hud() -> void:
+	var turn_player := _current_turn_player()
+	var order := _order_now()
+	for p in range(engine.num_players):
+		var total_lbl := hud_totals[p] as Label
+		var new_total: float = engine.stacks[p]
+		while shown_totals.size() <= p:
+			shown_totals.append(new_total)
+		if is_equal_approx(new_total, float(shown_totals[p])):
+			total_lbl.text = _fmt_chips(new_total)
+		else:
+			FX.count(total_lbl, float(shown_totals[p]), new_total, _fmt_chips)
+			FX.pop(total_lbl, 1.3)
+			shown_totals[p] = new_total
+		var out: bool = phase != "idle" and engine.folded[p]
+		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 0.45 if out else 1.0)
+		(hud_titles[p] as Label).text = "VOCÊ" if p == 0 else str(config["names"][p]).to_upper()
+		(hud_titles[p] as Label).add_theme_color_override("font_color", UIKit.GOLD if p == turn_player else UIKit.INK)
+		(dealer_badges[p] as Control).visible = engine.hand_no > 0 and engine.button == p
+		# Ordem: 1 = age agora, 2 = próximo...
+		var idx := order.find(p)
+		var ob := order_badges[p] as PanelContainer
+		ob.visible = idx >= 0
+		if idx >= 0:
+			(ob.get_child(0) as Label).text = str(idx + 1)
+			var sb := UIKit.box(UIKit.GOLD if idx == 0 else UIKit.PURPLE_DEEP, UIKit.GOLD if idx == 0 else UIKit.MUTED, 3, 15, 0)
+			sb.set_corner_radius_all(15)
+			ob.add_theme_stylebox_override("panel", sb)
+			(ob.get_child(0) as Label).add_theme_color_override("font_color", UIKit.BLACK if idx == 0 else UIKit.INK)
+		_refresh_bet_tags(p, idx)
+	info_label.text = "NÍVEL %d%s · BLIND ◎%d" % [engine.round_index + 1, ("/%d" % engine.levels) if engine.levels > 0 else "", engine.blind]
+	Widgets.progress_dots(trick_dots, ChaosEngine.HAND_SIZE, engine.trick_number)
+	var rest := _rest_banner()
+	modifier_label.text = "%s — %s" % [rest[0], rest[1]] if modifier_expanded else str(rest[0])
+	_refresh_pot()
+	_update_turn_highlight(turn_player)
+
+
+func _reset_actions() -> void:
+	for p in range(engine.num_players):
+		action_text[p] = ""
+		action_color[p] = UIKit.MUTED
+
+
+## Fichas na frente do jogador (até juntar no pote) e a linha de situação: É A VEZ / PRÓXIMO /
+## última ação / chamas da sequência.
+func _refresh_bet_tags(p: int, idx: int) -> void:
+	var streak: int = engine.streak[p] if p < engine.streak.size() else 0
+	var flames := ""
+	if streak >= 2:
+		flames = "%s×%s" % ["♨".repeat(ChaosCombos.flame_level(streak)), UIKit.fmt_dec(ChaosCombos.streak_mult(streak), 2)]
+	var pile := float(engine.contrib[p]) if not bets_gathered and phase != "idle" else 0.0
+	var pill := bet_pills[p] as PanelContainer
+	(bet_tags[p] as Label).text = "◎ %d" % int(pile)
+	(bet_tags[p] as Label).add_theme_color_override("font_color", UIKit.DANGER if engine.folded[p] else UIKit.GOLD)
+	pill.modulate.a = 1.0 if pile > 0.0 else 0.0
+	var status := ""
+	var col := UIKit.MUTED
+	if idx == 0:
+		status = "É A VEZ" if p != 0 else "SUA VEZ"
+		col = UIKit.GOLD
+	elif idx == 1:
+		status = "PRÓXIMO"
+		col = UIKit.INK
+	elif phase != "idle" and engine.folded[p]:
+		status = "DESISTIU"
+		col = UIKit.DANGER
+	elif str(action_text[p]) != "":
+		status = str(action_text[p])
+		col = action_color[p]
+	elif phase == "play" and engine.plays.any(func(pl): return int(pl["player"]) == p):
+		status = "JOGOU"
+	if flames != "":
+		status = (status + " " + flames).strip_edges()
+	var st := prog_tags[p] as Label
+	st.text = status
+	st.add_theme_color_override("font_color", col if flames == "" or status != flames else FLAME)
+
+
+func _refresh_pot() -> void:
+	if not pot_locked:
+		shown_pot = engine.pot if phase != "idle" or bets_gathered else 0.0
+		pot_label.text = _pot_text(shown_pot)
+	var sub := ""
+	if phase == "bet" and engine.bet_level > float(engine.blind):
+		sub = "aposta em ◎ %d" % int(engine.bet_level)
+	elif phase == "bet":
+		sub = "blind ◎ %d de cada" % engine.blind
+	pot_sub.text = sub
+	pot_sub.visible = sub != ""
+	pot_box.reset_size.call_deferred()
+	_layout_table.call_deferred()
+
+
+## Faz o pote rolar até o valor atual (pop dourado).
+func _pot_to(total: float) -> void:
+	var from := shown_pot
+	shown_pot = total
+	pot_locked = true
+	FX.count(pot_label, from, total, _pot_text, 0.5)
+	FX.pop(pot_box, 1.18)
+	get_tree().create_timer(GameState.anim(0.55)).timeout.connect(func():
+		pot_locked = false
+		if is_inside_tree():
+			_refresh_pot())
+
+
+func _global_center(c: Control) -> Vector2:
+	return c.global_position + c.size / 2.0
+
+
+func _seat_center(p: int) -> Vector2:
+	return _global_center(seat_avatars[p] as Control)
+
+
+func _pill_center(p: int) -> Vector2:
+	return _global_center(bet_pills[p] as Control)
+
+
+func _chips_for(amount: float) -> int:
+	return clampi(int(ceil(amount / float(engine.blind))), 1, 7)
+
+
+func _update_turn_highlight(turn_player: int) -> void:
+	turn_pulse_token += 1
+	var my_token := turn_pulse_token
+	for p in range(seat_avatars.size()):
+		var avatar: PanelContainer = seat_avatars[p]
+		var active := p == turn_player
+		var accent := UIKit.GOLD if active else UIKit.MUTED
+		var ring := UIKit.box(UIKit.PURPLE_DEEP, accent, 6 if active else 3, 60, 0)
+		ring.set_corner_radius_all(42)
+		avatar.add_theme_stylebox_override("panel", ring)
+		if not active:
+			avatar.scale = Vector2.ONE
+	if turn_player >= 0:
+		_pulse_avatar(seat_avatars[turn_player], my_token)
+
+
+# ------------------------------------------------------------------ apostas
+
+func _betting_phase() -> void:
+	human_turn = false
+	phase = "bet"
+	bets_gathered = false
+	pot_locked = false
+	shown_pot = 0.0
+	var first := engine.bet_actor()
+	_banner("APOSTAS", "Todos pagaram o blind (◎%d). Fala primeiro: %s. A ordem está nos números acima dos avatares." % [engine.blind, str(config["names"][first]).to_upper()], UIKit.GOLD)
+	_refresh_hud()
+	if not GameState.autoplay:
+		Sfx.play("chip")
+		for p in range(engine.num_players):
+			FX.fly_chips(popup_layer, _seat_center(p), _pill_center(p), 1)
+			FX.pop(bet_pills[p], 1.2)
+	await _wait(0.7)
+	var guard := 0
+	while engine.betting and guard < 40:
+		guard += 1
+		if not is_inside_tree() or finished:
+			return
+		var p := engine.bet_actor()
+		_refresh_hud()
+		var act: Dictionary
+		if p == 0 and not GameState.autoplay:
+			await _tip("bet", "SUA VEZ DE APOSTAR", "Todo mundo já pagou o blind. Você pode PASSAR, AUMENTAR, PAGAR ou DESISTIR. Só quem fica na rodada joga carta, e quem vence leva o pote. Quem desiste descarta a carta mais fraca, virada.")
+			act = await _human_bet()
+			if not is_inside_tree() or finished:
+				return
+		else:
+			await _wait(bot_rng.randf_range(0.6, 1.1))
+			act = ChaosBot.bet_decision(engine, p, int(config["difficulty"][p]), bot_rng)
+		var r := engine.bet_act(p, str(act["action"]), float(act.get("to", 0.0)))
+		if not r.get("ok", false):
+			push_warning("Aposta rejeitada: %s" % r.get("error"))
+			r = engine.bet_act(p, "check")
+			if not r.get("ok", false):
+				r = engine.bet_act(p, "fold")
+		await _show_bet_action(p, r)
+	if not is_inside_tree() or finished:
+		return
+	await _gather_bets()
+	_banner_clear()
+	_refresh_hud()
+
+
+## Mostra o que cada um fez; as fichas ficam na frente do jogador até fechar a rodada de apostas.
+func _show_bet_action(p: int, r: Dictionary) -> void:
+	var pname := str(config["names"][p]).to_upper()
+	var amount := float(r.get("amount", 0.0))
+	var title := ""
+	var sub := ""
+	var col := UIKit.MUTED
+	match str(r.get("action", "")):
+		"check":
+			action_text[p] = "PASSOU"
+			title = "%s PASSOU" % pname
+			sub = "Fica na rodada sem aumentar."
+		"call":
+			action_text[p] = "PAGOU"
+			title = "%s PAGOU" % pname
+			sub = "Pagou ◎ %d pra igualar em ◎ %d." % [int(amount), int(engine.bet_level)]
+			col = UIKit.OK
+		"raise":
+			action_text[p] = "AUMENTOU"
+			title = "%s AUMENTOU!" % pname
+			sub = "Aposta agora em ◎ %d. Quem não pagar, desiste." % int(r["to"])
+			col = UIKit.GOLD
+		"fold":
+			action_text[p] = "DESISTIU"
+			title = "%s DESISTIU" % pname
+			sub = "Fora da rodada: perde o que pôs e descarta a carta mais fraca."
+			if p == 0 and not engine.last_discard.is_empty():
+				sub = "Você perdeu o que pôs e descartou %s, sua carta mais fraca." % (engine.last_discard["card"] as CardData).display_name()
+				_rebuild_hand()
+			col = UIKit.DANGER
+	action_color[p] = col
+	_banner(title, sub, col if col != UIKit.MUTED else UIKit.INK)
+	_refresh_hud()
+	if amount > 0.0:
+		FX.fly_chips(popup_layer, _seat_center(p), _pill_center(p), _chips_for(amount))
+		Sfx.play("combo" if str(r["action"]) == "raise" else "chip")
+		FX.pop(bet_pills[p], 1.3)
+		_pot_to(engine.pot)
+		if str(r["action"]) == "raise":
+			FX.shake(main_area, 0.35)
+			FX.burst(popup_layer, _seat_center(p) - popup_layer.global_position, UIKit.GOLD, 14)
+	elif str(r.get("action", "")) == "fold":
+		Sfx.play("lose")
+	await _wait(0.75 if p != 0 else 0.45)
+
+
+## Fim das apostas: as fichas da frente de cada jogador voam juntas pro pote.
+func _gather_bets() -> void:
+	var any := false
+	if not GameState.autoplay:
+		for p in range(engine.num_players):
+			if engine.contrib[p] > 0.0:
+				any = true
+				FX.fly_chips(popup_layer, _pill_center(p), _global_center(pot_box), _chips_for(float(engine.contrib[p])), UIKit.DANGER if engine.folded[p] else UIKit.GOLD)
+		if any:
+			_banner("APOSTAS FECHADAS", "Todas as fichas vão pro pote.", UIKit.GOLD)
+			Sfx.play("combo")
+	await _wait(0.6)
+	bets_gathered = true
+	phase = "play"
+	shown_pot = 0.0
+	_pot_to(engine.pot)
+	_refresh_hud()
+	await _wait(0.5)
+
+
+# ------------------------------------------------------------------ pote
+
+## Fichas do pote voam pro vencedor; o pote zera.
+func _collect_pot(winner: int, total: float, gain: float) -> void:
+	var seat_at := _seat_center(winner)
+	FX.fly_chips(popup_layer, _global_center(pot_box), seat_at, _chips_for(total), UIKit.OK if winner == 0 else UIKit.GOLD)
+	Sfx.play("win" if winner == 0 else "chip")
+	await _wait(0.55)
+	if not is_inside_tree():
+		return
+	FX.float_text(popup_layer, seat_at, "%s◎ %d" % ["+" if gain >= 0.0 else "−", absi(int(gain))], UIKit.OK if gain >= 0.0 else UIKit.DANGER)
+	FX.burst(popup_layer, seat_at - popup_layer.global_position, UIKit.OK if winner == 0 else UIKit.GOLD, 16)
+	if winner == 0:
+		FX.shake(main_area, clampf(total / (float(engine.blind) * 20.0), 0.3, 0.9))
+		if total >= float(engine.blind) * 12.0:
+			Sfx.play("jackpot")
+			FX.chip_rain(popup_layer, 22)
+	_pot_to(0.0)
+	phase = "idle"
+	_refresh_hud()
+	await _wait(0.5)
+
+
+## Todo mundo desistiu: o último leva o pote sem jogar carta (o blefe funcionou).
+func _resolve_walkover(result: Dictionary) -> void:
+	var winner: int = result["winner"]
+	var wname := str(config["names"][winner]).to_upper()
+	_banner("%s LEVOU SEM JOGAR!" % wname, "Todo mundo desistiu. O pote é dele e ninguém viu as cartas.", UIKit.GOLD if winner == 0 else UIKit.INK)
+	if winner == 0:
+		_rebuild_hand()
+	if winner == 0 and float(result.get("gain", 0.0)) > best_gain:
+		best_gain = float(result["gain"])
+	await _collect_pot(winner, float(result["pot"]), float(result.get("gain", 0.0)))
+	_banner_clear()
+	_refresh_hud()
