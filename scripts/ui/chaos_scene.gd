@@ -1225,7 +1225,10 @@ func _resolve_trick(result: Dictionary) -> void:
 			notes.append("última é tudo ×3")
 	var sub := "Pote ◎%d" % int(pot_amt)
 	if absf(prize) >= 1.0:
-		sub += "  ·  prêmio das cartas %s◎%d" % ["+" if prize >= 0.0 else "−", absi(int(prize))]
+		sub += "  ·  bônus dos rivais %s◎%d" % ["+" if prize >= 0.0 else "−", absi(int(prize))]
+	var rake := float(result.get("rake", 0.0))
+	if rake >= 1.0:
+		sub += "  ·  taxa da casa ◎%d" % int(rake)
 	if float(result.get("mult", 1.0)) > 1.0:
 		sub += "  (×%s)" % UIKit.fmt_dec(float(result["mult"]), 2)
 	if not notes.is_empty():
@@ -1250,7 +1253,7 @@ func _resolve_trick(result: Dictionary) -> void:
 	if float(result.get("assalto_amount", 0.0)) > 0.0:
 		extras.append(["⚔ ASSALTO!", "%s roubou ◎%d de quem tinha mais fichas" % [wname, int(result["assalto_amount"])], UIKit.LOSS])
 	if int(result.get("modifier", -1)) == ChaosModifiers.Modifier.VAZA_MALDITA:
-		extras.append(["☠ RODADA MALDITA!", "%s paga à banca por vencer essa rodada" % wname, UIKit.LOSS])
+		extras.append(["☠ RODADA MALDITA!", "%s paga aos rivais por vencer essa rodada" % wname, UIKit.LOSS])
 	for e in extras:
 		_banner(e[0], e[1], e[2])
 		Sfx.play("combo")
@@ -1262,7 +1265,7 @@ func _resolve_trick(result: Dictionary) -> void:
 			return
 
 	# O pote (com o prêmio) voa pro vencedor.
-	await _collect_pot(winner, pot_amt + maxf(prize, 0.0) + float(result.get("saque_amount", 0.0)) + float(result.get("assalto_amount", 0.0)), gain)
+	await _collect_pot(winner, pot_amt - rake + maxf(prize, 0.0) + float(result.get("saque_amount", 0.0)) + float(result.get("assalto_amount", 0.0)), gain)
 	if not is_inside_tree():
 		return
 	var target := _slot_pos(winner) + (_slot_pos(winner) - table_center.size / 2.0 + CardView.SIZE / 2.0) * 0.8
@@ -1383,6 +1386,8 @@ func _show_results(summary: Dictionary) -> void:
 	v.add_child(stat_l)
 	if best_gain > 0.0:
 		v.add_child(UIKit.label("★ Maior pote seu: +◎%d" % int(best_gain), 30, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	if engine.human_rake >= 1.0:
+		v.add_child(UIKit.label("Taxa da casa nos seus potes: ◎%d" % int(engine.human_rake), 24, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	for line in summary["lines"]:
 		var ll := UIKit.label(str(line), 30, UIKit.OK if net >= 0 else UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER)
 		ll.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

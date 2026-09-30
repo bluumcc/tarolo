@@ -142,9 +142,9 @@ func player_name() -> String:
 
 ## Mesas do Caos: blind, com buy-in de 20 blinds (a stack com que você senta).
 const CHAOS_TABLES := [
-	{"name": "Iniciante", "blind": 10},
-	{"name": "Regular", "blind": 25},
-	{"name": "Alta", "blind": 100},
+	{"name": "Iniciante", "blind": 5, "bots": [0, 0, 1]},    # Fácil, Fácil, Normal
+	{"name": "Regular", "blind": 25, "bots": [1, 1, 2]},     # Normal, Normal, Difícil
+	{"name": "Alta", "blind": 100, "bots": [2, 2, 2]},       # Difícil x3
 ]
 var chaos_table := 0
 
@@ -171,7 +171,7 @@ func chaos_config() -> Dictionary:
 	return {
 		"players": 4,
 		"names": [player_name(), names[0], names[1], names[2]],
-		"difficulty": [BotAI.Difficulty.NORMAL, BotAI.Difficulty.NORMAL, BotAI.Difficulty.HARD, BotAI.Difficulty.NORMAL],
+		"difficulty": [BotAI.Difficulty.NORMAL, int(t["bots"][0]), int(t["bots"][1]), int(t["bots"][2])],
 		"blind": blind,
 		"buy_in": buy_in,
 		"table_name": str(t["name"]),

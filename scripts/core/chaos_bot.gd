@@ -161,12 +161,12 @@ static func bet_decision(engine: ChaosEngine, player: int, difficulty: int, rng:
 		var blind := float(engine.blind)
 		var steps := 1
 		if pwin >= 0.75 or bluffing:
-			steps = rng.randi_range(2, 4)
+			steps = rng.randi_range(2, 3)
 		elif pwin >= 0.5:
 			steps = rng.randi_range(1, 2)
 		var to := float(engine.bet_level) + blind * float(steps)
 		to = clampf(to, float(opt["min_to"]), float(opt["max_to"]))
-		if pwin >= 0.9 and rng.randf() < 0.25:
+		if pwin >= 0.92 and rng.randf() < 0.1:
 			to = float(opt["max_to"])
 		# Sem stack pra sustentar o blefe: não vai.
 		if bluffing and to > float(engine.stacks[player]) * 0.5 + float(engine.contrib[player]):

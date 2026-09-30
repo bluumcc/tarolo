@@ -3,7 +3,7 @@
 Vocabulário: **Partida → Nível → Rodada → Vez**. Um nível são 8 rodadas (8 cartas por jogador) com um modificador sorteado.
 
 ## Mesa (padrão, sem fim)
-- Mesas por blind: Iniciante ◎10, Regular ◎25, Alta ◎100. Entrada = 20 blinds (a stack); o resto da carteira fica protegido.
+- Mesas por blind: Iniciante ◎5, Regular ◎25, Alta ◎100 (bots mais fortes conforme o blind). Entrada = 40 blinds (a stack); o resto da carteira fica protegido.
 - Sem última rodada: a cada nível as cartas são redistribuídas e outro modificador é sorteado.
 - Sair da mesa devolve a stack à carteira. Ficou sem fichas pro blind: recompra ou sai. Bot quebrado é trocado por outro.
 - O placar é a stack de fichas. Não há pontos de partida.
@@ -19,8 +19,8 @@ Vocabulário: **Partida → Nível → Rodada → Vez**. Um nível são 8 rodada
 ## Regras de carta
 Como no Vanilla (seguir naipe, cortar com Trunfo), mas **sem obrigação de cobrir**: qualquer Trunfo é válido, mesmo mais fraco que o da mesa.
 
-## Prêmio da banca
-Os pontos das cartas da rodada (com modificadores, sequência e combos) viram fichas pagas pela banca ao vencedor: 1 ponto = ¼ do blind. Saque e Assalto ao Líder tiram fichas dos rivais; Rodada Maldita faz o vencedor pagar à banca.
+## Bônus dos rivais e taxa da casa
+Os pontos das cartas da rodada (com modificadores, sequência e combos) viram fichas **pagas pelos rivais** ao vencedor: 1 ponto = ¼ do blind. A casa cobra 3% do pote (teto 1,5 blinds) quando as cartas são jogadas. Economia completa em `docs/ECONOMIA.md`. Saque e Assalto ao Líder tiram fichas dos rivais; Rodada Maldita faz o vencedor pagar aos rivais.
 
 ## Combos
 Sequência de vitórias (×1,25 / ×1,5 / ×2), Cortado, Corte de Rei, Chuva de Trunfos, Realeza e Escada, todos lidos na mesa.

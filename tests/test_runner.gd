@@ -20,6 +20,7 @@ func _init() -> void:
 	_test_bonuses()
 	_test_chaos()
 	_test_colors()
+	_test_economy()
 	_test_bot_strategy()
 	print("\n%d ok, %d falhas" % [passed, failures])
 	quit(1 if failures > 0 else 0)
@@ -266,7 +267,7 @@ func _test_chaos() -> void:
 	var e := ChaosEngine.new()
 	e.setup_match({"seed": 11})
 	check((e.hands[0] as Array).size() == ChaosEngine.HAND_SIZE, "Caos: 8 cartas por jogador")
-	check(e.blind == 10 and int(e.stacks[0]) == 200, "mesa padrão: blind 10 e stack de 20 blinds")
+	check(e.blind == 10 and int(e.stacks[0]) == 400, "mesa padrão: blind 10 e stack de 40 blinds")
 
 	e.modifier = ChaosModifiers.Modifier.TRUNFO_DOBRO
 	check(e.card_value(c(4, 5)) == 1.0, "Trunfo em Dobro: 0,5 vira 1,0")
@@ -308,10 +309,10 @@ func _test_chaos() -> void:
 	var p1 := ChaosEngine.new()
 	p1.setup_match({"seed": 3})
 	p1.begin_trick()
-	check(is_equal_approx(p1.pot, 40.0) and is_equal_approx(p1.stacks[0], 190.0), "blind de todos vai pro pote")
+	check(is_equal_approx(p1.pot, 40.0) and is_equal_approx(p1.stacks[0], 390.0), "blind de todos vai pro pote")
 	check(p1.button == 1 and p1.bet_actor() == 2, "o botão gira e fala primeiro quem vem depois dele")
 	var o0 := p1.bet_options(2)
-	check(bool(o0["can_check"]) and is_equal_approx(float(o0["min_to"]), 20.0) and is_equal_approx(float(o0["max_to"]), 200.0), "primeiro a falar pode passar; aumento mínimo = 1 blind; máximo = menor stack")
+	check(bool(o0["can_check"]) and is_equal_approx(float(o0["min_to"]), 20.0) and is_equal_approx(float(o0["max_to"]), 400.0), "primeiro a falar pode passar; aumento mínimo = 1 blind; máximo = menor stack")
 	var r1 := p1.bet_act(2, "raise", 30.0)
 	check(r1["ok"] and is_equal_approx(p1.pot, 60.0) and p1.to_act.size() == 3, "aumentar põe fichas e todo mundo precisa responder")
 	check(not p1.bet_act(3, "raise", 10.0)["ok"] == false, "aumento abaixo do mínimo é corrigido pro mínimo")
@@ -324,7 +325,7 @@ func _test_chaos() -> void:
 	p1.bet_act(1, "call")
 	p1.bet_act(2, "call")
 	check(not p1.betting and p1.active_count() == 3, "rodada de apostas fecha quando todo mundo igualou ou desistiu")
-	check(is_equal_approx(p1.stacks[2], 160.0) and is_equal_approx(p1.pot, 130.0), "quem pagou põe o mesmo valor (40 cada; 10 do que desistiu)")
+	check(is_equal_approx(p1.stacks[2], 360.0) and is_equal_approx(p1.pot, 130.0), "quem pagou põe o mesmo valor (40 cada; 10 do que desistiu)")
 	check(p1.current != 0, "quem desistiu não joga carta")
 	var played := 0
 	while played < 3:
@@ -347,7 +348,7 @@ func _test_chaos() -> void:
 	p2.bet_act(1, "fold")
 	check(p2.walkover_player() == 2, "sobrou um: ele leva o pote")
 	var wo := p2.resolve_walkover()
-	check(bool(wo["walkover"]) and is_equal_approx(p2.stacks[2], 200.0 - 20.0 + 50.0), "blefe vence: leva o pote sem jogar carta")
+	check(bool(wo["walkover"]) and is_equal_approx(p2.stacks[2], 400.0 - 20.0 + 50.0), "blefe vence: leva o pote sem jogar carta")
 	check(p2.hands[2].size() == 7 and p2.hands[3].size() == 7, "no blefe vencido o vencedor também descarta, mãos iguais")
 	check(p2.trick_number == 1 and p2.session_stats[2]["bluffs"] == 1, "rodada conta e o blefe é registrado")
 	# All-in limitado pela menor stack.
@@ -357,7 +358,7 @@ func _test_chaos() -> void:
 	check(is_equal_approx(p3.bet_cap(), 60.0), "aumento máximo é a menor stack em jogo (sem potes paralelos)")
 	# Bot sem fichas pro blind é trocado.
 	p3.stacks[3] = 4.0
-	check(p3.refill_bots() == [3] and is_equal_approx(p3.stacks[3], 200.0), "bot quebrado sai e um novo senta com o buy-in")
+	check(p3.refill_bots() == [3] and p3.stacks[3] >= 300.0 and p3.stacks[3] <= 600.0, "bot quebrado sai e um novo senta com 30 a 60 blinds")
 	# Prêmio da banca e mesa sem fim.
 	check(is_equal_approx(p3.chips_of(4.0), 10.0), "1 ponto de carta = 1/4 do blind (4 pts = ◎10)")
 	var p4 := ChaosEngine.new()
@@ -371,7 +372,7 @@ func _test_chaos() -> void:
 		if p4.is_round_over():
 			p4.advance_round()
 		p4.refill_bots()
-		p4.stacks[0] = maxf(p4.stacks[0], 200.0)
+		p4.stacks[0] = maxf(p4.stacks[0], 400.0)
 		p4.begin_trick()
 		while p4.betting:
 			var actor := p4.bet_actor()
@@ -661,3 +662,53 @@ func _test_colors() -> void:
 	check(UIKit.text_on(UIKit.GOLD) == UIKit.TEXT_ON_LIGHT and UIKit.text_on(UIKit.OK) == UIKit.TEXT_ON_LIGHT, "botões dourado e verde usam texto escuro")
 	check(UIKit.text_on(UIKit.PURPLE_DEEP) == UIKit.INK and UIKit.text_on(UIKit.VIOLET) == UIKit.INK, "botões escuros usam texto claro")
 	check(UIKit.contrast(UIKit.TEXT_ON_LIGHT, UIKit.GOLD) >= 4.5, "texto escuro legível sobre dourado")
+
+
+## Economia de fichas: pacotes, recarga diária, taxa da casa e conservação de fichas.
+func _test_economy() -> void:
+	var prev := 0.0
+	for pk in ChaosEconomy.PACKS:
+		var rate := ChaosEconomy.fichas_per_real(pk)
+		check(rate >= prev, "pacote %s não dá menos fichas por real que o menor (%.0f/R$)" % [pk["name"], rate])
+		prev = rate
+	check(ChaosEconomy.bonus_pct(ChaosEconomy.PACKS[0]) == 0 and ChaosEconomy.bonus_pct(ChaosEconomy.PACKS[5]) >= 40, "bônus cresce com o tamanho do pacote")
+	check(ChaosEconomy.START_FICHAS >= ChaosEconomy.DAILY_MIN * 5, "saldo inicial paga 5 entradas mínimas")
+	var prof := {"fichas": 100}
+	check(ChaosEconomy.daily_available(prof), "recarga liberada abaixo do mínimo")
+	check(ChaosEconomy.claim_daily(prof) == ChaosEconomy.DAILY_AMOUNT and int(prof["fichas"]) == 100 + ChaosEconomy.DAILY_AMOUNT, "coletar credita a recarga")
+	prof["fichas"] = 50
+	check(not ChaosEconomy.daily_available(prof) and ChaosEconomy.claim_daily(prof) == 0, "só uma recarga por dia")
+	prof = {"fichas": 900}
+	check(not ChaosEconomy.daily_available(prof), "sem recarga com saldo acima do mínimo")
+	prof = {"fichas": 10}
+	check(ChaosEconomy.buy_simulated(prof, "cofre") == 2400 and int(prof["fichas"]) == 2410 and int(prof["spent_cents"]) == 1990, "compra simulada credita fichas e registra o gasto")
+	check(ChaosEconomy.buy_simulated(prof, "nada") == 0, "pacote inexistente não credita")
+	check(is_equal_approx(ChaosEconomy.rake_of(100.0, 10), 3.0) and is_equal_approx(ChaosEconomy.rake_of(2000.0, 10), 15.0), "taxa é 3% do pote com teto de 1,5 blinds")
+	check(ChaosEconomy.price_text(1990) == "R$ 19,90", "preço em reais")
+	# Conservação: sem trocas de bot, fichas na mesa + taxa da casa não mudam.
+	var ec := ChaosEngine.new()
+	ec.setup_match({"seed": 31, "levels": 0})
+	var total0 := 0.0
+	for st in ec.stacks:
+		total0 += float(st)
+	var rr := RandomNumberGenerator.new()
+	rr.seed = 4
+	for i in range(6):
+		ec.begin_trick()
+		while ec.betting:
+			var a := ec.bet_actor()
+			var d := ChaosBot.bet_decision(ec, a, BotAI.Difficulty.NORMAL, rr)
+			ec.bet_act(a, str(d["action"]), float(d.get("to", 0.0)))
+		if ec.walkover_player() != -1:
+			ec.resolve_walkover()
+		else:
+			while true:
+				var pl := ec.current
+				var rs := ec.play(pl, ChaosBot.choose(ec, pl, BotAI.Difficulty.NORMAL, rr))
+				if rs["trick_complete"]:
+					break
+	var total1 := 0.0
+	for st in ec.stacks:
+		total1 += float(st)
+	check(is_equal_approx(total0, total1 + ec.house_rake), "fichas se conservam: mesa + taxa da casa = total inicial (taxa %.0f)" % ec.house_rake)
+	check(ec.house_rake > 0.0, "a casa cobra taxa nas rodadas disputadas")

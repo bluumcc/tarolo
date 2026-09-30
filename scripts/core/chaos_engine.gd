@@ -3,7 +3,7 @@ extends RefCounted
 ## Estado puro da Mesa Caos: um "poker de rodadas". Cada nível distribui 8 cartas e sorteia
 ## um modificador. Cada rodada (4 cartas) é uma mão de aposta: todos pagam o blind (ante),
 ## falam na ordem do botão (passar, aumentar, pagar ou desistir) e só quem ficou joga carta.
-## Quem leva a rodada leva o pote, mais um prêmio da banca pelas cartas, modificadores e
+## Quem leva a rodada leva o pote, mais um bônus pago pelos rivais pelas cartas, modificadores e
 ## combos. O placar é a stack de fichas de cada um. A mesa não tem fim: cada nível novo
 ## redistribui as cartas e sorteia outro modificador.
 
@@ -14,15 +14,15 @@ signal match_finished(result: Dictionary)
 const HAND_SIZE := 8
 const ROUNDS := 5            # níveis de uma partida com fim (config "levels"); 0 = mesa sem fim
 const BLIND := 10
-const BUY_IN_BLINDS := 20    # stack de entrada = 20 blinds
+const BUY_IN_BLINDS := ChaosEconomy.BUY_IN_BLINDS    # stack de entrada = 20 blinds
 const MAX_RAISES := 2        # aumentos por rodada
-const PRIZE_PER_POINT := 0.25  # cada ponto das cartas vale 0,25 blind, pago pela banca
+const PRIZE_PER_POINT := 0.25  # cada ponto das cartas vale 0,25 blind, pago pelos rivais
 const GOLD_MULT := 3.0       # Rodada Dourada
 const KING_CUT_BONUS := 3.0  # Corte de Rei (pontos)
 const BREAK_BONUS := 2.0     # Cortado: quebrar a sequência de 2+ vitórias de alguém
 const SAQUE_AMOUNT := 2.0    # pontos roubados de cada rival no Saque
 const ASSALTO_AMOUNT := 4.0  # pontos roubados de quem tem a maior stack
-const CURSE_PENALTY := 3.0   # pontos que quem vence a Rodada Maldita paga à banca
+const CURSE_PENALTY := 3.0   # pontos que quem vence a Rodada Maldita paga aos rivais
 const FORTE_MULT := 1.5      # Naipe Forte
 const VAZA_PLUS := 1.0       # bônus fixo de Cada Rodada Vale +1
 const NAIPE_CURSED_VALUE := -1.0  # valor de cada carta do Naipe Maldito
@@ -55,7 +55,10 @@ var raises := 0
 var to_act: Array = []        # fila de quem ainda precisa falar
 var bet_log: Array = []       # [{player, action, to, amount}]
 var betting := false
-var last_discard: Dictionary = {}   # {player, card} do último descarte por desistência
+var last_discard: Dictionary = {}
+var rake_on := true            # taxa da casa (desligável nos testes de lógica)
+var house_rake := 0.0          # total cobrado pela casa na mesa
+var human_rake := 0.0          # quanto do total saiu de fichas do jogador 0   # {player, card} do último descarte por desistência
 
 var hands: Array = []
 var plays: Array = []
@@ -190,13 +193,15 @@ func active_count() -> int:
 	return active_players().size()
 
 
-## Bots sem fichas pro blind saem e um novo jogador senta com o buy-in. Devolve os assentos trocados.
+## Bots sem fichas pro blind saem e um novo jogador senta com 15 a 30 blinds (varia, como
+## gente de verdade). Devolve os assentos trocados.
 func refill_bots() -> Array:
 	var swapped: Array = []
 	for p in range(1, num_players):
 		if stacks[p] < blind:
-			stacks[p] = float(buy_in)
-			level_start_stacks[p] = float(buy_in)
+			var fresh := float(rng.randi_range(ChaosEconomy.BOT_STACK_BLINDS[0], ChaosEconomy.BOT_STACK_BLINDS[1]) * blind)
+			stacks[p] = fresh
+			level_start_stacks[p] = fresh
 			streak[p] = 0
 			swapped.append(p)
 	return swapped
@@ -437,7 +442,7 @@ func would_win(card: CardData, player: int) -> bool:
 	return int(trick[_lowest_index(trick)]["player"]) == player
 
 
-## Pontos das cartas viram fichas da banca: 1 ponto = PRIZE_PER_POINT blinds.
+## Pontos das cartas viram fichas (pagas pelos rivais): 1 ponto = PRIZE_PER_POINT blinds.
 func chips_of(points: float) -> float:
 	return roundf(points * PRIZE_PER_POINT * float(blind))
 
@@ -495,7 +500,7 @@ func _resolve_trick() -> Dictionary:
 				break
 	combo_count[winner] += combos.size()
 	var points := base_points * mult + bonus
-	var prize := chips_of(points)
+	var raw_prize := chips_of(points)
 	var saque_amount := 0.0
 	var assalto_amount := 0.0
 	if ev == ChaosModifiers.Modifier.ASSALTO_LIDER:
@@ -511,8 +516,25 @@ func _resolve_trick() -> Dictionary:
 			var take := minf(chips_of(SAQUE_AMOUNT), stacks[q])
 			stacks[q] -= take
 			saque_amount += take
-	# Prêmio negativo (Rodada Maldita) sai da stack do vencedor, no máximo o que ele tem.
-	prize = maxf(prize, -(stacks[winner] + pot))
+	# Prêmio das cartas: pago pelos rivais que jogaram a rodada (soma zero, a casa não cria
+	# fichas). Prêmio negativo (Rodada Maldita): o vencedor paga aos rivais, saindo do pote.
+	var rivals: Array = []
+	for pl in plays:
+		if int(pl["player"]) != winner:
+			rivals.append(int(pl["player"]))
+	var prize := 0.0
+	if raw_prize > 0.0 and not rivals.is_empty():
+		var share := ceilf(raw_prize / float(rivals.size()))
+		for q in rivals:
+			var pay := minf(share, stacks[q])
+			stacks[q] -= pay
+			prize += pay
+	elif raw_prize < 0.0 and not rivals.is_empty():
+		var cost := minf(-raw_prize, pot)
+		var each := floorf(cost / float(rivals.size()))
+		for q in rivals:
+			stacks[q] += each
+		prize = -each * float(rivals.size())
 	var result := {
 		"winner": winner, "winning_index": idx, "plays": plays.duplicate(), "points": points,
 		"base_points": base_points, "mult": mult, "prize": prize, "pot": pot, "combos": combos,
@@ -523,7 +545,7 @@ func _resolve_trick() -> Dictionary:
 	return _finish_trick(result, winner)
 
 
-## Paga o pote (e o prêmio da banca) ao vencedor, fecha a rodada e, no fim do nível, o resultado.
+## Paga o pote (menos a taxa da casa) e o bônus dos rivais ao vencedor, fecha a rodada e, no fim do nível, o resultado.
 func _finish_trick(result: Dictionary, winner: int) -> Dictionary:
 	if bool(result.get("walkover", false)):
 		var prev_streak: int = streak[last_winner] if last_winner != -1 else 0
@@ -532,10 +554,18 @@ func _finish_trick(result: Dictionary, winner: int) -> Dictionary:
 		result["streak"] = int(streak[winner])
 		result["broke"] = last_winner != -1 and last_winner != winner and prev_streak >= 2
 	last_winner = winner
-	stacks[winner] += pot + float(result["prize"]) + float(result["saque_amount"]) + float(result["assalto_amount"])
+	# Taxa da casa: só quando as cartas foram jogadas (sem disputa, sem taxa).
+	var rake := 0.0
+	if rake_on and not bool(result.get("walkover", false)):
+		rake = ChaosEconomy.rake_of(pot, blind)
+		house_rake += rake
+		if contrib[0] > 0.0:
+			human_rake += rake * contrib[0] / maxf(pot, 1.0)
+	result["rake"] = rake
+	stacks[winner] += pot - rake + float(result["prize"]) + float(result["saque_amount"]) + float(result["assalto_amount"])
 	session_stats[winner]["pots"] += 1
 	result["stacks"] = stacks.duplicate()
-	result["gain"] = pot + float(result["prize"]) + float(result["saque_amount"]) + float(result["assalto_amount"]) - contrib[winner]
+	result["gain"] = pot - rake + float(result["prize"]) + float(result["saque_amount"]) + float(result["assalto_amount"]) - contrib[winner]
 	pot = 0.0
 	history.append(result)
 	plays = []

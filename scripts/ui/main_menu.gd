@@ -4,7 +4,6 @@ extends Control
 var overlay_layer: Control
 var top_bar: PanelContainer
 
-const RELOAD_AMOUNT := 500
 
 
 func _ready() -> void:
@@ -117,24 +116,10 @@ func _hero() -> Control:
 	return box
 
 
-## Popup das fichas: saldo e recarga ilimitada (as fichas são só do jogo, não valem dinheiro).
+## Popup das fichas: saldo, recarga diária grátis e pacotes (compra simulada).
 func _open_fichas() -> void:
-	var v := _modal("SUAS FICHAS")
-	var bal := UIKit.label("◎ %s" % UIKit.fmt_int(int(SaveManager.section("profile")["fichas"])), 72, UIKit.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	v.add_child(bal)
-	var info := UIKit.label("Fichas são o dinheiro do jogo: pagam a entrada da mesa, entram nas suas apostas e o prêmio da partida vem em fichas. Acabaram? Recarregue quando quiser, quantas vezes quiser.", 28, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(info)
-	var reload := UIKit.button("RECARREGAR  +%d FICHAS" % RELOAD_AMOUNT, UIKit.OK)
-	reload.pressed.connect(func():
-		var prof := SaveManager.section("profile")
-		prof["fichas"] = int(prof["fichas"]) + RELOAD_AMOUNT
-		SaveManager.save_game()
-		bal.text = "◎ %s" % UIKit.fmt_int(int(prof["fichas"]))
-		FX.pop(bal, 1.3)
-		UIKit.sfx("win")
-		_refresh_fragments())
-	v.add_child(reload)
+	var v := _modal("FICHAS")
+	FichasShop.fill(v, _refresh_fragments)
 	_close_button(v)
 
 
@@ -368,21 +353,18 @@ func _open_chaos_confirm() -> void:
 	var profile := SaveManager.section("profile")
 	var fichas := int(profile["fichas"])
 	v.add_child(UIKit.label("Você tem %d fichas" % fichas, 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-	var info := UIKit.label("Escolha a mesa. Você senta com uma stack de 20 blinds, aposta a cada rodada (passar, aumentar, pagar ou desistir) e leva de volta a stack quando sair.", 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var info := UIKit.label("Escolha a mesa. Você senta com uma stack de 40 blinds, aposta a cada rodada (passar, aumentar, pagar ou desistir) e leva de volta a stack quando sair.", 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info.custom_minimum_size = Vector2(620, 0)
 	v.add_child(info)
 	var cheapest := GameState.chaos_buy_in(0)
 	if fichas < cheapest:
-		v.add_child(UIKit.label("Fichas insuficientes pra entrar.", 22, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
-		var loan := UIKit.button("EMPRÉSTIMO DA CASA (%d fichas)" % cheapest, UIKit.GOLD)
-		loan.pressed.connect(func():
-			profile["fichas"] = cheapest
-			SaveManager.save_game()
-			_refresh_fragments()
+		v.add_child(UIKit.label("Fichas insuficientes pra entrar.", 22, UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER))
+		var shop := UIKit.button("RECARGA E PACOTES", UIKit.OK)
+		shop.pressed.connect(func():
 			overlay_layer.get_child(overlay_layer.get_child_count() - 1).queue_free()
-			_open_chaos_confirm())
-		v.add_child(loan)
+			_open_fichas())
+		v.add_child(shop)
 		_close_button(v)
 		return
 	for i in range(GameState.CHAOS_TABLES.size()):
