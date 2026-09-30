@@ -12,3 +12,4 @@ Partida → Nível → Rodada → Vez (uma "rodada" tem 4 cartas; um "nível" te
 - Godot 4.3, UI em código. Testes: `godot --headless --path . -s res://tests/test_runner.gd` e `res://tests/Smoke.tscn`.
 - Web export em `docs/play` (`godot --headless --path . --export-release "Web" docs/play/index.html`) e push direto no `main`.
 - Modos de mesa: **Caos** (aposta por rodada, `docs/MESA_CAOS.md`) e **Blitz** (palpite de vitórias por nível, `docs/BLITZ.md`); mesma cena/motor, flag `engine.blitz`.
+- **Nunca tirar screenshot "pra conferir visualmente" por conta própria — gasta muito token.** Só capturar tela quando o usuário pedir explicitamente, ou quando for indispensável pra diagnosticar um bug visual relatado (e mesmo assim, o mínimo de capturas possível, apagando os arquivos temporários depois). Testes automatizados (`test_runner.gd`, `Smoke.tscn`) são a forma padrão de verificar qualquer mudança.
