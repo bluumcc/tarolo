@@ -28,10 +28,15 @@ Código: `ChaosEngine` com `blitz = true` (config `"mode": "blitz"`), `ChaosBot.
 5. **Cobrir:** quando um rival dobra ou triplica, todo mundo tem uma janela curta pra **COBRIR**
    (paga 1 entrada, iguala o peso dele) ou **DEIXAR** (de graça, mas fica com peso menor no rateio).
    Cobrir também usa um dos seus 2 lances do nível. É a mesma decisão de dobrar, só que em resposta.
-6. **Modificadores**: toda rodada sorteia 1 dos 11 (ver `docs/MODIFICADORES.md`), sempre anunciado em
-   tela cheia antes das apostas. No Blitz, O Louco Vence e Rodada Invertida mudam quem vence, Rodada
-   Dourada conta 2 vitórias ("Rodada Dobrada"), Saque/Assalto/Maldita roubam ou pagam fichas de
-   verdade (além da vitória), e os outros 5 só valem no Caos.
+6. **Fichas das cartas**: cada rodada, quem vence leva fichas dos rivais pelos pontos das cartas da mesa
+   (1 ponto = 0,25 blind × `BLITZ_POINT_FACTOR`, pago em partes iguais pelos rivais). Soma zero, sem
+   taxa. Cria a tensão de estratégia: vencer uma rodada rica rende fichas mas pode estourar o palpite;
+   perder uma rodada rica custa fichas mas protege o palpite.
+7. **Modificadores**: toda rodada sorteia 1 dos 10 (ver `docs/MODIFICADORES.md`), sempre anunciado em
+   tela cheia antes das apostas. A Rodada Dourada não entra no Blitz (multiplicar pontos se
+   confundiria com as vitórias do palpite). Os de pontos (Trunfo/Figuras em Dobro, Naipe Fraco/Forte,
+   Cartas Pequenas) mudam quanto as cartas pagam; O Louco Vence e Rodada Invertida mudam quem vence;
+   Saque/Assalto/Maldita movem fichas à parte.
 
 ## Economia: de onde vem e pra onde vai a ficha
 Sem taxa, o Blitz é soma zero entre os jogadores: fichas só trocam de mão. A casa não cria ficha —
@@ -93,3 +98,24 @@ fraca, e cobre o lance de rivais nas mesmas condições.
 - **Mesas configuráveis** (torneios): blind, buy-in, prêmio, data de início, número de níveis e
   blind crescente configuráveis por quem cria a mesa. Fica para uma fase futura de Blitz com salas
   criadas por jogadores.
+
+
+## Habilidade: jogar os pontos das cartas (simulação)
+`tests/blitz_skill_sim.gd` — bot "Difícil novo" (calcula fichas esperadas: palpite + prêmio das
+cartas − custo de gastar a carta) contra o "Difícil antigo" (só palpite, ignora pontos). Líquido bruto
+em blinds por nível, sem taxa da casa (soma zero entre os 4), 80 sessões × 30 níveis por linha, ±0,1 ep:
+
+| fator pontos→fichas | espelho (antigo×4) | novo vs 3 antigos | novo vs 3 fáceis |
+|---|---|---|---|
+| 0 (sem pontos) | −0,04 | +0,70 | +0,36 |
+| 0,25 | −0,05 | +0,81 | +0,46 |
+| **0,5 (atual)** | −0,05 | **+1,09** | +0,60 |
+| 1,0 | −0,18 | +1,40 | +0,79 |
+
+Leituras: (1) o espelho ≈ 0 confirma que a mesa é justa (nenhum assento ganha sozinho); (2) jogar
+bem rende de forma consistente (+1,1 blinds/nível ≈ 27% da entrada de 4 blinds), acima da taxa da
+casa (4%, teto de 2 blinds por pote pago); (3) os pontos aumentam a vantagem de quem os joga bem
+(+0,4 blinds/nível a 0,5 em relação a 0) sem tirar o palpite do centro (acerto do novo ≈ 37%).
+Fator 0,5 escolhido: vantagem clara sem deixar os pontos dominarem o prêmio do pote. Ajuste em
+`ChaosEngine.BLITZ_POINT_FACTOR`. Limite: bots, não humanos — a vantagem real contra jogadores humanos
+só se mede em PvP.

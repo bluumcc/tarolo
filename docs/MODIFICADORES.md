@@ -1,6 +1,6 @@
 # Modificadores do modo Caos/Blitz
 
-Todo nível embaralha os 11 modificadores e usa 8, um por rodada, sem repetir dentro do
+Todo nível embaralha os modificadores (11 no Caos, 10 no Blitz — sem a Rodada Dourada) e usa 8, um por rodada, sem repetir dentro do
 nível. Sempre por UMA rodada só — não existe mais modificador de nível inteiro. Antes de cada
 rodada, uma tela cheia explica a regra com objetividade (sem distrações) e uma contagem visível
 até começar (~3s; toca em "ENTENDI, CONTINUAR" pra pular). Nenhum é surpresa: o jogador sempre
@@ -9,25 +9,25 @@ sabe a regra antes de decidir, e no Blitz o palpite pode contar com essa informa
 Código: `scripts/core/chaos_modifiers.gd` (lista, textos), `ChaosEngine.draw_trick_modifier()`
 (sorteio), `ChaosScene._trick_start()` (tela cheia + contagem).
 
-## Os 12
+## Os 11 (o Blitz sorteia 10)
 
 | Modificador | O que muda | No Blitz |
 |---|---|---|
-| Trunfo em Dobro | Todo Trunfo vale o dobro de pontos | sem efeito |
-| Figuras em Dobro | Valete, Cavaleiro, Dama e Rei valem o dobro | sem efeito |
+| Trunfo em Dobro | Todo Trunfo vale o dobro de pontos | Trunfo paga o dobro de fichas |
+| Figuras em Dobro | Valete, Cavaleiro, Dama e Rei valem o dobro | figuras pagam o dobro de fichas |
 | O Louco Vence | O Louco pode vencer, como um Trunfo fraquinho | muda quem vence |
-| Naipe Fraco | Um naipe sorteado vale metade dos pontos | sem efeito |
-| Naipe Forte | Um naipe sorteado vale 1,5× os pontos | sem efeito |
+| Naipe Fraco | Um naipe sorteado vale metade dos pontos | o naipe sorteado paga metade |
+| Naipe Forte | Um naipe sorteado vale 1,5× os pontos | o naipe sorteado paga 1,5× |
 | Rodada Invertida | Vence a MENOR carta do naipe; Trunfo não corta | muda quem vence |
-| Cartas Pequenas Importam | As cartas de 0,5 ponto valem 1,0 | sem efeito |
-| Rodada Dourada | Os pontos valem ×3 | conta 2 vitórias ("Rodada Dobrada") |
+| Cartas Pequenas Importam | As cartas de 0,5 ponto valem 1,0 | cartas de 0,5 pt pagam como 1,0 |
+| Rodada Dourada | Os pontos valem ×3 | não entra no sorteio (confundiria com as vitórias do palpite) |
 | Saque | Quem vencer rouba 2 pontos de cada rival | rouba fichas de verdade, além da vitória |
 | Assalto ao Líder | Quem vencer rouba 4 pontos de quem lidera o placar | rouba fichas de quem lidera a stack, além da vitória |
 | Rodada Maldita | Quem vencer PERDE 3 pontos | paga fichas aos rivais, além da vitória |
 
-"Sem efeito" no Blitz não significa "não acontece": a rodada ainda é jogada normalmente e ainda
-conta 1 vitória pro palpite de quem vencer — só não move fichas fora disso. A tela do
-modificador avisa isso explicitamente quando é o caso.
+No Blitz os pontos das cartas viram fichas (ver `docs/BLITZ.md`, "Fichas das cartas"), então os
+modificadores de pontos passam a valer também lá: mudam quanto a rodada paga a quem vence e quanto
+custa perder. Nenhum modifica a contagem de vitórias do palpite — quem vence a rodada conta sempre 1.
 
 ## O que mudou nesta revisão
 - **Mundo ao Contrário e Rodada Invertida eram a mesma regra em escopos diferentes** (nível

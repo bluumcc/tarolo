@@ -789,26 +789,71 @@ func _test_blitz() -> void:
 	cv.stacks[2] = 0.0
 	check(not cv.can_cover(2), "Blitz: sem fichas pra pagar a entrada, não cobre")
 
-	# Rodada Dobrada conta 2 vitórias.
+	# Rodada Dourada não entra no sorteio do Blitz (confundiria com as vitórias do palpite).
+	var pool := ChaosModifiers.blitz_pool()
+	check(pool.size() == 10 and not pool.has(ChaosModifiers.Modifier.VAZA_DOURADA), "Blitz: sorteio sem a Rodada Dourada (10 modificadores)")
+	var gp := ChaosEngine.new()
+	var dourada_seen := false
+	for lv in range(12):
+		gp.setup_match({"seed": 100 + lv, "mode": "blitz", "blind": 10})
+		if (gp.modifier_sequence as Array).has(ChaosModifiers.Modifier.VAZA_DOURADA):
+			dourada_seen = true
+	check(not dourada_seen, "Blitz: nenhum nível sorteia Rodada Dourada")
+	check(ChaosModifiers.has_blitz_effect(ChaosModifiers.Modifier.TRUNFO_DOBRO) and not ChaosModifiers.has_blitz_effect(ChaosModifiers.Modifier.VAZA_DOURADA), "Blitz: Trunfo em Dobro vale, Dourada não")
+
+	# Pontos das cartas viram fichas, pagas pelos rivais: 4,5 + 3×0,5 = 6 pts → 6×0,25×10×0,5 = 7,5 → 8, 3 cada.
 	var g2 := ChaosEngine.new()
 	g2.setup_match({"seed": 9, "mode": "blitz", "blind": 10})
-	g2.modifier = ChaosModifiers.Modifier.VAZA_DOURADA
-	g2.hands[0] = [c(CardData.Suit.TRUNFO, 20)]
+	g2.modifier = -1
+	g2.hands[0] = [c(CardData.Suit.TRUNFO, 21)]
 	g2.hands[1] = [c(CardData.Suit.PAUS, 3)]
 	g2.hands[2] = [c(CardData.Suit.PAUS, 4)]
 	g2.hands[3] = [c(CardData.Suit.PAUS, 5)]
 	g2.leader = 0
 	g2.current = 0
+	var total0 := 0.0
+	for st in g2.stacks:
+		total0 += float(st)
 	for pl in range(4):
 		g2.play(pl, (g2.hands[pl] as Array)[0])
-	check(int(g2.wins[0]) == 2, "Blitz: Rodada Dobrada conta 2 vitórias")
+	check(int(g2.wins[0]) == 1, "Blitz: vencer a rodada conta 1 vitória")
+	var g2_total := 0.0
+	for st in g2.stacks:
+		g2_total += float(st)
+	check(is_equal_approx(float(g2.stacks[0]), float(g2.buy_in) + 9.0) and is_equal_approx(float(g2.stacks[1]), float(g2.buy_in) - 3.0), "Blitz: pontos das cartas pagam fichas do vencedor (rivais dividem)")
+	check(is_equal_approx(g2_total, total0), "Blitz: fichas das cartas são soma zero")
 
-	# No Blitz, Saque/Assalto/Maldita ainda mexem em fichas de verdade (à parte do palpite);
-	# os outros 6 modificadores não têm efeito nenhum lá (só valem no Caos).
-	check(ChaosModifiers.has_blitz_effect(ChaosModifiers.Modifier.SAQUE), "Saque tem efeito no Blitz")
-	check(not ChaosModifiers.has_blitz_effect(ChaosModifiers.Modifier.TRUNFO_DOBRO), "Trunfo em Dobro não tem efeito no Blitz")
+	# Trunfo em Dobro: 4,5×2 + 1,5 = 10,5 pts → 13,1 → 13 fichas, 5 de cada rival.
+	var g3 := ChaosEngine.new()
+	g3.setup_match({"seed": 9, "mode": "blitz", "blind": 10})
+	g3.modifier = ChaosModifiers.Modifier.TRUNFO_DOBRO
+	g3.hands[0] = [c(CardData.Suit.TRUNFO, 21)]
+	g3.hands[1] = [c(CardData.Suit.PAUS, 3)]
+	g3.hands[2] = [c(CardData.Suit.PAUS, 4)]
+	g3.hands[3] = [c(CardData.Suit.PAUS, 5)]
+	g3.leader = 0
+	g3.current = 0
+	for pl in range(4):
+		g3.play(pl, (g3.hands[pl] as Array)[0])
+	check(is_equal_approx(float(g3.stacks[0]), float(g3.buy_in) + 15.0), "Blitz: Trunfo em Dobro dobra o que o Trunfo paga")
+
+	# Fator 0 desliga o prêmio das cartas (isola os efeitos de fichas dos outros modificadores).
+	var g0 := ChaosEngine.new()
+	g0.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "point_factor": 0.0})
+	g0.modifier = -1
+	g0.hands[0] = [c(CardData.Suit.TRUNFO, 20)]
+	g0.hands[1] = [c(CardData.Suit.PAUS, 3)]
+	g0.hands[2] = [c(CardData.Suit.PAUS, 4)]
+	g0.hands[3] = [c(CardData.Suit.PAUS, 5)]
+	g0.leader = 0
+	g0.current = 0
+	for pl in range(4):
+		g0.play(pl, (g0.hands[pl] as Array)[0])
+	check(is_equal_approx(float(g0.stacks[0]), float(g0.buy_in)), "Blitz: fator 0 = sem prêmio das cartas")
+
+	# Saque/Assalto/Maldita mexem em fichas à parte dos pontos.
 	var gs := ChaosEngine.new()
-	gs.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "stacks": [200.0, 200.0, 200.0, 200.0]})
+	gs.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "point_factor": 0.0, "stacks": [200.0, 200.0, 200.0, 200.0]})
 	gs.modifier = ChaosModifiers.Modifier.SAQUE
 	gs.hands[0] = [c(CardData.Suit.TRUNFO, 20)]
 	gs.hands[1] = [c(CardData.Suit.PAUS, 3)]
@@ -822,7 +867,7 @@ func _test_blitz() -> void:
 	check(is_equal_approx(float(gs.stacks[0]), 200.0 + 3.0 * take) and is_equal_approx(float(gs.stacks[1]), 200.0 - take), "Blitz: Saque rouba fichas de cada rival, além de contar a vitória")
 
 	var ga := ChaosEngine.new()
-	ga.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "stacks": [200.0, 200.0, 500.0, 200.0]})
+	ga.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "point_factor": 0.0, "stacks": [200.0, 200.0, 500.0, 200.0]})
 	ga.modifier = ChaosModifiers.Modifier.ASSALTO_LIDER
 	ga.hands[0] = [c(CardData.Suit.TRUNFO, 20)]
 	ga.hands[1] = [c(CardData.Suit.PAUS, 3)]
@@ -836,7 +881,7 @@ func _test_blitz() -> void:
 	check(is_equal_approx(float(ga.stacks[0]), 200.0 + stolen) and is_equal_approx(float(ga.stacks[2]), 500.0 - stolen), "Blitz: Assalto ao Líder rouba de quem lidera a stack, além de contar a vitória")
 
 	var gm := ChaosEngine.new()
-	gm.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "stacks": [200.0, 200.0, 200.0, 200.0]})
+	gm.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "point_factor": 0.0, "stacks": [200.0, 200.0, 200.0, 200.0]})
 	gm.modifier = ChaosModifiers.Modifier.VAZA_MALDITA
 	gm.hands[0] = [c(CardData.Suit.TRUNFO, 20)]
 	gm.hands[1] = [c(CardData.Suit.PAUS, 3)]

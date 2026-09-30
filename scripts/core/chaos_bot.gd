@@ -4,10 +4,23 @@ extends RefCounted
 ## (passar, aumentar, pagar, desistir) pela força da mão, com blefe nos níveis difíceis.
 
 
+## Dificuldade só de simulação: o Difícil ANTIGO do Blitz (joga só pelo palpite, ignora os pontos
+## das cartas) — serve de régua pra medir quanto jogar os pontos rende.
+const LEGACY := 99
+## Quanto vale, em blinds, fechar o palpite exato (aproximado: fatia esperada do pote).
+const HIT_VALUE_BLINDS := 6.0
+## Pontos médios de uma carta que ainda vai cair na mesa (pra estimar o tamanho do prêmio).
+const AVG_CARD_POINTS := 1.4
+
+
 static func choose(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> CardData:
 	var legal: Array = engine.legal_for(player)
 	if legal.size() == 1:
 		return legal[0]
+	if engine.blitz and difficulty != LEGACY:
+		return _blitz_choose(engine, player, difficulty, rng)
+	if difficulty == LEGACY:
+		difficulty = BotAI.Difficulty.HARD
 	if difficulty == BotAI.Difficulty.EASY:
 		return legal[rng.randi_range(0, legal.size() - 1)]
 	if difficulty == BotAI.Difficulty.NORMAL and rng.randf() < 0.15:
@@ -278,3 +291,59 @@ static func wants_cover(engine: ChaosEngine, player: int, difficulty: int, rng: 
 	if not engine.can_cover(player):
 		return false
 	return _double_worth_it(engine, player, difficulty) and rng.randf() < 0.7
+
+
+## Blitz: joga cada carta pela conta de fichas esperadas — palpite (vencer ajuda ou atrapalha) +
+## prêmio das cartas da mesa (quem vence leva, os rivais pagam) − custo de gastar a carta agora.
+## Fácil joga ao acaso; Normal erra um pouco de vez em quando; Difícil calcula tudo.
+static func _blitz_choose(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> CardData:
+	var legal: Array = engine.legal_for(player)
+	if difficulty == BotAI.Difficulty.EASY:
+		return legal[rng.randi_range(0, legal.size() - 1)]
+	if difficulty == BotAI.Difficulty.NORMAL and rng.randf() < 0.15:
+		return legal[rng.randi_range(0, legal.size() - 1)]
+	var inverted := engine.active_modifier() == ChaosModifiers.Modifier.VAZA_INVERTIDA
+	var need := engine.blitz_need(player)
+	var left := engine.tricks_left()
+	# Valor de VENCER essa rodada pro palpite (negativo = vencer atrapalha).
+	var dv := 0.0
+	if need > 0:
+		var pneed := 1.0 if need >= left else float(need) / float(left)
+		dv = HIT_VALUE_BLINDS * pneed
+	elif need == 0:
+		dv = -HIT_VALUE_BLINDS
+	# Efeitos de fichas do modificador (em blinds): Saque/Assalto rendem a quem vence, Maldita custa.
+	var blind := float(engine.blind)
+	match engine.active_modifier():
+		ChaosModifiers.Modifier.SAQUE:
+			dv += engine.chips_of(ChaosEngine.SAQUE_AMOUNT) * float(engine.active_count() - 1) / blind
+		ChaosModifiers.Modifier.ASSALTO_LIDER:
+			if player != engine._highest_player():
+				dv += engine.chips_of(ChaosEngine.ASSALTO_AMOUNT) / blind
+		ChaosModifiers.Modifier.VAZA_MALDITA:
+			dv -= engine.chips_of(ChaosEngine.CURSE_PENALTY) / blind
+	var k := ChaosEngine.PRIZE_PER_POINT * engine.point_factor
+	var n_active := engine.active_count()
+	var unseen := n_active - engine.plays.size() - 1
+	var table := 0.0
+	for pl in engine.plays:
+		table += engine.card_value(pl["card"], player)
+	var noise := 0.0 if difficulty == BotAI.Difficulty.HARD else 0.6
+	var best: CardData = null
+	var best_score := -INF
+	for c in legal:
+		var power := _card_power(engine, c, inverted)
+		var pw := 0.0
+		if engine.would_win(c, player):
+			pw = 1.0 if unseen <= 0 else clampf(0.15 + 0.75 * power, 0.0, 0.95)
+		var total := table + engine.card_value(c, player) + float(maxi(unseen, 0)) * AVG_CARD_POINTS
+		var prize := k * total
+		var score := pw * (dv + prize) - (1.0 - pw) * prize / float(maxi(n_active - 1, 1))
+		# Guardar carta forte tem valor (poder futuro); as fracas saem primeiro.
+		score -= power * 0.5
+		if noise > 0.0:
+			score += rng.randf_range(-noise, noise)
+		if score > best_score:
+			best_score = score
+			best = c
+	return best

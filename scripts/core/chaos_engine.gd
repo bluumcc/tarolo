@@ -65,16 +65,18 @@ const BLITZ_STREAK_BONUS_BLINDS := 3              # prêmio especial da casa: 3+
 const BLITZ_BONUS_VAULT_SHARE := 0.5              # o prêmio só sai de até 50% da taxa que a casa já cobrou de você
 const BLITZ_DOUBLE_FROM := 3                       # 1º dobrar a partir da 4ª rodada; o 2º, da 6ª
 const BLITZ_MAX_DOUBLES := 2
+const BLITZ_POINT_FACTOR := 0.5                    # pontos das cartas → fichas no Blitz, em relação ao Caos (1 pt = 0,25 blind × fator)
 var blitz := false
 var doubles: Array = []       # quantas vezes cada um dobrou a entrada nesse nível (0 a 2)
 var predicts: Array = []      # palpite de cada um (-1 = ainda não fez)
 var stakes: Array = []        # fichas que cada um pôs no pote do nível
-var wins: Array = []          # vitórias contadas no nível (Rodada Dobrada conta 2)
+var wins: Array = []          # vitórias contadas no nível
 var carry := 0.0              # pote acumulado quando ninguém acerta
 var bonus_on := true          # prêmio especial de sequência (desligável nos testes)
 var hit_streak := 0           # acertos seguidos do jogador 0
 var human_bonus := 0.0        # total de prêmios da casa recebidos pelo jogador 0
 var blitz_result: Dictionary = {}
+var point_factor := BLITZ_POINT_FACTOR   # ajustável (simulação)
 
 var hands: Array = []
 var plays: Array = []
@@ -95,6 +97,7 @@ func setup_match(config: Dictionary) -> void:
 	buy_in = int(config.get("buy_in", blind * BUY_IN_BLINDS))
 	levels = int(config.get("levels", 0))
 	blitz = str(config.get("mode", "chaos")) == "blitz"
+	point_factor = float(config.get("point_factor", BLITZ_POINT_FACTOR))
 	carry = 0.0
 	hit_streak = 0
 	human_bonus = 0.0
@@ -126,8 +129,8 @@ func _setup_round() -> void:
 		streak.append(0)
 		captured.append([])
 		combo_count.append(0)
-	# Embaralha os 11 modificadores: as 8 vazas do nível usam os 8 primeiros, sem repetir.
-	modifier_sequence = ChaosModifiers.ALL.duplicate()
+	# Embaralha os modificadores: as 8 vazas do nível usam os 8 primeiros, sem repetir.
+	modifier_sequence = (ChaosModifiers.blitz_pool() if blitz else ChaosModifiers.ALL).duplicate()
 	Deck.shuffle(modifier_sequence, rng)
 	modifier = -1
 	weak_suit = -1
@@ -703,8 +706,24 @@ func blitz_status(player: int) -> String:
 ## Líder e Rodada Maldita ainda mexem em fichas de verdade, à parte do palpite — os outros 5
 ## modificadores não têm efeito nenhum aqui (só valem no Caos).
 func _resolve_trick_blitz(idx: int, winner: int, ev: int) -> Dictionary:
-	var value := 2 if ev == ChaosModifiers.Modifier.VAZA_DOURADA else 1
-	wins[winner] += value
+	wins[winner] += 1
+	# Pontos das cartas (já com o modificador) viram fichas pagas pelos rivais, como no Caos, só
+	# que num fator menor: o palpite continua sendo o prêmio principal, os pontos são o tempero.
+	var base_points := 0.0
+	for pl in plays:
+		base_points += card_value(pl["card"], winner)
+	var raw_prize := roundf(base_points * PRIZE_PER_POINT * float(blind) * point_factor)
+	var rivals: Array = []
+	for pl in plays:
+		if int(pl["player"]) != winner:
+			rivals.append(int(pl["player"]))
+	var prize := 0.0
+	if raw_prize > 0.0 and not rivals.is_empty():
+		var share := ceilf(raw_prize / float(rivals.size()))
+		for q in rivals:
+			var pay := minf(share, stacks[q])
+			stacks[q] -= pay
+			prize += pay
 	var saque_amount := 0.0
 	var assalto_amount := 0.0
 	if ev == ChaosModifiers.Modifier.ASSALTO_LIDER:
@@ -722,23 +741,20 @@ func _resolve_trick_blitz(idx: int, winner: int, ev: int) -> Dictionary:
 			saque_amount += take
 	var curse_amount := 0.0
 	if ev == ChaosModifiers.Modifier.VAZA_MALDITA:
-		var rivals: Array = []
-		for pl in plays:
-			if int(pl["player"]) != winner:
-				rivals.append(int(pl["player"]))
 		if not rivals.is_empty():
 			var cost := minf(chips_of(CURSE_PENALTY), stacks[winner])
 			var each := floorf(cost / float(rivals.size()))
 			for q in rivals:
 				stacks[q] += each
 			curse_amount = each * float(rivals.size())
-	stacks[winner] += saque_amount + assalto_amount - curse_amount
+	stacks[winner] += prize + saque_amount + assalto_amount - curse_amount
 	var result := {
-		"winner": winner, "winning_index": idx, "plays": plays.duplicate(), "points": 0.0,
-		"base_points": 0.0, "mult": 1.0, "prize": 0.0, "pot": pot, "combos": [], "streak": 0,
+		"winner": winner, "winning_index": idx, "plays": plays.duplicate(), "points": base_points,
+		"base_points": base_points, "mult": 1.0, "prize": prize, "pot": pot, "combos": [], "streak": 0,
 		"streak_mult": 1.0, "bonus": 0.0, "saque_amount": saque_amount, "assalto_amount": assalto_amount,
 		"curse_amount": curse_amount, "walkover": false, "trick_number": trick_number, "modifier": ev,
-		"value": value, "wins": wins.duplicate(), "rake": 0.0, "gain": saque_amount + assalto_amount - curse_amount,
+		"value": 1, "wins": wins.duplicate(), "rake": 0.0,
+		"gain": prize + saque_amount + assalto_amount - curse_amount,
 	}
 	return _finish_trick_blitz(result, winner)
 
@@ -788,7 +804,8 @@ func _settle_blitz() -> Dictionary:
 		weights.append(0.0)
 		session_stats[p]["levels"] += 1
 		var diff := absi(int(wins[p]) - int(predicts[p]))
-		if diff == 0:
+		if diff == 0 and float(stakes[p]) > 0.0:
+			# (Quem não pôs nada no pote — sem fichas na hora do palpite — não tem o que levar.)
 			hits.append(p)
 			weights[p] = float(stakes[p]) * blitz_weight(int(predicts[p]))
 			total_w += float(weights[p])

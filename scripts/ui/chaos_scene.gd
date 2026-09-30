@@ -508,10 +508,6 @@ func _rebuild_hand() -> void:
 ## de qual jogar ser visível e não só matemática escondida no placar. Mantém o texto do
 ## mesmo tamanho do padrão ("X,Y pts") pra não esticar a carta — só o ícone e a cor mudam.
 func _apply_modifier_badge(cv: CardView, card: CardData, player: int = 0) -> void:
-	if engine.blitz:
-		# No Blitz o valor em pontos da carta não conta pra nada (só quem vence a rodada).
-		cv.points_label.text = ""
-		return
 	var base := card.points()
 	var eff := engine.card_value(card, player)
 	if is_equal_approx(eff, base):
@@ -538,7 +534,7 @@ func _announce_round() -> void:
 	var kicker := "NÍVEL %d%s" % [engine.round_index + 1, (" DE %d" % engine.levels) if engine.levels > 0 else ""]
 	var lines: Array = []
 	if engine.round_index == 0 and engine.blitz:
-		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "ENTRADA ◎%d" % int(engine.blitz_entry()), "text": "Em cada nível você palpita quantas rodadas vai ganhar e paga a entrada. Acertou o número exato, leva o pote. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.MONEY})
+		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "ENTRADA ◎%d" % int(engine.blitz_entry()), "text": "Em cada nível você palpita quantas rodadas vai ganhar e paga a entrada. Acertou o número exato, leva o pote. Cada rodada ainda paga fichas pelos pontos das cartas. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.MONEY})
 	elif engine.round_index == 0:
 		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "BLIND ◎%d" % engine.blind, "text": "Todo mundo paga o blind a cada rodada. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.MONEY})
 	else:
@@ -658,7 +654,7 @@ func _reveal_after_spin(title_lbl: Label, text_lbl: Label, final_text: String, g
 
 ## Caça-níquel do modificador: os nomes giram, desaceleram e travam no sorteado.
 func _spin_label(lbl: Label, final_text: String) -> void:
-	var names: Array = ChaosModifiers.ALL.map(func(m): return "✦ %s" % ChaosModifiers.name_of(m, engine.blitz))
+	var names: Array = (ChaosModifiers.blitz_pool() if engine.blitz else ChaosModifiers.ALL).map(func(m): return "✦ %s" % ChaosModifiers.name_of(m, engine.blitz))
 	var steps := 14
 	for i in range(steps):
 		if not is_instance_valid(lbl):
@@ -2118,8 +2114,9 @@ func _resolve_trick_blitz(result: Dictionary) -> void:
 		FX.win_pulse(win_view, TABLE_SCALE)
 	var wname := str(config["names"][winner]).to_upper()
 	var sub := "Palpite: %d de %d" % [int(engine.wins[winner]), int(engine.predicts[winner])]
-	if int(result.get("value", 1)) == 2:
-		sub += "  ·  Rodada Dobrada: conta 2 vitórias"
+	var prize_amt := float(result.get("prize", 0.0))
+	if prize_amt > 0.0:
+		sub += "  ·  cartas +◎%d" % int(prize_amt)
 	var saque_amt := float(result.get("saque_amount", 0.0))
 	var assalto_amt := float(result.get("assalto_amount", 0.0))
 	var curse_amt := float(result.get("curse_amount", 0.0))
@@ -2132,8 +2129,8 @@ func _resolve_trick_blitz(result: Dictionary) -> void:
 	_banner("%s venceu a rodada!" % wname, sub, UIKit.ME if winner == 0 else UIKit.INK)
 	Sfx.play("chip")
 	FX.burst(popup_layer, _seat_center(winner) - popup_layer.global_position, UIKit.ME if winner == 0 else UIKit.CHIPS, 10)
-	if saque_amt + assalto_amt > 0.0:
-		FX.float_text(popup_layer, _seat_center(winner), "+◎ %d" % int(saque_amt + assalto_amt), UIKit.MONEY)
+	if prize_amt + saque_amt + assalto_amt > 0.0:
+		FX.float_text(popup_layer, _seat_center(winner), "+◎ %d" % int(prize_amt + saque_amt + assalto_amt), UIKit.MONEY)
 	elif curse_amt > 0.0:
 		FX.float_text(popup_layer, _seat_center(winner), "−◎ %d" % int(curse_amt), UIKit.LOSS)
 	_refresh_hud()
@@ -2147,7 +2144,7 @@ func _resolve_trick_blitz(result: Dictionary) -> void:
 		FX.float_text(popup_layer, _seat_center(winner), "ESTOUROU", UIKit.LOSS, 34)
 	# Segura o vencedor e o movimento de fichas na tela: a próxima vaza já abre uma tela cheia
 	# de modificador, e sem esse respiro o resultado desta some antes de dar pra ler.
-	var moved := saque_amt + assalto_amt + curse_amt > 0.0
+	var moved := prize_amt + saque_amt + assalto_amt + curse_amt > 0.0
 	await _wait(2.0 if moved else 1.6)
 	if not is_inside_tree():
 		return
