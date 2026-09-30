@@ -1368,9 +1368,17 @@ func _show_round_summary() -> String:
 	v.add_theme_constant_override("separation", 8)
 	box.add_child(v)
 	v.add_child(UIKit.label("FIM DO NÍVEL %d" % (int(r["round"]) + 1), 30, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(HSeparator.new())
 	var stacks: Array = r["stacks"]
 	var deltas: Array = r["deltas"]
+	# Saldo do próprio jogador, bem grande e com sinal, antes de qualquer outra coisa — o número
+	# que mais importa pra saber "ganhei ou perdi esse nível", sem precisar ler a lista toda.
+	var my_delta := int(deltas[0])
+	var saldo_color := UIKit.OK if my_delta >= 0 else UIKit.LOSS
+	var saldo := UIKit.label("%s◎%d" % ["+" if my_delta >= 0 else "−", absi(my_delta)], 56, saldo_color, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(saldo)
+	var saldo_cap := UIKit.label("SEU SALDO NESSE NÍVEL", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(saldo_cap)
+	v.add_child(HSeparator.new())
 	var won: Array = r["tricks_won"]
 	var order := range(engine.num_players)
 	order.sort_custom(func(a: int, b: int) -> bool: return float(stacks[a]) > float(stacks[b]))
