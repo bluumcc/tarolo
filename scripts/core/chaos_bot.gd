@@ -14,12 +14,12 @@ static func choose(engine: ChaosEngine, player: int, difficulty: int, rng: Rando
 		return legal[rng.randi_range(0, legal.size() - 1)]
 
 	var ev := engine.active_modifier()
-	var inverted := ev == ChaosModifiers.Modifier.MUNDO_CONTRARIO or ev == ChaosModifiers.Modifier.VAZA_INVERTIDA
+	var inverted := ev == ChaosModifiers.Modifier.VAZA_INVERTIDA
 	var mods := ChaosModifiers.Modifier
 	# Quer perder a rodada? (Rodada Maldita, ou Assalto ao Líder sendo ele o líder não muda nada.)
 	var want_lose := ev == mods.VAZA_MALDITA
 	# Aposta alta: vale gastar a carta mais forte pra garantir.
-	var high_stakes := ev in [mods.VAZA_DOURADA, mods.ULTIMA_TRIPLO, mods.PRIMEIRA_DOBRO, mods.SAQUE] \
+	var high_stakes := ev in [mods.VAZA_DOURADA, mods.SAQUE] \
 		or (ev == mods.ASSALTO_LIDER and player == engine._highest_player()) \
 		or engine.pot > float(engine.blind) * 8.0
 	var blitz_win := false
@@ -128,7 +128,7 @@ static func _cheapest(engine: ChaosEngine, cards: Array, player: int) -> CardDat
 ## a rodada pode obrigar a jogar uma carta menor).
 static func hand_strength(engine: ChaosEngine, player: int) -> float:
 	var ev := engine.active_modifier()
-	var inverted := ev == ChaosModifiers.Modifier.MUNDO_CONTRARIO or ev == ChaosModifiers.Modifier.VAZA_INVERTIDA
+	var inverted := ev == ChaosModifiers.Modifier.VAZA_INVERTIDA
 	var powers: Array = []
 	for c in engine.hands[player]:
 		powers.append(_card_power(engine, c, inverted))
@@ -222,7 +222,7 @@ const EXPECT_SCALE := 1.48   # calibrado por simulação (tests/blitz_sim.gd)
 ## Quantas rodadas a mão deve ganhar no nível (soma da chance de cada carta).
 static func expected_wins(engine: ChaosEngine, player: int) -> float:
 	var ev := engine.modifier
-	var inverted := ev == ChaosModifiers.Modifier.MUNDO_CONTRARIO
+	var inverted := ev == ChaosModifiers.Modifier.VAZA_INVERTIDA
 	var total := 0.0
 	for c in engine.hands[player]:
 		var pw := _card_power(engine, c, inverted)

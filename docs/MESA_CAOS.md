@@ -26,7 +26,7 @@ Os pontos das cartas da rodada (com modificadores, sequência e combos) viram fi
 Sequência de vitórias (×1,25 / ×1,5 / ×2), Cortado, Corte de Rei, Chuva de Trunfos, Realeza e Escada, todos lidos na mesa.
 
 ## Bots
-Estimam a força da mão (Trunfos altos e Reis; invertida no Mundo ao Contrário), comparam com as odds do pote e passam, pagam, aumentam ou desistem. No Difícil blefam (~14%).
+Estimam a força da mão (Trunfos altos e Reis; invertida no Rodada Invertida), comparam com as odds do pote e passam, pagam, aumentam ou desistem. No Difícil blefam (~14%).
 
 ## Fora de escopo por enquanto
 Torneio com blind crescente e eliminação (base para o Ranqueado), Deixar rolar e Torcida.

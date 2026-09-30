@@ -28,6 +28,8 @@ func session(diffs: Array, seed_i: int, levels: int, use_seat0_bot := true) -> D
 			exp_n += 1
 			e.blitz_place(p, ChaosBot.blitz_pick(e, p, diffs[p], rng))
 		while not e.is_round_over():
+			if e.plays.is_empty():
+				e.draw_trick_modifier()
 			var pl := e.current
 			if ChaosBot.wants_double(e, pl, diffs[pl], rng):
 				e.double_down(pl)

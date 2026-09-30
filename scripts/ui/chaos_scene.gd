@@ -49,7 +49,6 @@ var dealer_badges: Array = []
 var phase := "idle"            # "bet" | "play" | "idle"
 var bets_gathered := false     # apostas já juntadas no pote
 var first_round_done := false
-var modifier_revealed := false   # surpresa de rodada já foi revelada nesse nível
 var info_label: Label
 var trick_dots: HBoxContainer
 var shown_totals: Array = []
@@ -527,48 +526,40 @@ func _plural(n: int, one: String, many: String) -> String:
 
 # ------------------------------------------------------------------ níveis / modificador
 
-## Tela de transição de início de nível: ocupa a tela inteira, explica a regra da
-## nível e o que muda, e avança sozinha (ou ao tocar). Nada de jogo por trás.
+## Tela de transição de início de nível: só orienta (nível, mesa) — o modificador de cada
+## rodada é anunciado à parte, na hora, por `_trick_start()`.
 func _announce_round() -> void:
 	_refresh_hud()
 	_rebuild_hand()
 	var kicker := "NÍVEL %d%s" % [engine.round_index + 1, (" DE %d" % engine.levels) if engine.levels > 0 else ""]
 	var lines: Array = []
-	lines.append(_intro_block())
 	if engine.round_index == 0 and engine.blitz:
 		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "ENTRADA ◎%d" % int(engine.blitz_entry()), "text": "Em cada nível você palpita quantas rodadas vai ganhar e paga a entrada. Acertou o número exato, leva o pote. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.MONEY})
 	elif engine.round_index == 0:
 		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "BLIND ◎%d" % engine.blind, "text": "Todo mundo paga o blind a cada rodada. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.MONEY})
-	await _transition(kicker, lines, 3.4 if not first_round_done else 3.0)
+	else:
+		lines.append({"head": "CARTAS NOVAS", "title": "NÍVEL %d" % (engine.round_index + 1), "text": "Mão nova, 8 rodadas — cada uma com o seu próprio modificador, anunciado antes de começar.", "color": UIKit.MODIFIER})
+	await _transition(kicker, lines, 2.6 if not first_round_done else 2.2)
 	first_round_done = true
-	modifier_revealed = false
 	_banner_clear()
 
 
-## Cartão do modificador na tela de início: nível inteiro mostra a regra; rodada-surpresa
-## só avisa que vem algo; rodada fixa (1ª/última) já diz qual é.
-func _intro_block() -> Dictionary:
-	var m := engine.modifier
-	if ChaosModifiers.scope_of(m) == ChaosModifiers.Scope.ROUND:
-		return {"spin": true, "head": "MODIFICADOR · NÍVEL INTEIRO", "title": "✦ %s" % ChaosModifiers.label(m, engine.weak_suit), "text": "%s %s" % [ChaosModifiers.desc_of(m, engine.blitz), ChaosModifiers.tip_of(m, engine.blitz)], "color": UIKit.MODIFIER}
-	if ChaosModifiers.is_secret(m, engine.blitz):
-		return {"head": "MODIFICADOR · SURPRESA", "title": "? EM ALGUMA RODADA", "text": "Uma regra especial vai valer só em UMA rodada desse nível. Você só descobre qual e quando ela começar.", "color": UIKit.LOSS}
-	return {"head": "MODIFICADOR · RODADA %d" % (engine.modifier_trick + 1), "title": "%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.name_of(m, engine.blitz)], "text": "%s %s" % [ChaosModifiers.desc_of(m, engine.blitz), ChaosModifiers.tip_of(m, engine.blitz)], "color": ChaosModifiers.color_of(m)}
-
-
-## Texto da faixa em repouso (nenhuma mensagem ativa): lembra o modificador do nível sem
-## entregar a surpresa antes da hora. Retorna [título, subtítulo, cor].
+## Texto da faixa em repouso (nenhuma mensagem ativa): o modificador dessa rodada — já sempre
+## conhecido, porque `_trick_start()` avisa em tela cheia antes de qualquer decisão.
 func _rest_banner() -> Array:
 	var m := engine.modifier
-	if ChaosModifiers.scope_of(m) == ChaosModifiers.Scope.ROUND:
-		return ["✦ %s" % ChaosModifiers.label(m, engine.weak_suit), str(ChaosModifiers.desc_of(m, engine.blitz)), UIKit.MODIFIER]
-	var known := modifier_revealed or not ChaosModifiers.is_secret(m, engine.blitz)
-	if not known:
-		return ["? Surpresa em alguma rodada", "Uma regra especial vale em uma rodada só. Você descobre quando ela começar.", UIKit.LOSS]
-	var when := "rodada %d" % (engine.modifier_trick + 1)
-	var done := engine.trick_number > engine.modifier_trick
-	var sub := "já aconteceu · %s" % when if done else "%s · %s" % [ChaosModifiers.desc_of(m, engine.blitz), when]
-	return ["%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.name_of(m, engine.blitz)], sub, ChaosModifiers.color_of(m)]
+	if m == -1:
+		return ["", "", UIKit.MUTED]
+	return ["%s %s" % [ChaosModifiers.ICONS[m], _modifier_label(m)], str(ChaosModifiers.desc_of(m, engine.blitz)), ChaosModifiers.color_of(m)]
+
+
+## Nome do modificador, incluindo o naipe sorteado quando ele tiver um (e já traduzido pro
+## Blitz, quando o nome muda de mão pra lá).
+func _modifier_label(m: int) -> String:
+	var nm := ChaosModifiers.name_of(m, engine.blitz)
+	if ChaosModifiers.has_suit(m) and engine.weak_suit != -1:
+		nm = "%s (%s)" % [nm, CardData.SUIT_NAMES[engine.weak_suit]]
+	return nm
 
 
 ## Tela cheia de transição. `blocks`: [{head, title, text, color}]. Fecha ao tocar ou
@@ -606,6 +597,8 @@ func _transition(kicker: String, blocks: Array, hold: float) -> void:
 		v.add_child(card)
 	var go := UIKit.button("ENTENDI, CONTINUAR")
 	v.add_child(go)
+	var timer_lbl := UIKit.label("", 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(timer_lbl)
 	if not spins.is_empty():
 		go.disabled = true
 		go.modulate.a = 0.0
@@ -617,7 +610,9 @@ func _transition(kicker: String, blocks: Array, hold: float) -> void:
 	Sfx.play("chip")
 	for sp in spins:
 		_reveal_after_spin(sp[0], sp[1], sp[2], go)
-	# Só avança quando o jogador aperta o botão — sem tempo limite, dá pra ler com calma.
+	# Nenhuma distração: só o conteúdo. Avança sozinha depois de `hold` segundos (com contagem
+	# visível) ou na hora, se o jogador tocar antes.
+	_count_down(go, timer_lbl, hold, not spins.is_empty())
 	await go.pressed
 	if not is_inside_tree():
 		return
@@ -625,6 +620,23 @@ func _transition(kicker: String, blocks: Array, hold: float) -> void:
 	tw.tween_property(ov, "modulate:a", 0.0, GameState.anim(0.18))
 	await tw.finished
 	ov.queue_free()
+
+
+## Contagem visível até a tela avançar sozinha (espera o caça-níquel liberar o botão primeiro,
+## se houver um). Tocar em "ENTENDI, CONTINUAR" a qualquer momento pula a espera.
+func _count_down(go: Button, lbl: Label, hold: float, wait_spin: bool) -> void:
+	if wait_spin:
+		while is_instance_valid(go) and is_inside_tree() and go.disabled:
+			await get_tree().process_frame
+	if not is_instance_valid(go) or not is_inside_tree():
+		return
+	var left := hold
+	while left > 0.05 and is_instance_valid(go) and is_inside_tree():
+		lbl.text = "começa em %ds" % int(ceil(left))
+		await get_tree().create_timer(GameState.anim(0.2), true, false, true).timeout
+		left -= 0.2
+	if is_instance_valid(go) and not go.disabled:
+		go.pressed.emit()
 
 
 ## Roda o caça-níquel e só depois mostra a explicação e libera o botão.
@@ -642,7 +654,7 @@ func _reveal_after_spin(title_lbl: Label, text_lbl: Label, final_text: String, g
 
 ## Caça-níquel do modificador: os nomes giram, desaceleram e travam no sorteado.
 func _spin_label(lbl: Label, final_text: String) -> void:
-	var names: Array = (ChaosModifiers.BLITZ_POOL if engine.blitz else ChaosModifiers.ALL).map(func(m): return "✦ %s" % ChaosModifiers.name_of(m, engine.blitz))
+	var names: Array = ChaosModifiers.ALL.map(func(m): return "✦ %s" % ChaosModifiers.name_of(m, engine.blitz))
 	var steps := 14
 	for i in range(steps):
 		if not is_instance_valid(lbl):
@@ -680,16 +692,24 @@ func _banner_clear() -> void:
 
 ## Começo de rodada: se o modificador de rodada (surpresa) vale agora, revela numa tela cheia
 ## (surpresa) ou só na faixa (1ª/última, já conhecidas); deixa o aviso fixo durante a rodada.
+## Começo de toda rodada: sorteia o modificador dessa vaza e explica em tela cheia, sem
+## distração nenhuma por trás — só o conteúdo e a contagem até começar. Sempre acontece, nunca
+## é surpresa: o jogador (e, no Blitz, o palpite) sempre sabe a regra antes de decidir.
 func _trick_start() -> void:
-	var m := engine.active_modifier()
-	if m == -1 or ChaosModifiers.scope_of(m) == ChaosModifiers.Scope.ROUND:
+	engine.draw_trick_modifier()
+	if not is_inside_tree():
 		return
+	var m := engine.modifier
 	var color := ChaosModifiers.color_of(m)
-	if ChaosModifiers.is_secret(m, engine.blitz) and not modifier_revealed:
-		await _transition("PLOT TWIST!", [{"head": "RODADA %d" % (engine.trick_number + 1), "title": "%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.name_of(m, engine.blitz)], "text": "%s %s" % [ChaosModifiers.desc_of(m, engine.blitz), ChaosModifiers.tip_of(m, engine.blitz)], "color": color}], 2.6)
-	modifier_revealed = true
+	var block := {
+		"spin": true, "head": "MODIFICADOR DA RODADA %d DE %d" % [engine.trick_number + 1, ChaosEngine.HAND_SIZE],
+		"title": "%s %s" % [ChaosModifiers.ICONS[m], _modifier_label(m)],
+		"text": "%s %s" % [ChaosModifiers.desc_of(m, engine.blitz), ChaosModifiers.tip_of(m, engine.blitz)],
+		"color": color,
+	}
+	await _transition("RODADA %d" % (engine.trick_number + 1), [block], 3.0)
 	if is_inside_tree():
-		_banner("%s %s" % [ChaosModifiers.ICONS[m], ChaosModifiers.name_of(m, engine.blitz)], str(ChaosModifiers.desc_of(m, engine.blitz)), color)
+		_banner("%s %s" % [ChaosModifiers.ICONS[m], _modifier_label(m)], str(ChaosModifiers.desc_of(m, engine.blitz)), color)
 
 
 ## Modal genérico de escolha: `opts` = [{label, desc, color}]. Devolve o índice tocado,
@@ -1234,13 +1254,8 @@ func _resolve_trick(result: Dictionary) -> void:
 		best_gain = gain
 	var wname := str(config["names"][winner]).to_upper()
 	var notes: Array = []
-	match int(result.get("modifier", -1)):
-		ChaosModifiers.Modifier.VAZA_DOURADA:
-			notes.append("rodada dourada ×3")
-		ChaosModifiers.Modifier.PRIMEIRA_DOBRO:
-			notes.append("rodada relâmpago ×2")
-		ChaosModifiers.Modifier.ULTIMA_TRIPLO:
-			notes.append("última é tudo ×3")
+	if int(result.get("modifier", -1)) == ChaosModifiers.Modifier.VAZA_DOURADA:
+		notes.append("rodada dourada ×3")
 	var sub := "Pote ◎%d" % int(pot_amt)
 	if absf(prize) >= 1.0:
 		sub += "  ·  bônus dos rivais %s◎%d" % ["+" if prize >= 0.0 else "−", absi(int(prize))]
@@ -1316,7 +1331,6 @@ func _show_round_summary() -> String:
 	v.add_theme_constant_override("separation", 8)
 	box.add_child(v)
 	v.add_child(UIKit.label("FIM DO NÍVEL %d" % (int(r["round"]) + 1), 30, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label(ChaosModifiers.label(int(r["modifier"]), int(r["weak_suit"])), 28, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	var stacks: Array = r["stacks"]
 	var deltas: Array = r["deltas"]
@@ -2102,9 +2116,22 @@ func _resolve_trick_blitz(result: Dictionary) -> void:
 	var sub := "Palpite: %d de %d" % [int(engine.wins[winner]), int(engine.predicts[winner])]
 	if int(result.get("value", 1)) == 2:
 		sub += "  ·  Rodada Dobrada: conta 2 vitórias"
+	var saque_amt := float(result.get("saque_amount", 0.0))
+	var assalto_amt := float(result.get("assalto_amount", 0.0))
+	var curse_amt := float(result.get("curse_amount", 0.0))
+	if saque_amt > 0.0:
+		sub += "  ·  ⚔ saque +◎%d" % int(saque_amt)
+	if assalto_amt > 0.0:
+		sub += "  ·  ♛ assalto +◎%d" % int(assalto_amt)
+	if curse_amt > 0.0:
+		sub += "  ·  ☠ pagou ◎%d aos rivais" % int(curse_amt)
 	_banner("%s venceu a rodada!" % wname, sub, UIKit.ME if winner == 0 else UIKit.INK)
 	Sfx.play("chip")
 	FX.burst(popup_layer, _seat_center(winner) - popup_layer.global_position, UIKit.ME if winner == 0 else UIKit.CHIPS, 10)
+	if saque_amt + assalto_amt > 0.0:
+		FX.float_text(popup_layer, _seat_center(winner), "+◎ %d" % int(saque_amt + assalto_amt), UIKit.MONEY)
+	elif curse_amt > 0.0:
+		FX.float_text(popup_layer, _seat_center(winner), "−◎ %d" % int(curse_amt), UIKit.LOSS)
 	_refresh_hud()
 	FX.pop(bet_pills[winner], 1.35)
 	var need := engine.blitz_need(winner)

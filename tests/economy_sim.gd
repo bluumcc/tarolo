@@ -15,6 +15,7 @@ func session(diffs: Array, seed_i: int, stack_blinds: int) -> Dictionary:
 		e.refill_bots()
 		if e.stacks[0] < e.blind:
 			return {"bust": n, "n": n, "net": e.stacks[0] - start, "rake": e.human_rake}
+		e.draw_trick_modifier()
 		e.begin_trick()
 		var g := 0
 		while e.betting and g < 60:

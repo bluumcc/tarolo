@@ -36,10 +36,9 @@ var levels := 0               # 0 = sem fim
 var stacks: Array = []        # fichas de cada jogador na mesa
 var level_start_stacks: Array = []
 var round_index := 0          # nível atual (0-based)
-var modifier_sequence: Array = []
-var modifier := -1
+var modifier_sequence: Array = []  # ordem embaralhada dos 12 modificadores pra esse nível: 1 por vaza
+var modifier := -1            # modificador da vaza atual (-1 = ainda não sorteado pra essa vaza)
 var weak_suit := -1
-var modifier_trick := -1
 var streak: Array = []
 var last_winner := -1
 var combo_count: Array = []
@@ -111,8 +110,6 @@ func setup_match(config: Dictionary) -> void:
 	round_index = 0
 	hand_no = 0
 	match_result = {}
-	modifier_sequence = (ChaosModifiers.BLITZ_POOL if blitz else ChaosModifiers.ALL).duplicate()
-	Deck.shuffle(modifier_sequence, rng)
 	_setup_round()
 
 
@@ -129,21 +126,11 @@ func _setup_round() -> void:
 		streak.append(0)
 		captured.append([])
 		combo_count.append(0)
-	if round_index > 0 and round_index % modifier_sequence.size() == 0:
-		Deck.shuffle(modifier_sequence, rng)
-	modifier = modifier_sequence[round_index % modifier_sequence.size()]
+	# Embaralha os 12 modificadores: as 8 vazas do nível usam os 8 primeiros, sem repetir.
+	modifier_sequence = ChaosModifiers.ALL.duplicate()
+	Deck.shuffle(modifier_sequence, rng)
+	modifier = -1
 	weak_suit = -1
-	modifier_trick = -1
-	if ChaosModifiers.scope_of(modifier) == ChaosModifiers.Scope.TRICK:
-		if modifier == ChaosModifiers.Modifier.PRIMEIRA_DOBRO:
-			modifier_trick = 0
-		elif modifier == ChaosModifiers.Modifier.ULTIMA_TRIPLO:
-			modifier_trick = HAND_SIZE - 1
-		else:
-			modifier_trick = rng.randi_range(1, HAND_SIZE - 2)
-	if ChaosModifiers.has_suit(modifier):
-		var suits := [CardData.Suit.OUROS, CardData.Suit.PAUS, CardData.Suit.COPAS, CardData.Suit.ESPADAS]
-		weak_suit = suits[rng.randi_range(0, suits.size() - 1)]
 	leader = round_index % num_players
 	current = leader
 	trick_number = 0
@@ -184,15 +171,24 @@ func louco_can_win() -> bool:
 	return modifier == ChaosModifiers.Modifier.LOUCO_VENCE
 
 
-## Modificador que vale na rodada que está sendo jogada agora (-1 se nenhum).
+## Sorteia o modificador dessa vaza (o próximo da ordem embaralhada do nível) e, se ele tiver
+## naipe-alvo, sorteia o naipe também. Chamado uma vez no começo de cada vaza, antes de
+## qualquer decisão (aposta ou palpite) que dependa dele.
+func draw_trick_modifier() -> void:
+	modifier = modifier_sequence[trick_number]
+	weak_suit = -1
+	if ChaosModifiers.has_suit(modifier):
+		var suits := [CardData.Suit.OUROS, CardData.Suit.PAUS, CardData.Suit.COPAS, CardData.Suit.ESPADAS]
+		weak_suit = suits[rng.randi_range(0, suits.size() - 1)]
+
+
+## Modificador da vaza atual (-1 antes de `draw_trick_modifier` ser chamado).
 func active_modifier() -> int:
-	if ChaosModifiers.scope_of(modifier) == ChaosModifiers.Scope.ROUND or trick_number == modifier_trick:
-		return modifier
-	return -1
+	return modifier
 
 
 func is_active(mod: int) -> bool:
-	return active_modifier() == mod
+	return modifier == mod
 
 
 func legal_for(player: int) -> Array:
@@ -432,8 +428,8 @@ func card_value(c: CardData, _player: int = -1) -> float:
 		ChaosModifiers.Modifier.TRUNFO_DOBRO:
 			if c.is_trunfo():
 				v *= 2.0
-		ChaosModifiers.Modifier.REIS_DOBRO:
-			if c.rank == 14 and not c.is_trunfo():
+		ChaosModifiers.Modifier.FIGURAS_DOBRO:
+			if c.rank >= 11 and c.rank <= 14 and not c.is_trunfo():
 				v *= 2.0
 		ChaosModifiers.Modifier.NAIPE_FRACO:
 			if c.suit == weak_suit:
@@ -444,9 +440,6 @@ func card_value(c: CardData, _player: int = -1) -> float:
 		ChaosModifiers.Modifier.PEQUENAS_IMPORTAM:
 			if is_equal_approx(c.points(), 0.5):
 				v = 1.0
-		ChaosModifiers.Modifier.NAIPE_MALDITO:
-			if c.suit == weak_suit:
-				v = NAIPE_CURSED_VALUE
 	return v
 
 
@@ -468,7 +461,7 @@ func _lowest_index(trick: Array = []) -> int:
 ## Se `card`, jogada por `player` agora, venceria a rodada como está.
 func would_win(card: CardData, player: int) -> bool:
 	var ev := active_modifier()
-	if ev != ChaosModifiers.Modifier.MUNDO_CONTRARIO and ev != ChaosModifiers.Modifier.VAZA_INVERTIDA:
+	if ev != ChaosModifiers.Modifier.VAZA_INVERTIDA:
 		return TrickRules.would_win(card, player, plays, louco_can_win())
 	var trick := plays.duplicate()
 	trick.append({"player": player, "card": card})
@@ -482,7 +475,7 @@ func chips_of(points: float) -> float:
 
 func _resolve_trick() -> Dictionary:
 	var ev := active_modifier()
-	var inverted := ev == ChaosModifiers.Modifier.MUNDO_CONTRARIO or ev == ChaosModifiers.Modifier.VAZA_INVERTIDA
+	var inverted := ev == ChaosModifiers.Modifier.VAZA_INVERTIDA
 	var idx := _lowest_index() if inverted else TrickRules.winning_index(plays, louco_can_win())
 	var winner: int = plays[idx]["player"]
 	var cards: Array = plays.map(func(p): return p["card"])
@@ -493,10 +486,6 @@ func _resolve_trick() -> Dictionary:
 	for c in cards:
 		base_points += card_value(c, winner)
 	var mult := 1.0
-	if ev == ChaosModifiers.Modifier.PRIMEIRA_DOBRO:
-		mult *= 2.0
-	if ev == ChaosModifiers.Modifier.ULTIMA_TRIPLO:
-		mult *= 3.0
 	if ev == ChaosModifiers.Modifier.VAZA_DOURADA:
 		mult *= GOLD_MULT
 	var combos: Array = []
@@ -614,7 +603,7 @@ func _finish_trick(result: Dictionary, winner: int) -> Dictionary:
 			deltas.append(stacks[p] - level_start_stacks[p])
 		round_result = {
 			"round": round_index, "modifier": modifier, "weak_suit": weak_suit,
-			"modifier_trick": modifier_trick, "stacks": stacks.duplicate(), "deltas": deltas,
+			"stacks": stacks.duplicate(), "deltas": deltas,
 			"tricks_won": tricks_won(),
 		}
 		round_finished.emit(round_result)
@@ -709,15 +698,47 @@ func blitz_status(player: int) -> String:
 	return "short" if wins[player] < predicts[player] else "over"
 
 
+## No Blitz, só o que muda QUEM vence (Louco Vence/Rodada Invertida, já aplicados antes de
+## chegar aqui) e a contagem (Rodada Dourada→Dobrada) importam pro palpite. Saque, Assalto ao
+## Líder e Rodada Maldita ainda mexem em fichas de verdade, à parte do palpite — os outros 6
+## modificadores não têm efeito nenhum aqui (só valem no Caos).
 func _resolve_trick_blitz(idx: int, winner: int, ev: int) -> Dictionary:
 	var value := 2 if ev == ChaosModifiers.Modifier.VAZA_DOURADA else 1
 	wins[winner] += value
+	var saque_amount := 0.0
+	var assalto_amount := 0.0
+	if ev == ChaosModifiers.Modifier.ASSALTO_LIDER:
+		var rich := _highest_player()
+		if rich != winner:
+			assalto_amount = minf(chips_of(ASSALTO_AMOUNT), stacks[rich])
+			stacks[rich] -= assalto_amount
+	if ev == ChaosModifiers.Modifier.SAQUE:
+		for pl in plays:
+			var q: int = pl["player"]
+			if q == winner:
+				continue
+			var take := minf(chips_of(SAQUE_AMOUNT), stacks[q])
+			stacks[q] -= take
+			saque_amount += take
+	var curse_amount := 0.0
+	if ev == ChaosModifiers.Modifier.VAZA_MALDITA:
+		var rivals: Array = []
+		for pl in plays:
+			if int(pl["player"]) != winner:
+				rivals.append(int(pl["player"]))
+		if not rivals.is_empty():
+			var cost := minf(chips_of(CURSE_PENALTY), stacks[winner])
+			var each := floorf(cost / float(rivals.size()))
+			for q in rivals:
+				stacks[q] += each
+			curse_amount = each * float(rivals.size())
+	stacks[winner] += saque_amount + assalto_amount - curse_amount
 	var result := {
 		"winner": winner, "winning_index": idx, "plays": plays.duplicate(), "points": 0.0,
 		"base_points": 0.0, "mult": 1.0, "prize": 0.0, "pot": pot, "combos": [], "streak": 0,
-		"streak_mult": 1.0, "bonus": 0.0, "saque_amount": 0.0, "assalto_amount": 0.0,
-		"walkover": false, "trick_number": trick_number, "modifier": ev, "value": value,
-		"wins": wins.duplicate(), "rake": 0.0, "gain": 0.0,
+		"streak_mult": 1.0, "bonus": 0.0, "saque_amount": saque_amount, "assalto_amount": assalto_amount,
+		"curse_amount": curse_amount, "walkover": false, "trick_number": trick_number, "modifier": ev,
+		"value": value, "wins": wins.duplicate(), "rake": 0.0, "gain": saque_amount + assalto_amount - curse_amount,
 	}
 	return _finish_trick_blitz(result, winner)
 
@@ -738,7 +759,7 @@ func _finish_trick_blitz(result: Dictionary, winner: int) -> Dictionary:
 			deltas.append(stacks[p] - level_start_stacks[p])
 		round_result = {
 			"round": round_index, "modifier": modifier, "weak_suit": weak_suit,
-			"modifier_trick": modifier_trick, "stacks": stacks.duplicate(), "deltas": deltas,
+			"stacks": stacks.duplicate(), "deltas": deltas,
 			"tricks_won": tricks_won(), "wins": wins.duplicate(), "blitz": blitz_result,
 		}
 	trick_resolved.emit(result)
