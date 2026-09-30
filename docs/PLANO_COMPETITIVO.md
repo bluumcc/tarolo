@@ -150,7 +150,7 @@ tutorial guiado, cosméticos, torneios, novos modificadores.
   trocável (`engine.swap_cards`); substituída por pedido: todo mundo recebe `BLITZ_DEAL_SIZE`
   (10) e descarta `BLITZ_DISCARD_SIZE` (2) antes de saber a regra da 1ª rodada — sempre, inclusive
   no onboarding. `engine.can_discard/apply_discard`, bot em `ChaosBot.wants_discard`, UI em
-  `_human_discard_choice()`.
+  `_human_discard_play()` (seleciona direto da mão, sem popup).
 - **Onboarding (camadas de regra):** feito, fora do plano original de 6 fases, junto da Fase 2.
   `ChaosEngine.onboarding_levels` (config, contado por `GameState.ONBOARDING_LEVELS = 3`, salvo
   em `profile.blitz_levels`): as primeiras mesas de Blitz de uma conta nova não sorteiam

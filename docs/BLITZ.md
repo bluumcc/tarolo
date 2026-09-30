@@ -192,8 +192,12 @@ Conta do baralho: 78 cartas no total, 10×4=40 distribuídas (antes eram 32), so
 de sobra pro sorteio de naipe dos modificadores, que não consome carta nenhuma.
 
 `engine.can_discard/apply_discard` (motor), `ChaosBot.wants_discard` (bot: descarta as 2 mais
-fracas da mão crua, sem modificador — ainda não foi sorteado nesse ponto do nível), UI em
-`_human_discard_choice()` (toque pra marcar/desmarcar, confirma só com exatamente 2 marcadas).
+fracas da mão crua, sem modificador — ainda não foi sorteado nesse ponto do nível). Sem popup: a
+seleção é direto na própria mão, igual escolher carta pra jogar — `_human_discard_play()` põe a
+cena em `phase == "discard"`, `_rebuild_hand()` deixa as 10 cartas tocáveis, `_on_discard_tapped()`
+sobe a carta tocada (`CardView.set_selected`) e marca pra descarte, toca de novo pra desmarcar. O
+botão DESCARTAR (no lugar do DOBRAR, que essa hora do nível ainda não existe) só libera com
+exatamente `BLITZ_DISCARD_SIZE` marcadas; `_on_discard_pressed()` aplica e segue o nível.
 Sempre ativo, **inclusive no onboarding** — é a única etapa nova que não se esconde nas primeiras
 mesas de conta nova, porque molda a mão, não adiciona uma regra de aposta ou de rodada.
 

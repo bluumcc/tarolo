@@ -72,6 +72,8 @@ var hold_pot := -1.0
 var blitz_revealed: Array = []  # Blitz: entrada de cada um já paga (pote), pill visível na mesa
 var blitz_showdown := false     # Blitz: fim do nível — só aí o alvo dos rivais aparece pra você
 var double_btn: Button
+var discard_btn: Button
+var discard_picks: Array = []   # Blitz: cartas marcadas na mão pra descartar (até BLITZ_DISCARD_SIZE)
 var shown_pot := 0.0
 var pot_locked := false        # contador do pote rolando: o refresh não sobrescreve
 
@@ -262,6 +264,11 @@ func _build_ui() -> void:
 	double_btn.visible = false
 	double_btn.pressed.connect(_on_double_pressed)
 	status_row.add_child(double_btn)
+	discard_btn = UIKit.button("DESCARTAR", UIKit.OK, 24)
+	discard_btn.custom_minimum_size = Vector2(220, 52)
+	discard_btn.visible = false
+	discard_btn.pressed.connect(_on_discard_pressed)
+	status_row.add_child(discard_btn)
 
 	# Relógio da jogada: barra que esvazia — some fora da sua vez.
 	turn_bar = ProgressBar.new()
@@ -493,12 +500,13 @@ func _rebuild_hand() -> void:
 		hand_container.remove_child(c)
 		c.queue_free()
 	selected_view = null
-	var legal := engine.legal_for(0) if human_turn else []
+	var discarding := phase == "discard"
+	var legal := engine.legal_for(0) if (human_turn and not discarding) else []
 	for card in engine.hands[0]:
 		var cv: CardView = CARD_SCENE.instantiate()
 		cv.setup(card, true)
 		hand_container.add_child(cv)
-		cv.set_playable(human_turn and legal.has(card))
+		cv.set_playable(discarding or (human_turn and legal.has(card)))
 		cv.tapped.connect(_on_card_tapped)
 		cv.zoom_requested.connect(_show_zoom)
 		_apply_modifier_badge(cv, card)
@@ -805,6 +813,9 @@ func _process(delta: float) -> void:
 
 
 func _on_card_tapped(view: CardView) -> void:
+	if phase == "discard":
+		_on_discard_tapped(view)
+		return
 	if not human_turn or not view.playable:
 		if human_turn and not view.playable:
 			status_label.text = "Jogada ilegal — você é obrigado a seguir o naipe ou cortar com Trunfo."
@@ -1811,11 +1822,10 @@ func _blitz_open_level() -> bool:
 		if not engine.can_discard(p):
 			continue
 		if p == 0 and not GameState.autoplay:
-			await _tip("discard", "ESCOLHA 2 PRA DESCARTAR", "Você recebeu 10 cartas. Toque em 2 pra descartar antes de saber qualquer regra da rodada — sobram as 8 com que você joga o nível.")
-			await _human_discard_choice()
+			await _tip("discard", "ESCOLHA 2 PRA DESCARTAR", "Você recebeu 10 cartas. Toque em 2 delas na sua mão pra marcar — elas sobem. Toque de novo pra desmarcar. Confirme quando tiver 2 marcadas.")
+			await _human_discard_play()
 			if not is_inside_tree() or finished:
 				return false
-			_rebuild_hand()
 		else:
 			engine.apply_discard(p, ChaosBot.wants_discard(engine, p, int(config["difficulty"][p]), bot_rng))
 	phase = "predict"
@@ -1873,72 +1883,48 @@ func _blitz_reveal() -> void:
 	await _wait(0.8)
 
 
-## Painel do descarte inicial: recebeu 10 cartas, toca em 2 pra descartar (toggle) — o CONFIRMAR
-## só libera com exatamente 2 marcadas. Some sozinho depois da escolha.
-func _human_discard_choice() -> void:
-	modal_open = true
-	var vw := get_viewport_rect().size.x
-	var holder := MarginContainer.new()
-	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	holder.add_theme_constant_override("margin_top", int(seat_row.global_position.y + seat_row.size.y + 6.0))
-	overlay_layer.add_child(holder)
-	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 20)
-	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	box.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	box.custom_minimum_size = Vector2(minf(vw - 32.0, 660.0), 0)
-	holder.add_child(box)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 8)
-	box.add_child(v)
-	v.add_child(UIKit.label("DESCARTE 2 CARTAS", 26, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
-	var info := UIKit.label("Toque em 2 cartas pra descartar. Toque de novo pra desmarcar.", 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(info)
-	var body := VBoxContainer.new()
-	body.add_theme_constant_override("separation", 8)
-	v.add_child(body)
-	var hand: Array = (engine.hands[0] as Array).duplicate()
-	var st := {"picked": []}
-	st["render"] = func():
-		for c in body.get_children():
-			c.queue_free()
-		var scroll := ScrollContainer.new()
-		scroll.custom_minimum_size = Vector2(0, 88)
-		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-		scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		body.add_child(scroll)
-		UIKit.suppress_click_on_scroll(scroll)
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 6)
-		scroll.add_child(row)
-		var picked: Array = st["picked"]
-		for c in hand:
-			var card: CardData = c
-			var chosen: bool = picked.any(func(p): return (p as CardData).equals(card))
-			var b := UIKit.button(card.display_name(), UIKit.DANGER if chosen else UIKit.BUTTON_MUTED, 18)
-			b.custom_minimum_size = Vector2(0, 68)
-			b.pressed.connect(func():
-				if chosen:
-					picked = picked.filter(func(p): return not (p as CardData).equals(card))
-				elif picked.size() < ChaosEngine.BLITZ_DISCARD_SIZE:
-					picked.append(card)
-				st["picked"] = picked
-				(st["render"] as Callable).call())
-			row.add_child(b)
-		var go := UIKit.button("CONFIRMAR DESCARTE", UIKit.OK if picked.size() == ChaosEngine.BLITZ_DISCARD_SIZE else UIKit.BUTTON_MUTED, 26)
-		go.disabled = picked.size() != ChaosEngine.BLITZ_DISCARD_SIZE
-		go.custom_minimum_size = Vector2(0, 64)
-		go.pressed.connect(func():
-			engine.apply_discard(0, picked)
-			item_chosen.emit(1))
-		body.add_child(go)
-	(st["render"] as Callable).call()
-	UIKit.pop_in(box, GameState.anim(0.15))
+## Descarte inicial: sem popup — seleciona direto da própria mão, igual escolher carta pra jogar.
+## Toca numa carta e ela sobe (marcada pra descartar); toca de novo e ela desce (desmarca). O
+## botão DESCARTAR (no lugar do DOBRAR, que essa hora do nível ainda não existe) só libera com
+## exatamente `BLITZ_DISCARD_SIZE` marcadas.
+func _human_discard_play() -> void:
+	phase = "discard"
+	discard_picks = []
+	_rebuild_hand()
+	status_label.text = "Toque em %d cartas da sua mão pra descartar." % ChaosEngine.BLITZ_DISCARD_SIZE
+	discard_btn.visible = true
+	_refresh_discard_button()
 	await item_chosen
-	modal_open = false
-	if is_inside_tree():
-		holder.queue_free()
+	discard_btn.visible = false
+	status_label.text = ""
+	discard_picks = []
+
+
+func _on_discard_tapped(view: CardView) -> void:
+	if view.selected:
+		view.set_selected(false)
+		discard_picks.erase(view.data)
+	elif discard_picks.size() < ChaosEngine.BLITZ_DISCARD_SIZE:
+		view.set_selected(true)
+		discard_picks.append(view.data)
+	else:
+		return
+	Sfx.play("tick")
+	_refresh_discard_button()
+
+
+func _refresh_discard_button() -> void:
+	var ready := discard_picks.size() == ChaosEngine.BLITZ_DISCARD_SIZE
+	discard_btn.text = "DESCARTAR (%d/%d)" % [discard_picks.size(), ChaosEngine.BLITZ_DISCARD_SIZE]
+	discard_btn.disabled = not ready
+	discard_btn.modulate.a = 1.0 if ready else 0.6
+
+
+func _on_discard_pressed() -> void:
+	if discard_picks.size() != ChaosEngine.BLITZ_DISCARD_SIZE:
+		return
+	engine.apply_discard(0, discard_picks)
+	item_chosen.emit(1)
 
 
 ## Painel do palpite (fica abaixo dos avatares; a sua mão continua à vista). Devolve 0..8.
