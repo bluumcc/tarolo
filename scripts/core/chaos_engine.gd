@@ -61,16 +61,18 @@ var house_rake := 0.0          # total cobrado pela casa na mesa
 var human_rake := 0.0          # quanto do total saiu de fichas do jogador 0   # {player, card} do último descarte por desistência
 
 # Modo Blitz: palpite de vitórias por nível (em vez de aposta por rodada).
-const BLITZ_ENTRY_BLINDS := 2                      # entrada fixa de cada nível, em blinds
-const BLITZ_BONUS_BLINDS := 3                     # prêmio da casa por acerto (só pra você), × peso × sequência
-const BLITZ_DOUBLE_FROM := 3                       # dá pra dobrar a partir da 4ª rodada
+const BLITZ_ENTRY_BLINDS := 4                      # entrada fixa de cada nível, em blinds (10% da stack)
+const BLITZ_STREAK_BONUS_BLINDS := 3              # prêmio especial da casa: 3+ acertos seguidos (só você)
+const BLITZ_BONUS_VAULT_SHARE := 0.5              # o prêmio só sai de até 50% da taxa que a casa já cobrou de você
+const BLITZ_DOUBLE_FROM := 3                       # 1º dobrar a partir da 4ª rodada; o 2º, da 6ª
+const BLITZ_MAX_DOUBLES := 2
 var blitz := false
-var doubled: Array = []       # quem já dobrou a entrada nesse nível
+var doubles: Array = []       # quantas vezes cada um dobrou a entrada nesse nível (0 a 2)
 var predicts: Array = []      # palpite de cada um (-1 = ainda não fez)
 var stakes: Array = []        # fichas que cada um pôs no pote do nível
 var wins: Array = []          # vitórias contadas no nível (Rodada Dobrada conta 2)
 var carry := 0.0              # pote acumulado quando ninguém acerta
-var bonus_on := true          # prêmio da casa por acerto (desligável nos testes)
+var bonus_on := true          # prêmio especial de sequência (desligável nos testes)
 var hit_streak := 0           # acertos seguidos do jogador 0
 var human_bonus := 0.0        # total de prêmios da casa recebidos pelo jogador 0
 var blitz_result: Dictionary = {}
@@ -158,13 +160,13 @@ func _setup_round() -> void:
 	predicts = []
 	stakes = []
 	wins = []
-	doubled = []
+	doubles = []
 	blitz_result = {}
 	for p in range(num_players):
 		predicts.append(-1)
 		stakes.append(0.0)
 		wins.append(0)
-		doubled.append(false)
+		doubles.append(0)
 	if blitz:
 		pot = carry
 
@@ -655,22 +657,41 @@ func blitz_need(player: int) -> int:
 	return int(predicts[player]) - int(wins[player])
 
 
-## Dobrar: a partir da 4ª rodada, uma vez por nível, só se ainda dá pra acertar. Paga mais uma
-## entrada (o peso no pote dobra junto).
+## Dobrar: a partir da 4ª rodada (a 2ª vez, da 6ª), só se ainda dá pra acertar. Paga mais uma
+## entrada (o peso no pote dobra/triplica junto). No máximo 2 vezes por nível.
 func can_double(player: int) -> bool:
-	if not blitz or is_round_over() or doubled[player] or trick_number < BLITZ_DOUBLE_FROM:
+	if not can_cover(player):
+		return false
+	return trick_number >= BLITZ_DOUBLE_FROM + 2 * int(doubles[player])
+
+
+## Cobrir a dobra/triplicada de um rival: mesmo efeito de `double_down`, mas sem a espera da
+## rodada — é uma resposta imediata ao lance de outro jogador.
+func can_cover(player: int) -> bool:
+	if not blitz or is_round_over() or int(doubles[player]) >= BLITZ_MAX_DOUBLES:
 		return false
 	var need := blitz_need(player)
 	return need >= 0 and need <= tricks_left() and stacks[player] >= blitz_entry()
 
 
-func double_down(player: int) -> bool:
-	if not can_double(player):
-		return false
+func _pay_double(player: int) -> void:
 	stacks[player] -= blitz_entry()
 	stakes[player] += blitz_entry()
 	pot += blitz_entry()
-	doubled[player] = true
+	doubles[player] += 1
+
+
+func double_down(player: int) -> bool:
+	if not can_double(player):
+		return false
+	_pay_double(player)
+	return true
+
+
+func cover_double(player: int) -> bool:
+	if not can_cover(player):
+		return false
+	_pay_double(player)
 	return true
 
 
@@ -762,7 +783,7 @@ func _settle_blitz() -> Dictionary:
 		carry_out = pool
 	else:
 		if rake_on:
-			rake = ChaosEconomy.rake_of(pool, blind)
+			rake = ChaosEconomy.blitz_rake_of(pool, blind)
 		var dist := pool - rake
 		var paid := 0.0
 		var top: int = hits[0]
@@ -777,15 +798,14 @@ func _settle_blitz() -> Dictionary:
 			total_stakes += float(stakes[p])
 		house_rake += rake
 		human_rake += rake * float(stakes[0]) / maxf(total_stakes, 1.0)
-	# Prêmio da casa: quem (você) acerta o número exato ganha um extra, maior com palpite difícil,
-	# dobrando e em sequência de acertos. Recompensa a habilidade sem tirar dos bots.
+	# Prêmio especial da casa: 3 ou mais acertos seguidos (só você). É pago com a taxa que a casa
+	# já cobrou de você (no máximo metade dela), então a casa sempre sai no lucro.
 	var bonus := 0.0
 	if hits.has(0):
 		hit_streak += 1
-		if bonus_on:
-			var streak_mult := minf(1.0 + 0.5 * float(hit_streak - 1), 2.0)
-			bonus = float(BLITZ_BONUS_BLINDS * blind) * blitz_weight(int(predicts[0])) * streak_mult * (2.0 if doubled[0] else 1.0)
-			bonus = roundf(bonus)
+		if bonus_on and hit_streak >= 3:
+			var vault := maxf(human_rake - human_bonus, 0.0) * BLITZ_BONUS_VAULT_SHARE
+			bonus = floorf(minf(float(BLITZ_STREAK_BONUS_BLINDS * blind), vault))
 			human_bonus += bonus
 	else:
 		hit_streak = 0
@@ -796,7 +816,7 @@ func _settle_blitz() -> Dictionary:
 	stacks[0] += bonus
 	net[0] += bonus
 	var res := {
-		"predicts": predicts.duplicate(), "stakes": stakes.duplicate(), "wins": wins.duplicate(), "doubled": doubled.duplicate(),
+		"predicts": predicts.duplicate(), "stakes": stakes.duplicate(), "wins": wins.duplicate(), "doubles": doubles.duplicate(),
 		"hits": hits, "near": near, "payouts": payouts, "refunds": refunds, "net": net,
 		"pool": pool, "rake": rake, "carry_in": carry, "carry_out": carry_out,
 		"bonus": bonus, "streak": hit_streak,

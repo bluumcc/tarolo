@@ -31,6 +31,9 @@ func session(diffs: Array, seed_i: int, levels: int, use_seat0_bot := true) -> D
 			var pl := e.current
 			if ChaosBot.wants_double(e, pl, diffs[pl], rng):
 				e.double_down(pl)
+				for q in range(4):
+					if q != pl and ChaosBot.wants_cover(e, q, diffs[q], rng):
+						e.cover_double(q)
 			e.play(pl, ChaosBot.choose(e, pl, diffs[pl], rng))
 		for p in range(4):
 			act_sum += float(e.wins[p])
@@ -42,7 +45,7 @@ func session(diffs: Array, seed_i: int, levels: int, use_seat0_bot := true) -> D
 		if (br["hits"] as Array).is_empty():
 			carries += 1
 		lv += 1
-	return {"net": e.stacks[0] - start, "exp": exp_sum / maxf(exp_n, 1), "act": act_sum / maxf(exp_n, 1), "hits": hits, "near": near, "carries": carries, "lv": lv, "bust": bust, "rake": e.human_rake, "house": e.house_rake, "total": e.stacks[0] + e.stacks[1] + e.stacks[2] + e.stacks[3] + e.carry}
+	return {"net": e.stacks[0] - start, "exp": exp_sum / maxf(exp_n, 1), "act": act_sum / maxf(exp_n, 1), "hits": hits, "near": near, "carries": carries, "lv": lv, "bust": bust, "rake": e.human_rake, "bonus": e.human_bonus, "house": e.house_rake, "total": e.stacks[0] + e.stacks[1] + e.stacks[2] + e.stacks[3] + e.carry}
 
 
 func report(label: String, diffs: Array, levels: int) -> void:
@@ -56,6 +59,7 @@ func report(label: String, diffs: Array, levels: int) -> void:
 	var lvs := 0
 	var busts := 0
 	var rake := 0.0
+	var bonus := 0.0
 	var neg := 0
 	for i in range(N):
 		var r := session(diffs, i, levels)
@@ -67,11 +71,12 @@ func report(label: String, diffs: Array, levels: int) -> void:
 		carries += r["carries"]
 		lvs += r["lv"]
 		rake += r["rake"]
+		bonus += r["bonus"]
 		if r["bust"] >= 0:
 			busts += 1
 		if r["net"] < 0:
 			neg += 1
-	print("%-30s esperado %.2f real %.2f | acerto %2d%% perto %2d%% acumula %2d%% | líquido médio %+.1f blinds | perde %d%% | quebra %d%% | taxa %.1f" % [label, ex / N, ac / N, 100 * hits / maxi(lvs, 1), 100 * near / maxi(lvs, 1), 100 * carries / maxi(lvs, 1), net / N / 10.0, 100 * neg / N, 100 * busts / N, rake / N / 10.0])
+	print("%-30s esperado %.2f real %.2f | acerto %2d%% perto %2d%% acumula %2d%% | líquido médio %+.1f blinds | perde %d%% | quebra %d%% | taxa %.1f rakeback %.1f" % [label, ex / N, ac / N, 100 * hits / maxi(lvs, 1), 100 * near / maxi(lvs, 1), 100 * carries / maxi(lvs, 1), net / N / 10.0, 100 * neg / N, 100 * busts / N, rake / N / 10.0, bonus / N / 10.0])
 
 
 func _init() -> void:

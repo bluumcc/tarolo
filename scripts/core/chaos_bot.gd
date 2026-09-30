@@ -247,17 +247,34 @@ static func expected_left(engine: ChaosEngine, player: int) -> float:
 	return expected_wins(engine, player)
 
 
-## Dobra quando a chance de acertar é alta: já no alvo e com a mão que sobrou fraca demais pra
+## Vale a pena pagar mais uma entrada agora: já no alvo e com a mão que sobrou fraca demais pra
 ## ganhar mais (na simulação acerta ~90%), ou faltando 1 rodada e uma carta certeira. Fácil nunca
-## dobra; normal só com muita certeza.
-static func wants_double(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> bool:
-	if difficulty == BotAI.Difficulty.EASY or not engine.can_double(player):
+## topa; normal só com muita certeza. Serve tanto pra dobrar/triplicar (seu próprio lance) quanto
+## pra cobrir o lance de um rival — a conta de valer a pena é a mesma.
+static func _double_worth_it(engine: ChaosEngine, player: int, difficulty: int) -> bool:
+	if difficulty == BotAI.Difficulty.EASY:
 		return false
 	var need := engine.blitz_need(player)
 	var left := expected_left(engine, player)
-	var ok := false
+	if int(engine.doubles[player]) >= 1:
+		# Triplicar (ou cobrir a 2ª vez): só com o palpite praticamente fechado.
+		return difficulty == BotAI.Difficulty.HARD and need == 0 and left < 0.15
 	if need == 0:
-		ok = left < (0.3 if difficulty == BotAI.Difficulty.HARD else 0.15)
-	elif difficulty == BotAI.Difficulty.HARD and engine.tricks_left() == 1:
-		ok = absf(left - float(need)) < 0.15
-	return ok and rng.randf() < 0.85
+		return left < (0.3 if difficulty == BotAI.Difficulty.HARD else 0.15)
+	if difficulty == BotAI.Difficulty.HARD and engine.tricks_left() == 1:
+		return absf(left - float(need)) < 0.15
+	return false
+
+
+static func wants_double(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> bool:
+	if not engine.can_double(player):
+		return false
+	return _double_worth_it(engine, player, difficulty) and rng.randf() < 0.85
+
+
+## Cobrir a dobra/triplicada de um rival: mesma conta de valer a pena, mas sem esperar a rodada
+## (é uma resposta imediata). Um pouco mais cauteloso, porque a decisão não foi iniciativa sua.
+static func wants_cover(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> bool:
+	if not engine.can_cover(player):
+		return false
+	return _double_worth_it(engine, player, difficulty) and rng.randf() < 0.7

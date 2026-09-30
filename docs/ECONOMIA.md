@@ -71,9 +71,21 @@ Controle de inflação: a economia é fechada (soma zero menos a taxa); as únic
 Fichas compradas com dinheiro real que não podem ser sacadas caem no modelo de "jogo social" (cassino social) e algumas regiões têm regras próprias (classificação etária, loot boxes, tributos). Antes de cobrar de verdade, vale validar com a loja (Apple/Google) e com jurídico.
 
 
-## 6. Ajuste de ritmo (blinds ×2)
+## 8. Ajuste de ritmo (blinds ×2)
 Ganhar fichas era lento demais (~+90 em 15 min). Mudanças:
 - Blinds das mesas dobraram: Iniciante 10, Regular 50, Alta 200 (stack de 40 blinds: 400, 2.000 e 8.000).
 - Saldo inicial 1.500 (3 entradas Iniciante); recarga diária abaixo de 400, de 500 fichas.
 - Pacotes ×1,5 (750, 3.600, 9.750, 21.000) mantendo os mesmos preços.
-- Blitz: prêmio da casa por acerto exato (ver `docs/BLITZ.md`) e ritmo dos bots mais rápido.
+
+## 9. Blitz pensado para PvP: entrada maior, cobrir e rakeback
+O Blitz é desenhado pra jogadores reais entre si (os bots hoje só preenchem o lugar do servidor
+multiplayer, que ainda não existe). Nesse desenho a casa nunca cria ficha — só cobra taxa — e o
+primeiro "prêmio da casa" (pago do nada a cada acerto exato) virou **rakeback**:
+- Entrada por nível: de 2 para **4 blinds (10% da stack)**, pra o pote girar mais rápido.
+- Dobrar ganhou um 2º nível (**triplicar**, da 6ª rodada) e a **cobertura**: quando alguém dobra ou
+  triplica, os rivais podem cobrir (pagar o mesmo, igualar o peso) ou deixar. É dinheiro que sai
+  dos próprios jogadores, não da casa.
+- Taxa do Blitz: **4%** do pote pago, teto de 2 blinds.
+- O prêmio de sequência (3 acertos exatos seguidos) só paga com a taxa que a casa já cobrou daquele
+  jogador, no máximo metade dela: é rakeback, não fichas do nada, e a casa nunca fica no prejuízo
+  por causa dele. Detalhes e a simulação completa em `docs/BLITZ.md`.

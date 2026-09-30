@@ -719,27 +719,34 @@ func _test_blitz() -> void:
 	check(is_equal_approx(float(r3["payouts"][0]) + float(r3["payouts"][1]), carried - float(r3["refunds"][3]) - float(r3["refunds"][2]) - float(r3["refunds"][0]) - float(r3["refunds"][1])), "Blitz: acertos dividem o pote inteiro (incluindo o acumulado)")
 	check(float(r3["payouts"][1]) > float(r3["payouts"][0]), "Blitz: palpite mais alto pesa mais no pote")
 
-	# Prêmio da casa: só pra você, cresce com o peso do palpite, dobrar e sequência.
+	# Prêmio de sequência (rakeback): só pra você, só a partir do 3º acerto seguido, e nunca
+	# maior que metade da taxa que a casa já cobrou de você (o "cofre").
 	var bn := ChaosEngine.new()
 	bn.setup_match({"seed": 1, "mode": "blitz", "blind": 10})
-	bn.rake_on = false
-	bn.pot = 80.0
-	bn.stakes = [20.0, 20.0, 20.0, 20.0]
+	bn.rake_on = true
+	for i in range(2):
+		bn.pot = 800.0
+		bn.stakes = [200.0, 200.0, 200.0, 200.0]
+		bn.predicts = [3, 0, 0, 0]
+		bn.wins = [3, 1, 1, 1]
+		var rb := bn._settle_blitz()
+		check(is_equal_approx(float(rb["bonus"]), 0.0), "Blitz: %dº acerto seguido ainda não libera o prêmio de sequência" % (i + 1))
+	check(bn.hit_streak == 2 and bn.human_rake > 0.0, "Blitz: taxa acumula no cofre a cada pote pago")
+	var vault_before := bn.human_rake
+	bn.pot = 800.0
+	bn.stakes = [200.0, 200.0, 200.0, 200.0]
 	bn.predicts = [3, 0, 0, 0]
 	bn.wins = [3, 1, 1, 1]
-	var rb1 := bn._settle_blitz()
-	check(is_equal_approx(float(rb1["bonus"]), 3.0 * 10.0 * 1.5), "Blitz: prêmio da casa = 3 blinds × peso do palpite")
-	bn.pot = 80.0
-	bn.stakes = [20.0, 20.0, 20.0, 20.0]
-	bn.predicts = [3, 0, 0, 0]
-	bn.wins = [3, 1, 1, 1]
-	var rb2 := bn._settle_blitz()
-	check(is_equal_approx(float(rb2["bonus"]), roundf(3.0 * 10.0 * 1.5 * 1.5)) and int(rb2["streak"]) == 2, "Blitz: sequência de acertos aumenta o prêmio")
-	bn.pot = 80.0
+	var rb3 := bn._settle_blitz()
+	check(int(rb3["streak"]) == 3 and float(rb3["bonus"]) > 0.0, "Blitz: 3 acertos seguidos liberam o prêmio de sequência")
+	check(float(rb3["bonus"]) <= 0.5 * bn.human_rake + 0.001, "Blitz: prêmio nunca passa de metade da taxa acumulada no cofre")
+	check(float(rb3["bonus"]) <= ChaosEngine.BLITZ_STREAK_BONUS_BLINDS * bn.blind, "Blitz: prêmio tem teto de %d blinds" % ChaosEngine.BLITZ_STREAK_BONUS_BLINDS)
+	check(bn.human_rake > vault_before, "Blitz: o cofre segue enchendo mesmo depois de pagar o prêmio")
+	bn.pot = 800.0
 	bn.predicts = [3, 0, 0, 0]
 	bn.wins = [2, 1, 1, 1]
-	var rb3 := bn._settle_blitz()
-	check(is_equal_approx(float(rb3["bonus"]), 0.0) and bn.hit_streak == 0, "Blitz: errar zera a sequência e não dá prêmio")
+	var rb4 := bn._settle_blitz()
+	check(is_equal_approx(float(rb4["bonus"]), 0.0) and bn.hit_streak == 0, "Blitz: errar zera a sequência e não dá prêmio")
 
 	# Taxa da casa só quando o pote é pago.
 	var f3 := ChaosEngine.new()
@@ -751,7 +758,7 @@ func _test_blitz() -> void:
 	var r4 := f3._settle_blitz()
 	check(float(r4["rake"]) > 0.0 and float(r4["rake"]) <= 1.5 * 10.0, "Blitz: taxa da casa limitada quando há pagamento")
 
-	# Dobrar.
+	# Dobrar / triplicar.
 	var d := ChaosEngine.new()
 	d.setup_match({"seed": 4, "mode": "blitz", "blind": 10})
 	for p in range(4):
@@ -761,13 +768,35 @@ func _test_blitz() -> void:
 	check(d.can_double(0), "Blitz: no alvo, a partir da 4ª rodada, pode dobrar")
 	var pot_before := d.pot
 	check(d.double_down(0) and is_equal_approx(d.pot, pot_before + d.blitz_entry()) and is_equal_approx(float(d.stakes[0]), 2.0 * d.blitz_entry()), "Blitz: dobrar põe outra entrada no pote")
-	check(not d.can_double(0), "Blitz: só dobra uma vez por nível")
+	check(not d.can_double(0), "Blitz: o 2º lance só a partir da 6ª rodada")
+	d.trick_number = 4
+	check(not d.can_double(0), "Blitz: 5ª rodada ainda não libera triplicar")
+	d.trick_number = 5
+	check(d.can_double(0) and d.double_down(0) and int(d.doubles[0]) == 2, "Blitz: da 6ª rodada em diante, dá pra triplicar")
+	check(not d.can_double(0), "Blitz: no máximo 2 lances por nível")
 	d.wins[1] = 5
 	check(not d.can_double(1), "Blitz: não dobra quando já estourou o palpite")
 	d.wins[2] = 0
 	d.trick_number = 7
 	d.predicts[2] = 3
 	check(not d.can_double(2), "Blitz: não dobra quando não dá mais tempo de acertar")
+
+	# Cobrir a dobra/triplicada de um rival.
+	var cv := ChaosEngine.new()
+	cv.setup_match({"seed": 4, "mode": "blitz", "blind": 10})
+	for p in range(4):
+		cv.blitz_place(p, 1)
+	cv.trick_number = 0
+	cv.wins[0] = 1
+	check(cv.can_cover(0), "Blitz: cobrir não espera a 4ª rodada, ao contrário de dobrar")
+	check(not cv.can_double(0), "Blitz: dobrar (iniciativa própria) continua esperando a rodada")
+	var pot_cover := cv.pot
+	check(cv.cover_double(0) and is_equal_approx(cv.pot, pot_cover + cv.blitz_entry()) and int(cv.doubles[0]) == 1, "Blitz: cobrir paga mais uma entrada como um dobrar")
+	cv.wins[1] = 6
+	check(not cv.can_cover(1), "Blitz: não cobre quando já estourou o palpite")
+	check(cv.can_cover(2), "Blitz: outro jogador ainda pode cobrir")
+	cv.stacks[2] = 0.0
+	check(not cv.can_cover(2), "Blitz: sem fichas pra pagar a entrada, não cobre")
 
 	# Rodada Dobrada conta 2 vitórias.
 	var g2 := ChaosEngine.new()

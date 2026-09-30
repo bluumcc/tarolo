@@ -741,7 +741,7 @@ func _wait_human() -> CardData:
 	human_turn = true
 	await _tip("turn", "SUA VEZ!", "Toque numa carta pra selecioná-la (ela sobe) e toque de novo pra jogar. Você tem 10 segundos por jogada.")
 	if engine.blitz and engine.can_double(0):
-		await _tip("double", "PODE DOBRAR!", "A partir da 4ª rodada, o botão DOBRAR paga mais uma entrada e dobra o peso do seu palpite no pote. Vale a pena quando você já está no alvo e a mão que sobrou é fraca demais pra ganhar mais uma rodada. Só dá pra dobrar uma vez por nível.")
+		await _tip("double", "PODE DOBRAR!", "A partir da 4ª rodada, o botão DOBRAR paga mais uma entrada e dobra o peso do seu palpite no pote; da 6ª em diante dá pra TRIPLICAR. Vale a pena quando você já está no alvo e a mão que sobrou é fraca demais pra ganhar mais uma rodada. Só dá pra dobrar até duas vezes por nível.")
 	var ls := TrickRules.lead_suit(engine.plays)
 	if ls == -1:
 		status_label.text = "Sua vez — abra a rodada com qualquer carta"
@@ -1336,10 +1336,10 @@ func _show_round_summary() -> String:
 			var hit: bool = (b["hits"] as Array).has(p)
 			var near: bool = (b["near"] as Array).has(p)
 			var verdict := "ACERTOU ✓" if hit else ("ERROU POR 1" if near else "ERROU ✕")
-			var sub_l := UIKit.label("palpite %d · fez %d · %s%s" % [int(b["predicts"][p]), int(b["wins"][p]), verdict, " · dobrou" if bool(b["doubled"][p]) else ""], 22, UIKit.OK if hit else (UIKit.MUTED if near else UIKit.LOSS), HORIZONTAL_ALIGNMENT_CENTER)
+			var sub_l := UIKit.label("palpite %d · fez %d · %s%s" % [int(b["predicts"][p]), int(b["wins"][p]), verdict, " · ×%d" % (1 + int(b["doubles"][p])) if int(b["doubles"][p]) > 0 else ""], 22, UIKit.OK if hit else (UIKit.MUTED if near else UIKit.LOSS), HORIZONTAL_ALIGNMENT_CENTER)
 			v.add_child(sub_l)
 	if r.has("blitz") and float(r["blitz"]["bonus"]) > 0.0:
-		var bl := UIKit.label("Prêmio da casa: +◎%d (sequência de %d acerto%s)" % [int(r["blitz"]["bonus"]), int(r["blitz"]["streak"]), "" if int(r["blitz"]["streak"]) == 1 else "s"], 24, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+		var bl := UIKit.label("Prêmio de sequência da casa: +◎%d (%d acertos seguidos)" % [int(r["blitz"]["bonus"]), int(r["blitz"]["streak"])], 24, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
 		bl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(bl)
 	if r.has("blitz") and float(r["blitz"]["carry_out"]) > 0.0:
@@ -1424,7 +1424,7 @@ func _show_results(summary: Dictionary) -> void:
 	if best_gain > 0.0:
 		v.add_child(UIKit.label("★ Maior pote seu: +◎%d" % int(best_gain), 30, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
 	if engine.blitz and engine.human_bonus >= 1.0:
-		v.add_child(UIKit.label("Prêmios da casa por acertos: +◎%d" % int(engine.human_bonus), 26, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label("Prêmios de sequência: +◎%d" % int(engine.human_bonus), 26, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
 	if engine.human_rake >= 1.0:
 		v.add_child(UIKit.label("Taxa da casa nos seus potes: ◎%d" % int(engine.human_rake), 24, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	for line in summary["lines"]:
@@ -1906,25 +1906,104 @@ func _hand_label_blitz() -> String:
 	return "FRACA ☆☆☆"
 
 
-## Dobrar: paga mais uma entrada (peso do palpite dobra). Serve pra bots e pro botão.
-func _apply_double(p: int) -> void:
-	if not engine.double_down(p):
+## Dobrar/triplicar (seu próprio lance, `is_cover = false`) ou cobrir o lance de um rival (reage
+## na hora, sem esperar a rodada). Depois de um lance próprio (não de uma cobertura), oferece a
+## janela de cobertura aos outros 3.
+func _apply_double(p: int, is_cover := false) -> void:
+	if not (engine.cover_double(p) if is_cover else engine.double_down(p)):
 		return
 	var amt := engine.blitz_entry()
-	action_text[p] = "▲ DOBROU"
+	var verb := "COBRIU" if is_cover else ("TRIPLICOU" if int(engine.doubles[p]) == 2 else "DOBROU")
+	action_text[p] = "▲ ×%d" % (1 + int(engine.doubles[p]))
 	action_color[p] = UIKit.MONEY
-	if GameState.autoplay:
-		_refresh_hud()
-		return
-	var pname := "VOCÊ" if p == 0 else str(config["names"][p]).to_upper()
-	_banner("%s DOBROU!" % pname, "Pôs mais ◎%d no pote. Se acertar o palpite leva o dobro do peso; se errar, perde mais." % int(amt), UIKit.MONEY)
-	Sfx.play("combo")
-	FX.fly_chips(popup_layer, _seat_center(p), _global_center(pot_box), 3)
-	FX.burst(popup_layer, _seat_center(p) - popup_layer.global_position, UIKit.MONEY, 14)
-	FX.shake(main_area, 0.3)
-	_pot_to(engine.pot)
+	if not GameState.autoplay:
+		var pname := "VOCÊ" if p == 0 else str(config["names"][p]).to_upper()
+		_banner("%s %s!" % [pname, verb], "Pôs mais ◎%d no pote (aposta ×%d). Se acertar o palpite pesa mais no pote; se errar, perde mais." % [int(amt), 1 + int(engine.doubles[p])], UIKit.MONEY)
+		Sfx.play("combo")
+		FX.fly_chips(popup_layer, _seat_center(p), _global_center(pot_box), 3)
+		FX.burst(popup_layer, _seat_center(p) - popup_layer.global_position, UIKit.MONEY, 14)
+		FX.shake(main_area, 0.3)
+		_pot_to(engine.pot)
 	_refresh_hud()
-	await _wait(0.9 if p != 0 else 0.5)
+	if not is_cover:
+		await _offer_cover(p)
+	if not GameState.autoplay:
+		await _wait(0.9 if p != 0 else 0.5)
+
+
+## Depois que `actor` dobra ou triplica, os outros 3 podem cobrir: pagar mais uma entrada pra
+## igualar o peso dele no pote (custa um dos 2 lances do nível de quem cobre). Bots decidem na
+## hora; você tem uma janela curta pra tocar COBRIR, senão a resposta vira DEIXAR.
+func _offer_cover(actor: int) -> void:
+	for q in range(engine.num_players):
+		if q == actor or not is_inside_tree() or finished:
+			continue
+		if not engine.can_cover(q):
+			continue
+		if q == 0 and not GameState.autoplay:
+			if await _human_cover_choice(actor):
+				await _apply_double(0, true)
+		elif ChaosBot.wants_cover(engine, q, int(config["difficulty"][q]), bot_rng):
+			if not GameState.autoplay:
+				await _wait(bot_rng.randf_range(0.3, 0.7))
+				if not is_inside_tree() or finished:
+					return
+			await _apply_double(q, true)
+
+
+## Painel de cobertura (fica abaixo dos avatares, como o palpite e a aposta). Devolve true se
+## você tocou COBRIR; passados ~5s sem resposta, devolve false (DEIXAR).
+func _human_cover_choice(actor: int) -> bool:
+	modal_open = true
+	_refresh_double_button()   # some o DOBRAR enquanto essa decisão está pendente
+	var pname := str(config["names"][actor]).to_upper()
+	var vw := get_viewport_rect().size.x
+	var holder := MarginContainer.new()
+	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.add_theme_constant_override("margin_top", int(seat_row.global_position.y + seat_row.size.y + 6.0))
+	overlay_layer.add_child(holder)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MONEY, 20)
+	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	box.custom_minimum_size = Vector2(minf(vw - 32.0, 660.0), 0)
+	holder.add_child(box)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	box.add_child(v)
+	v.add_child(UIKit.label("%s %s!" % [pname, "TRIPLICOU" if int(engine.doubles[actor]) == 2 else "DOBROU"], 28, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
+	var info := UIKit.label("Cobrir custa ◎%d e iguala o peso dele no pote. Se você não cobrir, ele fica com mais peso no rateio." % int(engine.blitz_entry()), 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(info)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	v.add_child(row)
+	var st := {"result": false}
+	var pass_btn := UIKit.button("DEIXAR", UIKit.BUTTON_MUTED, 28)
+	pass_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pass_btn.pressed.connect(func():
+		st["result"] = false
+		item_chosen.emit(1))
+	row.add_child(pass_btn)
+	var cover_btn := UIKit.button("COBRIR ◎%d" % int(engine.blitz_entry()), UIKit.MONEY, 28)
+	cover_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cover_btn.pressed.connect(func():
+		st["result"] = true
+		item_chosen.emit(1))
+	row.add_child(cover_btn)
+	UIKit.pop_in(box, GameState.anim(0.15))
+	var timed_out := {"v": false}
+	get_tree().create_timer(GameState.anim(5.0)).timeout.connect(func():
+		if is_inside_tree() and modal_open and not timed_out["v"]:
+			timed_out["v"] = true
+			item_chosen.emit(-1))
+	await item_chosen
+	timed_out["v"] = true
+	modal_open = false
+	if is_inside_tree():
+		holder.queue_free()
+		_refresh_double_button()
+	return bool(st["result"])
 
 
 func _on_double_pressed() -> void:
@@ -1938,7 +2017,7 @@ func _refresh_double_button() -> void:
 	var show := engine.blitz and phase == "play" and not finished and not modal_open and engine.can_double(0)
 	double_btn.visible = show
 	if show:
-		double_btn.text = "DOBRAR ◎%d" % int(engine.blitz_entry())
+		double_btn.text = "%s ◎%d" % ["TRIPLICAR" if int(engine.doubles[0]) == 1 else "DOBRAR", int(engine.blitz_entry())]
 
 
 ## Palpite na frente do jogador, com o progresso ao vivo: verde no alvo, vermelho estourou ou
@@ -1958,7 +2037,7 @@ func _refresh_blitz_tag(p: int, idx: int) -> void:
 		elif need < 0 or need > engine.tricks_left():
 			col = UIKit.LOSS
 		lbl.add_theme_color_override("font_color", col)
-		cap.text = "PALPITE ×2" if bool(engine.doubled[p]) else "PALPITE"
+		cap.text = "PALPITE ×%d" % (1 + int(engine.doubles[p])) if int(engine.doubles[p]) > 0 else "PALPITE"
 	var status := ""
 	var col2 := UIKit.MUTED
 	if idx == 0:
@@ -2106,8 +2185,7 @@ func _blitz_settlement() -> void:
 		best_gain = float(br["net"][0])
 	if float(br["bonus"]) > 0.0:
 		await _wait(0.4)
-		var streak_txt := "  ·  sequência de %d acertos" % int(br["streak"]) if int(br["streak"]) >= 2 else ""
-		_banner("PRÊMIO DA CASA +◎%d" % int(br["bonus"]), "Você acertou o palpite exato%s. Palpite alto, dobrar e sequência aumentam o prêmio." % streak_txt, UIKit.MONEY)
+		_banner("SEQUÊNCIA DE %d ACERTOS! +◎%d" % [int(br["streak"]), int(br["bonus"])], "Prêmio especial da casa por acertar o palpite exato várias vezes seguidas.", UIKit.MONEY)
 		Sfx.play("jackpot")
 		FX.chip_rain(popup_layer, 26)
 		FX.float_text(popup_layer, _seat_center(0), "+◎ %d" % int(br["bonus"]), UIKit.MONEY, 44)

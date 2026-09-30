@@ -69,5 +69,12 @@ static func buy_simulated(profile: Dictionary, pack_id: String) -> int:
 	return 0
 
 
+## Blitz: pote maior e mais giro, então taxa de 4% (teto 2 blinds) só quando o pote é pago.
+const BLITZ_RAKE_PCT := 0.04
+const BLITZ_RAKE_CAP_BLINDS := 2.0
+static func blitz_rake_of(pot: float, blind: int) -> float:
+	return minf(roundf(pot * BLITZ_RAKE_PCT), roundf(BLITZ_RAKE_CAP_BLINDS * float(blind)))
+
+
 static func rake_of(pot: float, blind: int) -> float:
 	return minf(roundf(pot * RAKE_PCT), roundf(RAKE_CAP_BLINDS * float(blind)))
