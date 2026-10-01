@@ -1,8 +1,9 @@
 extends Node
 ## Estado da sessão: modo atual, lobby ranqueado e fechamento de partidas.
 
-## Vanilla é só recreativo (sem Mode.RANKED): o Elo agora é inteiramente do Blitz, fila
-## única — toda mesa real de Blitz vale fichas E LP/MMR ao mesmo tempo (ver `blitz_ranked`).
+## Vanilla é só recreativo (sem Mode.RANKED): o Elo agora é inteiramente do Blitz, fila única —
+## toda mesa real de Blitz vale fichas E LP/MMR ao mesmo tempo (`report_chaos_match`). Mesa de
+## torneio é um caminho totalmente separado (`report_tournament_table`) que nunca toca o Elo.
 enum Mode { CLASSIC }
 
 const MODE_NAMES := ["Vanilla"]
@@ -15,9 +16,6 @@ var autoplay := false
 var fast := false
 ## Partida de tutorial: mão fixa + dicas contextuais, não mexe em Gemas/elo.
 var tutorial := false
-## Falso só pra mesas de torneio: elas valem fichas (o bolão) mas não mexem no Elo da fila
-## regular — tudo mais (ex.: jogar Blitz pelo menu) é fila única e sempre ranqueada.
-var blitz_ranked := true
 
 
 func start_tutorial() -> void:
@@ -32,6 +30,10 @@ var last_rescue := 0
 ## Mesa contínua do Vanilla: os mesmos jogadores ficam sentados e o placar acumula, mão
 ## após mão, até alguém levantar. {names, totals, hands}
 var table: Dictionary = {}
+
+## Torneio em andamento (vazio = nenhum). {field, round, round_name, player_table, bg_winners}
+## — ver `start_tournament`/`report_tournament_table`.
+var tournament: Dictionary = {}
 
 
 func leave_table() -> void:
@@ -177,8 +179,7 @@ func chaos_config() -> Dictionary:
 	last_rescue = ChaosEconomy.rescue_if_broke(profile)
 	if last_rescue > 0:
 		SaveManager.save_game()
-	if blitz_ranked:
-		find_ranked_lobby()
+	find_ranked_lobby()
 	var t: Dictionary = CHAOS_TABLES[clampi(chaos_table, 0, CHAOS_TABLES.size() - 1)]
 	var blind := int(t["blind"])
 	var buy_in := chaos_buy_in()
@@ -208,9 +209,9 @@ func blitz_level_played() -> void:
 	SaveManager.save_game()
 
 
-## Fecha uma sessão de mesa Blitz (você saiu, quebrou ou a partida de teste acabou): devolve
-## a stack final às fichas do perfil, dá Gemas e — fila única — aplica LP/MMR se jogou pelo
-## menos um nível completo (torneio chama com `blitz_ranked = false`, então não mexe no Elo).
+## Fecha uma sessão de mesa Blitz real (você saiu, quebrou ou a partida de teste acabou): devolve
+## a stack final às fichas do perfil, dá Gemas e — fila única — aplica LP/MMR se jogou pelo menos
+## um nível completo. Mesas de torneio NUNCA passam por aqui (ver `report_tournament_table`).
 ## result: { standings, stacks, payout (sua stack), buy_in, hands }
 func report_chaos_match(result: Dictionary) -> Dictionary:
 	var standings: Array = result["standings"]
@@ -230,8 +231,7 @@ func report_chaos_match(result: Dictionary) -> Dictionary:
 		var frag_by_place := [15, 10, 6, 3]
 		frag = frag_by_place[clampi(placement, 0, 3)]
 		profile["gems"] = int(profile["gems"]) + frag
-		if blitz_ranked:
-			lines.append_array(apply_ranked_progress(placement, int(round(net))))
+		lines.append_array(apply_ranked_progress(placement, int(round(net))))
 	profile["fichas"] = int(profile["fichas"]) + payout
 	SaveManager.save_game()
 	if frag > 0:
@@ -244,6 +244,130 @@ func report_chaos_match(result: Dictionary) -> Dictionary:
 		"payout": payout,
 		"net_fichas": net,
 	}
+	last_summary = summary
+	return summary
+
+
+# ------------------------------------------------------------------ torneios
+
+func tournaments() -> Dictionary:
+	return SaveManager.section("tournaments")
+
+
+## Inscreve, cobra o buy-in, sorteia o campo de 16 e já resolve (headless) as mesas das
+## Quartas em que o jogador não está. Devolve {} se não tinha fichas pro buy-in.
+func start_tournament() -> Dictionary:
+	var profile := SaveManager.section("profile")
+	if int(profile["fichas"]) < Tournament.BUY_IN:
+		return {}
+	profile["fichas"] = int(profile["fichas"]) - Tournament.BUY_IN
+	SaveManager.save_game()
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var names: Array = BOT_NAMES.duplicate()
+	names += BOT_NAMES  # precisa de 15 bots, só há 12 nomes — repete, sem problema aqui
+	var field := Tournament.make_field(player_name(), names, rng)
+	tournament = {"field": field, "round": 0, "round_name": Tournament.ROUND_NAMES[0]}
+	_resolve_background_tables(rng)
+	return tournament
+
+
+## Resolve, headless, as mesas da fase atual que não têm o jogador — guarda os vencedores em
+## `bg_winners` e a mesa do jogador (pra entrar na cena) em `player_table`.
+func _resolve_background_tables(rng: RandomNumberGenerator) -> void:
+	var tables := Tournament.make_tables(tournament["field"])
+	var bg_winners: Array = []
+	var player_table: Array = []
+	for t in tables:
+		if Tournament.table_has_human(t):
+			player_table = t
+		else:
+			bg_winners.append(Tournament.simulate_table(t, rng)[0])
+	tournament["bg_winners"] = bg_winners
+	tournament["player_table"] = player_table
+
+
+## Config pra ChaosScene jogar a mesa atual do jogador no torneio: fase curta e decisiva
+## (níveis fixos), stacks neutros — o buy-in já foi cobrado na inscrição, nada mexe nas
+## fichas reais até o prêmio final (`report_tournament_table`).
+func tournament_table_config() -> Dictionary:
+	var t: Array = tournament.get("player_table", [])
+	var names: Array = []
+	var difficulty: Array = []
+	var human_i := 0
+	for i in range(t.size()):
+		var e: Dictionary = t[i]
+		names.append(str(e["name"]))
+		difficulty.append(int(e["difficulty"]))
+		if bool(e.get("human", false)):
+			human_i = i
+	# A cena sempre senta o jogador na vaga 0 — gira a ordem sem mudar quem joga contra quem.
+	if human_i != 0:
+		names = (names.slice(human_i) as Array) + (names.slice(0, human_i) as Array)
+		difficulty = (difficulty.slice(human_i) as Array) + (difficulty.slice(0, human_i) as Array)
+	var blind := 10
+	return {
+		"players": Tournament.TABLE_SIZE,
+		"names": names,
+		"difficulty": difficulty,
+		"blind": blind,
+		"buy_in": blind * ChaosEngine.BUY_IN_BLINDS,
+		"stacks": [400, 400, 400, 400],
+		"table_name": "Torneio · %s" % str(tournament.get("round_name", "")),
+		"mode": "blitz",
+		"levels": Tournament.LEVELS_PER_TABLE,
+		"entered": true,
+		"onboarding_levels": 0,
+		"tournament": true,
+	}
+
+
+## Fecha a mesa de torneio do jogador: decide se avança pra Final, é campeão, ou foi
+## eliminado — e paga o prêmio ao chegar/terminar na mesa final.
+## result: engine.make_standings() + payout/buy_in/hands (igual report_chaos_match).
+func report_tournament_table(result: Dictionary) -> Dictionary:
+	var standings: Array = result["standings"]
+	var placement := standings.find(0)
+	var round_i := int(tournament.get("round", 0))
+	var round_name := str(tournament.get("round_name", ""))
+	var profile := SaveManager.section("profile")
+	var lines: Array = []
+	var next := "eliminated"
+	if placement == 0 and round_i == 0:
+		var bg_winners: Array = tournament.get("bg_winners", [])
+		var field_entry: Dictionary = (tournament["field"] as Array)[0]
+		tournament["round"] = 1
+		tournament["round_name"] = Tournament.ROUND_NAMES[1]
+		tournament["player_table"] = bg_winners + [field_entry]
+		tournament["bg_winners"] = []
+		lines.append("Venceu as Quartas! Avança pra Final.")
+		next = "final"
+	elif placement == 0 and round_i == 1:
+		var prize := Tournament.payout_for(0)
+		profile["fichas"] = int(profile["fichas"]) + prize
+		var trk := tournaments()
+		trk["trophies"] = int(trk.get("trophies", 0)) + 1
+		(trk["titles"] as Array).append("Campeão do Torneio")
+		(trk["history"] as Array).push_front({"result": "campeão", "time": Time.get_datetime_string_from_system(false, true)})
+		lines.append("🏆 CAMPEÃO DO TORNEIO! +◎%d do bolão" % prize)
+		next = "champion"
+		tournament = {}
+	else:
+		if round_i == 1:
+			var prize := Tournament.payout_for(placement)
+			if prize > 0:
+				profile["fichas"] = int(profile["fichas"]) + prize
+				lines.append("%dº lugar na Final — +◎%d do bolão" % [placement + 1, prize])
+			else:
+				lines.append("%dº lugar na Final." % (placement + 1))
+		else:
+			lines.append("Eliminado nas Quartas (%dº lugar da mesa)." % (placement + 1))
+		var trk2 := tournaments()
+		(trk2["history"] as Array).push_front({"result": "eliminado · %s (%dº)" % [round_name, placement + 1], "time": Time.get_datetime_string_from_system(false, true)})
+		next = "eliminated"
+		tournament = {}
+	SaveManager.save_game()
+	var summary := {"placement": placement, "won": placement == 0, "lines": lines, "next": next, "round_name": round_name}
 	last_summary = summary
 	return summary
 
@@ -317,7 +441,7 @@ func report_match(result: Dictionary) -> Dictionary:
 
 
 ## Fila única do Blitz: placement (0 = 1º ... 3 = 4º) e o LP/MMR de acordo. Devolve as linhas
-## de resumo prontas pra mostrar. Usado só quando `blitz_ranked` (torneio chama com false).
+## de resumo prontas pra mostrar. Chamado só por `report_chaos_match` (mesa real).
 func apply_ranked_progress(placement: int, score: int) -> Array:
 	var rk := ranked()
 	var mmr := int(rk["mmr"])

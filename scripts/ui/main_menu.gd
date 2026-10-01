@@ -51,17 +51,19 @@ func _ready() -> void:
 	col.add_child(blitz)
 	var wide := get_viewport_rect().size.x > get_viewport_rect().size.y
 	var grid := GridContainer.new()
-	grid.columns = 3 if wide else 1
+	grid.columns = 4 if wide else 1
 	grid.add_theme_constant_override("h_separation", 18)
 	grid.add_theme_constant_override("v_separation", 18)
 	col.add_child(grid)
 	var h := 150 if wide else 132
+	var trk := GameState.tournaments()
 	var cards := [
 		Widgets.mode_card("VANILLA", "Tarot clássico: 78 cartas, trunfo e O Louco.", UIKit.BRAND.darkened(0.12), h, "♛", func():
 			GameState.mode = GameState.Mode.CLASSIC
 			GameState.leave_table()
 			get_tree().change_scene_to_file("res://scenes/GameScene.tscn"), 34),
 		Widgets.mode_card("RANQUEADO", "Temporada %d · %s · %d LP" % [int(rk["season"]), tier["label"], int(tier["lp"])], Color(Ranked.TIER_COLORS[tier["tier"]]).darkened(0.1), h, "⚔", func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn"), 34),
+		Widgets.mode_card("TORNEIO", "16 jogadores, eliminação em fases · ◎%d de entrada · 🏆 %d" % [Tournament.BUY_IN, int(trk.get("trophies", 0))], UIKit.MONEY.darkened(0.2), h, "🏆", _open_tournament, 34),
 		Widgets.mode_card("TUTORIAL", "Primeira vez? Uma mão guiada, com dicas.", UIKit.OK.darkened(0.15), h, "?", func():
 			GameState.start_tutorial()
 			get_tree().change_scene_to_file("res://scenes/GameScene.tscn"), 34),
@@ -127,6 +129,35 @@ func _refresh_gems() -> void:
 	if top_bar:
 		Widgets.set_pill_value(top_bar.find_child("ChipsPill", true, false), UIKit.fmt_int(int(prof["fichas"])))
 		Widgets.set_pill_value(top_bar.find_child("GemsPill", true, false), UIKit.fmt_int(int(prof["gems"])))
+
+
+## Popup do torneio: entrada, bolão, prêmios por colocação na final e histórico/troféus.
+func _open_tournament() -> void:
+	var v := _modal("TORNEIO")
+	var prof := SaveManager.section("profile")
+	var trk := GameState.tournaments()
+	v.add_child(UIKit.label("16 jogadores · eliminação em fases (Quartas → Final) · mesas de 4, preenchidas com bots.", 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("Entrada ◎%d  ·  Bolão ◎%d" % [Tournament.BUY_IN, Tournament.prize_pool()], 26, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("Só quem chega à Final leva prêmio: 1º ◎%d · 2º ◎%d · 3º ◎%d · 4º ◎%d" % [Tournament.payout_for(0), Tournament.payout_for(1), Tournament.payout_for(2), Tournament.payout_for(3)], 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(HSeparator.new())
+	v.add_child(UIKit.label("🏆 %d troféu(s)" % int(trk.get("trophies", 0)), 24, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
+	var hist: Array = trk.get("history", [])
+	if hist.is_empty():
+		v.add_child(UIKit.label("Nenhum torneio disputado ainda.", 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	for h in hist.slice(0, mini(5, hist.size())):
+		v.add_child(UIKit.label(str(h["result"]).capitalize(), 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+	var footer: Node = v.get_meta("modal_footer", v)
+	var enter := UIKit.button("ENTRAR (◎%d)" % Tournament.BUY_IN, UIKit.ACTION)
+	enter.disabled = int(prof["fichas"]) < Tournament.BUY_IN
+	enter.pressed.connect(func():
+		var t := GameState.start_tournament()
+		if t.is_empty():
+			return
+		get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn"))
+	footer.add_child(enter)
+	var close := UIKit.button("FECHAR", UIKit.MUTED)
+	close.pressed.connect(func(): overlay_layer.get_child(overlay_layer.get_child_count() - 1).queue_free())
+	footer.add_child(close)
 
 
 func _spacer(h: int) -> Control:

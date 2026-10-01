@@ -68,6 +68,31 @@ func _play_chaos() -> Dictionary:
 	return summary
 
 
+func _play_tournament_table() -> Dictionary:
+	var g: Node = CHAOS.instantiate()
+	add_child(g)
+	var summary: Dictionary = await g.match_finished
+	check(not g.engine.match_result.is_empty(), "mesa de torneio terminou")
+	await get_tree().process_frame
+	g.queue_free()
+	await get_tree().process_frame
+	return summary
+
+
+## Joga um torneio inteiro em autoplay: no máximo 2 mesas (Quartas, e Final se avançar).
+func _run_tournament(i: int) -> void:
+	SaveManager.section("profile")["fichas"] = maxi(int(SaveManager.section("profile")["fichas"]), 2000)
+	var t := GameState.start_tournament()
+	check(not t.is_empty(), "torneio %d: inscrição aceita" % i)
+	var rounds := 0
+	while not GameState.tournament.is_empty() and rounds < 3:
+		var s := await _play_tournament_table()
+		print("Torneio %d, mesa %d: %s" % [i, rounds + 1, " | ".join(s["lines"])])
+		rounds += 1
+	check(rounds in [1, 2], "torneio %d: 1 mesa (eliminado nas Quartas) ou 2 (chegou à Final), rodou %d" % [i, rounds])
+	check(GameState.tournament.is_empty(), "torneio %d: estado fechado ao terminar" % i)
+
+
 func _run() -> void:
 	var menu := await _open("res://scenes/MainMenu.tscn")
 	menu._open_settings()
@@ -89,3 +114,7 @@ func _run() -> void:
 		var s := await _play_chaos()
 		print("Blitz %d: %dº lugar | %s" % [i + 1, int(s["placement"]) + 1, " | ".join(s["lines"])])
 	check((GameState.ranked()["history"] as Array).size() == 8, "fila única: toda mesa de blitz completa aplica LP/MMR (tem %d)" % (GameState.ranked()["history"] as Array).size())
+
+	for i in range(4):
+		await _run_tournament(i + 1)
+	check((GameState.tournaments()["history"] as Array).size() == 4, "torneios: histórico registrado (tem %d)" % (GameState.tournaments()["history"] as Array).size())

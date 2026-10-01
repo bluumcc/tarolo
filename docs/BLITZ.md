@@ -288,11 +288,12 @@ o "Ranqueado" de hoje é a vitrine da liga + um atalho pro Blitz, não uma fila 
 - **Vanilla é 100% recreativo.** Não lê nem escreve elo nenhum (`GameState.Mode` só tem
   `CLASSIC`). `report_match()` só dá Gemas e pontos — sem LP/MMR.
 - **Toda mesa real de Blitz conta pro Elo**, automaticamente, sem escolha de "casual" vs
-  "ranqueado": `GameState.blitz_ranked` é `true` por padrão, e `report_chaos_match()` aplica
-  `apply_ranked_progress()` (mesma fórmula de LP/MMR que o Vanilla usava antes) toda vez que o
-  jogador completa pelo menos 1 nível inteiro (`hands >= ChaosEngine.HAND_SIZE`), seja entrando
-  pelo card "MODO BLITZ" do menu ou pela tela de Ranqueado. Só os torneios (ver próxima seção)
-  zeram `blitz_ranked` pra não mexer na fila regular.
+  "ranqueado": `report_chaos_match()` aplica `apply_ranked_progress()` (mesma fórmula de LP/MMR
+  que o Vanilla usava antes) toda vez que o jogador completa pelo menos 1 nível inteiro
+  (`hands >= ChaosEngine.HAND_SIZE`), seja entrando pelo card "MODO BLITZ" do menu ou pela tela
+  de Ranqueado. Mesa de torneio (ver próxima seção) é um caminho **totalmente separado**
+  (`report_tournament_table()`) que nunca chama `apply_ranked_progress()` — não precisa de flag
+  nem exceção, só não passa por ali.
 - `RankedLobby.tscn` não muda de função: mostra liga/LP/histórico e, ao "buscar partida", abre
   `ChaosScene.tscn` (antes abria `GameScene.tscn`, o motor Vanilla — por isso o Ranqueado nunca
   bateu com a regra "Blitz é a espinha dorsal do elo").
@@ -307,3 +308,33 @@ o "Ranqueado" de hoje é a vitrine da liga + um atalho pro Blitz, não uma fila 
 - **Carteira de dinheiro real:** reservado `profile.cash_balance` no save (sempre 0, sem UI) pra
   quando o pagamento de verdade for integrado — nenhuma mesa ou torneio em dinheiro real existe
   ainda.
+
+## Torneios (v1)
+
+`scripts/core/tournament.gd` (`Tournament`, lógica pura) + `GameState.start_tournament()` /
+`tournament_table_config()` / `report_tournament_table()`. Sem matchmaking de verdade — o campo
+inteiro é preenchido com bots; só a mesa do próprio jogador é jogada na cena, de verdade.
+
+- **Campo fixo de 16** (1 humano + 15 bots, dificuldade variada) em **2 fases, mesas de 4**:
+  Quartas (4 mesas) → Final (1 mesa, com os 4 vencedores das Quartas). Eliminação simples: só o
+  1º lugar de cada mesa avança.
+- **Buy-in cobrado uma vez** na inscrição (`Tournament.BUY_IN`, fichas), não por mesa — as mesas
+  do torneio usam um stack neutro (400, igual a uma mesa Iniciante) que não é a carteira real do
+  jogador. Quebrar numa mesa de torneio é eliminação (sem recompra com fichas de verdade — ver
+  guard em `_ensure_solvent()`).
+- **As 3 mesas da fase em que o jogador não está são resolvidas na hora, headless**
+  (`Tournament.simulate_table`): roda o motor com bots dos dois lados por um número fixo de
+  níveis (`LEVELS_PER_TABLE`) e ordena por stack final — mesmo padrão já usado em
+  `tests/blitz_sim.gd` pra medir o motor sem UI. Essa simulação não liga a aposta por rodada
+  (igual aos sims existentes): só decide colocação pra avançar o bracket, não precisa de
+  fidelidade total.
+- **Prêmio só pra quem chega na mesa final** (`Tournament.payout_for`): bolão = buy-in × 16, já
+  líquido da taxa da casa, dividido 55/28/12/5% pelas 4 colocações da Final. Eliminado nas
+  Quartas não leva fichas.
+- **Nunca mexe no Elo da fila regular** (ver seção anterior) nem usa `report_chaos_match`.
+- Troféus e títulos ficam na seção `tournaments` do save (`trophies`, `titles`, `history`) —
+  mostrados no popup "TORNEIO" do menu.
+- **Pendência real:** campo fixo de 16 é rígido (sem escolher tamanho de torneio nem horário de
+  início — é tudo instantâneo, sem agenda), e os bots das mesas simuladas usam a mesma IA de
+  sempre (sem estilo "grinder de torneio" dedicado). Primeira versão jogável, não o produto final
+  do documento de arquitetura.

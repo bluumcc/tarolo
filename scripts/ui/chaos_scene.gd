@@ -88,7 +88,7 @@ const POT_W := 250.0
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bot_rng.randomize()
-	config = GameState.chaos_config()
+	config = GameState.tournament_table_config() if not GameState.tournament.is_empty() else GameState.chaos_config()
 	if not bool(config.get("entered", true)):
 		add_child(UIKit.background())
 		overlay_layer = Control.new()
@@ -1166,6 +1166,11 @@ func _ensure_solvent() -> bool:
 	if GameState.autoplay:
 		_finish_match()
 		return false
+	if bool(config.get("tournament", false)):
+		# Torneio: quebrar na mesa é eliminação — sem recompra com fichas reais (o buy-in já
+		# foi pago na inscrição, a stack da mesa é só um número do bracket).
+		_finish_match()
+		return false
 	var profile := SaveManager.section("profile")
 	var can := int(profile["fichas"]) >= engine.buy_in
 	var opts: Array = []
@@ -1506,13 +1511,54 @@ func _finish_match() -> void:
 	result["buy_in"] = total_in
 	result["hands"] = engine.hand_no
 	engine.match_result = result
-	var summary := GameState.report_chaos_match(result)
+	var is_tournament := bool(config.get("tournament", false))
+	var summary := GameState.report_tournament_table(result) if is_tournament else GameState.report_chaos_match(result)
 	Sfx.play("win" if summary["won"] else "lose")
 	status_label.text = ""
 	if turn_bar:
 		turn_bar.modulate.a = 0.0
-	_show_results(summary)
+	if is_tournament:
+		_show_tournament_results(summary)
+	else:
+		_show_results(summary)
 	match_finished.emit(summary)
+
+
+## Resultado de uma mesa de torneio: sem os números de fichas reais (a mesa usa stack
+## neutro), só colocação e o que acontece a seguir — avançar, ser campeão ou ser eliminado.
+func _show_tournament_results(summary: Dictionary) -> void:
+	var ov := UIKit.overlay()
+	overlay_layer.add_child(ov)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND if summary["won"] else UIKit.LOSS, 24)
+	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 40.0, 664.0), 0)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	box.add_child(v)
+	var next := str(summary.get("next", "eliminated"))
+	var titles := {"final": "VENCEU AS %s!" % str(summary.get("round_name", "")), "champion": "🏆 CAMPEÃO DO TORNEIO!", "eliminated": "ELIMINADO"}
+	var title: String = titles[next]
+	v.add_child(UIKit.label(title, 34, UIKit.BRAND if summary["won"] else UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(HSeparator.new())
+	var order: Array = engine.match_result["standings"]
+	for i in range(order.size()):
+		var p: int = order[i]
+		var line := "%d. %s%s" % [i + 1, "♛ " if i == 0 else "", str(config["names"][p]).to_upper()]
+		v.add_child(UIKit.label(line, 32, UIKit.ME if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(HSeparator.new())
+	for line in summary["lines"]:
+		var ll := UIKit.label(str(line), 30, UIKit.OK if summary["won"] else UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER)
+		ll.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(ll)
+	if next == "final":
+		var go := UIKit.button("JOGAR A FINAL", UIKit.OK)
+		go.pressed.connect(func(): get_tree().reload_current_scene())
+		v.add_child(go)
+	var btn := UIKit.button("MENU PRINCIPAL", UIKit.MUTED)
+	btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
+	v.add_child(btn)
+	ov.add_child(UIKit.centered(box))
+	UIKit.pop_in(box, GameState.anim(0.25))
+	btn.grab_focus.call_deferred()
 
 
 func _show_results(summary: Dictionary) -> void:
