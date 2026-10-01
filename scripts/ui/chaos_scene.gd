@@ -73,7 +73,7 @@ var hold_pot := -1.0
 var blitz_revealed: Array = []  # Blitz: entrada de cada um já paga (pote), pill visível na mesa
 var blitz_showdown := false     # Blitz: fim do nível — só aí o alvo dos rivais aparece pra você
 var double_btn: Button
-var discard_btn: Button
+var mod_box: PanelContainer
 var discard_picks: Array = []   # Blitz: cartas marcadas na mão pra descartar (até BLITZ_DISCARD_SIZE)
 var discarding_now := false     # relógio do descarte rodando (reaproveita turn_bar)
 var discard_left := 0.0
@@ -208,7 +208,7 @@ func _build_ui() -> void:
 	# (Os 3 rivais ficam sentados ao redor da mesa — veja _build_seats.)
 
 	# Regra do nível — aviso fixo, sempre visível.
-	var mod_box := UIKit.panel(UIKit.OK.darkened(0.75), UIKit.OK, 10)
+	mod_box = UIKit.panel(UIKit.OK.darkened(0.75), UIKit.OK, 10)
 	mod_box.mouse_filter = Control.MOUSE_FILTER_STOP
 	modifier_label = UIKit.label("", 22, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
 	modifier_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -267,11 +267,6 @@ func _build_ui() -> void:
 	double_btn.visible = false
 	double_btn.pressed.connect(_on_double_pressed)
 	status_row.add_child(double_btn)
-	discard_btn = UIKit.button("DESCARTAR", UIKit.OK, 24)
-	discard_btn.custom_minimum_size = Vector2(220, 52)
-	discard_btn.visible = false
-	discard_btn.pressed.connect(_on_discard_pressed)
-	status_row.add_child(discard_btn)
 
 	# Relógio da jogada: barra que esvazia — some fora da sua vez.
 	turn_bar = ProgressBar.new()
@@ -591,40 +586,30 @@ func _transition(kicker: String, blocks: Array, hold: float) -> void:
 	var width := minf(get_viewport_rect().size.x - 80.0, 680.0)
 	v.custom_minimum_size = Vector2(width, 0)
 	v.add_child(UIKit.label(kicker, 46, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
-	var spins: Array = []  # [título, texto] dos blocos com caça-níquel: o texto só aparece quando ele trava
 	for b in blocks:
 		var card := UIKit.panel(UIKit.PURPLE_DEEP, b["color"], 18)
 		var cv := VBoxContainer.new()
 		cv.add_theme_constant_override("separation", 4)
 		card.add_child(cv)
 		cv.add_child(UIKit.label(b["head"], 28, b["color"], HORIZONTAL_ALIGNMENT_CENTER))
-		var title_lbl := UIKit.label(b["title"], 40, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-		cv.add_child(title_lbl)
+		cv.add_child(UIKit.label(b["title"], 40, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 		var t := UIKit.label(b["text"], 32, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 		t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		cv.add_child(t)
-		if b.get("spin", false):
-			t.modulate.a = 0.0
-			spins.append([title_lbl, t, str(b["title"])])
 		v.add_child(card)
 	var go := UIKit.button("ENTENDI, CONTINUAR")
 	v.add_child(go)
 	var timer_lbl := UIKit.label("", 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(timer_lbl)
-	if not spins.is_empty():
-		go.disabled = true
-		go.modulate.a = 0.0
 	ov.add_child(UIKit.centered(v))
 	UIKit.fit.call_deferred(v)
 	go.grab_focus.call_deferred()
 	ov.modulate.a = 0.0
 	create_tween().tween_property(ov, "modulate:a", 1.0, GameState.anim(0.18))
 	Sfx.play("chip")
-	for sp in spins:
-		_reveal_after_spin(sp[0], sp[1], sp[2], go)
 	# Nenhuma distração: só o conteúdo. Avança sozinha depois de `hold` segundos (com contagem
 	# visível) ou na hora, se o jogador tocar antes.
-	_count_down(go, timer_lbl, hold, not spins.is_empty())
+	_count_down(go, timer_lbl, hold)
 	await go.pressed
 	if not is_inside_tree():
 		return
@@ -634,12 +619,12 @@ func _transition(kicker: String, blocks: Array, hold: float) -> void:
 	ov.queue_free()
 
 
-## Contagem visível até a tela avançar sozinha (espera o caça-níquel liberar o botão primeiro,
-## se houver um). Tocar em "ENTENDI, CONTINUAR" a qualquer momento pula a espera.
-func _count_down(go: Button, lbl: Label, hold: float, wait_spin: bool) -> void:
-	if wait_spin:
-		while is_instance_valid(go) and is_inside_tree() and go.disabled:
-			await get_tree().process_frame
+## Contagem visível até a tela avançar sozinha. Tocar em "ENTENDI, CONTINUAR" a qualquer
+## momento pula a espera. Se `go` começa desabilitado (ex.: uma animação ainda não travou),
+## espera ele liberar antes de contar.
+func _count_down(go: Button, lbl: Label, hold: float) -> void:
+	while is_instance_valid(go) and is_inside_tree() and go.disabled:
+		await get_tree().process_frame
 	if not is_instance_valid(go) or not is_inside_tree():
 		return
 	var left := hold
@@ -649,35 +634,6 @@ func _count_down(go: Button, lbl: Label, hold: float, wait_spin: bool) -> void:
 		left -= 0.2
 	if is_instance_valid(go) and not go.disabled:
 		go.pressed.emit()
-
-
-## Roda o caça-níquel e só depois mostra a explicação e libera o botão.
-func _reveal_after_spin(title_lbl: Label, text_lbl: Label, final_text: String, go: Button) -> void:
-	await _spin_label(title_lbl, final_text)
-	if not is_instance_valid(text_lbl):
-		return
-	await get_tree().create_timer(GameState.anim(0.35)).timeout
-	if is_instance_valid(text_lbl):
-		create_tween().tween_property(text_lbl, "modulate:a", 1.0, GameState.anim(0.3))
-	if is_instance_valid(go):
-		go.disabled = false
-		create_tween().tween_property(go, "modulate:a", 1.0, GameState.anim(0.3))
-
-
-## Caça-níquel do modificador: os nomes giram, desaceleram e travam no sorteado.
-func _spin_label(lbl: Label, final_text: String) -> void:
-	var names: Array = (ChaosModifiers.blitz_pool() if engine.blitz else ChaosModifiers.ALL).map(func(m): return "✦ %s" % ChaosModifiers.name_of(m, engine.blitz))
-	var steps := 14
-	for i in range(steps):
-		if not is_instance_valid(lbl):
-			return
-		lbl.text = names[(i * 3 + 1) % names.size()]
-		Sfx.play("tick")
-		await get_tree().create_timer(0.05 + 0.014 * i).timeout
-	if is_instance_valid(lbl):
-		lbl.text = final_text
-		FX.pop(lbl, 1.35)
-		Sfx.play("win")
 
 
 ## Mensagem na faixa reservada acima da mesa (nunca cobre nada). `color` pinta a borda.
@@ -718,15 +674,110 @@ func _trick_start() -> void:
 		_banner_clear()
 		return
 	var color := ChaosModifiers.color_of(m)
-	var block := {
-		"spin": true, "head": "MODIFICADOR DA RODADA %d DE %d" % [engine.trick_number + 1, ChaosEngine.HAND_SIZE],
-		"title": "%s %s" % [ChaosModifiers.ICONS[m], _modifier_label(m)],
-		"text": "%s %s" % [ChaosModifiers.desc_of(m, engine.blitz), ChaosModifiers.tip_of(m, engine.blitz)],
-		"color": color,
-	}
-	await _transition("RODADA %d" % (engine.trick_number + 1), [block], 3.0)
+	await _modifier_transition(m, color)
 	if is_inside_tree():
 		_banner("%s %s" % [ChaosModifiers.ICONS[m], _modifier_label(m)], str(ChaosModifiers.desc_of(m, engine.blitz)), color)
+
+
+## Sorteio do modificador da rodada: em vez de texto trocando sozinho, um item fechado carrega,
+## estoura em partículas e revela o efeito sorteado — a mesma tela cheia e o mesmo avanço
+## automático/por toque de `_transition`, só que com uma animação própria no lugar do bloco.
+func _modifier_transition(m: int, color: Color) -> void:
+	if GameState.autoplay or not is_inside_tree():
+		await _wait(0.05)
+		return
+	var ov := ColorRect.new()
+	ov.color = UIKit.SCRIM
+	ov.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ov.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay_layer.add_child(ov)
+	var v := VBoxContainer.new()
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_theme_constant_override("separation", 20)
+	var width := minf(get_viewport_rect().size.x - 80.0, 680.0)
+	v.custom_minimum_size = Vector2(width, 0)
+	v.add_child(UIKit.label("RODADA %d DE %d" % [engine.trick_number + 1, ChaosEngine.HAND_SIZE], 30, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	var orb_hold := Control.new()
+	orb_hold.custom_minimum_size = Vector2(190, 190)
+	orb_hold.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var orb := PanelContainer.new()
+	orb.custom_minimum_size = Vector2(170, 170)
+	orb.size = Vector2(170, 170)
+	orb.position = Vector2(10, 10)
+	orb.pivot_offset = Vector2(85, 85)
+	var sealed := UIKit.box(UIKit.MUTED.darkened(0.6), UIKit.MUTED, 5, 85, 0)
+	sealed.set_corner_radius_all(85)
+	orb.add_theme_stylebox_override("panel", sealed)
+	var orb_icon := UIKit.label("✦", 60, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	orb_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	orb.add_child(orb_icon)
+	orb_hold.add_child(orb)
+	v.add_child(orb_hold)
+	var title_lbl := UIKit.label("", 40, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(title_lbl)
+	var text_lbl := UIKit.label("%s %s" % [ChaosModifiers.desc_of(m, engine.blitz), ChaosModifiers.tip_of(m, engine.blitz)], 30, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	text_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text_lbl.modulate.a = 0.0
+	v.add_child(text_lbl)
+	var go := UIKit.button("ENTENDI, CONTINUAR")
+	go.disabled = true
+	go.modulate.a = 0.0
+	v.add_child(go)
+	var timer_lbl := UIKit.label("", 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(timer_lbl)
+	ov.add_child(UIKit.centered(v))
+	UIKit.fit.call_deferred(v)
+	go.grab_focus.call_deferred()
+	ov.modulate.a = 0.0
+	create_tween().tween_property(ov, "modulate:a", 1.0, GameState.anim(0.18))
+	Sfx.play("tick")
+	_open_modifier_orb(orb, orb_icon, title_lbl, text_lbl, go, m, color)
+	_count_down(go, timer_lbl, 3.2)
+	await go.pressed
+	if not is_inside_tree():
+		return
+	var tw := create_tween()
+	tw.tween_property(ov, "modulate:a", 0.0, GameState.anim(0.18))
+	await tw.finished
+	ov.queue_free()
+
+
+## Anima o item: carrega (pulsa), estoura (partículas + tremor na cor do modificador) e revela
+## o ícone+nome sorteado, só então liberando o texto e o botão de continuar.
+func _open_modifier_orb(orb: PanelContainer, orb_icon: Label, title_lbl: Label, text_lbl: Label, go: Button, m: int, color: Color) -> void:
+	for i in range(3):
+		if not is_instance_valid(orb) or not is_inside_tree():
+			return
+		var tw := create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_property(orb, "scale", Vector2(1.08, 1.08), 0.22)
+		tw.tween_property(orb, "scale", Vector2(0.96, 0.96), 0.22)
+		await tw.finished
+	if not is_instance_valid(orb) or not is_inside_tree():
+		return
+	Sfx.play("chip")
+	var punch := create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	punch.tween_property(orb, "scale", Vector2(1.35, 1.35), 0.12)
+	await punch.finished
+	if not is_instance_valid(orb):
+		return
+	var opened := UIKit.box(color.darkened(0.55), color, 6, 85, 0)
+	opened.set_corner_radius_all(85)
+	orb.add_theme_stylebox_override("panel", opened)
+	orb_icon.text = str(ChaosModifiers.ICONS[m])
+	orb_icon.add_theme_color_override("font_color", color)
+	title_lbl.text = "%s %s" % [ChaosModifiers.ICONS[m], _modifier_label(m)]
+	FX.burst(popup_layer, orb.get_global_rect().get_center(), color, 20)
+	FX.shake(self, 0.35)
+	Sfx.play("win")
+	var settle := create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	settle.tween_property(orb, "scale", Vector2.ONE, 0.22)
+	await settle.finished
+	if not is_instance_valid(text_lbl):
+		return
+	create_tween().tween_property(text_lbl, "modulate:a", 1.0, GameState.anim(0.3))
+	if is_instance_valid(go):
+		go.disabled = false
+		create_tween().tween_property(go, "modulate:a", 1.0, GameState.anim(0.3))
 
 
 ## Modal genérico de escolha: `opts` = [{label, desc, color}]. Devolve o índice tocado,
@@ -846,8 +897,12 @@ func _on_card_tapped(view: CardView) -> void:
 	Sfx.play("tick")
 
 
-## Carta arrastada pra cima e solta além do limite: joga, saindo do ponto onde foi solta.
+## Carta arrastada pra cima e solta além do limite: joga (ou descarta, na etapa de descarte),
+## saindo do ponto onde foi solta.
 func _on_card_thrown(view: CardView, drop_global: Vector2) -> void:
+	if phase == "discard":
+		_commit_discard(view, drop_global)
+		return
 	if not human_turn or not view.playable:
 		return
 	throw_from = drop_global
@@ -1831,6 +1886,19 @@ func _resolve_walkover(result: Dictionary) -> void:
 
 # ------------------------------------------------------------------ Blitz
 
+## Descarte inicial: etapa própria, sem mesa, sem modificador, sem indicador de vez — só os
+## avatares com nome e stack, pra não confundir com informação de uma rodada que nem começou.
+func _set_discard_chrome(active: bool) -> void:
+	table_center.visible = not active
+	mod_box.visible = not active
+	banner_box.visible = not active
+	for p in range(engine.num_players):
+		(bet_pills[p] as PanelContainer).visible = not active
+		(order_badges[p] as PanelContainer).visible = not active
+		(dealer_badges[p] as PanelContainer).visible = not active
+		(prog_tags[p] as Label).visible = not active
+
+
 ## Começo do nível no Blitz: garante saldo, troca bots quebrados, coleta os palpites (o seu e os
 ## dos bots), revela todos juntos e joga as entradas no pote. Devolve false se a mesa acabou.
 func _blitz_open_level() -> bool:
@@ -1844,16 +1912,18 @@ func _blitz_open_level() -> bool:
 		return false
 	for q in engine.refill_bots():
 		await _new_player_sits(q)
+	_set_discard_chrome(true)
 	for p in range(engine.num_players):
 		if not engine.can_discard(p):
 			continue
 		if p == 0 and not GameState.autoplay:
-			await _tip("discard", "ESCOLHA 2 PRA DESCARTAR", "Você recebeu 10 cartas. Toque em 2 delas na sua mão pra marcar — elas sobem. Toque de novo pra desmarcar. Confirme quando tiver 2 marcadas.")
+			await _tip("discard", "ESCOLHA 2 PRA DESCARTAR", "Você recebeu 10 cartas. Toque numa carta pra focar — ela sobe. Toque de novo nela (ou arraste pra cima e solte) pra descartar. Repita até descartar 2.")
 			await _human_discard_play()
 			if not is_inside_tree() or finished:
 				return false
 		else:
 			engine.apply_discard(p, ChaosBot.wants_discard(engine, p, int(config["difficulty"][p]), bot_rng))
+	_set_discard_chrome(false)
 	phase = "predict"
 	bets_gathered = true
 	pot_locked = true
@@ -1910,16 +1980,13 @@ func _blitz_reveal() -> void:
 
 
 ## Descarte inicial: sem popup — seleciona direto da própria mão, igual escolher carta pra jogar.
-## Toca numa carta e ela sobe (marcada pra descartar); toca de novo e ela desce (desmarca). O
-## botão DESCARTAR (no lugar do DOBRAR, que essa hora do nível ainda não existe) só libera com
-## exatamente `BLITZ_DISCARD_SIZE` marcadas.
+## Toca numa carta pra focar (ela sobe); toca de novo nela (ou arrasta pra cima e solta, igual
+## jogar) pra descartar na hora, com animação — sem botão de confirmar, sem etapa extra.
 func _human_discard_play() -> void:
 	phase = "discard"
 	discard_picks = []
 	_rebuild_hand()
-	status_label.text = "Toque em %d cartas da sua mão pra descartar." % ChaosEngine.BLITZ_DISCARD_SIZE
-	discard_btn.visible = true
-	_refresh_discard_button()
+	status_label.text = "0/%d descartadas" % ChaosEngine.BLITZ_DISCARD_SIZE
 	discard_left = DISCARD_SECONDS
 	turn_bar.max_value = DISCARD_SECONDS
 	turn_bar.modulate.a = 1.0
@@ -1928,65 +1995,76 @@ func _human_discard_play() -> void:
 	discarding_now = false
 	turn_bar.modulate.a = 0.0
 	turn_bar.max_value = TURN_SECONDS
-	discard_btn.visible = false
 	status_label.text = ""
 	discard_picks = []
 
 
 func _on_discard_tapped(view: CardView) -> void:
+	if discard_picks.has(view.data):
+		return
 	if view.selected:
-		view.set_selected(false)
-		discard_picks.erase(view.data)
-	elif discard_picks.size() < ChaosEngine.BLITZ_DISCARD_SIZE:
-		view.set_selected(true)
-		discard_picks.append(view.data)
-	else:
+		_commit_discard(view)
 		return
+	for c in hand_container.get_children():
+		(c as CardView).set_selected(c == view)
+	(hand_container.get_parent() as HandScroller).reveal(view.position.x, CardView.SIZE.x)
 	Sfx.play("tick")
-	_refresh_discard_button()
 
 
-func _refresh_discard_button() -> void:
-	var ready := discard_picks.size() == ChaosEngine.BLITZ_DISCARD_SIZE
-	discard_btn.text = "DESCARTAR (%d/%d)" % [discard_picks.size(), ChaosEngine.BLITZ_DISCARD_SIZE]
-	discard_btn.disabled = not ready
-	discard_btn.modulate.a = 1.0 if ready else 0.6
-
-
-func _on_discard_pressed() -> void:
-	if discard_picks.size() != ChaosEngine.BLITZ_DISCARD_SIZE:
+## Descarta `view` na hora: a carta voa pra fora da mão (igual uma carta jogada) e some; a mão
+## reflui pro tamanho cheio assim que ela sai. Com as 2 descartadas, segue sozinho pro palpite.
+func _commit_discard(view: CardView, drop_global := Vector2.ZERO) -> void:
+	if discard_picks.has(view.data) or discard_picks.size() >= ChaosEngine.BLITZ_DISCARD_SIZE:
 		return
-	discarding_now = false
-	engine.apply_discard(0, discard_picks)
-	item_chosen.emit(1)
+	discard_picks.append(view.data)
+	view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	Sfx.play("card", randf_range(0.9, 1.15))
+	var from: Vector2 = drop_global if drop_global != Vector2.ZERO else view.global_position
+	var tw := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	tw.tween_property(view, "global_position", from + Vector2(0.0, -320.0), GameState.anim(0.3))
+	tw.parallel().tween_property(view, "rotation", randf_range(-0.35, 0.35), GameState.anim(0.3))
+	tw.parallel().tween_property(view, "modulate:a", 0.0, GameState.anim(0.3))
+	status_label.text = "%d/%d descartadas" % [discard_picks.size(), ChaosEngine.BLITZ_DISCARD_SIZE]
+	await tw.finished
+	if not is_inside_tree():
+		return
+	if is_instance_valid(view):
+		view.queue_free()
+	_layout_hand()
+	if discard_picks.size() == ChaosEngine.BLITZ_DISCARD_SIZE:
+		discarding_now = false
+		engine.apply_discard(0, discard_picks)
+		item_chosen.emit(1)
 
 
-## Painel do palpite (fica abaixo dos avatares; a sua mão continua à vista). Devolve 0..8.
+## Tela cheia de preparação do nível: o palpite tem etapa própria, separada da mesa — fundo
+## escurecido, selo da força da mão entrando com uma "mola", escolha de 0 a 8 embaixo.
 func _human_predict() -> int:
 	modal_open = true
-	var vw := get_viewport_rect().size.x
-	var holder := MarginContainer.new()
-	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	holder.add_theme_constant_override("margin_top", int(seat_row.global_position.y + seat_row.size.y + 6.0))
-	overlay_layer.add_child(holder)
-	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 20)
-	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	box.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	box.custom_minimum_size = Vector2(minf(vw - 32.0, 660.0), 0)
-	holder.add_child(box)
+	var ov := ColorRect.new()
+	ov.color = UIKit.SCRIM
+	ov.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ov.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay_layer.add_child(ov)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 8)
-	box.add_child(v)
-	v.add_child(UIKit.label("QUANTAS RODADAS VOCÊ VAI GANHAR?", 28, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
-	var hint := ChaosBot.suggested_predict(engine, 0)
-	var info := "Entrada ◎%d  ·  Pote ◎%d  ·  Sua mão: %s" % [int(engine.blitz_entry()), int(engine.carry), _hand_label_blitz()]
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_theme_constant_override("separation", 14)
+	var width := minf(get_viewport_rect().size.x - 64.0, 680.0)
+	v.custom_minimum_size = Vector2(width, 0)
+	v.add_child(UIKit.label("PREPARAÇÃO DO NÍVEL", 24, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("QUANTAS RODADAS VOCÊ VAI GANHAR?", 34, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
+	var strength_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MONEY, 14)
+	strength_box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	strength_box.add_child(UIKit.label(_hand_label_blitz(), 26, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(strength_box)
+	var info := "Entrada ◎%d  ·  Pote ◎%d" % [int(engine.blitz_entry()), int(engine.carry)]
 	var info_l := UIKit.label(info, 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	info_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(info_l)
 	var body := VBoxContainer.new()
-	body.add_theme_constant_override("separation", 8)
+	body.add_theme_constant_override("separation", 10)
 	v.add_child(body)
+	var hint := ChaosBot.suggested_predict(engine, 0)
 	var st := {"pick": hint}
 	st["render"] = func():
 		for c in body.get_children():
@@ -2011,11 +2089,28 @@ func _human_predict() -> int:
 		go.pressed.connect(func(): item_chosen.emit(1))
 		body.add_child(go)
 	(st["render"] as Callable).call()
-	UIKit.pop_in(box, GameState.anim(0.15))
+	ov.add_child(UIKit.centered(v))
+	UIKit.fit.call_deferred(v)
+	ov.modulate.a = 0.0
+	create_tween().tween_property(ov, "modulate:a", 1.0, GameState.anim(0.2))
+	UIKit.pop_in(body, GameState.anim(0.18))
+	Sfx.play("chip")
+	var str_center := func(): strength_box.pivot_offset = strength_box.size / 2.0
+	strength_box.resized.connect(str_center)
+	str_center.call()
+	strength_box.modulate.a = 0.0
+	strength_box.scale = Vector2(0.7, 0.7)
+	var stw := create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	stw.tween_property(strength_box, "modulate:a", 1.0, 0.3)
+	stw.parallel().tween_property(strength_box, "scale", Vector2.ONE, 0.35)
 	await item_chosen
 	modal_open = false
 	if is_inside_tree():
-		holder.queue_free()
+		var tw := create_tween()
+		tw.tween_property(ov, "modulate:a", 0.0, GameState.anim(0.15))
+		await tw.finished
+	if is_inside_tree():
+		ov.queue_free()
 	return int(st["pick"])
 
 
