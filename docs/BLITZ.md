@@ -310,32 +310,47 @@ o "Ranqueado" de hoje é a vitrine da liga + um atalho pro Blitz, não uma fila 
   quando o pagamento de verdade for integrado — nenhuma mesa ou torneio em dinheiro real existe
   ainda.
 
-## Torneios (v1)
+## Torneios (v2 — MTT de verdade)
 
 `scripts/core/tournament.gd` (`Tournament`, lógica pura) + `GameState.start_tournament()` /
 `tournament_table_config()` / `report_tournament_table()`. Sem matchmaking de verdade — o campo
-inteiro é preenchido com bots; só a mesa do próprio jogador é jogada na cena, de verdade.
+inteiro é preenchido com bots; só a mesa do próprio jogador é jogada na cena, de verdade, nível
+por nível. A v1 era um bracket de eliminação simples (mesas fixas de 4, só o 1º avançava); a v2
+é um multi-table tournament igual poker de verdade: várias mesas, gente indo embora conforme
+quebra, mesas se fundindo, até sobrar 1 campeão.
 
-- **Campo fixo de 16** (1 humano + 15 bots, dificuldade variada) em **2 fases, mesas de 4**:
-  Quartas (4 mesas) → Final (1 mesa, com os 4 vencedores das Quartas). Eliminação simples: só o
-  1º lugar de cada mesa avança.
-- **Buy-in cobrado uma vez** na inscrição (`Tournament.BUY_IN`, fichas), não por mesa — as mesas
-  do torneio usam um stack neutro (400, igual a uma mesa Iniciante) que não é a carteira real do
-  jogador. Quebrar numa mesa de torneio é eliminação (sem recompra com fichas de verdade — ver
-  guard em `_ensure_solvent()`).
-- **As 3 mesas da fase em que o jogador não está são resolvidas na hora, headless**
-  (`Tournament.simulate_table`): roda o motor com bots dos dois lados por um número fixo de
-  níveis (`LEVELS_PER_TABLE`) e ordena por stack final — mesmo padrão já usado em
-  `tests/blitz_sim.gd` pra medir o motor sem UI. Essa simulação não liga a aposta por rodada
-  (igual aos sims existentes): só decide colocação pra avançar o bracket, não precisa de
-  fidelidade total.
-- **Prêmio só pra quem chega na mesa final** (`Tournament.payout_for`): bolão = buy-in × 16, já
-  líquido da taxa da casa, dividido 55/28/12/5% pelas 4 colocações da Final. Eliminado nas
-  Quartas não leva fichas.
+- **Campo de 16** (1 humano + 15 bots, dificuldade variada), dividido em mesas de **2 a 7**
+  jogadores (`Tournament.MIN_TABLE`/`MAX_TABLE`). O teto de 7 não é arbitrário: o Blitz distribui
+  10 cartas por jogador na mão inicial (`BLITZ_DEAL_SIZE`) e o baralho de Tarot só tem 78 — 8
+  jogadores precisariam de 80 cartas, não cabe. 7×10 = 70 cabe com folga.
+- **A stack viaja com o jogador.** Cada `entrant` (humano ou bot) carrega sua própria stack real
+  ao longo do torneio inteiro — não é mais "mesa neutra reiniciada a cada fase". Quem quebra
+  (stack chega a 0) é eliminado e sai; ninguém senta no lugar dele (ao contrário da mesa de
+  Blitz normal, que reaproveita `engine.refill_bots()` pra repor bot quebrado — isso é
+  explicitamente desligado pras mesas de torneio, senão ninguém jamais seria eliminado).
+- **Blind escalando** (`Tournament.blind_for`): dobra a cada 3 níveis GLOBAIS do torneio (não por
+  mesa — todas as mesas, inclusive as headless, jogam no mesmo blind no mesmo nível). Sem isso o
+  torneio nunca anda: com blind fixo e stack de 400 (40 blinds), quase ninguém quebra.
+- **Realocação (`Tournament.rebalance`):** depois de cada nível, quem está numa mesa que caiu
+  abaixo do mínimo (2) é redistribuído na mesa mais curta que tiver vaga; quando o total já cabe
+  numa mesa só (≤7), tudo colapsa na mesa final.
+- **As mesas sem o jogador tocam o MESMO nível, headless** (`Tournament.simulate_level`): motor
+  rodado só com bots, sem UI, pra atualizar as stacks delas em paralelo com a mesa real do
+  jogador. Essa simulação não liga a aposta por rodada completa (decide só quem quebra, não
+  precisa de fidelidade total pras outras mesas).
+- **Stack > 0 sempre pode jogar, mesmo abaixo do blind** (all-in pelo que tiver — a ante já é
+  limitada ao que sobra em `begin_trick()`): só stack zerada é eliminação de verdade. Isso exigiu
+  um guard específico em `_ensure_solvent()` pra mesas de torneio — sem ele, um jogador
+  (humano ou bot) com stack positiva mas abaixo do blind escalado ficava travado pra sempre
+  (nunca jogava a mão que o eliminaria, nem nunca era marcado como eliminado).
+- **Prêmio pelos 4 melhores colocados do torneio inteiro** (`Tournament.payout_for`), não só de
+  quem chega numa "mesa final" fixa: bolão = buy-in × 16, líquido da taxa da casa, dividido
+  55/28/12/5%. Colocação de quem é eliminado é contada pelo tamanho do campo restante no
+  momento (quebrar com 10 pessoas ainda vivas = 11º lugar).
 - **Nunca mexe no Elo da fila regular** (ver seção anterior) nem usa `report_chaos_match`.
 - Troféus e títulos ficam na seção `tournaments` do save (`trophies`, `titles`, `history`) —
   mostrados no popup "TORNEIO" do menu.
-- **Pendência real:** campo fixo de 16 é rígido (sem escolher tamanho de torneio nem horário de
-  início — é tudo instantâneo, sem agenda), e os bots das mesas simuladas usam a mesma IA de
-  sempre (sem estilo "grinder de torneio" dedicado). Primeira versão jogável, não o produto final
-  do documento de arquitetura.
+- **Pendência real:** os bots das mesas simuladas usam a mesma IA de sempre (sem estilo "grinder
+  de torneio" dedicado nem consciência de ICM/all-in-or-fold perto da bolha), e o tamanho do
+  campo (16) e a régua de blind são fixos, sem configuração. Primeira versão jogável do formato
+  MTT, não o produto final.

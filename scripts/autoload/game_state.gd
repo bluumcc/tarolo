@@ -248,8 +248,14 @@ func tournaments() -> Dictionary:
 	return SaveManager.section("tournaments")
 
 
-## Inscreve, cobra o buy-in, sorteia o campo de 16 e já resolve (headless) as mesas das
-## Quartas em que o jogador não está. Devolve {} se não tinha fichas pro buy-in.
+## Torneio: a rotação atual da mesa do jogador (as MESMAS referências de `tournament["tables"]`,
+## na ordem que foi usada pra montar a config da cena) — pra escrever as stacks de volta sem
+## precisar procurar por nome depois que o nível termina.
+var _tournament_order: Array = []
+
+
+## Inscreve, cobra o buy-in, sorteia o campo de 16 e monta as mesas iniciais (até
+## `Tournament.MAX_TABLE` por mesa). Devolve {} se não tinha fichas pro buy-in.
 func start_tournament() -> Dictionary:
 	var profile := SaveManager.section("profile")
 	if int(profile["fichas"]) < Tournament.BUY_IN:
@@ -261,109 +267,141 @@ func start_tournament() -> Dictionary:
 	var names: Array = BOT_NAMES.duplicate()
 	names += BOT_NAMES  # precisa de 15 bots, só há 12 nomes — repete, sem problema aqui
 	var field := Tournament.make_field(player_name(), names, rng)
-	tournament = {"field": field, "round": 0, "round_name": Tournament.ROUND_NAMES[0]}
-	_resolve_background_tables(rng)
+	tournament = {"tables": Tournament.split_into_tables(field), "total_entrants": field.size(), "level": 0}
 	return tournament
 
 
-## Resolve, headless, as mesas da fase atual que não têm o jogador — guarda os vencedores em
-## `bg_winners` e a mesa do jogador (pra entrar na cena) em `player_table`.
-func _resolve_background_tables(rng: RandomNumberGenerator) -> void:
-	var tables := Tournament.make_tables(tournament["field"])
-	var bg_winners: Array = []
-	var player_table: Array = []
-	for t in tables:
+## Mesa atual do jogador dentro de `tournament["tables"]`.
+func _tournament_player_table() -> Array:
+	for t in (tournament["tables"] as Array):
 		if Tournament.table_has_human(t):
-			player_table = t
-		else:
-			bg_winners.append(Tournament.simulate_table(t, rng)[0])
-	tournament["bg_winners"] = bg_winners
-	tournament["player_table"] = player_table
+			return t
+	return []
 
 
-## Config pra ChaosScene jogar a mesa atual do jogador no torneio: fase curta e decisiva
-## (níveis fixos), stacks neutros — o buy-in já foi cobrado na inscrição, nada mexe nas
-## fichas reais até o prêmio final (`report_tournament_table`).
+## Config pra ChaosScene jogar 1 NÍVEL da mesa atual do jogador no torneio — stacks são as
+## reais do torneio (viajam com cada jogador entre mesas), mas o buy-in já foi cobrado na
+## inscrição, então não mexe nas fichas de verdade até o prêmio final
+## (`report_tournament_table`). A mesa toca só esse nível; o resultado decide a próxima.
 func tournament_table_config() -> Dictionary:
-	var t: Array = tournament.get("player_table", [])
-	var names: Array = []
-	var difficulty: Array = []
+	var t := _tournament_player_table()
 	var human_i := 0
 	for i in range(t.size()):
-		var e: Dictionary = t[i]
-		names.append(str(e["name"]))
-		difficulty.append(int(e["difficulty"]))
-		if bool(e.get("human", false)):
+		if bool((t[i] as Dictionary).get("human", false)):
 			human_i = i
 	# A cena sempre senta o jogador na vaga 0 — gira a ordem sem mudar quem joga contra quem.
-	if human_i != 0:
-		names = (names.slice(human_i) as Array) + (names.slice(0, human_i) as Array)
-		difficulty = (difficulty.slice(human_i) as Array) + (difficulty.slice(0, human_i) as Array)
-	var blind := 10
+	# Guarda as MESMAS referências nessa ordem, pra escrever a stack de volta depois sem procurar.
+	_tournament_order = (t.slice(human_i) as Array) + (t.slice(0, human_i) as Array)
+	var names: Array = []
+	var difficulty: Array = []
+	var stacks: Array = []
+	for e in _tournament_order:
+		names.append(str(e["name"]))
+		difficulty.append(int(e["difficulty"]))
+		stacks.append(float(e["stack"]))
+	var blind := Tournament.blind_for(int(tournament.get("level", 0)))
+	var alive := 0
+	for tb in (tournament["tables"] as Array):
+		alive += (tb as Array).size()
 	return {
-		"players": Tournament.TABLE_SIZE,
+		"players": _tournament_order.size(),
 		"names": names,
 		"difficulty": difficulty,
 		"blind": blind,
-		"buy_in": blind * ChaosEngine.BUY_IN_BLINDS,
-		"stacks": [400, 400, 400, 400],
-		"table_name": "Torneio · %s" % str(tournament.get("round_name", "")),
+		"buy_in": 0,
+		"stacks": stacks,
+		"table_name": "Torneio · %d restantes · blind ◎%d" % [alive, blind],
 		"mode": "blitz",
-		"levels": Tournament.LEVELS_PER_TABLE,
+		"levels": 1,
 		"entered": true,
 		"onboarding_levels": 0,
 		"tournament": true,
 	}
 
 
-## Fecha a mesa de torneio do jogador: decide se avança pra Final, é campeão, ou foi
-## eliminado — e paga o prêmio ao chegar/terminar na mesa final.
-## result: engine.make_standings() + payout/buy_in/hands (igual report_chaos_match).
+## Fecha o nível de torneio do jogador: atualiza as stacks de todo mundo (a mesa dele de
+## verdade, as outras headless no mesmo nível), tira quem quebrou, realoca quem sobrou e diz
+## se o jogador avança, é campeão (só 1 sobra no torneio inteiro) ou foi eliminado.
+## result: engine.make_standings() + stacks (igual report_chaos_match).
 func report_tournament_table(result: Dictionary) -> Dictionary:
-	var standings: Array = result["standings"]
-	var placement := standings.find(0)
-	var round_i := int(tournament.get("round", 0))
-	var round_name := str(tournament.get("round_name", ""))
+	var final_stacks: Array = result["stacks"]
+	for i in range(_tournament_order.size()):
+		(_tournament_order[i] as Dictionary)["stack"] = maxf(float(final_stacks[i]), 0.0)
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var blind := Tournament.blind_for(int(tournament.get("level", 0)))
+	# Mesas de bots (todas, exceto a do jogador, que já tocou de verdade) jogam o mesmo nível,
+	# no mesmo blind — o blind sobe com o torneio inteiro, não por mesa.
+	for t in (tournament["tables"] as Array):
+		if not Tournament.table_has_human(t):
+			Tournament.simulate_level(t, blind, rng)
+	var before := int(tournament.get("total_entrants", 0))
+	if before <= 0:
+		for t in (tournament["tables"] as Array):
+			before += (t as Array).size()
+	var survivors: Array = []
+	for t in (tournament["tables"] as Array):
+		for e in (t as Array):
+			if float(e["stack"]) > 0.0:
+				survivors.append(e)
+	var busted_count := before - survivors.size()
 	var profile := SaveManager.section("profile")
 	var lines: Array = []
 	var next := "eliminated"
-	if placement == 0 and round_i == 0:
-		var bg_winners: Array = tournament.get("bg_winners", [])
-		var field_entry: Dictionary = (tournament["field"] as Array)[0]
-		tournament["round"] = 1
-		tournament["round_name"] = Tournament.ROUND_NAMES[1]
-		tournament["player_table"] = bg_winners + [field_entry]
-		tournament["bg_winners"] = []
-		lines.append("Venceu as Quartas! Avança pra Final.")
-		next = "final"
-	elif placement == 0 and round_i == 1:
+	var human_alive := false
+	for e in survivors:
+		if bool(e.get("human", false)):
+			human_alive = true
+	if not human_alive:
+		var placement := survivors.size() + 1   # 1 = campeão; empatou com quem mais quebrou junto
+		var prize := Tournament.payout_for(placement - 1)
+		if prize > 0:
+			profile["fichas"] = int(profile["fichas"]) + prize
+			lines.append("%dº lugar — +◎%d do bolão" % [placement, prize])
+		else:
+			lines.append("%dº lugar — eliminado, %d jogadores restantes." % [placement, survivors.size()])
+		var trk := tournaments()
+		(trk["history"] as Array).push_front({"result": "%dº lugar" % placement, "time": Time.get_datetime_string_from_system(false, true)})
+		next = "eliminated"
+		tournament = {}
+	elif survivors.size() == 1:
 		var prize := Tournament.payout_for(0)
 		profile["fichas"] = int(profile["fichas"]) + prize
-		var trk := tournaments()
-		trk["trophies"] = int(trk.get("trophies", 0)) + 1
-		(trk["titles"] as Array).append("Campeão do Torneio")
-		(trk["history"] as Array).push_front({"result": "campeão", "time": Time.get_datetime_string_from_system(false, true)})
+		var trk2 := tournaments()
+		trk2["trophies"] = int(trk2.get("trophies", 0)) + 1
+		(trk2["titles"] as Array).append("Campeão do Torneio")
+		(trk2["history"] as Array).push_front({"result": "campeão", "time": Time.get_datetime_string_from_system(false, true)})
 		lines.append("🏆 CAMPEÃO DO TORNEIO! +◎%d do bolão" % prize)
 		next = "champion"
 		tournament = {}
 	else:
-		if round_i == 1:
-			var prize := Tournament.payout_for(placement)
-			if prize > 0:
-				profile["fichas"] = int(profile["fichas"]) + prize
-				lines.append("%dº lugar na Final — +◎%d do bolão" % [placement + 1, prize])
-			else:
-				lines.append("%dº lugar na Final." % (placement + 1))
+		var regrouped := Tournament.rebalance(_tables_from(survivors, tournament["tables"]))
+		tournament["tables"] = regrouped
+		tournament["total_entrants"] = survivors.size()
+		tournament["level"] = int(tournament.get("level", 0)) + 1
+		if busted_count > 0:
+			lines.append("%d jogador(es) eliminado(s) nesse nível — %d restantes." % [busted_count, survivors.size()])
 		else:
-			lines.append("Eliminado nas Quartas (%dº lugar da mesa)." % (placement + 1))
-		var trk2 := tournaments()
-		(trk2["history"] as Array).push_front({"result": "eliminado · %s (%dº)" % [round_name, placement + 1], "time": Time.get_datetime_string_from_system(false, true)})
-		next = "eliminated"
-		tournament = {}
+			lines.append("%d jogadores restantes." % survivors.size())
+		next = "advance"
 	SaveManager.save_game()
-	var summary := {"placement": placement, "won": placement == 0, "lines": lines, "next": next, "round_name": round_name}
+	var summary := {"won": next == "champion", "lines": lines, "next": next}
 	last_summary = summary
 	return summary
+
+
+## Reagrupa os sobreviventes nas MESMAS mesas que já estavam (preservando quem ficou com quem),
+## só removendo quem quebrou — `Tournament.rebalance` cuida de desfazer as que ficaram curtas.
+func _tables_from(survivors: Array, old_tables: Array) -> Array:
+	var out: Array = []
+	for t in old_tables:
+		var kept: Array = []
+		for e in (t as Array):
+			if survivors.has(e):
+				kept.append(e)
+		if not kept.is_empty():
+			out.append(kept)
+	return out
 
 
 ## Dificuldade dos bots no Vanilla (Ajustes): 0 Fácil, 1 Normal, 2 Difícil. O tutorial usa

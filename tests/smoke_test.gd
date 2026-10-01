@@ -79,17 +79,19 @@ func _play_tournament_table() -> Dictionary:
 	return summary
 
 
-## Joga um torneio inteiro em autoplay: no máximo 2 mesas (Quartas, e Final se avançar).
+## Joga um torneio inteiro em autoplay: MTT de verdade, um nível do jogador por vez, até ele
+## ser eliminado ou virar campeão (campo de 16, mesas de até Tournament.MAX_TABLE).
 func _run_tournament(i: int) -> void:
 	SaveManager.section("profile")["fichas"] = maxi(int(SaveManager.section("profile")["fichas"]), 2000)
 	var t := GameState.start_tournament()
 	check(not t.is_empty(), "torneio %d: inscrição aceita" % i)
-	var rounds := 0
-	while not GameState.tournament.is_empty() and rounds < 3:
+	var levels := 0
+	var cap := 60   # blind escalando, 16 pro campo some bem antes disso — mais que isso é anomalia
+	while not GameState.tournament.is_empty() and levels < cap:
 		var s := await _play_tournament_table()
-		print("Torneio %d, mesa %d: %s" % [i, rounds + 1, " | ".join(s["lines"])])
-		rounds += 1
-	check(rounds in [1, 2], "torneio %d: 1 mesa (eliminado nas Quartas) ou 2 (chegou à Final), rodou %d" % [i, rounds])
+		print("Torneio %d, nível %d: %s" % [i, levels + 1, " | ".join(s["lines"])])
+		levels += 1
+	check(levels < cap, "torneio %d: terminou antes do teto de níveis (rodou %d)" % [i, levels])
 	check(GameState.tournament.is_empty(), "torneio %d: estado fechado ao terminar" % i)
 
 

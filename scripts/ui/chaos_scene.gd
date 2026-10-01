@@ -1098,8 +1098,9 @@ func _run_round() -> void:
 			return
 		if not await _ensure_solvent():
 			return
-		for q in engine.refill_bots():
-			await _new_player_sits(q)
+		if not bool(config.get("tournament", false)):
+			for q in engine.refill_bots():
+				await _new_player_sits(q)
 		engine.begin_trick()
 		_reset_actions()
 		_refresh_hud()
@@ -1184,14 +1185,17 @@ func _new_player_sits(q: int) -> void:
 
 ## Você ficou sem fichas pro blind: recompra ou sai da mesa.
 func _ensure_solvent() -> bool:
+	if bool(config.get("tournament", false)):
+		# Torneio: qualquer stack > 0 ainda joga (all-in pelo que tiver — a ante já é limitada
+		# ao que sobrou em begin_trick()); só stack zerada é eliminação de verdade. Sem isso,
+		# quem ficasse abaixo do blind escalado travava pra sempre sem nunca ser eliminado.
+		if engine.stacks[0] > 0.0:
+			return true
+		_finish_match()
+		return false
 	if engine.stacks[0] >= float(engine.blind):
 		return true
 	if GameState.autoplay:
-		_finish_match()
-		return false
-	if bool(config.get("tournament", false)):
-		# Torneio: quebrar na mesa é eliminação — sem recompra com fichas reais (o buy-in já
-		# foi pago na inscrição, a stack da mesa é só um número do bracket).
 		_finish_match()
 		return false
 	var profile := SaveManager.section("profile")
@@ -1536,7 +1540,8 @@ func _finish_match() -> void:
 	engine.match_result = result
 	var is_tournament := bool(config.get("tournament", false))
 	var summary := GameState.report_tournament_table(result) if is_tournament else GameState.report_chaos_match(result)
-	Sfx.play("win" if summary["won"] else "lose")
+	var lost: bool = not bool(summary["won"]) and (not is_tournament or str(summary.get("next", "")) == "eliminated")
+	Sfx.play("lose" if lost else "win")
 	status_label.text = ""
 	if turn_bar:
 		turn_bar.modulate.a = 0.0
@@ -1558,9 +1563,9 @@ func _show_tournament_results(summary: Dictionary) -> void:
 	v.add_theme_constant_override("separation", 10)
 	box.add_child(v)
 	var next := str(summary.get("next", "eliminated"))
-	var titles := {"final": "VENCEU AS %s!" % str(summary.get("round_name", "")), "champion": "🏆 CAMPEÃO DO TORNEIO!", "eliminated": "ELIMINADO"}
+	var titles := {"advance": "VOCÊ AVANÇA!", "champion": "🏆 CAMPEÃO DO TORNEIO!", "eliminated": "ELIMINADO"}
 	var title: String = titles[next]
-	v.add_child(UIKit.label(title, 34, UIKit.BRAND if summary["won"] else UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label(title, 34, UIKit.BRAND if summary["won"] else (UIKit.LOSS if next == "eliminated" else UIKit.OK), HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	var order: Array = engine.match_result["standings"]
 	for i in range(order.size()):
@@ -1569,11 +1574,11 @@ func _show_tournament_results(summary: Dictionary) -> void:
 		v.add_child(UIKit.label(line, 32, UIKit.ME if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	for line in summary["lines"]:
-		var ll := UIKit.label(str(line), 30, UIKit.OK if summary["won"] else UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER)
+		var ll := UIKit.label(str(line), 30, UIKit.LOSS if next == "eliminated" else UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
 		ll.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(ll)
-	if next == "final":
-		var go := UIKit.button("JOGAR A FINAL", UIKit.OK)
+	if next == "advance":
+		var go := UIKit.button("PRÓXIMO NÍVEL", UIKit.OK)
 		go.pressed.connect(func(): get_tree().reload_current_scene())
 		v.add_child(go)
 	var btn := UIKit.button("MENU PRINCIPAL", UIKit.MUTED)
@@ -2021,8 +2026,10 @@ func _blitz_open_level() -> bool:
 	blitz_showdown = false
 	if not await _ensure_solvent():
 		return false
-	for q in engine.refill_bots():
-		await _new_player_sits(q)
+	if not bool(config.get("tournament", false)):
+		# Torneio: ninguém senta no lugar de quem quebrou — a mesa só encolhe (MTT de verdade).
+		for q in engine.refill_bots():
+			await _new_player_sits(q)
 	_set_discard_chrome(true)
 	for p in range(engine.num_players):
 		if not engine.can_discard(p):
