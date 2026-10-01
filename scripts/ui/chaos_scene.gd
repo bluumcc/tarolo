@@ -35,7 +35,7 @@ var selected_view: CardView
 var throw_from := Vector2.ZERO
 var has_throw_from := false
 var status_label: Label
-var banner_box: PanelContainer
+var banner_box: Panel
 var banner_title: Label
 var banner_sub: Label
 var turn_bar: ProgressBar
@@ -83,6 +83,7 @@ var pot_locked := false        # contador do pote rolando: o refresh não sobres
 const FLAME := UIKit.COMBO
 const SEAT_W := 150.0
 const POT_W := 250.0
+const POT_BOTTOM_GAP := 26.0   ## folga entre a base do pote e o topo das cartas
 
 
 func _ready() -> void:
@@ -233,15 +234,26 @@ func _build_ui() -> void:
 	center_col.add_child(_build_seats())
 
 	# Faixa de avisos — espaço RESERVADO (nunca cobre carta nem placar): resultado da
-	# rodada, combos, evento surpresa. Uma mensagem por vez, sempre no mesmo lugar.
-	banner_box = UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MUTED, 12)
+	# rodada, combos, evento surpresa. Uma mensagem por vez, sempre no mesmo lugar. Altura
+	# FIXA (nunca cresce com o texto) — é um `Panel` puro com clip, não um Container que se
+	# redimensiona pros filhos: textos longos truncam (title) ou quebram e cortam (sub) em vez
+	# de esticar o card.
+	banner_box = Panel.new()
 	banner_box.custom_minimum_size = Vector2(0, 88)
+	banner_box.clip_contents = true
+	banner_box.add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, UIKit.MUTED, 3, 4, 12))
 	var bv := VBoxContainer.new()
+	bv.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bv.offset_left = 14.0
+	bv.offset_right = -14.0
+	bv.offset_top = 8.0
+	bv.offset_bottom = -8.0
 	bv.alignment = BoxContainer.ALIGNMENT_CENTER
 	bv.add_theme_constant_override("separation", 2)
 	banner_box.add_child(bv)
 	banner_title = UIKit.label("", 26, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER)
-	banner_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	banner_title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	banner_title.clip_text = true
 	bv.add_child(banner_title)
 	banner_sub = UIKit.label("", 17, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	banner_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -402,7 +414,12 @@ func _build_seats() -> HBoxContainer:
 		var status_l := UIKit.label("", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 		status_l.autowrap_mode = TextServer.AUTOWRAP_OFF
 		status_l.clip_text = true
-		seat.add_child(status_l)
+		var status_wrap := MarginContainer.new()
+		status_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		status_wrap.add_theme_constant_override("margin_top", 6)
+		status_wrap.add_theme_constant_override("margin_bottom", 6)
+		status_wrap.add_child(status_l)
+		seat.add_child(status_wrap)
 		seat_row.add_child(seat)
 		seat_nodes[p] = seat
 		hud_badges[p] = seat
@@ -433,7 +450,7 @@ func _badge(text: String, fill: Color, border: Color) -> PanelContainer:
 
 ## Pote da rodada no centro da mesa.
 func _build_pot() -> void:
-	pot_box = UIKit.panel(UIKit.SURFACE_POT, UIKit.MONEY, 8)
+	pot_box = UIKit.panel(UIKit.SURFACE_POT, UIKit.MONEY, 16)
 	pot_box.custom_minimum_size = Vector2(POT_W, 0)
 	pot_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var pv := VBoxContainer.new()
@@ -459,8 +476,9 @@ func _layout_table() -> void:
 		var card_top := _slot_pos(0).y + CardView.SIZE.y * (1.0 - TABLE_SCALE) / 2.0
 		var px := (table_center.size.x - pot_box.size.x) / 2.0
 		if table_center.size.y >= 300.0:
-			# Pote centralizado no espaço livre acima das cartas.
-			pot_box.position = Vector2(px, maxf((card_top - pot_box.size.y) / 2.0, 8.0))
+			# Base do pote a uma folga fixa das cartas (não centralizado no vão: crescer o
+			# pote nunca empurra a base pra baixo, só sobe o topo) — um pouco mais pra cima.
+			pot_box.position = Vector2(px, maxf(card_top - POT_BOTTOM_GAP - pot_box.size.y, 8.0))
 		else:
 			pot_box.position = Vector2(px, table_center.size.y / 2.0 - pot_box.size.y / 2.0)
 	for v in table_views:
@@ -698,12 +716,16 @@ func _modifier_transition(m: int, color: Color) -> void:
 	ov.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	ov.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay_layer.add_child(ov)
+	# Kicker lá no topo da tela (não no meio, junto do resto) — é só contexto, não o assunto.
+	var kicker := UIKit.label("RODADA %d DE %d" % [engine.trick_number + 1, ChaosEngine.HAND_SIZE], 26, UIKit.ACTION, HORIZONTAL_ALIGNMENT_CENTER)
+	kicker.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	kicker.offset_top = 56.0
+	ov.add_child(kicker)
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_theme_constant_override("separation", 20)
+	v.add_theme_constant_override("separation", 16)
 	var width := minf(get_viewport_rect().size.x - 80.0, 680.0)
 	v.custom_minimum_size = Vector2(width, 0)
-	v.add_child(UIKit.label("RODADA %d DE %d" % [engine.trick_number + 1, ChaosEngine.HAND_SIZE], 30, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	var orb_hold := Control.new()
 	orb_hold.custom_minimum_size = Vector2(190, 190)
 	orb_hold.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -720,12 +742,18 @@ func _modifier_transition(m: int, color: Color) -> void:
 	orb.add_child(orb_icon)
 	orb_hold.add_child(orb)
 	v.add_child(orb_hold)
+	# Sem ícone no título: o orbe logo acima já mostra o ícone do modificador sorteado.
 	var title_lbl := UIKit.label("", 40, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(title_lbl)
-	var text_lbl := UIKit.label("%s %s" % [ChaosModifiers.desc_of(m, engine.blitz), ChaosModifiers.tip_of(m, engine.blitz)], 30, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-	text_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	text_lbl.modulate.a = 0.0
-	v.add_child(text_lbl)
+	# Efeito e dica em linhas separadas (não um parágrafo só) — mais fácil de ler de relance.
+	var desc_lbl := UIKit.label(ChaosModifiers.desc_of(m, engine.blitz), 28, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc_lbl.modulate.a = 0.0
+	v.add_child(desc_lbl)
+	var tip_lbl := UIKit.label(ChaosModifiers.tip_of(m, engine.blitz), 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	tip_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tip_lbl.modulate.a = 0.0
+	v.add_child(tip_lbl)
 	var go := UIKit.button("ENTENDI, CONTINUAR")
 	go.disabled = true
 	go.modulate.a = 0.0
@@ -738,8 +766,9 @@ func _modifier_transition(m: int, color: Color) -> void:
 	ov.modulate.a = 0.0
 	create_tween().tween_property(ov, "modulate:a", 1.0, GameState.anim(0.18))
 	Sfx.play("tick")
-	_open_modifier_orb(orb, orb_icon, title_lbl, text_lbl, go, m, color)
-	_count_down(go, timer_lbl, 3.2)
+	_open_modifier_orb(orb, orb_icon, title_lbl, desc_lbl, tip_lbl, go, m, color)
+	# +3s a mais pra realmente dar tempo de ler o modificador sorteado antes de avançar sozinho.
+	_count_down(go, timer_lbl, 6.2)
 	await go.pressed
 	if not is_inside_tree():
 		return
@@ -750,8 +779,8 @@ func _modifier_transition(m: int, color: Color) -> void:
 
 
 ## Anima o item: carrega (pulsa), estoura (partículas + tremor na cor do modificador) e revela
-## o ícone+nome sorteado, só então liberando o texto e o botão de continuar.
-func _open_modifier_orb(orb: PanelContainer, orb_icon: Label, title_lbl: Label, text_lbl: Label, go: Button, m: int, color: Color) -> void:
+## o ícone+nome sorteado, só então liberando os textos e o botão de continuar.
+func _open_modifier_orb(orb: PanelContainer, orb_icon: Label, title_lbl: Label, desc_lbl: Label, tip_lbl: Label, go: Button, m: int, color: Color) -> void:
 	for i in range(3):
 		if not is_instance_valid(orb) or not is_inside_tree():
 			return
@@ -772,16 +801,17 @@ func _open_modifier_orb(orb: PanelContainer, orb_icon: Label, title_lbl: Label, 
 	orb.add_theme_stylebox_override("panel", opened)
 	orb_icon.text = str(ChaosModifiers.ICONS[m])
 	orb_icon.add_theme_color_override("font_color", color)
-	title_lbl.text = "%s %s" % [ChaosModifiers.ICONS[m], _modifier_label(m)]
+	title_lbl.text = _modifier_label(m)
 	FX.burst(popup_layer, orb.get_global_rect().get_center(), color, 20)
 	FX.shake(self, 0.35)
 	Sfx.play("win")
 	var settle := create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	settle.tween_property(orb, "scale", Vector2.ONE, 0.22)
 	await settle.finished
-	if not is_instance_valid(text_lbl):
-		return
-	create_tween().tween_property(text_lbl, "modulate:a", 1.0, GameState.anim(0.3))
+	if is_instance_valid(desc_lbl):
+		create_tween().tween_property(desc_lbl, "modulate:a", 1.0, GameState.anim(0.3))
+	if is_instance_valid(tip_lbl):
+		create_tween().tween_property(tip_lbl, "modulate:a", 1.0, GameState.anim(0.3))
 	if is_instance_valid(go):
 		go.disabled = false
 		create_tween().tween_property(go, "modulate:a", 1.0, GameState.anim(0.3))
@@ -1210,16 +1240,16 @@ func _hand_label() -> String:
 func _human_bet() -> Dictionary:
 	modal_open = true
 	var opt := engine.bet_options(0)
-	var vw := get_viewport_rect().size.x
 	var holder := MarginContainer.new()
 	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	holder.add_theme_constant_override("margin_top", int(seat_row.global_position.y + seat_row.size.y + 6.0))
+	# Abaixo da mesa (que já tem o pote lá dentro), nunca cobrindo pote nem cartas jogadas.
+	holder.add_theme_constant_override("margin_top", int(table_center.global_position.y + table_center.size.y + 10.0))
 	overlay_layer.add_child(holder)
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 20)
 	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	box.custom_minimum_size = Vector2(minf(vw - 32.0, 660.0), 0)
+	box.custom_minimum_size = Vector2(maxf(table_center.size.x - 56.0, 240.0), 0)
 	holder.add_child(box)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
@@ -2125,80 +2155,81 @@ func _commit_discard(view: CardView, drop_global := Vector2.ZERO) -> void:
 		item_chosen.emit(1)
 
 
-## Tela cheia de preparação do nível: o palpite tem etapa própria, separada da mesa — fundo
-## escurecido, selo da força da mão entrando com uma "mola", escolha de 0 a 8 embaixo.
+## Card do palpite: claro, sem fundo escurecido por cima da mesa — fica abaixo dos avatares,
+## sem bloquear nem cobrir a mão (segurar ou botão direito numa carta ainda dá zoom), pra dar
+## pra olhar e conferir antes de decidir. Seletor de quantidade em −/+ com o palpite sugerido
+## em destaque, em vez de uma fileira de botões de 0 a 8.
 func _human_predict() -> int:
 	modal_open = true
-	var ov := ColorRect.new()
-	ov.color = UIKit.SCRIM
-	ov.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	ov.mouse_filter = Control.MOUSE_FILTER_STOP
-	overlay_layer.add_child(ov)
+	var vw := get_viewport_rect().size.x
+	var holder := MarginContainer.new()
+	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.add_theme_constant_override("margin_top", int(seat_row.global_position.y + seat_row.size.y + 10.0))
+	overlay_layer.add_child(holder)
+	var box := UIKit.panel(UIKit.PAPER, UIKit.BRAND, 20)
+	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	box.custom_minimum_size = Vector2(minf(vw - 32.0, 600.0), 0)
+	holder.add_child(box)
 	var v := VBoxContainer.new()
-	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_theme_constant_override("separation", 14)
-	var width := minf(get_viewport_rect().size.x - 64.0, 680.0)
-	v.custom_minimum_size = Vector2(width, 0)
-	v.add_child(UIKit.label("PREPARAÇÃO DO NÍVEL", 24, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("QUANTAS RODADAS VOCÊ VAI GANHAR?", 34, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
-	var strength_box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MONEY, 14)
-	strength_box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	strength_box.add_child(UIKit.label(_hand_label_blitz(), 26, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(strength_box)
-	var info := "Entrada ◎%d  ·  Pote ◎%d" % [int(engine.blitz_entry()), int(engine.carry)]
-	var info_l := UIKit.label(info, 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_theme_constant_override("separation", 8)
+	box.add_child(v)
+	v.add_child(UIKit.label("QUANTAS RODADAS VOCÊ VAI GANHAR?", 26, UIKit.TEXT_ON_LIGHT, HORIZONTAL_ALIGNMENT_CENTER))
+	var hint := ChaosBot.suggested_predict(engine, 0)
+	var info := "Entrada ◎%d  ·  Pote ◎%d  ·  Sua mão: %s" % [int(engine.blitz_entry()), int(engine.carry), _hand_label_blitz()]
+	var info_l := UIKit.label(info, 19, UIKit.TEXT_ON_LIGHT, HORIZONTAL_ALIGNMENT_CENTER)
+	info_l.modulate.a = 0.7
 	info_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(info_l)
+	v.add_child(HSeparator.new())
 	var body := VBoxContainer.new()
-	body.add_theme_constant_override("separation", 10)
+	body.add_theme_constant_override("separation", 8)
 	v.add_child(body)
-	var hint := ChaosBot.suggested_predict(engine, 0)
 	var st := {"pick": hint}
 	st["render"] = func():
 		for c in body.get_children():
 			c.queue_free()
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 6)
-		body.add_child(row)
-		for n in range(ChaosEngine.HAND_SIZE + 1):
-			var chosen: bool = int(st["pick"]) == n
-			var b := UIKit.button("%d%s" % [n, "★" if n == hint else ""], UIKit.ACTION if chosen else UIKit.BUTTON_MUTED, 28)
-			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			b.custom_minimum_size = Vector2(0, 68)
-			b.pressed.connect(func():
-				st["pick"] = n
-				(st["render"] as Callable).call())
-			row.add_child(b)
+		var stepper := HBoxContainer.new()
+		stepper.alignment = BoxContainer.ALIGNMENT_CENTER
+		stepper.add_theme_constant_override("separation", 20)
+		body.add_child(stepper)
+		var minus := UIKit.button("−", UIKit.BUTTON_MUTED, 36)
+		minus.custom_minimum_size = Vector2(76, 76)
+		minus.disabled = int(st["pick"]) <= 0
+		minus.pressed.connect(func():
+			st["pick"] = maxi(0, int(st["pick"]) - 1)
+			(st["render"] as Callable).call())
+		stepper.add_child(minus)
+		var count_l := UIKit.label(str(int(st["pick"])), 60, UIKit.TEXT_ON_LIGHT, HORIZONTAL_ALIGNMENT_CENTER)
+		count_l.custom_minimum_size = Vector2(110, 0)
+		stepper.add_child(count_l)
+		var plus := UIKit.button("+", UIKit.BUTTON_MUTED, 36)
+		plus.custom_minimum_size = Vector2(76, 76)
+		plus.disabled = int(st["pick"]) >= ChaosEngine.HAND_SIZE
+		plus.pressed.connect(func():
+			st["pick"] = mini(ChaosEngine.HAND_SIZE, int(st["pick"]) + 1)
+			(st["render"] as Callable).call())
+		stepper.add_child(plus)
+		var is_hint: bool = int(st["pick"]) == hint
+		var rec_l := UIKit.label("★ RECOMENDADO PELA SUA MÃO" if is_hint else "Recomendado pela sua mão: %d" % hint, 18, UIKit.GOOD_ON_LIGHT if is_hint else UIKit.TEXT_ON_LIGHT, HORIZONTAL_ALIGNMENT_CENTER)
+		rec_l.modulate.a = 1.0 if is_hint else 0.6
+		body.add_child(rec_l)
 		var w := ChaosEngine.blitz_weight(int(st["pick"]))
-		var legend := UIKit.label("Peso do seu palpite no pote: ×%s   (0–2 ×1 · 3–4 ×1,5 · 5+ ×2)" % UIKit.fmt_dec(w, 1), 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		var legend := UIKit.label("Peso do palpite no pote: ×%s   (0–2 ×1 · 3–4 ×1,5 · 5+ ×2)" % UIKit.fmt_dec(w, 1), 18, UIKit.TEXT_ON_LIGHT, HORIZONTAL_ALIGNMENT_CENTER)
+		legend.modulate.a = 0.65
 		legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		body.add_child(legend)
-		var go := UIKit.button("CONFIRMAR: %d %s" % [int(st["pick"]), "RODADA" if int(st["pick"]) == 1 else "RODADAS"], UIKit.OK, 30)
+		var go := UIKit.button("CONFIRMAR: %d %s" % [int(st["pick"]), "RODADA" if int(st["pick"]) == 1 else "RODADAS"], UIKit.OK, 28)
 		go.pressed.connect(func(): item_chosen.emit(1))
 		body.add_child(go)
 	(st["render"] as Callable).call()
-	ov.add_child(UIKit.centered(v))
-	UIKit.fit.call_deferred(v)
-	ov.modulate.a = 0.0
-	create_tween().tween_property(ov, "modulate:a", 1.0, GameState.anim(0.2))
-	UIKit.pop_in(body, GameState.anim(0.18))
+	UIKit.pop_in(box, GameState.anim(0.15))
 	Sfx.play("chip")
-	var str_center := func(): strength_box.pivot_offset = strength_box.size / 2.0
-	strength_box.resized.connect(str_center)
-	str_center.call()
-	strength_box.modulate.a = 0.0
-	strength_box.scale = Vector2(0.7, 0.7)
-	var stw := create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	stw.tween_property(strength_box, "modulate:a", 1.0, 0.3)
-	stw.parallel().tween_property(strength_box, "scale", Vector2.ONE, 0.35)
 	await item_chosen
 	modal_open = false
 	if is_inside_tree():
-		var tw := create_tween()
-		tw.tween_property(ov, "modulate:a", 0.0, GameState.anim(0.15))
-		await tw.finished
-	if is_inside_tree():
-		ov.queue_free()
+		holder.queue_free()
 	return int(st["pick"])
 
 
