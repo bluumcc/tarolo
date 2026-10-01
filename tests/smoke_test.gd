@@ -1,6 +1,7 @@
 extends Node
-## Smoke test das cenas com autoloads: abre o menu e o lobby, e joga rodadas completas
-## de Tarot Vanilla em autoplay nos modos Vanilla e Ranqueado.
+## Smoke test das cenas com autoloads: abre o menu e o lobby, joga rodadas completas de
+## Tarot Vanilla (recreativo, sem elo) e de Blitz (fila única — toda mesa completa aplica
+## LP/MMR automaticamente) em autoplay.
 ## Uso: godot --headless --path . res://tests/Smoke.tscn
 
 const GAME := preload("res://scenes/GameScene.tscn")
@@ -80,16 +81,11 @@ func _run() -> void:
 		print("Vanilla %d: %dº lugar · %s" % [i + 1, int(s["placement"]) + 1, " | ".join(s["lines"])])
 	check(int(SaveManager.section("profile")["matches"]) == 8, "vanilla contabilizado (%d)" % int(SaveManager.section("profile")["matches"]))
 
+	# Ranqueado é o próprio Blitz (fila única): a tela só mostra liga/histórico e manda pro Blitz.
 	var lobby := await _open("res://scenes/RankedLobby.tscn")
-	lobby.queue_free()
-	for i in range(6):
-		GameState.find_ranked_lobby()
-		var s := await _play(GameState.Mode.RANKED)
-		print("Ranqueado %d: %dº · %s" % [i + 1, int(s["placement"]) + 1, " | ".join(s["lines"])])
-	check((GameState.ranked()["history"] as Array).size() == 6, "histórico ranqueado")
-	lobby = await _open("res://scenes/RankedLobby.tscn")
 	lobby.queue_free()
 
 	for i in range(8):
 		var s := await _play_chaos()
 		print("Blitz %d: %dº lugar | %s" % [i + 1, int(s["placement"]) + 1, " | ".join(s["lines"])])
+	check((GameState.ranked()["history"] as Array).size() == 8, "fila única: toda mesa de blitz completa aplica LP/MMR (tem %d)" % (GameState.ranked()["history"] as Array).size())

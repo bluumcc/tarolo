@@ -715,10 +715,6 @@ func _refresh_hud() -> void:
 			(hud_cards[p] as Label).text = "%d cartas" % (engine.hands[p] as Array).size()
 	_update_turn_highlight(turn_player)
 	var mode_name: String = GameState.MODE_NAMES[GameState.mode]
-	var extra := ""
-	if GameState.mode == GameState.Mode.RANKED:
-		var t := Ranked.tier_info(int(GameState.ranked()["points"]), int(GameState.ranked()["mmr"]))
-		extra = "  ·  %s" % t["label"]
 	var pot := 0.0
 	for entry in engine.plays:
 		pot += ((entry as Dictionary)["card"] as CardData).points()
@@ -729,9 +725,9 @@ func _refresh_hud() -> void:
 	else:
 		var n := mini(engine.trick_number + 1, engine.total_tricks)
 		if n == engine.total_tricks:
-			info_label.text = "ÚLTIMA RODADA · fim da partida%s" % extra
+			info_label.text = "ÚLTIMA RODADA · fim da partida"
 		else:
-			info_label.text = "RODADA %d DE %d%s" % [n, engine.total_tricks, extra]
+			info_label.text = "RODADA %d DE %d" % [n, engine.total_tricks]
 		if not hold_boss:
 			_refresh_boss(true)
 
@@ -1601,8 +1597,6 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 	var title := "O CHEFE VENCEU" if r["success"] else "O CHEFE CAIU!"
 	if r["taker"] == 0:
 		title = "VOCÊ BATEU A META" if r["success"] else "VOCÊ NÃO BATEU A META"
-	if GameState.mode == GameState.Mode.RANKED:
-		title = "%dº LUGAR" % (int(summary["placement"]) + 1)
 	v.add_child(UIKit.label(title, 32, UIKit.BRAND if r["success"] else UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(UIKit.label("%s · %s · %s / %s pts (%s%s)" % [
 		str(config["names"][r["taker"]]),
@@ -1639,7 +1633,7 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 	v.add_child(HSeparator.new())
 	for line in summary["lines"]:
 		v.add_child(UIKit.label(str(line), 30, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-	if not GameState.table.is_empty() and GameState.mode == GameState.Mode.CLASSIC and not tutorial:
+	if not GameState.table.is_empty() and not tutorial:
 		v.add_child(HSeparator.new())
 		v.add_child(UIKit.label("PLACAR DA MESA · %d mão(s)" % int(GameState.table["hands"]), 30, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 		var order: Array = range(engine.num_players)
@@ -1649,7 +1643,7 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 			v.add_child(UIKit.label("%s  %s%d" % [str(config["names"][p]).to_upper(), "+" if tot >= 0 else "", tot], 32, UIKit.ME if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	if tutorial:
 		v.add_child(HSeparator.new())
-		var tut_close := UIKit.label("Tutorial concluído! Isso não afeta suas Fragmentos nem seu elo — quando quiser, jogue de verdade no Vanilla ou Ranqueado.", 30, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
+		var tut_close := UIKit.label("Tutorial concluído! Isso não afeta suas Gemas nem seu elo — quando quiser, jogue de verdade no Vanilla ou Ranqueado.", 30, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
 		tut_close.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		tut_close.custom_minimum_size = Vector2(620, 0)
 		v.add_child(tut_close)
@@ -1727,8 +1721,7 @@ func _open_pause() -> void:
 	var resume := UIKit.button("CONTINUAR")
 	resume.pressed.connect(ov.queue_free)
 	v.add_child(resume)
-	var quit_label := "ABANDONAR (conta como 4º)" if GameState.mode == GameState.Mode.RANKED else "SAIR PARA O MENU"
-	var quit := UIKit.button(quit_label, UIKit.DANGER)
+	var quit := UIKit.button("SAIR PARA O MENU", UIKit.DANGER)
 	quit.pressed.connect(_abandon)
 	v.add_child(quit)
 	ov.add_child(UIKit.centered(box))
@@ -1737,14 +1730,7 @@ func _open_pause() -> void:
 
 func _abandon() -> void:
 	finished = true
-	match GameState.mode:
-		GameState.Mode.RANKED:
-			var taker_seat := maxi(engine.taker, 0)
-			var deltas := Scoring.distribute(-25.0, taker_seat, engine.num_players)
-			GameState.report_match({"placement": engine.num_players - 1, "taker": taker_seat, "contract": maxi(engine.contract, 0), "success": false, "deltas": deltas})
-			get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn")
-		_:
-			get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
+	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
 
 
 func _unhandled_input(event: InputEvent) -> void:

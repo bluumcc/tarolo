@@ -279,3 +279,31 @@ ainda simula só predict/jogo de carta/liquidação, sem `begin_trick`/`bet_act`
 escrever uma simulação que jogue com a aposta por rodada ligada e confirmar que a escada de
 dificuldade e o equilíbrio entre estilos sobrevivem ao novo mecanismo, e depois calibrar os bots
 pra também levarem o palpite em conta na hora de apostar.
+
+## Fila única: Blitz é o Ranqueado
+
+Decisão de arquitetura (sem matchmaking de verdade ainda — as mesas são preenchidas com bots,
+o "Ranqueado" de hoje é a vitrine da liga + um atalho pro Blitz, não uma fila separada):
+
+- **Vanilla é 100% recreativo.** Não lê nem escreve elo nenhum (`GameState.Mode` só tem
+  `CLASSIC`). `report_match()` só dá Gemas e pontos — sem LP/MMR.
+- **Toda mesa real de Blitz conta pro Elo**, automaticamente, sem escolha de "casual" vs
+  "ranqueado": `GameState.blitz_ranked` é `true` por padrão, e `report_chaos_match()` aplica
+  `apply_ranked_progress()` (mesma fórmula de LP/MMR que o Vanilla usava antes) toda vez que o
+  jogador completa pelo menos 1 nível inteiro (`hands >= ChaosEngine.HAND_SIZE`), seja entrando
+  pelo card "MODO BLITZ" do menu ou pela tela de Ranqueado. Só os torneios (ver próxima seção)
+  zeram `blitz_ranked` pra não mexer na fila regular.
+- `RankedLobby.tscn` não muda de função: mostra liga/LP/histórico e, ao "buscar partida", abre
+  `ChaosScene.tscn` (antes abria `GameScene.tscn`, o motor Vanilla — por isso o Ranqueado nunca
+  bateu com a regra "Blitz é a espinha dorsal do elo").
+
+## Carteiras: Fichas (jogo) e Gemas (cosmético)
+
+- **Fichas** continuam sem valor monetário, não saem do jogo. Resgate automático
+  (`ChaosEconomy.rescue_if_broke`): se o saldo zerar, a casa injeta `RESCUE_AMOUNT` (400, a
+  entrada da mesa Iniciante) na hora de sentar — sem precisar pedir ou esperar a recarga diária.
+- **Gemas** (antes "Fragmentos" — só o nome mudou, a moeda é a mesma: cosmética, nunca afeta
+  jogo) são ganhas em partidas de Vanilla e Blitz e gastas na Loja de Cosméticos.
+- **Carteira de dinheiro real:** reservado `profile.cash_balance` no save (sempre 0, sem UI) pra
+  quando o pagamento de verdade for integrado — nenhuma mesa ou torneio em dinheiro real existe
+  ainda.

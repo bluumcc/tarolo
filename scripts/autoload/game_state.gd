@@ -1,9 +1,11 @@
 extends Node
 ## Estado da sessão: modo atual, lobby ranqueado e fechamento de partidas.
 
-enum Mode { CLASSIC, RANKED }
+## Vanilla é só recreativo (sem Mode.RANKED): o Elo agora é inteiramente do Blitz, fila
+## única — toda mesa real de Blitz vale fichas E LP/MMR ao mesmo tempo (ver `blitz_ranked`).
+enum Mode { CLASSIC }
 
-const MODE_NAMES := ["Vanilla", "Ranqueado"]
+const MODE_NAMES := ["Vanilla"]
 const BOT_NAMES := ["João", "Ana", "Felipe", "Mateus", "Lucas", "Sabrina", "Joana", "Pedro", "Márcio", "Júnior", "Fábio", "Marcos"]
 
 var mode: int = Mode.CLASSIC
@@ -11,8 +13,11 @@ var mode: int = Mode.CLASSIC
 var autoplay := false
 ## Remove esperas de animação (testes headless).
 var fast := false
-## Partida de tutorial: mão fixa + dicas contextuais, não mexe em Fragmentos/elo.
+## Partida de tutorial: mão fixa + dicas contextuais, não mexe em Gemas/elo.
 var tutorial := false
+## Falso só pra mesas de torneio: elas valem fichas (o bolão) mas não mexem no Elo da fila
+## regular — tudo mais (ex.: jogar Blitz pelo menu) é fila única e sempre ranqueada.
+var blitz_ranked := true
 
 
 func start_tutorial() -> void:
@@ -21,6 +26,9 @@ func start_tutorial() -> void:
 
 var ranked_lobby: Array = []   # [{name, mmr}] adversários encontrados no matchmaking
 var last_summary: Dictionary = {}
+## Resgate automático de fichas (ChaosEconomy.rescue_if_broke) aplicado na última sentada na
+## mesa — a cena mostra um aviso uma vez e zera isso de novo.
+var last_rescue := 0
 ## Mesa contínua do Vanilla: os mesmos jogadores ficam sentados e o placar acumula, mão
 ## após mão, até alguém levantar. {names, totals, hands}
 var table: Dictionary = {}
@@ -166,6 +174,11 @@ func chaos_config() -> Dictionary:
 	var names := BOT_NAMES.duplicate()
 	names.shuffle()
 	var profile := SaveManager.section("profile")
+	last_rescue = ChaosEconomy.rescue_if_broke(profile)
+	if last_rescue > 0:
+		SaveManager.save_game()
+	if blitz_ranked:
+		find_ranked_lobby()
 	var t: Dictionary = CHAOS_TABLES[clampi(chaos_table, 0, CHAOS_TABLES.size() - 1)]
 	var blind := int(t["blind"])
 	var buy_in := chaos_buy_in()
@@ -195,8 +208,9 @@ func blitz_level_played() -> void:
 	SaveManager.save_game()
 
 
-## Fecha uma sessão de mesa Caos (você saiu, quebrou ou a partida de teste acabou): devolve
-## a stack final às fichas do perfil e dá Fragmentos se jogou pelo menos um nível.
+## Fecha uma sessão de mesa Blitz (você saiu, quebrou ou a partida de teste acabou): devolve
+## a stack final às fichas do perfil, dá Gemas e — fila única — aplica LP/MMR se jogou pelo
+## menos um nível completo (torneio chama com `blitz_ranked = false`, então não mexe no Elo).
 ## result: { standings, stacks, payout (sua stack), buy_in, hands }
 func report_chaos_match(result: Dictionary) -> Dictionary:
 	var standings: Array = result["standings"]
@@ -208,18 +222,20 @@ func report_chaos_match(result: Dictionary) -> Dictionary:
 	var net := payout - buy_in
 	var won := net > 0
 	var frag := 0
+	var lines: Array = []
 	if hands >= ChaosEngine.HAND_SIZE:
 		profile["matches"] = int(profile["matches"]) + 1
 		if won:
 			profile["wins"] = int(profile["wins"]) + 1
 		var frag_by_place := [15, 10, 6, 3]
 		frag = frag_by_place[clampi(placement, 0, 3)]
-		profile["fragments"] = int(profile["fragments"]) + frag
+		profile["gems"] = int(profile["gems"]) + frag
+		if blitz_ranked:
+			lines.append_array(apply_ranked_progress(placement, int(round(net))))
 	profile["fichas"] = int(profile["fichas"]) + payout
 	SaveManager.save_game()
-	var lines: Array = []
 	if frag > 0:
-		lines.append("+%d Fragmentos" % frag)
+		lines.append("+%d Gemas" % frag)
 	lines.append("%s%d fichas nessa mesa (stack final %d)" % ["+" if net >= 0 else "", net, payout])
 	var summary := {
 		"placement": placement,
@@ -232,8 +248,8 @@ func report_chaos_match(result: Dictionary) -> Dictionary:
 	return summary
 
 
-## Dificuldade dos bots no Vanilla comum (Ajustes): 0 Fácil, 1 Normal, 2 Difícil. O
-## tutorial usa sempre Fácil (jogadas previsíveis) e o Ranqueado usa o seu elo.
+## Dificuldade dos bots no Vanilla (Ajustes): 0 Fácil, 1 Normal, 2 Difícil. O tutorial usa
+## sempre Fácil (jogadas previsíveis). Vanilla é recreativo — não lê elo nenhum.
 func bots_difficulty() -> int:
 	if tutorial:
 		return BotAI.Difficulty.EASY
@@ -250,20 +266,16 @@ func match_config() -> Dictionary:
 		"difficulty": [BotAI.Difficulty.HARD, bots_difficulty(), bots_difficulty(), bots_difficulty()],
 		"tutorial": tutorial,
 	}
-	if mode == Mode.CLASSIC and not tutorial:
+	if not tutorial:
 		if table.is_empty():
 			table = {"names": cfg["names"].duplicate(), "totals": [0.0, 0.0, 0.0, 0.0], "hands": 0}
 		else:
 			cfg["names"] = table["names"].duplicate()
-	if mode == Mode.RANKED:
-		var diff := Ranked.bot_difficulty_for_mmr(int(ranked()["mmr"]))
-		cfg["difficulty"] = [BotAI.Difficulty.HARD, diff, diff, diff]
-		for i in range(mini(ranked_lobby.size(), 3)):
-			cfg["names"][i + 1] = ranked_lobby[i]["name"]
 	return cfg
 
 
-## Fecha a partida, aplica economia/LP e devolve um resumo para a tela de resultado.
+## Fecha a partida de Vanilla (recreativo puro — nunca mexe em elo) e devolve um resumo para
+## a tela de resultado.
 ## result: { placement: int, taker: int, contract: int, success: bool, deltas: Array }
 func report_match(result: Dictionary) -> Dictionary:
 	var placement := int(result["placement"])
@@ -293,44 +305,43 @@ func report_match(result: Dictionary) -> Dictionary:
 	summary["lines"].append("%s · %s" % [role, outcome] if was_taker else role)
 	summary["lines"].append("%s%d pontos" % ["+" if int(result["deltas"][0]) >= 0 else "", int(result["deltas"][0])])
 
-	match mode:
-		Mode.CLASSIC:
-			var frag := 8 if won else 3
-			profile["fragments"] = int(profile["fragments"]) + frag
-			summary["lines"].append("+%d Fragmentos" % frag)
-		Mode.RANKED:
-			var rk := ranked()
-			var mmr := int(rk["mmr"])
-			var lobby := lobby_avg_mmr()
-			var d_lp := Ranked.lp_delta(placement, mmr, lobby)
-			var d_mmr := Ranked.mmr_delta(placement, mmr, lobby)
-			var before := Ranked.tier_info(int(rk["points"]), mmr)
-			rk["points"] = maxi(0, int(rk["points"]) + d_lp)
-			rk["mmr"] = maxi(0, mmr + d_mmr)
-			rk["peak_points"] = maxi(int(rk["peak_points"]), int(rk["points"]))
-			if placement <= 1:
-				rk["wins"] = int(rk["wins"]) + 1
-			else:
-				rk["losses"] = int(rk["losses"]) + 1
-			var after := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
-			var hist: Array = rk["history"]
-			hist.push_front({"placement": placement + 1, "lp": d_lp, "score": int(result["deltas"][0]), "tier": after["label"], "time": Time.get_datetime_string_from_system(false, true)})
-			while hist.size() > 20:
-				hist.pop_back()
-			summary["lines"].append("%s%d LP  ·  MMR %s%d" % ["+" if d_lp >= 0 else "", d_lp, "+" if d_mmr >= 0 else "", d_mmr])
-			if after["tier"] > before["tier"]:
-				summary["lines"].append("PROMOÇÃO! %s" % after["label"])
-			elif after["tier"] < before["tier"]:
-				summary["lines"].append("Rebaixamento: %s" % after["label"])
-			else:
-				summary["lines"].append(after["label"])
-			var frag := 12 if placement == 0 else 5
-			profile["fragments"] = int(profile["fragments"]) + frag
-			summary["lines"].append("+%d Fragmentos" % frag)
-			summary["next"] = "ranked"
+	var frag := 8 if won else 3
+	profile["gems"] = int(profile["gems"]) + frag
+	summary["lines"].append("+%d Gemas" % frag)
 
 	if won:
 		profile["wins"] = int(profile["wins"]) + 1
 	SaveManager.save_game()
 	last_summary = summary
 	return summary
+
+
+## Fila única do Blitz: placement (0 = 1º ... 3 = 4º) e o LP/MMR de acordo. Devolve as linhas
+## de resumo prontas pra mostrar. Usado só quando `blitz_ranked` (torneio chama com false).
+func apply_ranked_progress(placement: int, score: int) -> Array:
+	var rk := ranked()
+	var mmr := int(rk["mmr"])
+	var lobby := lobby_avg_mmr()
+	var d_lp := Ranked.lp_delta(placement, mmr, lobby)
+	var d_mmr := Ranked.mmr_delta(placement, mmr, lobby)
+	var before := Ranked.tier_info(int(rk["points"]), mmr)
+	rk["points"] = maxi(0, int(rk["points"]) + d_lp)
+	rk["mmr"] = maxi(0, mmr + d_mmr)
+	rk["peak_points"] = maxi(int(rk["peak_points"]), int(rk["points"]))
+	if placement <= 1:
+		rk["wins"] = int(rk["wins"]) + 1
+	else:
+		rk["losses"] = int(rk["losses"]) + 1
+	var after := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
+	var hist: Array = rk["history"]
+	hist.push_front({"placement": placement + 1, "lp": d_lp, "score": score, "tier": after["label"], "time": Time.get_datetime_string_from_system(false, true)})
+	while hist.size() > 20:
+		hist.pop_back()
+	var lines: Array = ["%s%d LP  ·  MMR %s%d" % ["+" if d_lp >= 0 else "", d_lp, "+" if d_mmr >= 0 else "", d_mmr]]
+	if after["tier"] > before["tier"]:
+		lines.append("PROMOÇÃO! %s" % after["label"])
+	elif after["tier"] < before["tier"]:
+		lines.append("Rebaixamento: %s" % after["label"])
+	else:
+		lines.append(after["label"])
+	return lines

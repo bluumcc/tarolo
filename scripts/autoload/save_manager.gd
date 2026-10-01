@@ -17,7 +17,8 @@ func defaults() -> Dictionary:
 	return {
 		"version": SAVE_VERSION,
 		"settings": {"music_volume": 0.8, "sfx_volume": 0.9, "fullscreen": false, "anim_speed": 1.0, "hand_layout": "row", "difficulty": 1},
-		"profile": {"name": "Arcanista", "fragments": 0, "matches": 0, "wins": 0, "fichas": 1500, "blitz_levels": 0},
+		"profile": {"name": "Arcanista", "gems": 0, "matches": 0, "wins": 0, "fichas": 1500, "blitz_levels": 0, "cash_balance": 0},
+		"tournaments": {"titles": [], "trophies": 0, "history": []},
 		"ranked": {"season": 1, "points": 0, "mmr": Ranked.BASE_MMR, "peak_points": 0, "wins": 0, "losses": 0, "history": []},
 		"tips": {},
 		"cosmetics": {"owned": ["noite"], "equipped": "noite"},
@@ -34,6 +35,20 @@ func load_game() -> void:
 	var parsed = JSON.parse_string(f.get_as_text())
 	if typeof(parsed) == TYPE_DICTIONARY:
 		_merge(data, parsed)
+	_migrate_fragments_to_gems(parsed)
+
+
+## Save antigo guardava a moeda cosmética como "fragments"; migra pra "gems" (chave atual) uma
+## única vez, sem perder saldo de quem já jogava antes da troca de nome.
+func _migrate_fragments_to_gems(parsed) -> void:
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	var incoming_profile = parsed.get("profile", {})
+	if typeof(incoming_profile) != TYPE_DICTIONARY or not incoming_profile.has("fragments"):
+		return
+	var profile: Dictionary = data["profile"]
+	profile["gems"] = int(profile.get("gems", 0)) + int(incoming_profile["fragments"])
+	profile.erase("fragments")
 
 
 func save_game() -> void:

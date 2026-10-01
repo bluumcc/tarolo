@@ -18,7 +18,7 @@ func _ready() -> void:
 	add_child(page)
 
 	var prof := SaveManager.section("profile")
-	top_bar = Widgets.top_bar(str(prof["name"]), "%d vitórias · %d partidas" % [int(prof["wins"]), int(prof["matches"])], UIKit.fmt_int(int(prof["fichas"])), UIKit.fmt_int(int(prof["fragments"])))
+	top_bar = Widgets.top_bar(str(prof["name"]), "%d vitórias · %d partidas" % [int(prof["wins"]), int(prof["matches"])], UIKit.fmt_int(int(prof["fichas"])), UIKit.fmt_int(int(prof["gems"])))
 	top_bar.custom_minimum_size = Vector2(0, Widgets.TOPBAR_H)
 	page.add_child(top_bar)
 	var chips_pill := top_bar.find_child("ChipsPill", true, false) as Control
@@ -119,14 +119,14 @@ func _hero() -> Control:
 
 ## Popup das fichas: saldo, recarga diária grátis e pacotes (compra simulada).
 func _open_fichas() -> void:
-	FichasShop.open(overlay_layer, _refresh_fragments)
+	FichasShop.open(overlay_layer, _refresh_gems)
 
 
-func _refresh_fragments() -> void:
+func _refresh_gems() -> void:
 	var prof := SaveManager.section("profile")
 	if top_bar:
 		Widgets.set_pill_value(top_bar.find_child("ChipsPill", true, false), UIKit.fmt_int(int(prof["fichas"])))
-		Widgets.set_pill_value(top_bar.find_child("FragsPill", true, false), UIKit.fmt_int(int(prof["fragments"])))
+		Widgets.set_pill_value(top_bar.find_child("GemsPill", true, false), UIKit.fmt_int(int(prof["gems"])))
 
 
 func _spacer(h: int) -> Control:
@@ -215,7 +215,7 @@ func _open_settings() -> void:
 		profile["name"] = clean if not clean.is_empty() else "Arcanista"
 		name_edit.text = str(profile["name"])
 		SaveManager.save_game()
-		_refresh_fragments())
+		_refresh_gems())
 	v.add_child(name_edit)
 	var s := GameState.settings()
 	v.add_child(UIKit.label("Como ver sua mão de cartas", 20))
@@ -302,7 +302,7 @@ func _open_cosmetics() -> void:
 	var prof := SaveManager.section("profile")
 	var rk := GameState.ranked()
 	var peak_tier := int(Ranked.tier_info(int(rk["peak_points"]), int(rk["mmr"]))["tier"])
-	v.add_child(UIKit.label("◆ %s Fragmentos" % UIKit.fmt_int(int(prof["fragments"])), 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("◆ %s Gemas" % UIKit.fmt_int(int(prof["gems"])), 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	for id in UIKit.CARD_BACKS.keys():
 		var back: Dictionary = UIKit.CARD_BACKS[id]
 		var row := HBoxContainer.new()
@@ -337,13 +337,13 @@ func _open_cosmetics() -> void:
 		else:
 			var price := int(back["price"])
 			btn = UIKit.button("◆ %d" % price, UIKit.ACTION, 18)
-			btn.disabled = int(prof["fragments"]) < price
+			btn.disabled = int(prof["gems"]) < price
 			btn.pressed.connect(func():
-				prof["fragments"] = int(prof["fragments"]) - price
+				prof["gems"] = int(prof["gems"]) - price
 				owned.append(id)
 				Sfx.play("buy")
 				SaveManager.save_game()
-				_refresh_fragments()
+				_refresh_gems()
 				_reopen_cosmetics())
 		btn.custom_minimum_size = Vector2(130, 44)
 		row.add_child(btn)

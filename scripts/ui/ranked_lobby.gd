@@ -148,5 +148,5 @@ func _search() -> void:
 	await get_tree().create_timer(GameState.anim(1.0)).timeout
 	if not is_inside_tree():
 		return
-	GameState.mode = GameState.Mode.RANKED
-	get_tree().change_scene_to_file("res://scenes/GameScene.tscn")
+	GameState.blitz_ranked = true
+	get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn")

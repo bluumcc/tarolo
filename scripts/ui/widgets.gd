@@ -10,7 +10,7 @@ const TOPBAR_H := 104
 const NAV_H := 128
 
 
-## Pílula de status (ícone + valor): fichas, fragmentos, nível.
+## Pílula de status (ícone + valor): fichas, gemas, nível.
 static func stat_pill(icon: String, value: String, color: Color = UIKit.BRAND) -> PanelContainer:
 	var p := PanelContainer.new()
 	var sb := UIKit.box(UIKit.SURFACE_DEEP, color.darkened(0.3), 3, 30, 8)
@@ -35,7 +35,7 @@ static func set_pill_value(pill: Control, value: String) -> void:
 
 
 ## Barra superior persistente: avatar + nome/nível à esquerda, moedas à direita.
-static func top_bar(name_text: String, level_text: String, chips: String, frags: String) -> PanelContainer:
+static func top_bar(name_text: String, level_text: String, chips: String, gems: String) -> PanelContainer:
 	var bar := PanelContainer.new()
 	var sb := UIKit.box(UIKit.SURFACE, UIKit.BLACK, 3, 0, 12)
 	sb.set_corner_radius_all(0)
@@ -59,8 +59,8 @@ static func top_bar(name_text: String, level_text: String, chips: String, frags:
 	var a := stat_pill("◎", chips, UIKit.MONEY)
 	a.name = "ChipsPill"
 	row.add_child(a)
-	var b := stat_pill("◆", frags, UIKit.CHIPS)
-	b.name = "FragsPill"
+	var b := stat_pill("◆", gems, UIKit.CHIPS)
+	b.name = "GemsPill"
 	row.add_child(b)
 	return bar
 
