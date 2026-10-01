@@ -47,6 +47,10 @@ var button := 0               # "dealer": fala por último
 
 # Aposta da rodada atual.
 var pot := 0.0
+## Pote da aposta por rodada — separado do `pot` acima de propósito: no Blitz os dois existem ao
+## mesmo tempo (o `pot` é o do palpite do nível inteiro; este é só da rodada atual, zera a cada
+## `begin_trick()`). Misturar os dois faria a conta do palpite vazar pra aposta da rodada.
+var trick_pot := 0.0
 var contrib: Array = []       # quanto cada um pôs nessa rodada
 var folded: Array = []        # desistiu dessa rodada (não joga carta)
 var bet_level := 0.0          # valor que todos precisam igualar
@@ -81,6 +85,11 @@ var styles: Array = []                  # estilo de cada bot (ChaosBot.Style), f
 var onboarding_levels := 0              # níveis restantes sem dobrar/cobrir (Blitz, contas novas — modificador sempre ativo)
 const BLITZ_DEAL_SIZE := 10             # recebe 10, descarta 2 (ver DISCARD_SIZE), fica com HAND_SIZE (8)
 const BLITZ_DISCARD_SIZE := 2
+## Aposta por rodada: cada uma das 8 rodadas tem sua própria mini-aposta (passar/apostar/
+## aumentar/desistir), com pote próprio (`trick_pot`) pago a quem vence a rodada — por cima do
+## palpite do nível. A ante (o "pontapé" que todo mundo paga só pra rodada acontecer) é uma
+## fração do blind, não o blind inteiro: já existe a entrada do palpite pesando por rodada.
+const BLITZ_TRICK_ANTE_FACTOR := 0.25
 
 var hands: Array = []
 var plays: Array = []
@@ -253,21 +262,25 @@ func refill_bots() -> Array:
 	return swapped
 
 
-## Abre a rodada de apostas: gira o botão, cobra o blind de todos (quem tem menos que o
-## blind precisa ter sido trocado/recomprado antes) e monta a fila de fala.
+## Abre a rodada de apostas: gira o botão, cobra a ante de todos (quem tem menos precisa ter
+## sido trocado/recomprado antes) e monta a fila de fala. No Blitz a ante é uma fração do blind
+## (a rodada já tem a entrada do palpite pesando; a ante daqui é só o pontapé de cada rodada,
+## não outro custo do tamanho da entrada inteira) — escreve em `trick_pot`, separado do `pot`
+## do palpite do nível (os dois existem ao mesmo tempo, não podem se misturar).
 func begin_trick() -> void:
-	pot = 0.0
+	trick_pot = 0.0
 	raises = 0
 	bet_log = []
 	hand_no += 1
 	button = hand_no % num_players
+	var ante_size := float(blind) * (BLITZ_TRICK_ANTE_FACTOR if blitz else 1.0)
 	for p in range(num_players):
 		folded[p] = false
-		var ante := minf(float(blind), stacks[p])
+		var ante := minf(ante_size, stacks[p])
 		contrib[p] = ante
 		stacks[p] -= ante
-		pot += ante
-	bet_level = float(blind)
+		trick_pot += ante
+	bet_level = ante_size
 	to_act = []
 	for i in range(1, num_players + 1):
 		to_act.append((button + i) % num_players)
@@ -302,7 +315,7 @@ func bet_options(player: int) -> Dictionary:
 		"can_raise": can_raise,
 		"min_to": minf(bet_level + float(blind), cap),
 		"max_to": cap,
-		"pot": pot,
+		"pot": trick_pot,
 	}
 
 
@@ -321,7 +334,9 @@ func bet_act(player: int, action: String, to := 0.0) -> Dictionary:
 			else:
 				folded[player] = true
 				session_stats[player]["folds"] += 1
-				_discard_weakest(player)
+				# No Blitz o descarte é aleatório (custo fixo, sem entregar qual carta era fraca);
+				# no Caos (legado) continua a mais fraca virada.
+				_discard_random(player) if blitz else _discard_weakest(player)
 		"check":
 			if not opt["can_check"]:
 				return {"ok": false, "error": "precisa pagar"}
@@ -332,7 +347,7 @@ func bet_act(player: int, action: String, to := 0.0) -> Dictionary:
 				amount = float(opt["call"])
 				stacks[player] -= amount
 				contrib[player] += amount
-				pot += amount
+				trick_pot += amount
 		"raise":
 			if not opt["can_raise"]:
 				return {"ok": false, "error": "sem aumento"}
@@ -340,7 +355,7 @@ func bet_act(player: int, action: String, to := 0.0) -> Dictionary:
 			amount = target - contrib[player]
 			stacks[player] -= amount
 			contrib[player] = target
-			pot += amount
+			trick_pot += amount
 			bet_level = target
 			raises += 1
 			to = target
@@ -378,6 +393,18 @@ func _discard_weakest(player: int) -> CardData:
 	return worst
 
 
+## Blitz: desistir custa exatamente 1 carta aleatória (não a mais fraca) — o custo é o mesmo pra
+## todo mundo, sem entregar qual carta era boa ou ruim. As mãos continuam do mesmo tamanho.
+func _discard_random(player: int) -> CardData:
+	var hand: Array = hands[player]
+	if hand.is_empty():
+		return null
+	var picked: CardData = hand[rng.randi_range(0, hand.size() - 1)]
+	hand.erase(picked)
+	last_discard = {"player": player, "card": picked}
+	return picked
+
+
 func _card_worth(c: CardData) -> float:
 	if c.is_louco():
 		return 60.0 if louco_can_win() else 5.0
@@ -407,12 +434,31 @@ func resolve_walkover() -> Dictionary:
 	if winner == -1:
 		return {}
 	session_stats[winner]["bluffs"] += 1
-	# Ninguém jogou carta: o vencedor também descarta a mais fraca pra todas as mãos ficarem iguais.
-	var dropped := _discard_weakest(winner)
+	# Ninguém jogou carta: o vencedor também descarta pra todas as mãos ficarem iguais — aleatória
+	# no Blitz (mesmo custo de quem desistiu), a mais fraca no Caos (legado).
+	var dropped := _discard_random(winner) if blitz else _discard_weakest(winner)
+	if blitz:
+		var ev := active_modifier()
+		var value := 2 if ev == ChaosModifiers.Modifier.VAZA_DOURADA else 1
+		wins[winner] += value
+		var trick_pot_total := trick_pot
+		stacks[winner] += trick_pot_total
+		var trick_gain: float = trick_pot_total - float(contrib[winner])
+		trick_pot = 0.0
+		var result := {
+			"discarded": dropped,
+			"winner": winner, "winning_index": -1, "plays": [], "points": 0.0, "base_points": 0.0,
+			"mult": 1.0, "prize": 0.0, "pot": pot, "combos": [], "streak": 0, "streak_mult": 1.0,
+			"bonus": 0.0, "saque_amount": 0.0, "assalto_amount": 0.0, "curse_amount": 0.0,
+			"walkover": true, "trick_number": trick_number, "modifier": ev,
+			"value": value, "wins": wins.duplicate(), "rake": 0.0, "trick_pot": trick_pot_total, "trick_gain": trick_gain,
+			"gain": trick_gain,
+		}
+		return _finish_trick_blitz(result, winner)
 	var result := {
 		"discarded": dropped,
 		"winner": winner, "winning_index": -1, "plays": [], "points": 0.0, "base_points": 0.0,
-		"mult": 1.0, "prize": 0.0, "pot": pot, "combos": [], "streak": 0, "streak_mult": 1.0,
+		"mult": 1.0, "prize": 0.0, "pot": trick_pot, "combos": [], "streak": 0, "streak_mult": 1.0,
 		"bonus": 0.0, "saque_amount": 0.0, "assalto_amount": 0.0, "walkover": true,
 		"trick_number": trick_number, "modifier": active_modifier(),
 	}
@@ -571,14 +617,14 @@ func _resolve_trick() -> Dictionary:
 			stacks[q] -= pay
 			prize += pay
 	elif raw_prize < 0.0 and not rivals.is_empty():
-		var cost := minf(-raw_prize, pot)
+		var cost := minf(-raw_prize, trick_pot)
 		var each := floorf(cost / float(rivals.size()))
 		for q in rivals:
 			stacks[q] += each
 		prize = -each * float(rivals.size())
 	var result := {
 		"winner": winner, "winning_index": idx, "plays": plays.duplicate(), "points": points,
-		"base_points": base_points, "mult": mult, "prize": prize, "pot": pot, "combos": combos,
+		"base_points": base_points, "mult": mult, "prize": prize, "pot": trick_pot, "combos": combos,
 		"streak": int(streak[winner]), "streak_mult": streak_mult, "bonus": bonus,
 		"saque_amount": saque_amount, "assalto_amount": assalto_amount, "walkover": false,
 		"trick_number": trick_number, "modifier": ev,
@@ -598,16 +644,16 @@ func _finish_trick(result: Dictionary, winner: int) -> Dictionary:
 	# Taxa da casa: só quando as cartas foram jogadas (sem disputa, sem taxa).
 	var rake := 0.0
 	if rake_on and not bool(result.get("walkover", false)):
-		rake = ChaosEconomy.rake_of(pot, blind)
+		rake = ChaosEconomy.rake_of(trick_pot, blind)
 		house_rake += rake
 		if contrib[0] > 0.0:
-			human_rake += rake * contrib[0] / maxf(pot, 1.0)
+			human_rake += rake * contrib[0] / maxf(trick_pot, 1.0)
 	result["rake"] = rake
-	stacks[winner] += pot - rake + float(result["prize"]) + float(result["saque_amount"]) + float(result["assalto_amount"])
+	stacks[winner] += trick_pot - rake + float(result["prize"]) + float(result["saque_amount"]) + float(result["assalto_amount"])
 	session_stats[winner]["pots"] += 1
 	result["stacks"] = stacks.duplicate()
-	result["gain"] = pot - rake + float(result["prize"]) + float(result["saque_amount"]) + float(result["assalto_amount"]) - contrib[winner]
-	pot = 0.0
+	result["gain"] = trick_pot - rake + float(result["prize"]) + float(result["saque_amount"]) + float(result["assalto_amount"]) - contrib[winner]
+	trick_pot = 0.0
 	history.append(result)
 	plays = []
 	trick_number += 1
@@ -655,8 +701,13 @@ func clone_for_sim() -> ChaosEngine:
 	c.combo_count = combo_count.duplicate()
 	c.hand_no = hand_no
 	c.pot = pot
+	c.trick_pot = trick_pot
 	c.contrib = contrib.duplicate()
 	c.folded = folded.duplicate()
+	c.bet_level = bet_level
+	c.raises = raises
+	c.betting = betting
+	c.to_act = to_act.duplicate()
 	c.doubles = doubles.duplicate()
 	c.predicts = predicts.duplicate()
 	c.stakes = stakes.duplicate()
@@ -847,14 +898,20 @@ func _resolve_trick_blitz(idx: int, winner: int, ev: int) -> Dictionary:
 			for q in rivals:
 				stacks[q] += each
 			curse_amount = each * float(rivals.size())
+	# Pote da aposta por rodada: paga pra quem venceu a rodada de cartas, por cima do tempero de
+	# pontos acima — o ganho líquido desconta o que o próprio vencedor pôs nessa rodada.
+	var trick_pot_total := trick_pot
+	stacks[winner] += trick_pot_total
+	var trick_gain: float = trick_pot_total - float(contrib[winner])
+	trick_pot = 0.0
 	stacks[winner] += prize + saque_amount + assalto_amount - curse_amount
 	var result := {
 		"winner": winner, "winning_index": idx, "plays": plays.duplicate(), "points": base_points,
 		"base_points": base_points, "mult": 1.0, "prize": prize, "pot": pot, "combos": [], "streak": 0,
 		"streak_mult": 1.0, "bonus": 0.0, "saque_amount": saque_amount, "assalto_amount": assalto_amount,
 		"curse_amount": curse_amount, "walkover": false, "trick_number": trick_number, "modifier": ev,
-		"value": value, "wins": wins.duplicate(), "rake": 0.0,
-		"gain": prize + saque_amount + assalto_amount - curse_amount,
+		"value": value, "wins": wins.duplicate(), "rake": 0.0, "trick_pot": trick_pot_total, "trick_gain": trick_gain,
+		"gain": prize + saque_amount + assalto_amount - curse_amount + trick_gain,
 	}
 	return _finish_trick_blitz(result, winner)
 

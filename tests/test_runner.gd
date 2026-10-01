@@ -313,12 +313,12 @@ func _test_chaos() -> void:
 	var p1 := ChaosEngine.new()
 	p1.setup_match({"seed": 3})
 	p1.begin_trick()
-	check(is_equal_approx(p1.pot, 40.0) and is_equal_approx(p1.stacks[0], 390.0), "blind de todos vai pro pote")
+	check(is_equal_approx(p1.trick_pot, 40.0) and is_equal_approx(p1.stacks[0], 390.0), "blind de todos vai pro pote")
 	check(p1.button == 1 and p1.bet_actor() == 2, "o botão gira e fala primeiro quem vem depois dele")
 	var o0 := p1.bet_options(2)
 	check(bool(o0["can_check"]) and is_equal_approx(float(o0["min_to"]), 20.0) and is_equal_approx(float(o0["max_to"]), 400.0), "primeiro a falar pode passar; aumento mínimo = 1 blind; máximo = menor stack")
 	var r1 := p1.bet_act(2, "raise", 30.0)
-	check(r1["ok"] and is_equal_approx(p1.pot, 60.0) and p1.to_act.size() == 3, "aumentar põe fichas e todo mundo precisa responder")
+	check(r1["ok"] and is_equal_approx(p1.trick_pot, 60.0) and p1.to_act.size() == 3, "aumentar põe fichas e todo mundo precisa responder")
 	check(not p1.bet_act(3, "raise", 10.0)["ok"] == false, "aumento abaixo do mínimo é corrigido pro mínimo")
 	check(is_equal_approx(p1.bet_level, 40.0), "aumento mínimo sobre 30 é 40")
 	var r3 := p1.bet_act(0, "check")
@@ -329,7 +329,7 @@ func _test_chaos() -> void:
 	p1.bet_act(1, "call")
 	p1.bet_act(2, "call")
 	check(not p1.betting and p1.active_count() == 3, "rodada de apostas fecha quando todo mundo igualou ou desistiu")
-	check(is_equal_approx(p1.stacks[2], 360.0) and is_equal_approx(p1.pot, 130.0), "quem pagou põe o mesmo valor (40 cada; 10 do que desistiu)")
+	check(is_equal_approx(p1.stacks[2], 360.0) and is_equal_approx(p1.trick_pot, 130.0), "quem pagou põe o mesmo valor (40 cada; 10 do que desistiu)")
 	check(p1.current != 0, "quem desistiu não joga carta")
 	var played := 0
 	while played < 3:

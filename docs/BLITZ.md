@@ -232,3 +232,50 @@ continuam compartilhados entre os dois modos por baixo do capô — ainda têm `
 mais é `false` (nada no menu cria uma mesa sem ser Blitz), esse código fica morto, mas inofensivo.
 Não arranquei linha a linha porque é um arquivo de ~2200 linhas compartilhado com o Blitz ativo —
 fazer isso com segurança é um corte à parte, não uma linha de continuação desta sessão.
+
+## Aposta por rodada (cada uma das 8 rodadas é uma mini-mão de poker)
+Motivação: o palpite sozinho não dava espaço suficiente pra estratégia virar ficha — a aposta é
+essencialmente fixa (entrada + dobrar/cobrir) e só resolve no fim do nível. A mesma mecânica de
+aposta por rodada que já existia no Caos (passar/apostar/aumentar/desistir, pote próprio por
+rodada) foi reaproveitada pro Blitz: agora, **antes de cada uma das 8 rodadas**, rola uma rodada de
+aposta normal — quem não desistir joga carta depois; quem vence a disputa de cartas também leva o
+pote dessa aposta, em cima do que já ganha em pontos/modificador. Isso dá mais alavancagem pra quem
+lê bem a mão (apostar mais quando a mão é forte) sem mudar o palpite do nível, que continua sendo o
+prêmio principal.
+
+**Dois potes distintos, nunca confundir:**
+- `pot` — o pote do **palpite do nível inteiro** (entrada de `BLITZ_ENTRY_BLINDS`, dobrar/cobrir,
+  acumula em `carry` se ninguém acerta). Existe o nível inteiro, zera só na liquidação
+  (`_settle_blitz`).
+- `trick_pot` — o pote da **aposta daquela rodada específica**, zera em todo `begin_trick()` e é
+  pago pra quem vencer a disputa de cartas da rodada (ou pra quem sobrar, se todo mundo desistir —
+  `resolve_walkover`). Os dois existem ao mesmo tempo o nível inteiro; misturá-los faria a conta do
+  palpite vazar pra aposta da rodada (ou vice-versa).
+
+**Ante por rodada:** `BLITZ_TRICK_ANTE_FACTOR` (0,25× blind) — mais baixa que a ante do Caos
+(1× blind), porque a rodada de Blitz já carrega o custo da entrada do palpite por cima; cobrar o
+blind inteiro de novo por rodada ficaria caro demais depressa.
+
+**Desistir custa 1 carta aleatória, não dinheiro extra além do que já apostou.** No Caos quem
+desiste descarta a carta mais fraca (`_discard_weakest`) — no Blitz, decisão explícita: descarta
+uma carta **sorteada** da mão (`_discard_random`), pra não entregar de graça qual carta era boa ou
+ruim. Em ambos os casos o consumo é de exatamente 1 carta por rodada, jogada ou descartada — as
+mãos continuam do mesmo tamanho (nunca ficam sem carta antes da 8ª rodada).
+
+**Reaproveitado quase 100% do Caos:** motor (`begin_trick`, `bet_actor`, `bet_cap`, `to_call`,
+`bet_options`, `bet_act`, `walkover_player`/`resolve_walkover`) e UI (`_betting_phase`,
+`_human_bet`, `_gather_bets`, `_show_bet_action`) já eram mode-agnósticos — a única mudança real
+foi: (1) separar `pot` de `trick_pot` dentro do motor (os dois existiam misturados por engano, já
+que até aqui só um modo usava pote por rodada de cada vez), (2) a ante proporcional
+(`BLITZ_TRICK_ANTE_FACTOR`), (3) o descarte aleatório condicional no fold, e (4) pagar `trick_pot`
+pro vencedor dentro de `_resolve_trick_blitz`/`resolve_walkover` (que antes só cuidavam do palpite
+e não sabiam que existia um pote de rodada a liquidar).
+
+**Bots:** a decisão de aposta reaproveita `ChaosBot.bet_decision` tal como está no Caos — ainda não
+é ciente do palpite do jogador (não considera "preciso de mais X vitórias" ao decidir apostar
+alto). Primeira versão aceitável, mas não validada por simulação dedicada: `tests/blitz_gate.gd`
+(espelho ≈0, escada de dificuldade, nenhum estilo dominado) passa, mas não cobre o caminho novo —
+ainda simula só predict/jogo de carta/liquidação, sem `begin_trick`/`bet_act`. **Pendência real:**
+escrever uma simulação que jogue com a aposta por rodada ligada e confirmar que a escada de
+dificuldade e o equilíbrio entre estilos sobrevivem ao novo mecanismo, e depois calibrar os bots
+pra também levarem o palpite em conta na hora de apostar.

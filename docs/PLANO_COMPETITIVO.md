@@ -164,3 +164,16 @@ tutorial guiado, cosméticos, torneios, novos modificadores.
   medir direito: um erro meu de rótulo no primeiro teste tinha inflado o número em ~10×.
   Calibração fina (ajustar taxa/dificuldade por mesa) fica pra quando houver amostra maior ou
   telemetria real — mexer sem medir bem de novo é o mesmo erro do triplicar.
+- **Modo Caos removido:** fora do plano original. A pedido explícito, tirado do jogo inteiro
+  (menu, Smoke test, docs, config padrão) — o Blitz passou a ser o único modo de mesa. Motor e
+  cena continuam compartilhados por baixo do capô (ver "Modo Caos removido" em `docs/BLITZ.md`).
+- **Aposta por rodada:** fora do plano original — motivado pela hipótese (confirmada com os dados
+  da própria experiência do triplicar) de que apostas fixas limitam demais o quanto estratégia
+  vira ficha, faltando a escalada de apostas que o poker de verdade tem. Reaproveitou quase 100%
+  do motor/UI de aposta por rodada que o Caos (removido) já tinha — passar/apostar/aumentar/
+  desistir, pote próprio por rodada (`trick_pot`, separado do `pot` do palpite), desistir custa 1
+  carta aleatória (`_discard_random`). Detalhe técnico completo em "Aposta por rodada" em
+  `docs/BLITZ.md`. **Não validado por simulação:** `tests/blitz_gate.gd` não cobre esse caminho
+  (não passa por `begin_trick`/`bet_act`) — falta medir se a escada de dificuldade e o equilíbrio
+  entre estilos se mantêm com a aposta ligada, e se o objetivo real (mais alavancagem pra quem
+  joga bem) de fato se confirma, e não só mais ruído.
