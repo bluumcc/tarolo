@@ -319,10 +319,11 @@ por nível. A v1 era um bracket de eliminação simples (mesas fixas de 4, só o
 é um multi-table tournament igual poker de verdade: várias mesas, gente indo embora conforme
 quebra, mesas se fundindo, até sobrar 1 campeão.
 
-- **Campo de 16** (1 humano + 15 bots, dificuldade variada), dividido em mesas de **2 a 7**
-  jogadores (`Tournament.MIN_TABLE`/`MAX_TABLE`). O teto de 7 não é arbitrário: o Blitz distribui
-  10 cartas por jogador na mão inicial (`BLITZ_DEAL_SIZE`) e o baralho de Tarot só tem 78 — 8
-  jogadores precisariam de 80 cartas, não cabe. 7×10 = 70 cabe com folga.
+- **Campo de 16** (1 humano + 15 bots, dificuldade variada), dividido em mesas de **2 a 4**
+  jogadores (`Tournament.MIN_TABLE`/`MAX_TABLE`). O teto fica em 4 (não no máximo que o baralho
+  permitiria — 78 cartas ÷ 10 da mão inicial do Blitz dariam pra ir até 7) porque 4 é o único
+  tamanho de mesa balanceado e testado hoje: bots, dificuldade e modificadores como "Assalto ao
+  Líder" foram calibrados especificamente pra 3 rivais.
 - **A stack viaja com o jogador.** Cada `entrant` (humano ou bot) carrega sua própria stack real
   ao longo do torneio inteiro — não é mais "mesa neutra reiniciada a cada fase". Quem quebra
   (stack chega a 0) é eliminado e sai; ninguém senta no lugar dele (ao contrário da mesa de

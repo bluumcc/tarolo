@@ -83,7 +83,7 @@ var pot_locked := false        # contador do pote rolando: o refresh não sobres
 const FLAME := UIKit.COMBO
 const SEAT_W := 150.0
 const POT_W := 250.0
-const POT_BOTTOM_GAP := 26.0   ## folga entre a base do pote e o topo das cartas
+const POT_TOP_GAP := 14.0   ## quase colado no topo do card da mesa
 
 
 func _ready() -> void:
@@ -466,14 +466,9 @@ func _layout_table() -> void:
 	if table_center == null:
 		return
 	if pot_box:
-		var card_top := _slot_pos(0).y + CardView.SIZE.y * (1.0 - TABLE_SCALE) / 2.0
+		# Quase no topo do card da mesa — não centralizado no vão acima das cartas.
 		var px := (table_center.size.x - pot_box.size.x) / 2.0
-		if table_center.size.y >= 300.0:
-			# Base do pote a uma folga fixa das cartas (não centralizado no vão: crescer o
-			# pote nunca empurra a base pra baixo, só sobe o topo) — um pouco mais pra cima.
-			pot_box.position = Vector2(px, maxf(card_top - POT_BOTTOM_GAP - pot_box.size.y, 8.0))
-		else:
-			pot_box.position = Vector2(px, table_center.size.y / 2.0 - pot_box.size.y / 2.0)
+		pot_box.position = Vector2(px, POT_TOP_GAP)
 	for v in table_views:
 		var cv: CardView = v["view"]
 		cv.position = _slot_pos(int(v["player"]))
@@ -1240,8 +1235,8 @@ func _human_bet() -> Dictionary:
 	var holder := MarginContainer.new()
 	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Abaixo da mesa (que já tem o pote lá dentro), nunca cobrindo pote nem cartas jogadas.
-	holder.add_theme_constant_override("margin_top", int(table_center.global_position.y + table_center.size.y + 10.0))
+	# Logo abaixo do pote (que fica quase no topo da mesa) — não embaixo da mesa inteira.
+	holder.add_theme_constant_override("margin_top", int(pot_box.global_position.y + pot_box.size.y + 10.0))
 	overlay_layer.add_child(holder)
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 20)
 	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -2007,7 +2002,6 @@ func _resolve_walkover(result: Dictionary) -> void:
 func _set_discard_chrome(active: bool) -> void:
 	table_center.visible = not active
 	mod_box.visible = not active
-	banner_box.visible = not active
 	for p in range(engine.num_players):
 		(bet_pills[p] as PanelContainer).visible = not active
 		(order_badges[p] as PanelContainer).visible = not active
@@ -2047,6 +2041,7 @@ func _blitz_open_level() -> bool:
 	pot_locked = true
 	shown_pot = engine.carry
 	pot_label.text = _pot_text(shown_pot)
+	pot_box.visible = false   # só aparece depois do palpite, quando as entradas de verdade entram
 	var carry_txt := "  Pote acumulado: ◎%d." % int(engine.carry) if engine.carry > 0.0 else ""
 	_banner("PALPITES", "Quantas rodadas cada um vai ganhar?%s Cada um sabe só o seu — os rivais ficam em segredo até o fim do nível." % carry_txt, UIKit.MONEY)
 	_refresh_hud()
@@ -2073,6 +2068,7 @@ func _blitz_open_level() -> bool:
 
 ## Revela os palpites um a um: a entrada voa pro pote e o palpite aparece na frente do jogador.
 func _blitz_reveal() -> void:
+	pot_box.visible = true
 	var running := engine.carry
 	for p in range(engine.num_players):
 		blitz_revealed[p] = true
@@ -2104,6 +2100,7 @@ func _human_discard_play() -> void:
 	phase = "discard"
 	discard_picks = []
 	_rebuild_hand()
+	_banner("ESCOLHA 2 CARTAS PRA DESCARTAR", "Toque numa carta pra focar — ela sobe. Toque de novo nela (ou arraste pra cima e solte) pra descartar.", UIKit.BRAND)
 	status_label.text = "0/%d descartadas" % ChaosEngine.BLITZ_DISCARD_SIZE
 	discard_left = DISCARD_SECONDS
 	turn_bar.max_value = DISCARD_SECONDS
@@ -2115,6 +2112,7 @@ func _human_discard_play() -> void:
 	turn_bar.max_value = TURN_SECONDS
 	status_label.text = ""
 	discard_picks = []
+	_banner_clear()
 
 
 func _on_discard_tapped(view: CardView) -> void:
@@ -2155,22 +2153,20 @@ func _commit_discard(view: CardView, drop_global := Vector2.ZERO) -> void:
 		item_chosen.emit(1)
 
 
-## Card do palpite: claro, sem fundo escurecido por cima da mesa — fica abaixo dos avatares,
-## sem bloquear nem cobrir a mão (segurar ou botão direito numa carta ainda dá zoom), pra dar
-## pra olhar e conferir antes de decidir. Seletor de quantidade em −/+ com o palpite sugerido
-## em destaque, em vez de uma fileira de botões de 0 a 8.
+## Card do palpite: claro, sem fundo escurecido — vira o próprio conteúdo do card da mesa
+## (table_center), que está vazio nessa etapa (nem pote nem cartas ainda). A mão continua à
+## vista e interagível embaixo (segurar ou botão direito numa carta ainda dá zoom). Seletor de
+## quantidade em −/+ com o palpite sugerido em destaque, em vez de uma fileira de botões de 0 a 8.
 func _human_predict() -> int:
 	modal_open = true
-	var vw := get_viewport_rect().size.x
-	var holder := MarginContainer.new()
+	var holder := CenterContainer.new()
 	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	holder.add_theme_constant_override("margin_top", int(seat_row.global_position.y + seat_row.size.y + 10.0))
-	overlay_layer.add_child(holder)
+	holder.mouse_filter = Control.MOUSE_FILTER_PASS
+	table_center.add_child(holder)
 	var box := UIKit.panel(UIKit.PAPER, UIKit.BRAND, 20)
 	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	box.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	box.custom_minimum_size = Vector2(minf(vw - 32.0, 600.0), 0)
+	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	box.custom_minimum_size = Vector2(minf(table_center.size.x - 32.0, 600.0), 0)
 	holder.add_child(box)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)

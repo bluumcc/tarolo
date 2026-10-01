@@ -8,9 +8,10 @@ extends RefCounted
 ## nível (as outras tocam headless, no mesmo nível, em paralelo "no escuro").
 
 const FIELD_SIZE := 16
-## Teto de 7: o Blitz distribui 10 cartas por jogador na mão inicial (`BLITZ_DEAL_SIZE`) e o
-## baralho de Tarot tem 78 — 8 jogadores precisariam de 80, não cabe. 7×10 = 70 cabe com sobra.
-const MAX_TABLE := 7
+## Teto em 4: o tamanho balanceado/testado do Blitz (bots, dificuldade, modificadores como
+## "Assalto ao Líder" foram todos calibrados pra 3 rivais). Dava pra ir até 7 pelo limite do
+## baralho (78 cartas ÷ 10 da mão inicial), mas sem balancear e testar fora de 4 primeiro.
+const MAX_TABLE := 4
 ## Mesa nunca fica menor que isso sem ser desfeita e redistribuída (heads-up ainda é jogável).
 const MIN_TABLE := 2
 const BUY_IN := 300             ## fichas, cobradas uma vez na inscrição (não por mesa/nível)
