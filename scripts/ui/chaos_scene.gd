@@ -1808,7 +1808,6 @@ func _show_bet_action(p: int, r: Dictionary) -> void:
 			if p == 0 and not engine.last_discard.is_empty():
 				var dcard := (engine.last_discard["card"] as CardData).display_name()
 				sub = ("Você perdeu o que pôs e descartou %s, sorteada da sua mão." % dcard) if engine.blitz else ("Você perdeu o que pôs e descartou %s, sua carta mais fraca." % dcard)
-				_rebuild_hand()
 			col = UIKit.LOSS
 	action_color[p] = col
 	_banner(title, sub, col if col != UIKit.MUTED else UIKit.INK)
@@ -1823,7 +1822,43 @@ func _show_bet_action(p: int, r: Dictionary) -> void:
 			FX.burst(popup_layer, _seat_center(p) - popup_layer.global_position, UIKit.BRAND, 14)
 	elif str(r.get("action", "")) == "fold":
 		Sfx.play("lose")
+		if p == 0 and not engine.last_discard.is_empty():
+			await _show_fold_discard(engine.last_discard["card"] as CardData)
 	await _wait(0.75 if p != 0 else 0.45)
+
+
+## Destaca a carta descartada pela desistência antes de sumir — foca (sobe, borda acesa), segura
+## um instante pra dar tempo de ver qual foi, e só então destrói (voa pra fora e desfaz). Sem isso
+## a carta só desaparecia na troca de mão seguinte, rápido demais pra notar.
+func _show_fold_discard(card: CardData) -> void:
+	var view: CardView = null
+	for c in hand_container.get_children():
+		if (c as CardView).data == card:
+			view = c
+			break
+	if view == null:
+		_rebuild_hand()
+		return
+	view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	view.z_index = 5
+	for c in hand_container.get_children():
+		if c != view:
+			(c as CardView).set_selected(false)
+	view.set_selected(true)
+	(hand_container.get_parent() as HandScroller).reveal(view.position.x, CardView.SIZE.x)
+	await get_tree().create_timer(GameState.anim(0.55), true, false, true).timeout
+	if not is_inside_tree() or not is_instance_valid(view):
+		_rebuild_hand()
+		return
+	var from := view.global_position
+	var tw := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	tw.tween_property(view, "global_position", from + Vector2(0.0, -260.0), GameState.anim(0.32))
+	tw.parallel().tween_property(view, "rotation", randf_range(-0.35, 0.35), GameState.anim(0.32))
+	tw.parallel().tween_property(view, "scale", Vector2(0.65, 0.65), GameState.anim(0.32))
+	tw.parallel().tween_property(view, "modulate:a", 0.0, GameState.anim(0.32))
+	await tw.finished
+	if is_inside_tree():
+		_rebuild_hand()
 
 
 ## Fim das apostas: as fichas da frente de cada jogador voam juntas pro pote.
