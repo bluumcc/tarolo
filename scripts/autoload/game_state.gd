@@ -24,9 +24,6 @@ func start_tutorial() -> void:
 
 var ranked_lobby: Array = []   # [{name, mmr}] adversários encontrados no matchmaking
 var last_summary: Dictionary = {}
-## Resgate automático de fichas (ChaosEconomy.rescue_if_broke) aplicado na última sentada na
-## mesa — a cena mostra um aviso uma vez e zera isso de novo.
-var last_rescue := 0
 ## Mesa contínua do Vanilla: os mesmos jogadores ficam sentados e o placar acumula, mão
 ## após mão, até alguém levantar. {names, totals, hands}
 var table: Dictionary = {}
@@ -176,9 +173,6 @@ func chaos_config() -> Dictionary:
 	var names := BOT_NAMES.duplicate()
 	names.shuffle()
 	var profile := SaveManager.section("profile")
-	last_rescue = ChaosEconomy.rescue_if_broke(profile)
-	if last_rescue > 0:
-		SaveManager.save_game()
 	find_ranked_lobby()
 	var t: Dictionary = CHAOS_TABLES[clampi(chaos_table, 0, CHAOS_TABLES.size() - 1)]
 	var blind := int(t["blind"])

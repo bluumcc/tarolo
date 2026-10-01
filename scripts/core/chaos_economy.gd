@@ -9,7 +9,6 @@ extends RefCounted
 const START_FICHAS := 1500        # 3 entradas da mesa Iniciante (blind 10, stack 400)
 const DAILY_MIN := 400            # abaixo disso (não paga nem a entrada mais barata) libera a recarga
 const DAILY_AMOUNT := 500         # 1 entrada Iniciante + folga
-const RESCUE_AMOUNT := 400        # exatamente a entrada da mesa Iniciante — nunca deixa zerar sem saída
 const RAKE_PCT := 0.03            # taxa da casa sobre o pote quando há disputa de cartas
 const RAKE_CAP_BLINDS := 1.5      # teto da taxa por rodada, em blinds
 const BOT_STACK_BLINDS := [30, 60]  # bot novo senta com 30 a 60 blinds
@@ -51,22 +50,15 @@ static func claimed_today(profile: Dictionary) -> bool:
 	return str(profile.get("daily_on", "")) == today()
 
 
+## Recarga diária: sempre manual (o jogador abre a Loja de Fichas e toca em RESGATAR), no máximo
+## 1 vez a cada 24h (`daily_on`), e só libera quando o saldo está abaixo de `DAILY_MIN` — nunca
+## automática, nunca sem teto de fichas.
 static func claim_daily(profile: Dictionary) -> int:
 	if not daily_available(profile):
 		return 0
 	profile["fichas"] = int(profile["fichas"]) + DAILY_AMOUNT
 	profile["daily_on"] = today()
 	return DAILY_AMOUNT
-
-
-## Resgate anti-falência: se as fichas zeraram (ou foram pro negativo por algum ajuste), a casa
-## injeta o mínimo pra sentar de novo na mesa mais barata — automático, sem precisar pedir. Devolve
-## quanto foi injetado (0 se não precisava).
-static func rescue_if_broke(profile: Dictionary) -> int:
-	if int(profile["fichas"]) > 0:
-		return 0
-	profile["fichas"] = RESCUE_AMOUNT
-	return RESCUE_AMOUNT
 
 
 ## Compra simulada: credita as fichas e registra o gasto (nada é cobrado de verdade).

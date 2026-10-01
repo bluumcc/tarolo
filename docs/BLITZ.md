@@ -300,9 +300,10 @@ o "Ranqueado" de hoje é a vitrine da liga + um atalho pro Blitz, não uma fila 
 
 ## Carteiras: Fichas (jogo) e Gemas (cosmético)
 
-- **Fichas** continuam sem valor monetário, não saem do jogo. Resgate automático
-  (`ChaosEconomy.rescue_if_broke`): se o saldo zerar, a casa injeta `RESCUE_AMOUNT` (400, a
-  entrada da mesa Iniciante) na hora de sentar — sem precisar pedir ou esperar a recarga diária.
+- **Fichas** continuam sem valor monetário, não saem do jogo. A recarga grátis (`ChaosEconomy.
+  claim_daily`) continua **manual** — o jogador abre a Loja de Fichas e toca em RESGATAR — no
+  máximo 1 vez a cada 24h (`daily_on`) e só aparece disponível com o saldo abaixo do teto
+  (`DAILY_MIN`, 400). Nenhuma injeção automática de fichas existe em lugar nenhum do jogo.
 - **Gemas** (antes "Fragmentos" — só o nome mudou, a moeda é a mesma: cosmética, nunca afeta
   jogo) são ganhas em partidas de Vanilla e Blitz e gastas na Loja de Cosméticos.
 - **Carteira de dinheiro real:** reservado `profile.cash_balance` no save (sempre 0, sem UI) pra

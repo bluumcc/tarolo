@@ -115,13 +115,6 @@ func _ready() -> void:
 		SaveManager.save_game()
 		if not is_inside_tree():
 			return
-	if GameState.last_rescue > 0 and not GameState.autoplay:
-		_banner("A CASA TE DEU UMA AJUDA", "Suas fichas zeraram — ◎%d de resgate pra continuar jogando." % GameState.last_rescue, UIKit.MONEY)
-		GameState.last_rescue = 0
-		await _wait(1.6)
-		if not is_inside_tree():
-			return
-		_banner_clear()
 	await _announce_round()
 	if not is_inside_tree():
 		return
