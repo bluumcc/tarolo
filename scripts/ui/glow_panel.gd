@@ -1,13 +1,13 @@
 class_name GlowPanel
 extends MarginContainer
 ## Painel com borda de brilho procedural (sem imagens).
-## Usa _draw() puro — funciona em web, mobile e desktop.
+## Usa _draw() + Tween — sem _process, sem redraw redundante em painéis estáticos.
 
 var accent := UIKit.VIOLET
 var bg := Color(0.04, 0.02, 0.10, 0.95)
 var corner_size := 18.0
 var glow_layers := 4
-var pulse_speed := 0.9
+var pulse_speed := 0.9  # 0 = sem animação (painéis do histórico, por ex.)
 
 var _pulse := 1.0
 
@@ -15,17 +15,24 @@ var _pulse := 1.0
 func _ready() -> void:
 	for s in ["left", "right", "top", "bottom"]:
 		add_theme_constant_override("margin_" + s, 16)
-	set_process(true)
+	if pulse_speed > 0.0:
+		_start_pulse()
 
 
-func _process(dt: float) -> void:
-	_pulse = sin(Time.get_ticks_msec() * 0.001 * pulse_speed) * 0.08 + 0.92
+func _start_pulse() -> void:
+	var half := 1.0 / pulse_speed
+	var tw := create_tween().set_loops()
+	tw.tween_method(_set_pulse, 1.0, 0.88, half)
+	tw.tween_method(_set_pulse, 0.88, 1.0, half)
+
+
+func _set_pulse(v: float) -> void:
+	_pulse = v
 	queue_redraw()
 
 
 func _draw() -> void:
 	var r := Rect2(Vector2.ZERO, size)
-	var rad := 16.0
 
 	# Fundo escuro
 	draw_rect(r, bg)
@@ -48,15 +55,11 @@ func _draw() -> void:
 	var bl := Vector2(r.position.x, r.end.y)
 	var br := r.end
 
-	# Canto superior-esquerdo
 	draw_line(tl + Vector2(cs, 0), tl, bright, bw)
 	draw_line(tl, tl + Vector2(0, cs), bright, bw)
-	# Canto superior-direito
 	draw_line(tr + Vector2(-cs, 0), tr, bright, bw)
 	draw_line(tr, tr + Vector2(0, cs), bright, bw)
-	# Canto inferior-esquerdo
 	draw_line(bl + Vector2(cs, 0), bl, bright, bw)
 	draw_line(bl, bl + Vector2(0, -cs), bright, bw)
-	# Canto inferior-direito
 	draw_line(br + Vector2(-cs, 0), br, bright, bw)
 	draw_line(br, br + Vector2(0, -cs), bright, bw)

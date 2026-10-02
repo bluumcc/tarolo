@@ -1,146 +1,535 @@
 extends Control
-## MainMenu.tscn — navegação para os modos, Loja de Cosméticos e Configurações.
+## Hub principal — TAROLO logo, abas RANKEADA / CLÁSSICO / LOJA / MENU.
+## Portrait (coluna única) e landscape (top bar unificada) com rebuild no cruzamento do limiar.
 
-var overlay_layer: Control
-var top_bar: PanelContainer
+var _overlay: Control        ## camada de modais (filha mais alta)
+var _wallet: HBoxContainer   ## pílulas de fichas/gemas (para refresh)
+var _content_col: VBoxContainer
 
+var _active_tab := "RANKEADA"
+var _last_wide  := false
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(UIKit.background())
-	_spawn_stars()
+	_last_wide = _is_wide()
+	_build()
 
-	# Estrutura da tela: barra superior fixa · conteúdo rolável · navegação inferior fixa.
+
+func _is_wide() -> bool:
+	return get_viewport_rect().size.x / get_viewport_rect().size.y >= 1.3
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED:
+		var wide := _is_wide()
+		if wide != _last_wide:
+			_last_wide = wide
+			_build()
+
+
+# ── Layout principal ─────────────────────────────────────────────────────────
+
+func _build() -> void:
+	while get_child_count() > 0:
+		get_child(0).queue_free()
+
+	# Fundo com shader roxo profundo
+	var bg := ColorRect.new()
+	bg.color = UIKit.NIGHT
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mat := ShaderMaterial.new()
+	mat.shader = preload("res://shaders/background_lobby.gdshader")
+	bg.material = mat
+	add_child(bg)
+
 	var page := VBoxContainer.new()
 	page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	page.add_theme_constant_override("separation", 0)
 	add_child(page)
 
-	var prof := SaveManager.section("profile")
-	top_bar = Widgets.top_bar(str(prof["name"]), "%d vitórias · %d partidas" % [int(prof["wins"]), int(prof["matches"])], UIKit.fmt_int(int(prof["fichas"])), UIKit.fmt_int(int(prof["gems"])))
-	top_bar.custom_minimum_size = Vector2(0, Widgets.TOPBAR_H)
-	page.add_child(top_bar)
-	var chips_pill := top_bar.find_child("ChipsPill", true, false) as Control
-	chips_pill.mouse_filter = Control.MOUSE_FILTER_STOP
-	chips_pill.gui_input.connect(func(e: InputEvent):
-		if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT and e.pressed:
-			UIKit.sfx("tick")
-			_open_fichas())
+	var wide := _is_wide()
+	page.add_child(_build_topbar(wide))
+	if not wide:
+		page.add_child(_build_tabbar_portrait())
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	page.add_child(scroll)
 	UIKit.suppress_click_on_scroll(scroll)
-	var center := CenterContainer.new()
-	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.add_child(center)
-	var col := VBoxContainer.new()
-	col.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - Widgets.MARGIN * 2.0, 1040.0 if get_viewport_rect().size.x > get_viewport_rect().size.y else 672.0), 0)
-	col.add_theme_constant_override("separation", 18)
-	center.add_child(col)
 
-	# Herói: logo + leque de cartas de enfeite.
-	col.add_child(_hero())
+	var mg := MarginContainer.new()
+	for s in ["left", "right", "top", "bottom"]:
+		mg.add_theme_constant_override("margin_" + s, Widgets.MARGIN)
+	scroll.add_child(mg)
 
-	# Todos os cards da mesma altura — legendas curtas de propósito pra caber. Competitivo
-	# (ex-Blitz) e Tutorial ocupam a largura toda; Torneio e Clássico (ex-Vanilla) dividem a
-	# mesma linha. Cores sempre escuras/saturadas o bastante pro texto branco ler bem — nunca
-	# o dourado/verde claros de antes, que forçavam texto escuro.
+	_content_col = VBoxContainer.new()
+	_content_col.add_theme_constant_override("separation", 20)
+	_content_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mg.add_child(_content_col)
+
+	_populate_tab(wide)
+
+	_overlay = Control.new()
+	_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_overlay)
+
+
+# ── Barra superior ────────────────────────────────────────────────────────────
+
+func _build_topbar(wide: bool) -> PanelContainer:
+	var head := PanelContainer.new()
+	var hsb := UIKit.box(UIKit.SURFACE, UIKit.BLACK, 3, 0, 12)
+	hsb.set_corner_radius_all(0)
+	if not wide:
+		hsb.corner_radius_bottom_left  = 20
+		hsb.corner_radius_bottom_right = 20
+	hsb.content_margin_left  = Widgets.MARGIN
+	hsb.content_margin_right = Widgets.MARGIN
+	head.add_theme_stylebox_override("panel", hsb)
+	head.custom_minimum_size = Vector2(0, Widgets.TOPBAR_H)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	head.add_child(row)
+
+	# Logo
+	var logo := UIKit.label("TAROLO", 38, UIKit.BRAND)
+	logo.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	logo.add_theme_color_override("font_outline_color", UIKit.TITLE_OUTLINE)
+	logo.add_theme_constant_override("outline_size", 7)
+	row.add_child(logo)
+
+	if wide:
+		# Abas no centro da barra superior
+		var spacer := Control.new()
+		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(spacer)
+		row.add_child(_make_tab_buttons(false))
+		var spacer2 := Control.new()
+		spacer2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(spacer2)
+	else:
+		var spacer := Control.new()
+		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(spacer)
+
+	_wallet = _build_wallet()
+	row.add_child(_wallet)
+
+	return head
+
+
+func _build_tabbar_portrait() -> Control:
+	var p := PanelContainer.new()
+	var sb := UIKit.box(UIKit.SURFACE_DEEP, UIKit.OUTLINE, 2, 0, 0)
+	sb.set_corner_radius_all(0)
+	sb.set_border_width_all(0)
+	sb.border_width_bottom = 2
+	p.add_theme_stylebox_override("panel", sb)
+	p.add_child(_make_tab_buttons(true))
+	return p
+
+
+func _make_tab_buttons(expand: bool) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 0)
+	for name in ["RANKEADA", "CLÁSSICO", "LOJA", "MENU"]:
+		var btn := _tab_btn(name, name == _active_tab)
+		if expand:
+			btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(btn)
+	return row
+
+
+func _tab_btn(tab: String, active: bool) -> Button:
+	var accent := _tab_accent(tab)
+	var face   := accent.darkened(0.18) if active else UIKit.SURFACE_DEEP
+	var b      := UIKit.button(tab, face, 22)
+	b.focus_mode      = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(0, 60)
+	b.add_theme_constant_override("outline_size", 3 if active else 0)
+	b.add_theme_color_override("font_outline_color", accent.darkened(0.5))
+	for cn in ["font_color", "font_hover_color", "font_pressed_color"]:
+		b.add_theme_color_override(cn, accent if active else UIKit.MUTED)
+	# Replace chunky 3D styleboxes with flat tab style
+	var mk := func(bg: Color) -> StyleBoxFlat:
+		var sb := UIKit.box(bg, accent if active else UIKit.SURFACE, 2, 0, 0)
+		sb.set_corner_radius_all(0)
+		sb.set_border_width_all(0)
+		sb.border_width_bottom = 3 if active else 1
+		sb.content_margin_left  = 12
+		sb.content_margin_right = 12
+		return sb
+	b.add_theme_stylebox_override("normal",  mk.call(face))
+	b.add_theme_stylebox_override("hover",   mk.call(accent.darkened(0.08) if active else UIKit.SURFACE))
+	b.add_theme_stylebox_override("pressed", mk.call(face))
+	b.add_theme_stylebox_override("focus",   mk.call(face))
+	b.pressed.connect(func(): _switch_tab(tab))
+	return b
+
+
+func _tab_accent(tab: String) -> Color:
+	match tab:
+		"RANKEADA": return UIKit.DANGER
+		"CLÁSSICO": return UIKit.ACTION
+		"LOJA":     return UIKit.MONEY
+		_:          return UIKit.MUTED
+
+
+func _switch_tab(tab: String) -> void:
+	if tab == _active_tab:
+		return
+	_active_tab = tab
+	UIKit.sfx("tick")
+	_build()
+
+
+# ── Carteira (fichas + gemas) ─────────────────────────────────────────────────
+
+func _build_wallet() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+
+	var prof := SaveManager.section("profile")
+
+	var chip_p := _pill("◎ " + UIKit.fmt_int(int(prof["fichas"])), UIKit.CHIPS, "ChipsLabel")
+	chip_p.mouse_filter = Control.MOUSE_FILTER_STOP
+	chip_p.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT and e.pressed:
+			UIKit.sfx("tick")
+			_open_fichas())
+	row.add_child(chip_p)
+
+	row.add_child(_pill("◆ " + UIKit.fmt_int(int(prof["gems"])), UIKit.MODIFIER, "GemsLabel"))
+
+	return row
+
+
+func _pill(text: String, color: Color, label_name: String) -> PanelContainer:
+	var p   := UIKit.panel(UIKit.SURFACE_DEEP, color.darkened(0.3), 8)
+	var sb  := p.get_theme_stylebox("panel") as StyleBoxFlat
+	sb.set_corner_radius_all(28)
+	sb.content_margin_left  = 16
+	sb.content_margin_right = 20
+	sb.content_margin_top   = 8
+	sb.content_margin_bottom = 8
+	p.custom_minimum_size = Vector2(0, 52)
+	var lbl := UIKit.label(text, 22, color)
+	lbl.name = label_name
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	p.add_child(lbl)
+	return p
+
+
+func _refresh_wallet() -> void:
+	if not is_instance_valid(_wallet):
+		return
+	var prof := SaveManager.section("profile")
+	var cl   := _wallet.find_child("ChipsLabel", true, false) as Label
+	var gl   := _wallet.find_child("GemsLabel",  true, false) as Label
+	if cl:
+		cl.text = "◎ " + UIKit.fmt_int(int(prof["fichas"]))
+	if gl:
+		gl.text = "◆ " + UIKit.fmt_int(int(prof["gems"]))
+
+
+# ── Conteúdo de cada aba ──────────────────────────────────────────────────────
+
+func _populate_tab(wide: bool) -> void:
+	match _active_tab:
+		"RANKEADA": _build_ranked(wide)
+		"CLÁSSICO": _build_classic(wide)
+		"LOJA":     _build_shop(wide)
+		"MENU":     _build_menu(wide)
+
+
+func _build_ranked(wide: bool) -> void:
+	var rk := GameState.ranked()
+	var t  := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
+	var tc := Color(Ranked.TIER_COLORS[t["tier"]])
+
+	# Cartão de liga
+	var badge := GlowPanel.new()
+	badge.accent = tc
+	badge.bg     = UIKit.SURFACE_DEEP
+	var bv := VBoxContainer.new()
+	bv.add_theme_constant_override("separation", 12)
+	badge.add_child(bv)
+	_content_col.add_child(badge)
+
+	var emblem := PanelContainer.new()
+	emblem.custom_minimum_size  = Vector2(140, 140)
+	emblem.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var esb := UIKit.chunky(tc)
+	esb.set_corner_radius_all(70)
+	esb.content_margin_left  = 0
+	esb.content_margin_right = 0
+	emblem.add_theme_stylebox_override("panel", esb)
+	var div_txt := str(t["division"]) if str(t["division"]) != "" else "★"
+	var div := UIKit.label(div_txt, 60, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	div.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	emblem.add_child(div)
+	bv.add_child(emblem)
+
+	bv.add_child(UIKit.label(str(t["label"]).to_upper(), 50, tc, HORIZONTAL_ALIGNMENT_CENTER))
+
+	var bar := MeterBar.new()
+	bar.custom_minimum_size = Vector2(0, 30)
+	bar.set_colors(tc, UIKit.OUTLINE)
+	bar.set_values(float(t["progress"]), 1.0, false)
+	bv.add_child(bar)
+
+	bv.add_child(UIKit.label(
+			"%d LP  ·  MMR %s" % [int(t["lp"]), UIKit.fmt_int(int(rk["mmr"]))],
+			26, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+
+	var peak := Ranked.tier_info(int(rk["peak_points"]), int(rk["mmr"]))
+	bv.add_child(UIKit.label(
+			"%d vitórias · %d derrotas · pico: %s" % [int(rk["wins"]), int(rk["losses"]), peak["label"]],
+			20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+
+	# Escada de ligas
+	var ladder_p := GlowPanel.new()
+	ladder_p.accent     = UIKit.VIOLET
+	ladder_p.bg         = UIKit.SURFACE_DEEP
+	ladder_p.pulse_speed = 0.0
+	var lv := VBoxContainer.new()
+	lv.add_theme_constant_override("separation", 8)
+	ladder_p.add_child(lv)
+	lv.add_child(UIKit.label("LIGAS", 24, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	var ladder := HBoxContainer.new()
+	ladder.alignment = BoxContainer.ALIGNMENT_CENTER
+	ladder.add_theme_constant_override("separation", 8)
+	for i in range(Ranked.TIERS.size()):
+		var reached := i <= int(t["tier"])
+		var dot := Panel.new()
+		dot.custom_minimum_size = Vector2(36, 36)
+		var dc := Color(Ranked.TIER_COLORS[i]) if reached else UIKit.SURFACE
+		dot.add_theme_stylebox_override("panel", UIKit.dot_style(dc, UIKit.OUTLINE, 18))
+		if reached:
+			var dl := UIKit.label(str(i + 1), 16, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+			dl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			dl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			dot.add_child(dl)
+		ladder.add_child(dot)
+	lv.add_child(ladder)
+	_content_col.add_child(ladder_p)
+
+	# Regra
+	var rule := UIKit.label(
+			"1º e 2º ganham LP · 3º e 4º perdem",
+			22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	rule.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_content_col.add_child(rule)
+
+	# Botão principal
+	var find_btn := UIKit.button("⚔  BUSCAR PARTIDA", tc, 36)
+	find_btn.custom_minimum_size = Vector2(0, 96)
+	find_btn.pressed.connect(func():
+		get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn"))
+	_content_col.add_child(find_btn)
+
+	# Histórico (compacto)
+	var hist: Array = rk["history"]
+	if not hist.is_empty():
+		_content_col.add_child(UIKit.label("HISTÓRICO RECENTE", 26, UIKit.BRAND))
+	for h in hist.slice(0, mini(5, hist.size())):
+		var lp  := int(h["lp"])
+		var win := lp >= 0
+		var hp  := GlowPanel.new()
+		hp.accent      = UIKit.OK if win else UIKit.DANGER
+		hp.bg          = UIKit.SURFACE_DEEP
+		hp.pulse_speed = 0.0
+		var hl := UIKit.label(
+				"%dº lugar  ·  %s pts  ·  %s%d LP  ·  %s" % [
+					int(h["placement"]),
+					UIKit.fmt_int(int(h["score"])),
+					"+" if win else "",
+					lp,
+					h["tier"]
+				], 22)
+		hl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		hp.add_child(hl)
+		_content_col.add_child(hp)
+
+
+func _build_classic(wide: bool) -> void:
+	var h := 150 if not wide else 132
 	var trk := GameState.tournaments()
-	var h := 150 if get_viewport_rect().size.y > get_viewport_rect().size.x else 132
 
-	var competitivo := Widgets.mode_card("COMPETITIVO", "Palpite + aposta por rodada. Toda mesa vale Elo.", UIKit.DANGER.darkened(0.12), h, "❖", _open_blitz_confirm, 38)
-	col.add_child(competitivo)
+	var competitivo := Widgets.mode_card(
+			"COMPETITIVO",
+			"Palpite + aposta por rodada. Toda mesa vale Elo.",
+			UIKit.DANGER.darkened(0.12), h, "❖", _open_blitz_confirm, 38)
+	_content_col.add_child(competitivo)
 
-	var row2 := GridContainer.new()
-	row2.columns = 2
-	row2.add_theme_constant_override("h_separation", 18)
-	row2.add_theme_constant_override("v_separation", 18)
-	col.add_child(row2)
-	var torneio := Widgets.mode_card("TORNEIO", "Mesas de %d-%d · 🏆 %d" % [Tournament.MIN_TABLE, Tournament.MAX_TABLE, int(trk.get("trophies", 0))], UIKit.MONEY.darkened(0.5), h, "🏆", _open_tournament, 28)
-	var classico := Widgets.mode_card("CLÁSSICO", "Tarot tradicional, 78 cartas.", UIKit.PURPLE, h, "♛", func():
-		GameState.mode = GameState.Mode.CLASSIC
-		GameState.leave_table()
-		get_tree().change_scene_to_file("res://scenes/GameScene.tscn"), 28)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 18)
+	grid.add_theme_constant_override("v_separation", 18)
+	_content_col.add_child(grid)
+
+	var torneio := Widgets.mode_card(
+			"TORNEIO",
+			"Mesas de %d-%d · 🏆 %d" % [Tournament.MIN_TABLE, Tournament.MAX_TABLE, int(trk.get("trophies", 0))],
+			UIKit.MONEY.darkened(0.5), h, "🏆", _open_tournament, 28)
+	var classico := Widgets.mode_card(
+			"CLÁSSICO",
+			"Tarot tradicional, 78 cartas.",
+			UIKit.PURPLE, h, "♛",
+			func():
+				GameState.mode = GameState.Mode.CLASSIC
+				GameState.leave_table()
+				get_tree().change_scene_to_file("res://scenes/GameScene.tscn"), 28)
 	for c in [torneio, classico]:
 		c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row2.add_child(c)
+		grid.add_child(c)
 
-	var tutorial := Widgets.mode_card("TUTORIAL", "Primeira vez? Mão guiada, com dicas.", UIKit.OK.darkened(0.4), h, "?", func():
-		GameState.start_tutorial()
-		get_tree().change_scene_to_file("res://scenes/GameScene.tscn"), 38)
-	col.add_child(tutorial)
-	col.add_child(_spacer(8))
+	var tutorial := Widgets.mode_card(
+			"TUTORIAL",
+			"Primeira vez? Mão guiada, com dicas.",
+			UIKit.OK.darkened(0.4), h, "?",
+			func():
+				GameState.start_tutorial()
+				get_tree().change_scene_to_file("res://scenes/GameScene.tscn"), 38)
+	_content_col.add_child(tutorial)
 
-	var nav := Widgets.bottom_nav([
-		{"icon": "★", "label": "Cosméticos", "cb": _open_cosmetics},
-		{"icon": "?", "label": "Como jogar", "cb": _open_rules},
-		{"icon": "❖", "label": "COMPETITIVO", "cb": _open_blitz_confirm, "center": true},
-		{"icon": "⚙", "label": "Ajustes", "cb": _open_settings},
-		{"icon": "♚", "label": "Ranking", "cb": func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn")},
-	])
-	nav.custom_minimum_size = Vector2(0, Widgets.NAV_H)
-	page.add_child(nav)
-
-	overlay_layer = Control.new()
-	overlay_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	overlay_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(overlay_layer)
 	competitivo.grab_focus.call_deferred()
 
 
-## Logo do jogo com três cartas em leque (as mesmas do jogo, só de enfeite).
-func _hero() -> Control:
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 0)
-	var fan := Control.new()
-	fan.custom_minimum_size = Vector2(0, 210 if get_viewport_rect().size.y > get_viewport_rect().size.x else 150)
-	fan.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(fan)
-	var wide := get_viewport_rect().size.x > get_viewport_rect().size.y
-	var cx := 520.0 if wide else 336.0
-	var sc := 0.5 if wide else 0.62
-	var specs := [[CardData.Suit.COPAS, 14, -14.0, -110.0], [CardData.Suit.TRUNFO, 21, 0.0, 0.0], [CardData.Suit.ESPADAS, 12, 14.0, 110.0]]
-	for sp in specs:
-		var cv: CardView = preload("res://scenes/Card.tscn").instantiate()
-		cv.setup(CardData.make(sp[0], sp[1]), true)
-		cv.interactive = false
-		cv.scale = Vector2(sc, sc)
-		cv.rotation_degrees = sp[2]
-		fan.add_child(cv)
-		cv.position = Vector2(cx + sp[3] * (sc / 0.62) - CardView.SIZE.x / 2.0, 10.0 - abs(sp[2]) * 1.2)
-	var title := UIKit.label("TAROLO", 88, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	title.add_theme_color_override("font_outline_color", UIKit.TITLE_OUTLINE)
-	title.add_theme_constant_override("outline_size", 14)
-	box.add_child(title)
-	var sub := UIKit.label("JOGO DE RODADAS", 26, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER)
-	box.add_child(sub)
-	return box
+func _build_shop(_wide: bool) -> void:
+	_content_col.add_child(UIKit.label("COSMÉTICOS", 34, UIKit.BRAND))
+
+	var prof     := SaveManager.section("profile")
+	var cos      := SaveManager.section("cosmetics")
+	var rk       := GameState.ranked()
+	var peak_t   := int(Ranked.tier_info(int(rk["peak_points"]), int(rk["mmr"]))["tier"])
+
+	_content_col.add_child(UIKit.label("◆ %s Gemas" % UIKit.fmt_int(int(prof["gems"])), 24, UIKit.MUTED))
+
+	for id in UIKit.CARD_BACKS.keys():
+		var back: Dictionary = UIKit.CARD_BACKS[id]
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+
+		var swatch := Panel.new()
+		swatch.custom_minimum_size = Vector2(44, 64)
+		swatch.add_theme_stylebox_override("panel",
+				UIKit.box(Color(back["color"]), UIKit.BRAND.darkened(0.35), 3, 6, 0))
+		row.add_child(swatch)
+
+		var name_l := UIKit.label(str(back["name"]), 24)
+		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_l.vertical_alignment    = VERTICAL_ALIGNMENT_CENTER
+		row.add_child(name_l)
+
+		var owned: Array = cos["owned"]
+		var btn: Button
+		if str(cos["equipped"]) == id:
+			btn = UIKit.button("EQUIPADO", UIKit.OK, 20)
+			btn.disabled = true
+		elif owned.has(id):
+			btn = UIKit.button("EQUIPAR", UIKit.OK, 20)
+			btn.pressed.connect(func():
+				cos["equipped"] = id
+				SaveManager.save_game()
+				_switch_tab("LOJA"))
+		elif back.has("requires_tier"):
+			var req := int(back["requires_tier"])
+			var lbl := "DESBLOQUEAR" if peak_t >= req else "REQ. %s" % Ranked.TIERS[req].to_upper()
+			btn = UIKit.button(lbl, UIKit.ACTION, 20)
+			btn.disabled = peak_t < req
+			btn.pressed.connect(func():
+				owned.append(id)
+				Sfx.play("buy")
+				SaveManager.save_game()
+				_switch_tab("LOJA"))
+		else:
+			var price := int(back["price"])
+			btn = UIKit.button("◆ %d" % price, UIKit.ACTION, 20)
+			btn.disabled = int(prof["gems"]) < price
+			btn.pressed.connect(func():
+				prof["gems"] = int(prof["gems"]) - price
+				owned.append(id)
+				Sfx.play("buy")
+				SaveManager.save_game()
+				_refresh_wallet()
+				_switch_tab("LOJA"))
+		btn.custom_minimum_size = Vector2(144, 56)
+		row.add_child(btn)
+		_content_col.add_child(row)
 
 
-## Popup das fichas: saldo, recarga diária grátis e pacotes (compra simulada).
+func _build_menu(_wide: bool) -> void:
+	_content_col.add_child(UIKit.label("MENU", 34, UIKit.BRAND))
+
+	var items: Array[Array] = [
+		["COMO JOGAR",      UIKit.INFO,   _open_rules],
+		["CONFIGURAÇÕES",   UIKit.MUTED,  _open_settings],
+		["LOJA DE FICHAS",  UIKit.MONEY,  _open_fichas],
+	]
+	for item in items:
+		var btn := UIKit.button(item[0], item[1] as Color)
+		btn.pressed.connect(item[2] as Callable)
+		_content_col.add_child(btn)
+
+	var reset := UIKit.button("APAGAR PROGRESSO", UIKit.DANGER)
+	reset.pressed.connect(func():
+		SaveManager.reset()
+		get_tree().reload_current_scene())
+	_content_col.add_child(reset)
+
+	var ver := UIKit.label("v1.0 · Tarolo", 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	_content_col.add_child(ver)
+
+
+# ── Modais ────────────────────────────────────────────────────────────────────
+
 func _open_fichas() -> void:
-	FichasShop.open(overlay_layer, _refresh_gems)
+	FichasShop.open(_overlay, _refresh_wallet)
 
 
-func _refresh_gems() -> void:
-	var prof := SaveManager.section("profile")
-	if top_bar:
-		Widgets.set_pill_value(top_bar.find_child("ChipsPill", true, false), UIKit.fmt_int(int(prof["fichas"])))
-		Widgets.set_pill_value(top_bar.find_child("GemsPill", true, false), UIKit.fmt_int(int(prof["gems"])))
+func _modal(title: String) -> VBoxContainer:
+	var ov  := UIKit.overlay()
+	_overlay.add_child(ov)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 24)
+	var outer := VBoxContainer.new()
+	outer.add_theme_constant_override("separation", 12)
+	outer.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 96.0, 580.0), 0)
+	box.add_child(outer)
+	outer.add_child(UIKit.label(title, 38, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size = Vector2(0, clampf(get_viewport_rect().size.y * 0.42, 220.0, 480.0))
+	scroll.size_flags_vertical  = Control.SIZE_EXPAND_FILL
+	outer.add_child(scroll)
+	UIKit.suppress_click_on_scroll(scroll)
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 12)
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(body)
+	body.set_meta("modal_footer", outer)
+	ov.add_child(UIKit.centered(box))
+	UIKit.fit.call_deferred(box)
+	return body
 
 
-## Popup do torneio: entrada, bolão, prêmios por colocação na final e histórico/troféus.
+func _close_modal() -> void:
+	if _overlay.get_child_count() > 0:
+		_overlay.get_child(_overlay.get_child_count() - 1).queue_free()
+
+
 func _open_tournament() -> void:
-	var v := _modal("TORNEIO")
+	var v   := _modal("TORNEIO")
 	var prof := SaveManager.section("profile")
 	var trk := GameState.tournaments()
-	v.add_child(UIKit.label("16 jogadores · mesas de %d a %d, preenchidas com bots. Quem quebra sai e as mesas se fundem, até sobrar 1 campeão." % [Tournament.MIN_TABLE, Tournament.MAX_TABLE], 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("16 jogadores · mesas de %d a %d, preenchidas com bots." % [Tournament.MIN_TABLE, Tournament.MAX_TABLE], 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(UIKit.label("Entrada ◎%d  ·  Bolão ◎%d" % [Tournament.BUY_IN, Tournament.prize_pool()], 26, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("Só os 4 melhores levam prêmio: 1º ◎%d · 2º ◎%d · 3º ◎%d · 4º ◎%d" % [Tournament.payout_for(0), Tournament.payout_for(1), Tournament.payout_for(2), Tournament.payout_for(3)], 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("1º ◎%d · 2º ◎%d · 3º ◎%d · 4º ◎%d" % [Tournament.payout_for(0), Tournament.payout_for(1), Tournament.payout_for(2), Tournament.payout_for(3)], 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	v.add_child(UIKit.label("🏆 %d troféu(s)" % int(trk.get("trophies", 0)), 24, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	var hist: Array = trk.get("history", [])
@@ -158,75 +547,8 @@ func _open_tournament() -> void:
 		get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn"))
 	footer.add_child(enter)
 	var close := UIKit.button("FECHAR", UIKit.MUTED)
-	close.pressed.connect(func(): overlay_layer.get_child(overlay_layer.get_child_count() - 1).queue_free())
+	close.pressed.connect(_close_modal)
 	footer.add_child(close)
-
-
-func _spacer(h: int) -> Control:
-	var c := Control.new()
-	c.custom_minimum_size = Vector2(0, h)
-	return c
-
-
-func _caption(text: String) -> Label:
-	var l := UIKit.label(text, 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	return l
-
-
-func _spawn_stars() -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.randomize()
-	var vp := get_viewport_rect().size
-	for i in range(14):
-		var s := UIKit.label("✶" if i % 3 else "♦", rng.randi_range(12, 30), UIKit.PURPLE.lightened(0.25))
-		s.position = Vector2(rng.randf() * vp.x, rng.randf() * vp.y)
-		s.modulate.a = rng.randf_range(0.15, 0.5)
-		add_child(s)
-		var tw := s.create_tween().set_loops()
-		tw.tween_property(s, "position:y", s.position.y - 30.0, rng.randf_range(3.0, 6.0)).set_trans(Tween.TRANS_SINE)
-		tw.tween_property(s, "position:y", s.position.y, rng.randf_range(3.0, 6.0)).set_trans(Tween.TRANS_SINE)
-
-
-## Popup com cabeçalho (título) e rodapé fixos; só o meio rola, como o popup de Fichas e o de
-## Ajuda em passos — nunca deixa o popup crescer sem fim. Devolve o corpo (rolável): tudo que o
-## chamador adiciona nele fica dentro da área que rola. Pra um botão fixo no rodapé (ex.: FECHAR),
-## use `_close_button` ou pegue o rodapé com `body.get_meta("modal_footer")`.
-func _modal(title: String) -> VBoxContainer:
-	var ov := UIKit.overlay()
-	overlay_layer.add_child(ov)
-	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 24)
-	var outer := VBoxContainer.new()
-	outer.add_theme_constant_override("separation", 12)
-	outer.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 96.0, 580.0), 0)
-	box.add_child(outer)
-	outer.add_child(UIKit.label(title, 38, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
-	var scroll := ScrollContainer.new()
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	# Folga generosa: título + rodapé (até 2 botões) + esse teto sempre cabem dentro do teto de
-	# 75% do UIKit.centered() que envolve o popup — assim só existe UM scroll (esse aqui dentro),
-	# nunca dois competindo (o de fora nunca precisa entrar em ação).
-	scroll.custom_minimum_size = Vector2(0, clampf(get_viewport_rect().size.y * 0.42, 220.0, 480.0))
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	outer.add_child(scroll)
-	UIKit.suppress_click_on_scroll(scroll)
-	var body := VBoxContainer.new()
-	body.add_theme_constant_override("separation", 12)
-	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(body)
-	body.set_meta("modal_footer", outer)
-	ov.add_child(UIKit.centered(box))
-	UIKit.fit.call_deferred(box)
-	return body
-
-
-func _close_button(body: VBoxContainer) -> void:
-	var footer: Node = body.get_meta("modal_footer", body)
-	var close := UIKit.button("FECHAR", UIKit.MUTED)
-	close.pressed.connect(func():
-		overlay_layer.get_child(overlay_layer.get_child_count() - 1).queue_free())
-	footer.add_child(close)
-	close.grab_focus.call_deferred()
 
 
 func _open_settings() -> void:
@@ -234,12 +556,12 @@ func _open_settings() -> void:
 	var profile := SaveManager.section("profile")
 	v.add_child(UIKit.label("Seu nome", 20))
 	var name_edit := LineEdit.new()
-	name_edit.text = str(profile["name"])
+	name_edit.text       = str(profile["name"])
 	name_edit.max_length = 16
 	name_edit.custom_minimum_size = Vector2(0, 40)
 	name_edit.add_theme_stylebox_override("normal", UIKit.box(UIKit.PURPLE_DEEP, UIKit.MUTED, 2, 6, 10))
-	name_edit.add_theme_stylebox_override("focus", UIKit.box(UIKit.PURPLE_DEEP, UIKit.BRAND, 2, 6, 10))
-	name_edit.add_theme_color_override("font_color", UIKit.INK)
+	name_edit.add_theme_stylebox_override("focus",  UIKit.box(UIKit.PURPLE_DEEP, UIKit.BRAND, 2, 6, 10))
+	name_edit.add_theme_color_override("font_color",             UIKit.INK)
 	name_edit.add_theme_color_override("font_placeholder_color", UIKit.MUTED)
 	name_edit.placeholder_text = "Arcanista"
 	name_edit.text_submitted.connect(func(_t: String): name_edit.release_focus())
@@ -247,28 +569,18 @@ func _open_settings() -> void:
 		var clean := name_edit.text.strip_edges()
 		profile["name"] = clean if not clean.is_empty() else "Arcanista"
 		name_edit.text = str(profile["name"])
-		SaveManager.save_game()
-		_refresh_gems())
+		SaveManager.save_game())
 	v.add_child(name_edit)
 	var s := GameState.settings()
 	v.add_child(UIKit.label("Como ver sua mão de cartas", 20))
 	var hand_row := HBoxContainer.new()
 	hand_row.add_theme_constant_override("separation", 10)
 	v.add_child(hand_row)
-	var hand_row_btn := UIKit.button("FILEIRA", UIKit.OK if str(s["hand_layout"]) == "row" else UIKit.MUTED, 19)
-	hand_row_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hand_row_btn.pressed.connect(func():
-		s["hand_layout"] = "row"
-		SaveManager.save_game()
-		_reopen_settings())
-	hand_row.add_child(hand_row_btn)
-	var hand_fan_btn := UIKit.button("LEQUE", UIKit.OK if str(s["hand_layout"]) == "fan" else UIKit.MUTED, 19)
-	hand_fan_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hand_fan_btn.pressed.connect(func():
-		s["hand_layout"] = "fan"
-		SaveManager.save_game()
-		_reopen_settings())
-	hand_row.add_child(hand_fan_btn)
+	for layout in ["row", "fan"]:
+		var lb := UIKit.button(layout.to_upper(), UIKit.OK if str(s["hand_layout"]) == layout else UIKit.MUTED, 19)
+		lb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		lb.pressed.connect(func(): s["hand_layout"] = layout; SaveManager.save_game(); _reopen_settings())
+		hand_row.add_child(lb)
 	v.add_child(UIKit.label("Dificuldade dos bots", 20))
 	var diff_row := HBoxContainer.new()
 	diff_row.add_theme_constant_override("separation", 10)
@@ -276,23 +588,16 @@ func _open_settings() -> void:
 	for d in range(3):
 		var db := UIKit.button(str(BotAI.DIFFICULTY_NAMES[d]).to_upper(), UIKit.OK if int(s["difficulty"]) == d else UIKit.MUTED, 19)
 		db.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		db.pressed.connect(func():
-			s["difficulty"] = d
-			SaveManager.save_game()
-			_reopen_settings())
+		db.pressed.connect(func(): s["difficulty"] = d; SaveManager.save_game(); _reopen_settings())
 		diff_row.add_child(db)
 	for entry in [["Música", "music_volume"], ["Efeitos", "sfx_volume"]]:
 		v.add_child(UIKit.label(entry[0], 20))
 		var sl := HSlider.new()
-		sl.min_value = 0.0
-		sl.max_value = 1.0
-		sl.step = 0.05
-		sl.value = float(s[entry[1]])
+		sl.min_value = 0.0; sl.max_value = 1.0; sl.step = 0.05
+		sl.value     = float(s[entry[1]])
 		sl.custom_minimum_size = Vector2(0, 32)
 		var key: String = entry[1]
-		sl.value_changed.connect(func(val: float):
-			s[key] = val
-			GameState.apply_settings())
+		sl.value_changed.connect(func(val: float): s[key] = val; GameState.apply_settings())
 		v.add_child(sl)
 	v.add_child(UIKit.label("Velocidade das animações", 20))
 	var speed := OptionButton.new()
@@ -306,128 +611,53 @@ func _open_settings() -> void:
 		var fs := CheckButton.new()
 		fs.text = "Tela cheia"
 		fs.button_pressed = bool(s["fullscreen"])
-		fs.toggled.connect(func(on: bool):
-			s["fullscreen"] = on
-			GameState.apply_settings())
+		fs.toggled.connect(func(on: bool): s["fullscreen"] = on; GameState.apply_settings())
 		v.add_child(fs)
 	var footer: Node = v.get_meta("modal_footer", v)
-	var reset := UIKit.button("APAGAR PROGRESSO", UIKit.DANGER, 18)
-	reset.pressed.connect(func():
-		SaveManager.reset()
-		get_tree().reload_current_scene())
-	footer.add_child(reset)
-	var close := UIKit.button("SALVAR E FECHAR")
-	close.pressed.connect(func():
-		SaveManager.save_game()
-		overlay_layer.get_child(overlay_layer.get_child_count() - 1).queue_free())
-	footer.add_child(close)
+	var save_btn := UIKit.button("SALVAR E FECHAR")
+	save_btn.pressed.connect(func(): SaveManager.save_game(); _close_modal())
+	footer.add_child(save_btn)
 
 
 func _reopen_settings() -> void:
-	for c in overlay_layer.get_children():
-		c.queue_free()
+	_close_modal()
 	_open_settings()
 
 
-func _open_cosmetics() -> void:
-	var v := _modal("LOJA DE COSMÉTICOS")
-	var cos := SaveManager.section("cosmetics")
-	var prof := SaveManager.section("profile")
-	var rk := GameState.ranked()
-	var peak_tier := int(Ranked.tier_info(int(rk["peak_points"]), int(rk["mmr"]))["tier"])
-	v.add_child(UIKit.label("◆ %s Gemas" % UIKit.fmt_int(int(prof["gems"])), 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-	for id in UIKit.CARD_BACKS.keys():
-		var back: Dictionary = UIKit.CARD_BACKS[id]
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
-		var swatch := Panel.new()
-		swatch.custom_minimum_size = Vector2(36, 50)
-		swatch.add_theme_stylebox_override("panel", UIKit.box(Color(back["color"]), UIKit.BRAND.darkened(0.35), 3, 4, 0))
-		row.add_child(swatch)
-		var name_l := UIKit.label(str(back["name"]), 22)
-		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(name_l)
-		var owned: Array = cos["owned"]
-		var btn: Button
-		if str(cos["equipped"]) == id:
-			btn = UIKit.button("EQUIPADO", UIKit.OK, 18)
-			btn.disabled = true
-		elif owned.has(id):
-			btn = UIKit.button("EQUIPAR", UIKit.OK, 18)
-			btn.pressed.connect(func():
-				cos["equipped"] = id
-				SaveManager.save_game()
-				_reopen_cosmetics())
-		elif back.has("requires_tier"):
-			var req := int(back["requires_tier"])
-			btn = UIKit.button("DESBLOQUEAR" if peak_tier >= req else "REQ. %s" % Ranked.TIERS[req].to_upper(), UIKit.ACTION, 18)
-			btn.disabled = peak_tier < req
-			btn.pressed.connect(func():
-				owned.append(id)
-				Sfx.play("buy")
-				SaveManager.save_game()
-				_reopen_cosmetics())
-		else:
-			var price := int(back["price"])
-			btn = UIKit.button("◆ %d" % price, UIKit.ACTION, 18)
-			btn.disabled = int(prof["gems"]) < price
-			btn.pressed.connect(func():
-				prof["gems"] = int(prof["gems"]) - price
-				owned.append(id)
-				Sfx.play("buy")
-				SaveManager.save_game()
-				_refresh_gems()
-				_reopen_cosmetics())
-		btn.custom_minimum_size = Vector2(130, 44)
-		row.add_child(btn)
-		v.add_child(row)
-	_close_button(v)
-
-
-func _reopen_cosmetics() -> void:
-	for c in overlay_layer.get_children():
-		c.queue_free()
-	_open_cosmetics()
-
-
 func _open_blitz_confirm() -> void:
-	_open_table_select()
-
-
-## Escolha da mesa (blind + entrada) da Mesa Blitz.
-func _open_table_select() -> void:
 	var v := _modal("MESA BLITZ")
 	var profile := SaveManager.section("profile")
-	var fichas := int(profile["fichas"])
+	var fichas  := int(profile["fichas"])
 	v.add_child(UIKit.label("Você tem %d fichas" % fichas, 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-	var txt := "Escolha a mesa. Você senta com uma stack de 40 blinds, palpita quantas rodadas vai ganhar em cada nível (acertou o número exato, leva o pote) e leva de volta a stack quando sair."
-	var info := UIKit.label(txt, 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	info.custom_minimum_size = Vector2(620, 0)
-	v.add_child(info)
+	var txt := UIKit.label("Escolha a mesa. Você senta com uma stack de 40 blinds, palpita quantas rodadas vai ganhar e leva de volta a stack quando sair.", 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	txt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(txt)
 	var cheapest := GameState.chaos_buy_in(0)
 	if fichas < cheapest:
-		v.add_child(UIKit.label("Fichas insuficientes pra entrar.", 22, UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(UIKit.label("Fichas insuficientes.", 22, UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER))
 		var shop := UIKit.button("RECARGA E PACOTES", UIKit.OK)
-		shop.pressed.connect(func():
-			overlay_layer.get_child(overlay_layer.get_child_count() - 1).queue_free()
-			_open_fichas())
+		shop.pressed.connect(func(): _close_modal(); _open_fichas())
 		v.add_child(shop)
-		_close_button(v)
+		var cl := UIKit.button("FECHAR", UIKit.MUTED)
+		cl.pressed.connect(_close_modal)
+		v.get_meta("modal_footer", v).add_child(cl)
 		return
 	for i in range(GameState.CHAOS_TABLES.size()):
 		var t: Dictionary = GameState.CHAOS_TABLES[i]
 		var cost := GameState.chaos_buy_in(i)
-		var entry_txt := "entrada ◎%d" % (int(t["blind"]) * 2)
-		var b := UIKit.button("%s · %s · stack ◎%d" % [str(t["name"]).to_upper(), entry_txt, cost], UIKit.INFO if i == 0 else UIKit.PURPLE, 26)
+		var b := UIKit.button(
+				"%s · entrada ◎%d · stack ◎%d" % [str(t["name"]).to_upper(), int(t["blind"]) * 2, cost],
+				UIKit.INFO if i == 0 else UIKit.PURPLE, 26)
 		b.disabled = fichas < cost
 		b.pressed.connect(func():
 			GameState.chaos_table = i
-			GameState.chaos_mode = "blitz"
+			GameState.chaos_mode  = "blitz"
 			get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn"))
 		v.add_child(b)
-	_close_button(v)
+	var cl := UIKit.button("FECHAR", UIKit.MUTED)
+	cl.pressed.connect(_close_modal)
+	v.get_meta("modal_footer", v).add_child(cl)
 
 
 func _open_rules() -> void:
-	StepsModal.open(overlay_layer, "COMO JOGAR", HelpContent.vanilla(), "ENTENDI", false)
+	StepsModal.open(_overlay, "COMO JOGAR", HelpContent.vanilla(), "ENTENDI", false)

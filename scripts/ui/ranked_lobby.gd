@@ -8,11 +8,13 @@ var _searching := false
 var _content: VBoxContainer
 var _left_col: VBoxContainer
 var _right_col: VBoxContainer
+var _last_wide := false
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(UIKit.background())
+	_last_wide = _is_wide()
 	_build()
 
 
@@ -215,7 +217,10 @@ func _fill_columns(left: VBoxContainer, right: VBoxContainer) -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
-		_build()
+		var wide := _is_wide()
+		if wide != _last_wide:
+			_last_wide = wide
+			_build()
 
 
 func _search() -> void:
