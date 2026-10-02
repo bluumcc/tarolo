@@ -272,7 +272,7 @@ func begin_trick() -> void:
 	raises = 0
 	bet_log = []
 	hand_no += 1
-	button = hand_no % num_players
+	button = leader  # aposta começa do jogador após o líder da vaza
 	var ante_size := float(blind) * (BLITZ_TRICK_ANTE_FACTOR if blitz else 1.0)
 	for p in range(num_players):
 		folded[p] = false
