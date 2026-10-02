@@ -116,17 +116,41 @@ static func simulate_level(entrants: Array, blind: int, rng: RandomNumberGenerat
 	var eng := ChaosEngine.new()
 	eng.setup_match({"seed": rng.randi(), "levels": 1, "mode": "blitz", "blind": blind, "players": n, "stacks": stacks})
 	for p in range(n):
+		if eng.can_discard(p):
+			eng.apply_discard(p, ChaosBot.wants_discard(eng, p, int(entrants[p]["difficulty"]), rng))
+	for p in range(n):
 		eng.blitz_place(p, ChaosBot.blitz_pick(eng, p, int(entrants[p]["difficulty"]), rng))
 	while not eng.is_round_over():
-		if eng.plays.is_empty():
-			eng.draw_trick_modifier()
-		var pl := eng.current
-		if ChaosBot.wants_double(eng, pl, int(entrants[pl]["difficulty"]), rng):
-			eng.double_down(pl)
-			for q in range(n):
-				if q != pl and ChaosBot.wants_cover(eng, q, int(entrants[q]["difficulty"]), rng):
-					eng.cover_double(q)
-		eng.play(pl, ChaosBot.choose(eng, pl, int(entrants[pl]["difficulty"]), rng))
+		eng.draw_trick_modifier()
+		eng.begin_trick()
+		# Fase de apostas por rodada (ante + aumentar/desistir)
+		var bet_guard := 0
+		while eng.betting and bet_guard < 40:
+			bet_guard += 1
+			var ba := eng.bet_actor()
+			if ba == -1:
+				break
+			var act := ChaosBot.bet_decision(eng, ba, int(entrants[ba]["difficulty"]), rng)
+			eng.bet_act(ba, str(act["action"]), float(act.get("to", 0.0)))
+		# Walkover: todos desistiram exceto um
+		if eng.walkover_player() != -1:
+			eng.resolve_walkover()
+			continue
+		# Jogar as cartas da rodada
+		var trick_done := false
+		var play_guard := 0
+		while not trick_done and play_guard < 10:
+			play_guard += 1
+			var pl := eng.current
+			if ChaosBot.wants_double(eng, pl, int(entrants[pl]["difficulty"]), rng):
+				eng.double_down(pl)
+				for q in range(n):
+					if q != pl and ChaosBot.wants_cover(eng, q, int(entrants[q]["difficulty"]), rng):
+						eng.cover_double(q)
+			var res := eng.play(pl, ChaosBot.choose(eng, pl, int(entrants[pl]["difficulty"]), rng))
+			if not res.get("ok", false):
+				break
+			trick_done = bool(res.get("trick_complete", false))
 	for p in range(n):
 		entrants[p]["stack"] = maxf(eng.stacks[p], 0.0)
 
