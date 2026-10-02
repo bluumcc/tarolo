@@ -689,8 +689,8 @@ func _test_blitz() -> void:
 	check((r["hits"] as Array) == [0] and (r["near"] as Array) == [1], "Blitz: acertou exato / errou por 1")
 	check(is_equal_approx(float(r["refunds"][1]), 10.0), "Blitz: errou por 1 recebe metade da entrada")
 	check(is_equal_approx(float(r["payouts"][0]), 70.0) and is_equal_approx(float(r["net"][0]), 50.0), "Blitz: único acerto leva o pote (menos o reembolso)")
-	check(is_equal_approx(float(r["net"][2]), -20.0) and is_equal_approx(float(r["net"][3]), -20.0), "Blitz: errou por 2+ perde a entrada")
-	check(is_equal_approx(f.carry, 0.0) and is_equal_approx(f.pot, 0.0), "Blitz: pote pago zera")
+	check(is_equal_approx(float(r["net"][2]), -40.0) and is_equal_approx(float(r["net"][3]), -40.0), "Blitz: errou por 2+ perde a entrada e paga multa")
+	check(is_equal_approx(f.carry, 40.0) and is_equal_approx(f.pot, 0.0), "Blitz: pote pago zera, multas ficam no carry")
 
 	var f2 := ChaosEngine.new()
 	f2.setup_match({"seed": 1, "mode": "blitz", "blind": 10})
@@ -701,7 +701,7 @@ func _test_blitz() -> void:
 	f2.predicts = [1, 3, 5, 0]
 	f2.wins = [4, 4, 0, 4]
 	var r2 := f2._settle_blitz()
-	check((r2["hits"] as Array).is_empty() and is_equal_approx(f2.carry, 80.0 - float(r2["refunds"][1]) - float(r2["refunds"][3]) - float(r2["refunds"][0]) - float(r2["refunds"][2])), "Blitz: ninguém acertou, pote acumula")
+	check((r2["hits"] as Array).is_empty() and is_equal_approx(f2.carry, 80.0 - float(r2["refunds"][1]) - float(r2["refunds"][3]) - float(r2["refunds"][0]) - float(r2["refunds"][2]) + 60.0), "Blitz: ninguém acertou, pote acumula + multas")
 	f2.pot = f2.carry + 80.0
 	var carried := f2.pot
 	f2.stakes = [20.0, 20.0, 20.0, 20.0]

@@ -64,7 +64,7 @@ var house_rake := 0.0          # total cobrado pela casa na mesa
 var human_rake := 0.0          # quanto do total saiu de fichas do jogador 0   # {player, card} do último descarte por desistência
 
 # Modo Blitz: palpite de vitórias por nível (em vez de aposta por rodada).
-const BLITZ_ENTRY_BLINDS := 4                      # entrada fixa de cada nível, em blinds (10% da stack)
+const BLITZ_ENTRY_BLINDS := 8                      # entrada fixa de cada nível, em blinds (20% da stack)
 const BLITZ_STREAK_BONUS_BLINDS := 3              # prêmio especial da casa: 3+ acertos seguidos (só você)
 const BLITZ_BONUS_VAULT_SHARE := 0.5              # o prêmio só sai de até 50% da taxa que a casa já cobrou de você
 const BLITZ_DOUBLE_FROM := 3                       # 1º dobrar a partir da 4ª rodada; o 2º, da 6ª
@@ -1010,6 +1010,18 @@ func _settle_blitz() -> Dictionary:
 		net.append(float(payouts[p]) + float(refunds[p]) - float(stakes[p]))
 	stacks[0] += bonus
 	net[0] += bonus
+	# Multa por erro grosso (≥2 rodadas fora): 2 blinds extras vão pro carry do próximo nível.
+	# Quem errou exato já perdeu toda a entrada; quem foi perto (diff=1) perdeu metade — só os
+	# erros grandes pagam extra, pra tornar o acerto do palpite mais decisivo.
+	var miss_penalty := 0.0
+	for p in range(num_players):
+		var diff := absi(int(wins[p]) - int(predicts[p]))
+		if diff >= 2 and float(stakes[p]) > 0.0:
+			var pen := minf(float(blind) * 2.0, stacks[p])
+			stacks[p] -= pen
+			net[p] -= pen
+			miss_penalty += pen
+	carry_out += miss_penalty
 	var res := {
 		"predicts": predicts.duplicate(), "stakes": stakes.duplicate(), "wins": wins.duplicate(), "doubles": doubles.duplicate(),
 		"hits": hits, "near": near, "payouts": payouts, "refunds": refunds, "net": net,
