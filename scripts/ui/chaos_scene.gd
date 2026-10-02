@@ -1252,8 +1252,6 @@ func _human_bet() -> Dictionary:
 	v.add_child(UIKit.label("SUA VEZ DE APOSTAR", 32, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	var stack := int(engine.stacks[0])
 	var call_amt := int(opt["call"])
-	var leader_lbl := UIKit.label("▶ ABRE A RODADA: %s" % _leader_name(), 24, UIKit.TURN, HORIZONTAL_ALIGNMENT_CENTER)
-	v.add_child(leader_lbl)
 	var info := "Pote da rodada ◎%d  ·  Sua stack ◎%d  ·  Sua mão: %s" % [int(engine.trick_pot), stack, _hand_label()]
 	var info_l := UIKit.label(info, 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	info_l.modulate.a = 0.8
@@ -1823,6 +1821,7 @@ func _betting_phase() -> void:
 	shown_pot = 0.0
 	var first := engine.bet_actor()
 	_banner("APOSTAS", "Todos pagaram a ante (◎%d). Fala primeiro: %s. A ordem está nos números acima dos avatares." % [int(engine.bet_level), str(config["names"][first]).to_upper()], UIKit.MONEY)
+	status_label.text = "▶ Abre a rodada: %s" % _leader_name()
 	_refresh_hud()
 	if not GameState.autoplay:
 		Sfx.play("chip")
@@ -1858,6 +1857,7 @@ func _betting_phase() -> void:
 		return
 	await _gather_bets()
 	_banner_clear()
+	status_label.text = ""
 	_refresh_hud()
 
 
