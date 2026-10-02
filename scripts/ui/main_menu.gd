@@ -31,8 +31,8 @@ func _notification(what: int) -> void:
 # ── Layout principal ─────────────────────────────────────────────────────────
 
 func _build() -> void:
-	while get_child_count() > 0:
-		get_child(0).queue_free()
+	for c in get_children():
+		c.queue_free()
 
 	# Fundo com shader roxo profundo
 	var bg := ColorRect.new()
