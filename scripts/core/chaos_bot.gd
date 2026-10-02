@@ -222,9 +222,24 @@ static func win_chance(engine: ChaosEngine, player: int, difficulty: int, rng: R
 
 
 ## Decisão de aposta do bot: {action, to, bluff}. `bluff` = aumentou sem mão.
+## No Blitz, ajusta o apetite por vencer essa rodada conforme o palpite: quem já bateu (ou
+## passou) o número que apostou evita ganhar rodadas demais (só o acerto EXATO paga o pote
+## cheio); quem ainda precisa de quase todas as que faltam força mais a sorte. Sem isso o bot
+## só olhava a força da própria carta, nunca "quanto falta pro meu palpite".
 static func bet_decision(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> Dictionary:
 	var opt := engine.bet_options(player)
 	var pwin := win_chance(engine, player, difficulty, rng)
+	if engine.blitz and int(engine.predicts[player]) >= 0:
+		var needed := int(engine.predicts[player]) - int(engine.wins[player])
+		var remaining := ChaosEngine.HAND_SIZE - engine.trick_number
+		var bias := 0.0
+		if needed <= 0:
+			bias = -0.05
+		elif remaining > 0 and needed >= remaining:
+			bias = 0.06
+		else:
+			bias = 0.02
+		pwin = clampf(pwin + bias, 0.02, 0.98)
 	var bluff_rate := 0.0
 	var raise_rate := 0.35
 	var call_margin := 1.0

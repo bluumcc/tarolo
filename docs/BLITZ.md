@@ -271,14 +271,15 @@ que até aqui só um modo usava pote por rodada de cada vez), (2) a ante proporc
 pro vencedor dentro de `_resolve_trick_blitz`/`resolve_walkover` (que antes só cuidavam do palpite
 e não sabiam que existia um pote de rodada a liquidar).
 
-**Bots:** a decisão de aposta reaproveita `ChaosBot.bet_decision` tal como está no Caos — ainda não
-é ciente do palpite do jogador (não considera "preciso de mais X vitórias" ao decidir apostar
-alto). Primeira versão aceitável, mas não validada por simulação dedicada: `tests/blitz_gate.gd`
-(espelho ≈0, escada de dificuldade, nenhum estilo dominado) passa, mas não cobre o caminho novo —
-ainda simula só predict/jogo de carta/liquidação, sem `begin_trick`/`bet_act`. **Pendência real:**
-escrever uma simulação que jogue com a aposta por rodada ligada e confirmar que a escada de
-dificuldade e o equilíbrio entre estilos sobrevivem ao novo mecanismo, e depois calibrar os bots
-pra também levarem o palpite em conta na hora de apostar.
+**Bots:** `ChaosBot.bet_decision` agora é ciente do palpite — ajusta o quanto "quer vencer" essa
+rodada conforme falta pra bater o número exato apostado: já bateu (ou passou) o palpite, evita
+vencer rodadas demais (só o acerto exato paga o pote cheio); precisa de quase todas as que
+faltam, força mais a sorte. `tests/blitz_betting_gate.gd` cobre o caminho que `blitz_gate.gd`
+não cobria: roda o mesmo critério (espelho ≈0, escada de dificuldade Difícil > Normal > Fácil,
+nenhum estilo dominado) mas com `begin_trick`/`bet_act`/`walkover` de verdade ligados. A
+primeira calibração do bias (±0,12/0,15) quebrou o espelho (+1,12 blind/nível); reduzida pra
+±0,02–0,06 até o gate passar de novo — os dois gates (`blitz_gate.gd` e
+`blitz_betting_gate.gd`) devem continuar passando a cada ajuste nessa função.
 
 ## Fila única: Blitz é o Ranqueado
 
