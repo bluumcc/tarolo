@@ -45,38 +45,40 @@ func _ready() -> void:
 	# Herói: logo + leque de cartas de enfeite.
 	col.add_child(_hero())
 
-	var rk := GameState.ranked()
-	var tier := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
-	var blitz := Widgets.mode_card("MODO BLITZ", "Dê o palpite: quantas rodadas você vai ganhar? Acertou, leva o pote! Com modificadores, dobra e combos.", UIKit.DANGER, 176 if get_viewport_rect().size.y > get_viewport_rect().size.x else 150, "❖", _open_blitz_confirm, 46)
-	col.add_child(blitz)
-	var wide := get_viewport_rect().size.x > get_viewport_rect().size.y
-	var grid := GridContainer.new()
-	grid.columns = 4 if wide else 1
-	grid.add_theme_constant_override("h_separation", 18)
-	grid.add_theme_constant_override("v_separation", 18)
-	col.add_child(grid)
-	var h := 150 if wide else 132
+	# Todos os cards da mesma altura — legendas curtas de propósito pra caber. Competitivo
+	# (ex-Blitz) e Tutorial ocupam a largura toda; Torneio e Clássico (ex-Vanilla) dividem a
+	# mesma linha. Cores sempre escuras/saturadas o bastante pro texto branco ler bem — nunca
+	# o dourado/verde claros de antes, que forçavam texto escuro.
 	var trk := GameState.tournaments()
-	var cards := [
-		Widgets.mode_card("VANILLA", "Tarot clássico: 78 cartas, trunfo e O Louco.", UIKit.BRAND.darkened(0.12), h, "♛", func():
-			GameState.mode = GameState.Mode.CLASSIC
-			GameState.leave_table()
-			get_tree().change_scene_to_file("res://scenes/GameScene.tscn"), 34),
-		Widgets.mode_card("RANQUEADO", "Temporada %d · %s · %d LP" % [int(rk["season"]), tier["label"], int(tier["lp"])], Color(Ranked.TIER_COLORS[tier["tier"]]).darkened(0.1), h, "⚔", func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn"), 34),
-		Widgets.mode_card("TORNEIO", "16 jogadores, eliminação em fases · ◎%d de entrada · 🏆 %d" % [Tournament.BUY_IN, int(trk.get("trophies", 0))], UIKit.MONEY.darkened(0.2), h, "🏆", _open_tournament, 34),
-		Widgets.mode_card("TUTORIAL", "Primeira vez? Uma mão guiada, com dicas.", UIKit.OK.darkened(0.15), h, "?", func():
-			GameState.start_tutorial()
-			get_tree().change_scene_to_file("res://scenes/GameScene.tscn"), 34),
-	]
-	for c in cards:
+	var h := 150 if get_viewport_rect().size.y > get_viewport_rect().size.x else 132
+
+	var competitivo := Widgets.mode_card("COMPETITIVO", "Palpite + aposta por rodada. Toda mesa vale Elo.", UIKit.DANGER.darkened(0.12), h, "❖", _open_blitz_confirm, 38)
+	col.add_child(competitivo)
+
+	var row2 := GridContainer.new()
+	row2.columns = 2
+	row2.add_theme_constant_override("h_separation", 18)
+	row2.add_theme_constant_override("v_separation", 18)
+	col.add_child(row2)
+	var torneio := Widgets.mode_card("TORNEIO", "Mesas de %d-%d · 🏆 %d" % [Tournament.MIN_TABLE, Tournament.MAX_TABLE, int(trk.get("trophies", 0))], UIKit.MONEY.darkened(0.5), h, "🏆", _open_tournament, 28)
+	var classico := Widgets.mode_card("CLÁSSICO", "Tarot tradicional, 78 cartas.", UIKit.PURPLE, h, "♛", func():
+		GameState.mode = GameState.Mode.CLASSIC
+		GameState.leave_table()
+		get_tree().change_scene_to_file("res://scenes/GameScene.tscn"), 28)
+	for c in [torneio, classico]:
 		c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		grid.add_child(c)
+		row2.add_child(c)
+
+	var tutorial := Widgets.mode_card("TUTORIAL", "Primeira vez? Mão guiada, com dicas.", UIKit.OK.darkened(0.4), h, "?", func():
+		GameState.start_tutorial()
+		get_tree().change_scene_to_file("res://scenes/GameScene.tscn"), 38)
+	col.add_child(tutorial)
 	col.add_child(_spacer(8))
 
 	var nav := Widgets.bottom_nav([
 		{"icon": "★", "label": "Cosméticos", "cb": _open_cosmetics},
 		{"icon": "?", "label": "Como jogar", "cb": _open_rules},
-		{"icon": "❖", "label": "BLITZ", "cb": _open_blitz_confirm, "center": true},
+		{"icon": "❖", "label": "COMPETITIVO", "cb": _open_blitz_confirm, "center": true},
 		{"icon": "⚙", "label": "Ajustes", "cb": _open_settings},
 		{"icon": "♚", "label": "Ranking", "cb": func(): get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn")},
 	])
@@ -87,7 +89,7 @@ func _ready() -> void:
 	overlay_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(overlay_layer)
-	blitz.grab_focus.call_deferred()
+	competitivo.grab_focus.call_deferred()
 
 
 ## Logo do jogo com três cartas em leque (as mesmas do jogo, só de enfeite).
