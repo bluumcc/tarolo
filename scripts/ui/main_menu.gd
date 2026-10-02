@@ -387,8 +387,7 @@ func _build_ranked(_wide: bool) -> void:
 	find_btn.custom_minimum_size = Vector2(0, 88)
 	find_btn.add_theme_color_override("font_outline_color", tc.darkened(0.5))
 	find_btn.add_theme_constant_override("outline_size", 5)
-	find_btn.pressed.connect(func():
-		get_tree().change_scene_to_file("res://scenes/RankedLobby.tscn"))
+	find_btn.pressed.connect(_start_ranked_matchmaking)
 	ab_mg.add_child(find_btn)
 
 
@@ -692,6 +691,59 @@ func _open_blitz_confirm() -> void:
 	var cl := UIKit.button("FECHAR", UIKit.MUTED)
 	cl.pressed.connect(_close_modal)
 	v.get_meta("modal_footer", v).add_child(cl)
+
+
+func _start_ranked_matchmaking() -> void:
+	# Overlay de matchmaking inline: busca → nomes → inicia ChaosScene (modo blitz/rankeado)
+	var ov := UIKit.overlay()
+	_overlay.add_child(ov)
+
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.DANGER, 24)
+	var bv  := VBoxContainer.new()
+	bv.add_theme_constant_override("separation", 20)
+	bv.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 96.0, 520.0), 0)
+	box.add_child(bv)
+
+	bv.add_child(UIKit.label("RANKEADA", 38, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+
+	var status_lbl := UIKit.label("Procurando adversários...", 26, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	status_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	bv.add_child(status_lbl)
+
+	var cancel_btn := UIKit.button("CANCELAR", UIKit.MUTED, 24)
+	cancel_btn.custom_minimum_size = Vector2(0, 64)
+	cancel_btn.pressed.connect(func(): ov.queue_free())
+	bv.add_child(cancel_btn)
+
+	ov.add_child(UIKit.centered(box))
+	UIKit.fit.call_deferred(box)
+
+	# Animação de busca
+	var elapsed := 0.0
+	var wait    := randf_range(1.2, 2.6)
+	while elapsed < wait:
+		if not is_instance_valid(ov):
+			return
+		status_lbl.text = "Procurando adversários...  %ds" % (int(elapsed) + 1)
+		await get_tree().create_timer(GameState.anim(0.25)).timeout
+		elapsed += 0.25
+
+	if not is_instance_valid(ov):
+		return
+
+	# Partida encontrada
+	var lobby := GameState.find_ranked_lobby()
+	var names := ", ".join(lobby.map(func(p: Dictionary) -> String: return str(p["name"])))
+	status_lbl.text = "Partida encontrada!\n%s" % names
+	UIKit.sfx("combo")
+	cancel_btn.queue_free()
+
+	await get_tree().create_timer(GameState.anim(1.2)).timeout
+	if not is_instance_valid(ov):
+		return
+
+	GameState.chaos_mode = "blitz"
+	get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn")
 
 
 func _open_rules() -> void:
