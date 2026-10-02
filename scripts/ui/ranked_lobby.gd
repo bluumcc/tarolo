@@ -1,26 +1,40 @@
 extends Control
-## RankedLobby.tscn — elo atual, histórico e matchmaking por MMR.
+## RankedLobby — arena ranqueada com visual Tarot Royale.
+## Layout portrait (coluna única) e landscape (2 colunas).
 
-var content: VBoxContainer
-var search_btn: Button
-var status: Label
-var searching := false
+var _status: Label
+var _search_btn: Button
+var _searching := false
+var _content: VBoxContainer
+var _left_col: VBoxContainer
+var _right_col: VBoxContainer
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(UIKit.background())
+	_build()
+
+
+func _is_wide() -> bool:
+	return get_viewport_rect().size.x / get_viewport_rect().size.y >= 1.3
+
+
+func _build() -> void:
+	# Limpa filhos além do background (índice 0).
+	while get_child_count() > 1:
+		get_child(1).queue_free()
 	var page := VBoxContainer.new()
 	page.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	page.add_theme_constant_override("separation", 0)
 	add_child(page)
 
-	# Cabeçalho fixo: voltar + título.
+	# ── Barra de topo ─────────────────────────────────────────────────────
 	var head := PanelContainer.new()
 	var hsb := UIKit.box(UIKit.SURFACE, UIKit.BLACK, 3, 0, 12)
 	hsb.set_corner_radius_all(0)
-	hsb.corner_radius_bottom_left = 28
-	hsb.corner_radius_bottom_right = 28
+	hsb.corner_radius_bottom_left = 24
+	hsb.corner_radius_bottom_right = 24
 	hsb.content_margin_left = Widgets.MARGIN
 	hsb.content_margin_right = Widgets.MARGIN
 	head.add_theme_stylebox_override("panel", hsb)
@@ -32,108 +46,187 @@ func _ready() -> void:
 	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
 	hrow.add_child(back)
 	var rk0 := GameState.ranked()
-	var ttl := UIKit.label("RANQUEADO · TEMPORADA %d" % int(rk0["season"]), 30, UIKit.INK)
+	var ttl := UIKit.label("RANQUEADO · TEMPORADA %d" % int(rk0["season"]), 30, UIKit.BRAND)
 	ttl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	ttl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	hrow.add_child(ttl)
 	page.add_child(head)
 
+	# ── Scroll ────────────────────────────────────────────────────────────
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	page.add_child(scroll)
 	UIKit.suppress_click_on_scroll(scroll)
-	var center := CenterContainer.new()
-	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(center)
+
 	var margin := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, Widgets.MARGIN)
-	center.add_child(margin)
-	content = VBoxContainer.new()
-	content.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - Widgets.MARGIN * 2.0, 672.0), 0)
-	content.add_theme_constant_override("separation", 18)
-	margin.add_child(content)
-	_render()
+	for s in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + s, Widgets.MARGIN)
+	scroll.add_child(margin)
+
+	if _is_wide():
+		_build_wide(margin)
+	else:
+		_build_portrait(margin)
+
+	_search_btn.grab_focus.call_deferred()
 
 
-func _render() -> void:
+func _build_portrait(parent: MarginContainer) -> void:
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 20)
+	parent.add_child(col)
+	_content = col
+	_fill_columns(col, col)
+
+
+func _build_wide(parent: MarginContainer) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 20)
+	parent.add_child(row)
+
+	_left_col = VBoxContainer.new()
+	_left_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_left_col.add_theme_constant_override("separation", 20)
+	row.add_child(_left_col)
+
+	_right_col = VBoxContainer.new()
+	_right_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_right_col.add_theme_constant_override("separation", 20)
+	row.add_child(_right_col)
+
+	_content = _left_col
+	_fill_columns(_left_col, _right_col)
+
+
+func _fill_columns(left: VBoxContainer, right: VBoxContainer) -> void:
 	var rk := GameState.ranked()
 	var t := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
-	var color := Color(Ranked.TIER_COLORS[t["tier"]])
+	var tier_color := Color(Ranked.TIER_COLORS[t["tier"]])
 
-	# Cartão da liga: emblema, nome, barra de LP e números.
-	var badge := UIKit.panel(UIKit.PURPLE_DEEP, color, 24)
+	# ── Cartão de liga ─────────────────────────────────────────────────
+	var badge_panel := GlowPanel.new()
+	badge_panel.accent = tier_color
+	badge_panel.bg = UIKit.SURFACE_DEEP
 	var bv := VBoxContainer.new()
-	bv.add_theme_constant_override("separation", 10)
-	badge.add_child(bv)
+	bv.add_theme_constant_override("separation", 12)
+	badge_panel.add_child(bv)
+	left.add_child(badge_panel)
+
+	# Emblema circular
 	var emblem := PanelContainer.new()
-	emblem.custom_minimum_size = Vector2(150, 150)
+	emblem.custom_minimum_size = Vector2(140, 140)
 	emblem.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	var esb := UIKit.chunky(color)
-	esb.set_corner_radius_all(75)
+	var esb := UIKit.chunky(tier_color)
+	esb.set_corner_radius_all(70)
 	esb.content_margin_left = 0
 	esb.content_margin_right = 0
 	emblem.add_theme_stylebox_override("panel", esb)
-	var div := UIKit.label(str(t["division"]) if str(t["division"]) != "" else "★", 64, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var div_txt := str(t["division"]) if str(t["division"]) != "" else "★"
+	var div := UIKit.label(div_txt, 60, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	div.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	div.add_theme_color_override("font_outline_color", color.darkened(0.6))
+	div.add_theme_color_override("font_outline_color", tier_color.darkened(0.6))
 	emblem.add_child(div)
 	bv.add_child(emblem)
-	bv.add_child(UIKit.label(str(t["label"]).to_upper(), 56, color, HORIZONTAL_ALIGNMENT_CENTER))
+
+	# Nome da liga
+	bv.add_child(UIKit.label(str(t["label"]).to_upper(), 50, tier_color, HORIZONTAL_ALIGNMENT_CENTER))
+
+	# Barra de LP
 	var bar := MeterBar.new()
-	bar.custom_minimum_size = Vector2(0, 34)
-	bar.set_colors(color, UIKit.OUTLINE)
+	bar.custom_minimum_size = Vector2(0, 30)
+	bar.set_colors(tier_color, UIKit.OUTLINE)
 	bar.set_values(float(t["progress"]), 1.0, false)
 	bv.add_child(bar)
-	bv.add_child(UIKit.label("%d LP  ·  MMR %s" % [int(t["lp"]), UIKit.fmt_int(int(rk["mmr"]))], 28, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
-	var peak := Ranked.tier_info(int(rk["peak_points"]), int(rk["mmr"]))
-	bv.add_child(UIKit.label("%d vitórias · %d derrotas · pico: %s" % [int(rk["wins"]), int(rk["losses"]), peak["label"]], 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-	content.add_child(badge)
 
-	# Escada de ligas: uma bolinha por liga, as alcançadas coloridas.
+	# LP e MMR
+	bv.add_child(UIKit.label(
+		"%d LP  ·  MMR %s" % [int(t["lp"]), UIKit.fmt_int(int(rk["mmr"]))],
+		26, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
+
+	# Vitórias / derrotas / pico
+	var peak := Ranked.tier_info(int(rk["peak_points"]), int(rk["mmr"]))
+	bv.add_child(UIKit.label(
+		"%d vitórias · %d derrotas · pico: %s" % [int(rk["wins"]), int(rk["losses"]), peak["label"]],
+		20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+
+	# ── Escada de ligas ────────────────────────────────────────────────
+	var ladder_panel := GlowPanel.new()
+	ladder_panel.accent = UIKit.VIOLET
+	ladder_panel.bg = UIKit.SURFACE_DEEP
+	var lv := VBoxContainer.new()
+	lv.add_theme_constant_override("separation", 8)
+	ladder_panel.add_child(lv)
+	lv.add_child(UIKit.label("LIGAS", 24, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	var ladder := HBoxContainer.new()
 	ladder.alignment = BoxContainer.ALIGNMENT_CENTER
-	ladder.add_theme_constant_override("separation", 10)
+	ladder.add_theme_constant_override("separation", 8)
 	for i in range(Ranked.TIERS.size()):
 		var reached := i <= int(t["tier"])
 		var dot := Panel.new()
-		dot.custom_minimum_size = Vector2(40, 40)
-		dot.add_theme_stylebox_override("panel", UIKit.dot_style(Color(Ranked.TIER_COLORS[i]) if reached else UIKit.PURPLE_DEEP, UIKit.OUTLINE, 20))
+		dot.custom_minimum_size = Vector2(36, 36)
+		var dot_color := Color(Ranked.TIER_COLORS[i]) if reached else UIKit.SURFACE
+		dot.add_theme_stylebox_override("panel", UIKit.dot_style(dot_color, UIKit.OUTLINE, 18))
+		if reached:
+			var dot_lbl := UIKit.label(str(i + 1), 16, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+			dot_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			dot_lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			dot.add_child(dot_lbl)
 		ladder.add_child(dot)
-	content.add_child(ladder)
+	lv.add_child(ladder)
+	left.add_child(ladder_panel)
 
-	status = UIKit.label("1º e 2º lugar ganham LP · 3º e 4º perdem", 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	content.add_child(status)
-	search_btn = UIKit.button("BUSCAR PARTIDA", color, 36)
-	search_btn.custom_minimum_size = Vector2(0, 100)
-	search_btn.pressed.connect(_search)
-	content.add_child(search_btn)
+	# ── Botão buscar partida ───────────────────────────────────────────
+	_status = UIKit.label(
+		"1º e 2º ganham LP · 3º e 4º perdem",
+		22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	left.add_child(_status)
 
-	content.add_child(UIKit.label("HISTÓRICO", 30, UIKit.INK))
+	_search_btn = UIKit.button("⚔  BUSCAR PARTIDA", tier_color, 36)
+	_search_btn.custom_minimum_size = Vector2(0, 96)
+	_search_btn.pressed.connect(_search)
+	left.add_child(_search_btn)
+
+	# ── Histórico ──────────────────────────────────────────────────────
+	right.add_child(UIKit.label("HISTÓRICO", 28, UIKit.BRAND))
 	var hist: Array = rk["history"]
 	if hist.is_empty():
-		content.add_child(UIKit.label("Nenhuma partida ranqueada ainda.", 22, UIKit.MUTED))
+		right.add_child(UIKit.label("Nenhuma partida ranqueada ainda.", 22, UIKit.MUTED))
 	for h in hist:
 		var lp := int(h["lp"])
-		var row := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.OK if lp >= 0 else UIKit.DANGER, 14)
-		var rl := UIKit.label("%dº lugar  ·  %s pts  ·  %s%d LP  ·  %s" % [int(h["placement"]), UIKit.fmt_int(int(h["score"])), "+" if lp >= 0 else "", lp, h["tier"]], 22)
-		rl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		row.add_child(rl)
-		content.add_child(row)
-	search_btn.grab_focus.call_deferred()
+		var win := lp >= 0
+		var hp := GlowPanel.new()
+		hp.accent = UIKit.OK if win else UIKit.DANGER
+		hp.bg = UIKit.SURFACE_DEEP
+		hp.pulse_speed = 0.0
+		var hl := UIKit.label(
+			"%dº lugar  ·  %s pts  ·  %s%d LP  ·  %s" % [
+				int(h["placement"]),
+				UIKit.fmt_int(int(h["score"])),
+				"+" if win else "",
+				lp,
+				h["tier"]
+			], 22)
+		hl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		hp.add_child(hl)
+		right.add_child(hp)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED:
+		_build()
 
 
 func _search() -> void:
-	if searching:
+	if _searching:
 		return
-	searching = true
-	search_btn.disabled = true
+	_searching = true
+	_search_btn.disabled = true
 	var elapsed := 0.0
 	var wait := randf_range(1.2, 2.6)
 	while elapsed < wait:
-		status.text = "Procurando adversários... %ds" % int(elapsed + 1.0)
+		_status.text = "Procurando adversários... %ds" % int(elapsed + 1.0)
 		await get_tree().create_timer(GameState.anim(0.25)).timeout
 		if not is_inside_tree():
 			return
@@ -142,8 +235,8 @@ func _search() -> void:
 	var names: Array = []
 	for o in lobby:
 		names.append("%s (%d)" % [o["name"], int(o["mmr"])])
-	status.text = "Partida encontrada: " + ", ".join(names)
-	status.add_theme_color_override("font_color", UIKit.BRAND)
+	_status.text = "Partida encontrada: " + ", ".join(names)
+	_status.add_theme_color_override("font_color", UIKit.BRAND)
 	Sfx.play("combo")
 	await get_tree().create_timer(GameState.anim(1.0)).timeout
 	if not is_inside_tree():
