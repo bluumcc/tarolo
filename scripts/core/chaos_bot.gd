@@ -240,6 +240,16 @@ static func bet_decision(engine: ChaosEngine, player: int, difficulty: int, rng:
 		else:
 			bias = 0.02
 		pwin = clampf(pwin + bias, 0.02, 0.98)
+	# Stack curta: push/fold — nunca limp. Quanto menos blinds, mais urgente ir all-in.
+	# Vale pra torneio (pressão do cego escalando) e pra mesas comuns no fim de um nível ruim.
+	var stack_bb: float = float(engine.stacks[player]) / maxf(float(engine.blind), 1.0)
+	if engine.blitz and stack_bb < 8.0 and not bool(opt["can_check"]):
+		var push_threshold := 0.38 if stack_bb >= 4.0 else 0.0
+		if pwin >= push_threshold:
+			if bool(opt["can_raise"]):
+				return {"action": "raise", "to": float(opt["max_to"]), "bluff": false}
+			return {"action": "call", "to": 0.0, "bluff": false}
+		return {"action": "fold", "to": 0.0, "bluff": false}
 	var bluff_rate := 0.0
 	var raise_rate := 0.35
 	var call_margin := 1.0
@@ -302,6 +312,8 @@ static func suggested_predict(engine: ChaosEngine, player: int) -> int:
 
 
 ## Palpite do bot (0 a 8). Difícil lê melhor a mão; fácil erra bastante.
+## Stack curta (< 6 blinds): aposta em mais vitórias pra tentar recuperar — conservar fichas
+## não é opção quando vai ser cegado em breve; o pote do acerto exato é a única saída real.
 static func blitz_pick(engine: ChaosEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> int:
 	var noise := 0.9 if difficulty == BotAI.Difficulty.EASY else (0.45 if difficulty == BotAI.Difficulty.NORMAL else 0.15)
 	var ex := expected_wins(engine, player) + rng.randf_range(-noise, noise)
@@ -310,6 +322,11 @@ static func blitz_pick(engine: ChaosEngine, player: int, difficulty: int, rng: R
 			ex -= 0.3
 		Style.AGRESSIVO:
 			ex += 0.3
+	# Stack curta: empurra o palpite pra cima (gamble por recuperação).
+	var stack_bb: float = float(engine.stacks[player]) / maxf(float(engine.blind), 1.0)
+	if stack_bb < 6.0:
+		var push := lerpf(0.8, 0.0, stack_bb / 6.0)   # 0 blinds → +0.8; 6 blinds → +0
+		ex += push
 	return clampi(int(round(ex)), 0, ChaosEngine.HAND_SIZE)
 
 
