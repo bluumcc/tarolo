@@ -2145,6 +2145,7 @@ func _commit_discard(view: CardView, drop_global := Vector2.ZERO) -> void:
 	if not is_inside_tree():
 		return
 	if is_instance_valid(view):
+		hand_container.remove_child(view)
 		view.queue_free()
 	_layout_hand()
 	if discard_picks.size() == ChaosEngine.BLITZ_DISCARD_SIZE:
@@ -2166,7 +2167,7 @@ func _human_predict() -> int:
 	var box := UIKit.panel(UIKit.PAPER, UIKit.BRAND, 20)
 	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	box.custom_minimum_size = Vector2(minf(table_center.size.x - 32.0, 600.0), 0)
+	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 32.0, 600.0), 0)
 	holder.add_child(box)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
@@ -2185,6 +2186,7 @@ func _human_predict() -> int:
 	var st := {"pick": hint}
 	st["render"] = func():
 		for c in body.get_children():
+			body.remove_child(c)
 			c.queue_free()
 		var stepper := HBoxContainer.new()
 		stepper.alignment = BoxContainer.ALIGNMENT_CENTER
