@@ -617,15 +617,6 @@ func _open_settings() -> void:
 		SaveManager.save_game())
 	v.add_child(name_edit)
 	var s := GameState.settings()
-	v.add_child(UIKit.label("Como ver sua mão de cartas", 20))
-	var hand_row := HBoxContainer.new()
-	hand_row.add_theme_constant_override("separation", 10)
-	v.add_child(hand_row)
-	for layout in ["row", "fan"]:
-		var lb := UIKit.button(layout.to_upper(), UIKit.OK if str(s["hand_layout"]) == layout else UIKit.MUTED, 19)
-		lb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		lb.pressed.connect(func(): s["hand_layout"] = layout; SaveManager.save_game(); _reopen_settings())
-		hand_row.add_child(lb)
 	v.add_child(UIKit.label("Dificuldade dos bots", 20))
 	var diff_row := HBoxContainer.new()
 	diff_row.add_theme_constant_override("separation", 10)

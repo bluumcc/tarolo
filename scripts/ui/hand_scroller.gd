@@ -108,9 +108,10 @@ func _decide_gesture(d: Vector2) -> void:
 	for c in content.get_children():
 		if c is CardView:
 			(c as CardView).cancel_press()   # esse toque virou gesto: não conta como toque
-	if absf(d.x) >= absf(d.y):
+	var can_scroll := max_scroll() > 1.0
+	if can_scroll and absf(d.x) >= absf(d.y):
 		_mode = "scroll"
-	elif d.y < 0.0 and pressed != null and pressed.playable and ghost_layer != null:
+	elif d.y < 0.0 and pressed != null and pressed.playable and ghost_layer != null and (absf(d.y) > absf(d.x) * 0.5 or not can_scroll):
 		_mode = "card"
 		_begin_card_drag(pressed)
 	else:

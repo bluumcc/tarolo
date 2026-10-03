@@ -665,8 +665,7 @@ func _layout_hand() -> void:
 	# novo…) até estourar um limite interno do Godot (~800000px) e empurrar a mão e o
 	# rodapé pra bem fora da tela. A altura útil é sempre a da carta + a folga do lift.
 	var avail_h := CardView.SIZE.y + CardView.MAX_LIFT
-	var mode := str(GameState.settings().get("hand_layout", "row"))
-	var content_w := HandLayout.apply(cards, avail_w, avail_h, mode, CardView.SIZE)
+	var content_w := HandLayout.apply(cards, avail_w, avail_h, "fan", CardView.SIZE)
 	(parent as HandScroller).set_content_size(Vector2(content_w, avail_h))
 
 

@@ -7,9 +7,9 @@ extends RefCounted
 ## encolhem, só se escondem parcialmente atrás da vizinha.
 
 const ROW_MAX_OVERLAP := 0.5    # fileira: no máximo 50% de uma carta escondida atrás da outra
-const FAN_MAX_OVERLAP := 0.82   # leque: bem mais fechado, cabe mão grande sem precisar rolar tanto
-const FAN_MAX_ANGLE_DEG := 24.0 # inclinação total do leque (das pontas ao centro)
-const FAN_ARC := 18.0           # o quanto a carta do meio sobe em relação às pontas
+const FAN_STEP_RAD := 0.036     # leque: abertura angular entre cartas vizinhas
+const FAN_MAX_HALF_ANGLE := 0.40 # leque: metade da abertura máxima (rad)
+const FAN_MAX_GAP := 0.62        # leque: distância máxima entre centros, em larguras de carta
 
 
 ## Posiciona/rotaciona cada CardView em `cards` (já filhos de `hand_container`) dentro da
@@ -45,25 +45,37 @@ static func _apply_row(cards: Array, avail_w: float, avail_h: float, card_size: 
 
 
 static func _apply_fan(cards: Array, avail_w: float, avail_h: float, card_size: Vector2) -> float:
+	# Arco de verdade (tipo arco-íris): os centros das cartas ficam num círculo, cada carta
+	# girada pela tangente. O raio é calculado pra mão inteira caber na largura disponível.
 	var n := cards.size()
-	var card_w := card_size.x
-	var sep := card_w * (1.0 - FAN_MAX_OVERLAP)
-	if n > 1:
-		var natural := card_w + (n - 1) * sep
-		if natural > avail_w:
-			sep = maxf(card_w * 0.1, (avail_w - card_w) / float(n - 1))
-	var total_w := card_w + (n - 1) * sep
-	var start_x := maxf((avail_w - total_w) / 2.0, 0.0)
-	var max_angle := deg_to_rad(FAN_MAX_ANGLE_DEG) * clampf(float(n) / 12.0, 0.4, 1.0)
-	var base_y := avail_h - card_size.y - FAN_ARC
-	var pivot := Vector2(card_size.x / 2.0, card_size.y * 1.35)  # abaixo da carta — gira feito leque de baralho de verdade
+	var cx := avail_w / 2.0
+	if n == 1:
+		var only: CardView = cards[0]
+		only.pivot_offset = card_size / 2.0
+		only.rotation = 0.0
+		only.position = Vector2(cx - card_size.x / 2.0, avail_h - card_size.y - 6.0)
+		only.z_index = 0
+		return avail_w
+	var alpha := clampf(FAN_STEP_RAD * float(n - 1), 0.12, FAN_MAX_HALF_ANGLE)
+	var s := sin(alpha)
+	var c := cos(alpha)
+	var half_w := card_size.x / 2.0 * c + card_size.y / 2.0 * s   # meia largura da carta da ponta, já girada
+	var half_h := card_size.y / 2.0 * c + card_size.x / 2.0 * s
+	var span := maxf(avail_w - 2.0 * half_w, card_size.x * 0.5)
+	var radius := span / (2.0 * s)
+	var max_gap := card_size.x * FAN_MAX_GAP   # poucas cartas: não abre demais
+	var gap := radius * 2.0 * alpha / float(n - 1)
+	if gap > max_gap:
+		radius = max_gap * float(n - 1) / (2.0 * alpha)
+	var drop := radius * (1.0 - c)
+	var y_peak := avail_h - drop - half_h - 2.0   # centro da carta do meio
 	for i in range(n):
 		var cv: CardView = cards[i]
-		var t := 0.5 if n == 1 else float(i) / float(n - 1)
-		var angle := lerpf(-max_angle, max_angle, t)
-		var arc := sin(t * PI) * FAN_ARC  # desce um pouco nas pontas, sobe no meio
-		cv.position = Vector2(start_x + i * sep, base_y + arc)
-		cv.rotation = angle
-		cv.pivot_offset = pivot
+		var t := float(i) / float(n - 1)
+		var a := lerpf(-alpha, alpha, t)
+		var center := Vector2(cx + radius * sin(a), y_peak + radius * (1.0 - cos(a)))
+		cv.pivot_offset = card_size / 2.0
+		cv.rotation = a
+		cv.position = center - card_size / 2.0
 		cv.z_index = i
-	return maxf(total_w, avail_w)
+	return avail_w

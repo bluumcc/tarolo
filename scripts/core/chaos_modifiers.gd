@@ -153,5 +153,29 @@ static func desc_of(modifier: int, blitz := false) -> String:
 	return str(DESCRIPTIONS[modifier])
 
 
+## Descrição de uma linha (cabe na faixa do card da mesa).
+const SHORT := {
+	Modifier.TRUNFO_DOBRO: "Trunfos valem o dobro.",
+	Modifier.FIGURAS_DOBRO: "Figuras valem o dobro.",
+	Modifier.LOUCO_VENCE: "O Louco pode vencer.",
+	Modifier.NAIPE_FRACO: "Naipe sorteado paga metade.",
+	Modifier.NAIPE_FORTE: "Naipe sorteado paga 1,5×.",
+	Modifier.VAZA_INVERTIDA: "Vence a menor carta. Trunfo não corta.",
+	Modifier.VAZA_MAIS_UM: "Quem vence ganha +1 ponto.",
+	Modifier.PEQUENAS_IMPORTAM: "Cartas de 0,5 valem 1,0.",
+	Modifier.VAZA_DOURADA: "Pontos ×3.",
+	Modifier.SAQUE: "Quem vence rouba de cada rival.",
+	Modifier.ASSALTO_LIDER: "Quem vence rouba de quem lidera.",
+	Modifier.VAZA_MALDITA: "Quem vence paga aos rivais.",
+}
+const BLITZ_SHORT := {Modifier.VAZA_DOURADA: "Vale 2 vitórias no palpite."}
+
+
+static func short_of(modifier: int, blitz := false) -> String:
+	if blitz and BLITZ_SHORT.has(modifier):
+		return str(BLITZ_SHORT[modifier])
+	return str(SHORT[modifier])
+
+
 static func tip_of(modifier: int, blitz := false) -> String:
 	return str(BLITZ_TIPS[modifier]) if blitz and BLITZ_TIPS.has(modifier) else str(TIPS[modifier])

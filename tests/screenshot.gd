@@ -13,7 +13,7 @@ func _ready() -> void:
 	if args.has("speed"):
 		Engine.time_scale = float(args["speed"])   # acelera timers/tweens (a jogada do humano estoura sozinha)
 	if args.has("notips"):
-		for k in ["chaos_intro", "blitz_intro", "turn", "power", "double", "bet", "predict"]:
+		for k in ["chaos_intro", "blitz_intro", "turn", "power", "double", "bet", "predict", "discard"]:
 			SaveManager.section("tips")[k] = true
 	var lookup := {"menu": "res://scenes/MainMenu.tscn", "game": "res://scenes/GameScene.tscn", "bid": "res://scenes/GameScene.tscn", "tutorial": "res://scenes/GameScene.tscn", "ranked": "res://scenes/RankedLobby.tscn", "chaos": "res://scenes/ChaosScene.tscn"}  # "tutorial" reusa a mesa, só troca a mão/dicas
 	var path: String = lookup[scene]
