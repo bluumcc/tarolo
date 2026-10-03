@@ -38,18 +38,29 @@ static func expected(mmr: int, lobby_mmr: int) -> float:
 	return 1.0 / (1.0 + pow(10.0, float(lobby_mmr - mmr) / 400.0))
 
 
-## placement: 0 = 1º lugar ... 3 = 4º lugar (partida de 4 jogadores).
+## placement: 0 = 1º lugar ... (players-1) = último.
 static func mmr_delta(placement: int, mmr: int, lobby_mmr: int, players: int = 4) -> int:
 	var actual := 1.0 - float(placement) / float(players - 1)
 	return int(round(48.0 * (actual - expected(mmr, lobby_mmr))))
 
 
-static func lp_delta(placement: int, mmr: int, lobby_mmr: int) -> int:
-	var base: Array = [28, 10, -9, -21]
+## Tabelas LP base por tamanho de mesa (3–6 jogadores).
+## Net ≈ 0; top 50% ganha LP, bottom 50% perde; magnitudes simétricas.
+const LP_BASE := {
+	3: [22, 4, -26],
+	4: [28, 10, -9, -21],
+	5: [24, 10, 2, -12, -22],
+	6: [20, 10, 4, -4, -12, -20],
+}
+
+static func lp_delta(placement: int, mmr: int, lobby_mmr: int, players: int = 4) -> int:
+	var base: Array = LP_BASE.get(clampi(players, 3, 6), LP_BASE[4])
+	var idx := clampi(placement, 0, base.size() - 1)
 	var adjust := clampi(int(round(float(lobby_mmr - mmr) / 50.0)), -8, 8)
-	var delta: int = base[clampi(placement, 0, 3)] + adjust
-	# Vitórias sempre dão LP e derrotas sempre tiram (sensação de progresso previsível).
-	if placement <= 1:
+	var delta: int = base[idx] + adjust
+	# Top half sempre ganha LP, bottom half sempre perde (sensação de progresso previsível).
+	var half := players / 2
+	if placement < half:
 		return maxi(delta, 4)
 	return mini(delta, -4)
 

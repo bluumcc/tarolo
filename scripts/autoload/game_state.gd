@@ -284,7 +284,8 @@ func report_chaos_match(result: Dictionary) -> Dictionary:
 		var frag_by_place := [15, 10, 6, 3]
 		frag = frag_by_place[clampi(placement, 0, 3)]
 		profile["gems"] = int(profile["gems"]) + frag
-		lines.append_array(apply_ranked_progress(placement, int(round(net))))
+		var n_players: int = (result["standings"] as Array).size()
+		lines.append_array(apply_ranked_progress(placement, int(round(net)), n_players))
 	profile["fichas"] = int(profile["fichas"]) + payout
 	SaveManager.save_game()
 	if frag > 0:
@@ -532,14 +533,14 @@ func report_match(result: Dictionary) -> Dictionary:
 	return summary
 
 
-## Fila única do Blitz: placement (0 = 1º ... 3 = 4º) e o LP/MMR de acordo. Devolve as linhas
-## de resumo prontas pra mostrar. Chamado só por `report_chaos_match` (mesa real).
-func apply_ranked_progress(placement: int, score: int) -> Array:
+## Fila única do Blitz: placement (0 = 1º), players = tamanho real da mesa (3–6).
+## Devolve as linhas de resumo prontas pra mostrar. Chamado só por `report_chaos_match`.
+func apply_ranked_progress(placement: int, score: int, players: int = 4) -> Array:
 	var rk := ranked()
 	var mmr := int(rk["mmr"])
 	var lobby := lobby_avg_mmr()
-	var d_lp := Ranked.lp_delta(placement, mmr, lobby)
-	var d_mmr := Ranked.mmr_delta(placement, mmr, lobby)
+	var d_lp := Ranked.lp_delta(placement, mmr, lobby, players)
+	var d_mmr := Ranked.mmr_delta(placement, mmr, lobby, players)
 	var before := Ranked.tier_info(int(rk["points"]), mmr)
 	rk["points"] = maxi(0, int(rk["points"]) + d_lp)
 	rk["mmr"] = maxi(0, mmr + d_mmr)
