@@ -726,8 +726,7 @@ func _ranked_search(exclude_blind: int) -> void:
 	var who := UIKit.label("Com %s" % names, 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	who.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bv.add_child(who)
-	if not affordable:
-		bv.add_child(UIKit.label("Saldo insuficiente (precisa de ◎%s)" % UIKit.fmt_int(GameState.ranked_room_buy_in(room)), 20, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+	var buy_in_cost := GameState.ranked_room_buy_in(room)
 	var enter := UIKit.button("ENTRAR", UIKit.OK if affordable else UIKit.MUTED, 34)
 	enter.custom_minimum_size = Vector2(0, 88)
 	enter.disabled = not affordable
@@ -736,6 +735,20 @@ func _ranked_search(exclude_blind: int) -> void:
 		GameState.chaos_mode = "blitz"
 		get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn"))
 	bv.add_child(enter)
+	if not affordable:
+		bv.add_child(UIKit.label("Saldo insuficiente — precisa de ◎%s" % UIKit.fmt_int(buy_in_cost), 20, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+		var add_btn := UIKit.button("ADICIONAR FICHAS", UIKit.ACTION, 26)
+		add_btn.custom_minimum_size = Vector2(0, 64)
+		add_btn.pressed.connect(func():
+			FichasShop.open(ov, func():
+				_refresh_wallet()
+				var new_fichas: int = int(SaveManager.section("profile")["fichas"])
+				if new_fichas >= buy_in_cost:
+					enter.disabled = false
+					enter.add_theme_color_override("font_color", UIKit.OK)
+					if is_instance_valid(add_btn):
+						add_btn.queue_free()))
+		bv.add_child(add_btn)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	bv.add_child(row)
