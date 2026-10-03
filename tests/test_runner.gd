@@ -355,12 +355,39 @@ func _test_chaos() -> void:
 	check(bool(wo["walkover"]) and is_equal_approx(p2.stacks[1], 400.0 - 20.0 + 50.0), "blefe vence: leva o pote sem jogar carta")
 	check(p2.hands[1].size() == 7 and p2.hands[2].size() == 7, "no blefe vencido o vencedor também descarta, mãos iguais")
 	check(p2.trick_number == 1 and p2.session_stats[1]["bluffs"] == 1, "rodada conta e o blefe é registrado")
-	# All-in limitado pela menor stack.
+	# All-in: cada um vai até a própria stack; stack curta paga "o que tem" e nunca fica negativa.
 	var p3 := ChaosEngine.new()
 	p3.setup_match({"seed": 5, "stacks": [200, 200, 60, 200]})
 	p3.begin_trick()
-	check(is_equal_approx(p3.bet_cap(), 60.0), "aumento máximo é a menor stack em jogo (sem potes paralelos)")
+	var first := p3.bet_actor()
+	var o1 := p3.bet_options(first)
+	check(is_equal_approx(float(o1["max_to"]), p3.stacks[first] + p3.contrib[first]), "all-in vai até a stack inteira, mesmo com rival de stack curta")
+	var all_to := float(o1["max_to"])
+	p3.bet_act(first, "raise", all_to)
+	check(is_equal_approx(p3.stacks[first], 0.0), "all-in zera a stack (nada sobra fora do pote)")
+	while p3.betting:
+		var who := p3.bet_actor()
+		p3.bet_act(who, "call")
+	var min_stack := 0.0
+	for st in p3.stacks:
+		min_stack = minf(min_stack, float(st))
+	check(min_stack >= 0.0, "stack nunca fica negativa depois de pagar um all-in")
+	var total_before := 0.0
+	for q in range(4):
+		total_before += float(p3.stacks[q])
+	total_before += p3.trick_pot
+	p3.betting = false
+	p3._settle_side_pots(2)
+	var total_after := 0.0
+	for q in range(4):
+		total_after += float(p3.stacks[q])
+	total_after += p3.trick_pot
+	check(is_equal_approx(total_before, total_after), "potes paralelos devolvem o excedente sem criar nem perder fichas")
+	check(p3.trick_pot <= 4.0 * float(p3.contrib[2]) + 0.001, "all-in curto só leva de cada rival o que ele mesmo pôs")
 	# Bot sem fichas pro blind é trocado.
+	p3 = ChaosEngine.new()
+	p3.setup_match({"seed": 5, "stacks": [200, 200, 60, 200]})
+	p3.begin_trick()
 	p3.stacks[3] = 4.0
 	check(p3.refill_bots() == [3] and p3.stacks[3] >= 300.0 and p3.stacks[3] <= 600.0, "bot quebrado sai e um novo senta com 30 a 60 blinds")
 	# Prêmio da banca e mesa sem fim.

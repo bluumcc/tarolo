@@ -283,38 +283,58 @@ func begin_trick() -> void:
 	bet_level = ante_size
 	to_act = []
 	for i in range(1, num_players + 1):
-		to_act.append((button + i) % num_players)
+		var q := (button + i) % num_players
+		if stacks[q] > 0.0:
+			to_act.append(q)
 	betting = true
+	# Quase todo mundo all-in na ante: ninguém tem o que decidir.
+	if to_act.size() <= 1 and _nobody_to_match():
+		to_act = []
+		betting = false
+		_start_trick_play()
 
 
 func bet_actor() -> int:
 	return int(to_act[0]) if betting and not to_act.is_empty() else -1
 
 
-## Máximo que todo mundo ainda na rodada consegue cobrir (sem potes paralelos).
-func bet_cap() -> float:
-	var cap := INF
-	for p in range(num_players):
-		if not folded[p]:
-			cap = minf(cap, stacks[p] + contrib[p])
-	return cap
+## Maior "total na rodada" que alguém ainda consegue pagar dentre os rivais de `player` que
+## não desistiram — aumentar acima disso seria dinheiro que ninguém pode cobrir.
+func _rival_reach(player: int) -> float:
+	var reach := 0.0
+	for q in range(num_players):
+		if q != player and not folded[q]:
+			reach = maxf(reach, stacks[q] + contrib[q])
+	return reach
+
+
+## Verdadeiro se ninguém além do último que fala tem fichas pra igualar mais nada.
+func _nobody_to_match() -> bool:
+	var with_chips := 0
+	for q in range(num_players):
+		if not folded[q] and stacks[q] > 0.0:
+			with_chips += 1
+	return with_chips <= 1
 
 
 func to_call(player: int) -> float:
-	return maxf(bet_level - contrib[player], 0.0)
+	return minf(maxf(bet_level - contrib[player], 0.0), maxf(stacks[player], 0.0))
 
 
-## Opções de quem está falando: {can_check, call, can_raise, min_to, max_to, pot}.
+## Opções de quem está falando: {can_check, call, can_raise, min_to, max_to, pot, all_in_to}.
+## O pagar é limitado à stack (pagar "tudo que tem" é all-in) e o aumento vai até o all-in
+## pessoal, limitado só pelo que o rival mais forte ainda consegue cobrir.
 func bet_options(player: int) -> Dictionary:
-	var cap := bet_cap()
+	var own_max: float = stacks[player] + contrib[player]
+	var max_to := minf(own_max, _rival_reach(player))
 	var call_amt := to_call(player)
-	var can_raise := raises < MAX_RAISES and cap > bet_level
+	var can_raise: bool = raises < MAX_RAISES and max_to > bet_level and stacks[player] > call_amt
 	return {
-		"can_check": call_amt <= 0.0,
+		"can_check": bet_level - contrib[player] <= 0.0,
 		"call": call_amt,
 		"can_raise": can_raise,
-		"min_to": minf(bet_level + float(blind), cap),
-		"max_to": cap,
+		"min_to": minf(bet_level + float(blind), max_to),
+		"max_to": max_to,
 		"pot": trick_pot,
 	}
 
@@ -367,7 +387,7 @@ func bet_act(player: int, action: String, to := 0.0) -> Dictionary:
 		to_act = []
 		for i in range(1, num_players):
 			var q := (player + i) % num_players
-			if not folded[q]:
+			if not folded[q] and stacks[q] > 0.0:
 				to_act.append(q)
 	if active_count() <= 1:
 		to_act = []
@@ -377,6 +397,21 @@ func bet_act(player: int, action: String, to := 0.0) -> Dictionary:
 		betting = false
 		_start_trick_play()
 	return {"ok": true, "action": action, "to": bet_level, "amount": amount, "done": done}
+
+
+## Potes paralelos (all-in): o vencedor só leva de cada rival o que ele mesmo pôs na rodada;
+## o que passar disso volta pra quem pôs. O que sobra em `trick_pot` é o que o vencedor leva.
+func _settle_side_pots(winner: int) -> void:
+	var won := 0.0
+	for q in range(num_players):
+		var c: float = contrib[q]
+		if q == winner or folded[q]:
+			won += c
+			continue
+		var take := minf(c, contrib[winner])
+		won += take
+		stacks[q] += c - take
+	trick_pot = won
 
 
 ## Quem desiste descarta a carta mais fraca (virada): as mãos continuam do mesmo tamanho.
@@ -441,6 +476,7 @@ func resolve_walkover() -> Dictionary:
 		var ev := active_modifier()
 		var value := 2 if ev == ChaosModifiers.Modifier.VAZA_DOURADA else 1
 		wins[winner] += value
+		_settle_side_pots(winner)
 		var trick_pot_total := trick_pot
 		stacks[winner] += trick_pot_total
 		var trick_gain: float = trick_pot_total - float(contrib[winner])
@@ -641,6 +677,7 @@ func _finish_trick(result: Dictionary, winner: int) -> Dictionary:
 		result["streak"] = int(streak[winner])
 		result["broke"] = last_winner != -1 and last_winner != winner and prev_streak >= 2
 	last_winner = winner
+	_settle_side_pots(winner)
 	# Taxa da casa: só quando as cartas foram jogadas (sem disputa, sem taxa).
 	var rake := 0.0
 	if rake_on and not bool(result.get("walkover", false)):
@@ -900,6 +937,7 @@ func _resolve_trick_blitz(idx: int, winner: int, ev: int) -> Dictionary:
 			curse_amount = each * float(rivals.size())
 	# Pote da aposta por rodada: paga pra quem venceu a rodada de cartas, por cima do tempero de
 	# pontos acima — o ganho líquido desconta o que o próprio vencedor pôs nessa rodada.
+	_settle_side_pots(winner)
 	var trick_pot_total := trick_pot
 	stacks[winner] += trick_pot_total
 	var trick_gain: float = trick_pot_total - float(contrib[winner])

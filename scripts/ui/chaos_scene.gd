@@ -374,8 +374,9 @@ func _build_seats() -> HBoxContainer:
 		var ord := _badge("", UIKit.PURPLE_DEEP, UIKit.MUTED)
 		ord.position = Vector2(0, 0)
 		wrap.add_child(ord)
-		var dl := _badge("D", UIKit.INK, UIKit.MUTED)
-		dl.position = Vector2(66, 62)
+		var dl := _badge("D", UIKit.MONEY, UIKit.BLACK)
+		dl.custom_minimum_size = Vector2(40, 40)
+		dl.position = Vector2(60, 56)
 		dl.visible = false
 		wrap.add_child(dl)
 		seat.add_child(wrap)
@@ -435,7 +436,7 @@ func _badge(text: String, fill: Color, border: Color) -> PanelContainer:
 	var sb := UIKit.box(fill, border, 3, 15, 0)
 	sb.set_corner_radius_all(15)
 	b.add_theme_stylebox_override("panel", sb)
-	var l := UIKit.label(text, 20, UIKit.TEXT_ON_LIGHT if fill == UIKit.INK else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var l := UIKit.label(text, 20, UIKit.TEXT_ON_LIGHT if (fill == UIKit.INK or fill == UIKit.MONEY) else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	l.autowrap_mode = TextServer.AUTOWRAP_OFF
 	b.add_child(l)
 	return b
@@ -1275,7 +1276,8 @@ func _human_bet() -> Dictionary:
 			fold.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			fold.pressed.connect(func(): done.call({"action": "fold"}))
 			row.add_child(fold)
-		var main_txt := "PASSAR" if bool(opt["can_check"]) else "PAGAR ◎%d" % call_amt
+		var all_in_call := not bool(opt["can_check"]) and float(call_amt) >= float(engine.stacks[0])
+		var main_txt := "PASSAR" if bool(opt["can_check"]) else ("PAGAR ◎%d%s" % [call_amt, " (ALL-IN)" if all_in_call else ""])
 		var main := UIKit.button(main_txt, UIKit.OK, 30)
 		main.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		main.pressed.connect(func(): done.call({"action": "check" if bool(opt["can_check"]) else "call"}))
@@ -1287,6 +1289,11 @@ func _human_bet() -> Dictionary:
 				st["raising"] = true
 				(st["render"] as Callable).call())
 			row.add_child(rb)
+		if not bool(opt["can_raise"]):
+			var why := _no_raise_reason(opt)
+			var wl := UIKit.label(why, 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+			wl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			body.add_child(wl)
 		if bool(st["raising"]):
 			_build_raise_picker(body, opt, st, done)
 	(st["render"] as Callable).call()
@@ -1298,6 +1305,15 @@ func _human_bet() -> Dictionary:
 	return st.get("result", {"action": "check"})
 
 
+## Por que o AUMENTAR não aparece — a pergunta que o jogador faria.
+func _no_raise_reason(opt: Dictionary) -> String:
+	if engine.raises >= ChaosEngine.MAX_RAISES:
+		return "Limite de %d aumentos nesta rodada já foi atingido." % ChaosEngine.MAX_RAISES
+	if float(engine.stacks[0]) <= float(opt["call"]):
+		return "Pagar já usa todas as suas fichas (all-in)."
+	return "Os rivais que ainda têm fichas não conseguem cobrir um aumento maior."
+
+
 ## Seletor de valor do aumento: atalhos (mínimo, ½ pote, pote, all-in) e − / + de 1 blind.
 func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, done: Callable) -> void:
 	var blind := engine.blind
@@ -1307,6 +1323,10 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 	var level := int(engine.bet_level)
 	st["to"] = clampi(int(st["to"]), lo, hi)
 	body.add_child(UIKit.label("QUANTO AUMENTAR?", 24, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
+	if float(hi) < float(engine.stacks[0] + engine.contrib[0]):
+		var cap_l := UIKit.label("Máximo ◎%d: é o que o rival mais forte ainda consegue cobrir." % hi, 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		cap_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body.add_child(cap_l)
 	var shortcuts := HBoxContainer.new()
 	shortcuts.add_theme_constant_override("separation", 6)
 	body.add_child(shortcuts)
@@ -1688,7 +1708,7 @@ func _refresh_hud() -> void:
 		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 0.45 if out else 1.0)
 		(hud_titles[p] as Label).text = "VOCÊ" if p == 0 else str(config["names"][p]).to_upper()
 		(hud_titles[p] as Label).add_theme_color_override("font_color", UIKit.TURN if p == turn_player else UIKit.INK)
-		(dealer_badges[p] as Control).visible = not engine.blitz and engine.hand_no > 0 and engine.button == p
+		(dealer_badges[p] as Control).visible = engine.hand_no > 0 and engine.button == p
 		# Ordem: 1 = age agora, 2 = próximo...
 		var idx := order.find(p)
 		var ob := order_badges[p] as PanelContainer
@@ -1820,7 +1840,7 @@ func _betting_phase() -> void:
 	pot_locked = false
 	shown_pot = 0.0
 	var first := engine.bet_actor()
-	_banner("APOSTAS", "Todos pagaram a ante (◎%d). Fala primeiro: %s. A ordem está nos números acima dos avatares." % [int(engine.bet_level), str(config["names"][first]).to_upper()], UIKit.MONEY)
+	_banner("APOSTAS", "Todos pagaram a ante (◎%d). DEALER (o D dourado): %s — joga a carta primeiro e fala por último. Fala primeiro: %s." % [int(engine.bet_level), str(config["names"][engine.button]).to_upper(), str(config["names"][first]).to_upper()], UIKit.MONEY)
 	status_label.text = "▶ Abre a rodada: %s" % _leader_name()
 	_refresh_hud()
 	if not GameState.autoplay:

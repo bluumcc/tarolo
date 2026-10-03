@@ -6,7 +6,7 @@ extends SceneTree
 ## sobrevivem ao mecanismo de aposta por rodada antes dele ser considerado calibrado.
 ## Uso: godot --headless --path . -s res://tests/blitz_betting_gate.gd
 
-const SESSIONS := 24
+const SESSIONS := 96
 const LEVELS := 16
 var fails := 0
 

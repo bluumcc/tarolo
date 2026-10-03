@@ -98,7 +98,6 @@ func _run_tournament(i: int) -> void:
 func _run() -> void:
 	var menu := await _open("res://scenes/MainMenu.tscn")
 	menu._open_settings()
-	menu._open_cosmetics()
 	menu._open_rules()
 	await get_tree().process_frame
 	menu.queue_free()
