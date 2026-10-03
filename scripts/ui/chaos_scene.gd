@@ -97,6 +97,8 @@ func _ready() -> void:
 		action_color.append(UIKit.MUTED)
 		shown_totals.append(engine.stacks[p])
 	_build_ui()
+	if engine.blitz:
+		_set_discard_chrome(true)
 	get_viewport().size_changed.connect(_on_resize)
 	_refresh_hud()
 	_rebuild_hand()
@@ -421,20 +423,69 @@ func _on_resize() -> void:
 	_layout_hand()
 
 
-## Assento de rival: avatar + card com nome, stack, vazas e situação. A posição é calculada em
-## `_layout_seats` (em volta da mesa, a distâncias iguais).
+## Assento de rival: avatar e só o nome embaixo. Tocar no avatar abre o card com o stack. As
+## bolinhas do avatar: vazas ganhas (canto de baixo à esquerda) e o D do dealer (à direita).
+## A posição é calculada em `_layout_seats` (em volta da mesa, a distâncias iguais).
 func _build_rival_seat(p: int) -> Control:
 	var seat := Control.new()
 	seat.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	seat.add_child(_make_avatar(p, 84.0))
+	var wrap := _make_avatar(p, 84.0)
+	wrap.mouse_filter = Control.MOUSE_FILTER_STOP
+	seat.add_child(wrap)
+	var name_l := UIKit.label("", 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	name_l.add_theme_font_size_override("font_size", 22)
+	name_l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	name_l.clip_text = true
+	name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	seat.add_child(name_l)
 	var card := UIKit.panel(UIKit.SURFACE_DEEP, UIKit.OUTLINE, 8)
-	card.custom_minimum_size = Vector2(150, 0)
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(_make_info(p, true))
+	card.add_child(_make_rival_info(p))
+	card.visible = false
 	seat.add_child(card)
+	hud_titles[p] = name_l
+	var token := {"n": 0}
+	wrap.gui_input.connect(func(event: InputEvent):
+		if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
+			return
+		Sfx.play("tick")
+		card.visible = not card.visible
+		token["n"] += 1
+		var mine: int = token["n"]
+		if card.visible:
+			get_tree().create_timer(3.0).timeout.connect(func():
+				if mine == token["n"] and is_instance_valid(card):
+					card.visible = false))
 	seat_nodes[p] = seat
 	hud_badges[p] = seat
 	return seat
+
+
+## Conteúdo do card que abre ao tocar no avatar: só o stack (número). Os outros nós existem
+## escondidos só pra manter os mesmos vetores de HUD.
+func _make_rival_info(p: int) -> VBoxContainer:
+	var v := VBoxContainer.new()
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var stack_l := UIKit.label("0", 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	stack_l.add_theme_font_size_override("font_size", 22)
+	stack_l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	v.add_child(stack_l)
+	var pill := PanelContainer.new()
+	pill.visible = false
+	var pv := VBoxContainer.new()
+	pill.add_child(pv)
+	pv.add_child(UIKit.label("", 22))
+	var bet_l := UIKit.label("", 22)
+	pv.add_child(bet_l)
+	v.add_child(pill)
+	var status_l := UIKit.label("", 20)
+	status_l.visible = false
+	v.add_child(status_l)
+	hud_totals[p] = stack_l
+	bet_tags[p] = bet_l
+	bet_pills[p] = pill
+	prog_tags[p] = status_l
+	return v
 
 
 ## Avatar redondo com a bolinha de ordem (canto de cima) e o D dourado do dealer.
@@ -455,8 +506,9 @@ func _make_avatar(p: int, d: float) -> Control:
 	face.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	ring.add_child(face)
 	wrap.add_child(ring)
-	var ord := _badge("", UIKit.PURPLE_DEEP, UIKit.MUTED)
-	ord.position = Vector2(0, 0)
+	var ord := _badge("0", UIKit.PURPLE_DEEP, UIKit.MUTED)   # vazas ganhas
+	ord.custom_minimum_size = Vector2(40, 40)
+	ord.position = Vector2(0.0, wrap.size.y - 40.0)
 	wrap.add_child(ord)
 	var dl := _badge("D", UIKit.MONEY, UIKit.BLACK)
 	dl.custom_minimum_size = Vector2(40, 40)
@@ -513,8 +565,8 @@ func _make_info(p: int, rival: bool) -> VBoxContainer:
 	return v
 
 
-## Rivais em volta da mesa, com ângulos iguais entre si. Nas laterais o card (stack + vazas)
-## fica embaixo do avatar; em cima e embaixo da mesa, ao lado dele.
+## Rivais em volta da mesa, com ângulos iguais entre si. Cada assento é o avatar com o nome
+## embaixo; o card do stack (ao tocar) abre por cima, sem mexer no tamanho do assento.
 func _layout_seats() -> void:
 	if table_center == null or stage == null:
 		return
@@ -526,23 +578,19 @@ func _layout_seats() -> void:
 		if seat == null:
 			continue
 		var wrap := seat.get_child(0) as Control
-		var card := seat.get_child(1) as Control
+		var name_l := seat.get_child(1) as Control
+		var card := seat.get_child(2) as Control
+		var w := 130.0
+		var name_h := name_l.get_combined_minimum_size().y
+		wrap.position = Vector2((w - wrap.size.x) / 2.0, 0.0)
+		name_l.position = Vector2(0.0, wrap.size.y)
+		name_l.size = Vector2(w, name_h)
 		card.size = card.get_combined_minimum_size()
+		card.position = Vector2((w - card.size.x) / 2.0, wrap.size.y + name_h + 2.0)
+		var h := wrap.size.y + name_h
+		seat.size = Vector2(w, h)
 		var theta := TableEllipse.seat_angle(p, n)
 		var pt := c + Vector2(cos(theta) * r.x, sin(theta) * r.y)
-		var w := 0.0
-		var h := 0.0
-		if absf(cos(theta)) <= 0.7:
-			w = wrap.size.x + 4.0 + card.size.x
-			h = maxf(wrap.size.y, card.size.y)
-			wrap.position = Vector2(0.0, (h - wrap.size.y) / 2.0)
-			card.position = Vector2(wrap.size.x + 4.0, (h - card.size.y) / 2.0)
-		else:
-			w = maxf(wrap.size.x, card.size.x)
-			h = wrap.size.y + 2.0 + card.size.y
-			wrap.position = Vector2((w - wrap.size.x) / 2.0, 0.0)
-			card.position = Vector2((w - card.size.x) / 2.0, wrap.size.y + 2.0)
-		seat.size = Vector2(w, h)
 		seat.position = Vector2(
 			clampf(pt.x - w / 2.0, 0.0, maxf(stage.size.x - w, 0.0)),
 			clampf(pt.y - h / 2.0, 0.0, maxf(stage.size.y - h, 0.0)))
@@ -659,6 +707,8 @@ func _plural(n: int, one: String, many: String) -> String:
 ## Tela de transição de início de nível: só orienta (nível, mesa) — o modificador de cada
 ## rodada é anunciado à parte, na hora, por `_trick_start()`.
 func _announce_round() -> void:
+	if engine.blitz:
+		_set_discard_chrome(true)
 	_refresh_hud()
 	_rebuild_hand()
 	var kicker := "NÍVEL %d%s" % [engine.round_index + 1, (" DE %d" % engine.levels) if engine.levels > 0 else ""]
@@ -1825,14 +1875,11 @@ func _refresh_hud() -> void:
 		(hud_titles[p] as Label).text = "VOCÊ" if p == 0 else str(config["names"][p]).to_upper()
 		(hud_titles[p] as Label).add_theme_color_override("font_color", UIKit.TURN if p == turn_player else UIKit.INK)
 		(dealer_badges[p] as Control).visible = engine.hand_no > 0 and engine.button == p
-		# Ordem: 1 = age agora, 2 = próximo...
 		var idx := order.find(p)
 		var ob := order_badges[p] as PanelContainer
-		ob.visible = idx >= 0 and p != 0
-		if idx >= 0:
-			(ob.get_child(0) as Label).text = str(idx + 1)
-			ob.add_theme_stylebox_override("panel", UIKit.box_cached(UIKit.TURN if idx == 0 else UIKit.PURPLE_DEEP, UIKit.TURN if idx == 0 else UIKit.MUTED, 3, 15, 0))
-			(ob.get_child(0) as Label).add_theme_color_override("font_color", UIKit.TEXT_ON_LIGHT if idx == 0 else UIKit.INK)
+		ob.visible = p != 0
+		if p != 0:
+			(ob.get_child(0) as Label).text = str(int(engine.wins[p]))
 		_refresh_bet_tags(p, idx)
 	info_label.text = "NÍVEL %d%s · %s ◎%d" % [engine.round_index + 1, ("/%d" % engine.levels) if engine.levels > 0 else "", "ENTRADA" if engine.blitz else "BLIND", int(engine.blitz_entry()) if engine.blitz else engine.blind]
 	Widgets.progress_dots(trick_dots, ChaosEngine.HAND_SIZE, engine.trick_number)
@@ -1924,6 +1971,8 @@ func _seat_center(p: int) -> Vector2:
 
 
 func _pill_center(p: int) -> Vector2:
+	if p != 0:
+		return _seat_center(p)
 	return _global_center(bet_pills[p] as Control)
 
 
@@ -2143,7 +2192,8 @@ func _set_discard_chrome(active: bool) -> void:
 	for p in range(1, engine.num_players):
 		(seat_nodes[p] as Control).visible = not active
 	for p in range(engine.num_players):
-		(bet_pills[p] as PanelContainer).visible = not active
+		if p == 0:
+			(bet_pills[p] as PanelContainer).visible = not active
 		(order_badges[p] as PanelContainer).visible = not active
 		(dealer_badges[p] as PanelContainer).visible = not active
 
@@ -2151,6 +2201,7 @@ func _set_discard_chrome(active: bool) -> void:
 ## Começo do nível no Blitz: garante saldo, troca bots quebrados, coleta os palpites (o seu e os
 ## dos bots), revela todos juntos e joga as entradas no pote. Devolve false se a mesa acabou.
 func _blitz_open_level() -> bool:
+	_set_discard_chrome(true)   # antes de qualquer espera: a mesa não pisca na tela
 	_reset_actions()
 	hold_stacks = []
 	hold_pot = -1.0
