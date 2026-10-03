@@ -246,13 +246,13 @@ func _build_hand_zone(root: VBoxContainer) -> void:
 	root.add_child(zone)
 
 	center_card = UIKit.panel(UIKit.SURFACE_DEEP, UIKit.OUTLINE, 10)
-	center_card.anchor_left = 0.2
-	center_card.anchor_right = 0.8
+	center_card.anchor_left = 0.1
+	center_card.anchor_right = 0.9
 	center_card.anchor_top = 0.0
 	center_card.anchor_bottom = 1.0
 	center_card.offset_left = 0.0
 	center_card.offset_right = 0.0
-	center_card.offset_top = 0.0
+	center_card.offset_top = -36.0
 	center_card.offset_bottom = 0.0
 	center_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	zone.add_child(center_card)
@@ -2137,6 +2137,8 @@ func _resolve_walkover(result: Dictionary) -> void:
 ## avatares com nome e stack, pra não confundir com informação de uma rodada que nem começou.
 func _set_discard_chrome(active: bool) -> void:
 	table_center.visible = not active
+	for p in range(1, engine.num_players):
+		(seat_nodes[p] as Control).visible = not active
 	for p in range(engine.num_players):
 		(bet_pills[p] as PanelContainer).visible = not active
 		(order_badges[p] as PanelContainer).visible = not active
@@ -2169,7 +2171,6 @@ func _blitz_open_level() -> bool:
 				return false
 		else:
 			engine.apply_discard(p, ChaosBot.wants_discard(engine, p, int(config["difficulty"][p]), bot_rng))
-	_set_discard_chrome(false)
 	phase = "predict"
 	bets_gathered = true
 	pot_locked = true
@@ -2187,6 +2188,8 @@ func _blitz_open_level() -> bool:
 		pick = await _human_predict()
 		if not is_inside_tree() or finished:
 			return false
+	_set_discard_chrome(false)   # mesa e avatares só aparecem depois do lance
+	_refresh_hud()
 	engine.blitz_place(0, pick)
 	for p in range(1, engine.num_players):
 		engine.blitz_place(p, ChaosBot.blitz_pick(engine, p, int(config["difficulty"][p]), bot_rng))
@@ -2299,19 +2302,19 @@ func _human_predict() -> int:
 	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	holder.mouse_filter = Control.MOUSE_FILTER_PASS
 	stage.add_child(holder)
-	var box := UIKit.panel(UIKit.PAPER, UIKit.BRAND, 20)
+	var box := UIKit.panel(UIKit.SURFACE_DEEP, UIKit.BRAND, 20)
 	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 32.0, 600.0), 0)
+	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x * 0.8, 640.0), 0)
 	holder.add_child(box)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	box.add_child(v)
-	v.add_child(UIKit.label("QUANTAS RODADAS VOCÊ VAI GANHAR?", 26, UIKit.TEXT_ON_LIGHT, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("QUANTAS RODADAS VOCÊ VAI GANHAR?", 26, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	var hint := ChaosBot.suggested_predict(engine, 0)
 	var info := "Entrada ◎%d  ·  Pote ◎%d  ·  Sua mão: %s" % [int(engine.blitz_entry()), int(engine.carry), _hand_label_blitz()]
-	var info_l := UIKit.label(info, 19, UIKit.TEXT_ON_LIGHT, HORIZONTAL_ALIGNMENT_CENTER)
-	info_l.modulate.a = 0.7
+	var info_l := UIKit.label(info, 19, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	info_l.modulate.a = 1.0
 	info_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(info_l)
 	v.add_child(HSeparator.new())
@@ -2334,7 +2337,7 @@ func _human_predict() -> int:
 			st["pick"] = maxi(0, int(st["pick"]) - 1)
 			(st["render"] as Callable).call())
 		stepper.add_child(minus)
-		var count_l := UIKit.label(str(int(st["pick"])), 60, UIKit.TEXT_ON_LIGHT, HORIZONTAL_ALIGNMENT_CENTER)
+		var count_l := UIKit.label(str(int(st["pick"])), 60, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 		count_l.custom_minimum_size = Vector2(110, 0)
 		stepper.add_child(count_l)
 		var plus := UIKit.button("+", UIKit.BUTTON_MUTED, 36)
@@ -2345,12 +2348,12 @@ func _human_predict() -> int:
 			(st["render"] as Callable).call())
 		stepper.add_child(plus)
 		var is_hint: bool = int(st["pick"]) == hint
-		var rec_l := UIKit.label("★ RECOMENDADO PELA SUA MÃO" if is_hint else "Recomendado pela sua mão: %d" % hint, 18, UIKit.GOOD_ON_LIGHT if is_hint else UIKit.TEXT_ON_LIGHT, HORIZONTAL_ALIGNMENT_CENTER)
-		rec_l.modulate.a = 1.0 if is_hint else 0.6
+		var rec_l := UIKit.label("★ RECOMENDADO PELA SUA MÃO" if is_hint else "Recomendado pela sua mão: %d" % hint, 18, UIKit.OK if is_hint else UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		rec_l.modulate.a = 1.0
 		body.add_child(rec_l)
 		var w := ChaosEngine.blitz_weight(int(st["pick"]))
-		var legend := UIKit.label("Peso do palpite no pote: ×%s   (0–2 ×1 · 3–4 ×1,5 · 5+ ×2)" % UIKit.fmt_dec(w, 1), 18, UIKit.TEXT_ON_LIGHT, HORIZONTAL_ALIGNMENT_CENTER)
-		legend.modulate.a = 0.65
+		var legend := UIKit.label("Peso do palpite no pote: ×%s   (0–2 ×1 · 3–4 ×1,5 · 5+ ×2)" % UIKit.fmt_dec(w, 1), 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		legend.modulate.a = 1.0
 		legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		body.add_child(legend)
 		var go := UIKit.button("CONFIRMAR: %d %s" % [int(st["pick"]), "RODADA" if int(st["pick"]) == 1 else "RODADAS"], UIKit.OK, 28)
