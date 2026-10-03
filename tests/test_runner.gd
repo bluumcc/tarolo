@@ -780,6 +780,7 @@ func _test_blitz() -> void:
 
 	# Dobrar / triplicar.
 	var d := ChaosEngine.new()
+	d.doubles_enabled = true
 	d.setup_match({"seed": 4, "mode": "blitz", "blind": 10})
 	for p in range(4):
 		d.blitz_place(p, 1)
@@ -803,6 +804,7 @@ func _test_blitz() -> void:
 
 	# Cobrir a dobra/triplicada de um rival.
 	var cv := ChaosEngine.new()
+	cv.doubles_enabled = true
 	cv.setup_match({"seed": 4, "mode": "blitz", "blind": 10})
 	for p in range(4):
 		cv.blitz_place(p, 1)

@@ -76,6 +76,9 @@ var doubles: Array = []       # quantas vezes cada um dobrou a entrada nesse ní
 var predicts: Array = []      # palpite de cada um (-1 = ainda não fez)
 var stakes: Array = []        # fichas que cada um pôs no pote do nível
 var wins: Array = []          # vitórias contadas no nível (Rodada Dobrada conta 2)
+## Dobrar/triplicar/cobrir o palpite no pote do nível: desligado por enquanto (mistura com as apostas
+## da rodada). Os testes ligam pra manter a mecânica coberta.
+var doubles_enabled := false
 var carry := 0.0              # pote acumulado quando ninguém acerta
 var bonus_on := true          # prêmio especial de sequência (desligável nos testes)
 var hit_streak := 0           # acertos seguidos do jogador 0
@@ -817,7 +820,7 @@ func can_double(player: int) -> bool:
 ## Cobrir a dobra/triplicada de um rival: mesmo efeito de `double_down`, mas sem a espera da
 ## rodada — é uma resposta imediata ao lance de outro jogador.
 func can_cover(player: int) -> bool:
-	if not blitz or is_round_over() or int(doubles[player]) >= BLITZ_MAX_DOUBLES or onboarding_levels > 0:
+	if not doubles_enabled or not blitz or is_round_over() or int(doubles[player]) >= BLITZ_MAX_DOUBLES or onboarding_levels > 0:
 		return false
 	var need := blitz_need(player)
 	return need >= 0 and need <= tricks_left() and stacks[player] >= blitz_entry()
