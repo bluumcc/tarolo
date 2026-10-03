@@ -52,8 +52,8 @@ func _build() -> void:
 
 	var wide := _is_wide()
 	page.add_child(_build_topbar(wide))
-	if not wide:
-		page.add_child(_build_tabbar_portrait())
+	if wide:
+		page.add_child(_build_tabbar_portrait())  # landscape: abas abaixo do topbar
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -62,18 +62,23 @@ func _build() -> void:
 	UIKit.suppress_click_on_scroll(scroll)
 
 	var mg := MarginContainer.new()
-	for s in ["left", "right", "top", "bottom"]:
-		mg.add_theme_constant_override("margin_" + s, Widgets.MARGIN)
+	mg.add_theme_constant_override("margin_left", 0)
+	mg.add_theme_constant_override("margin_right", 0)
+	mg.add_theme_constant_override("margin_top", 0)
+	mg.add_theme_constant_override("margin_bottom", Widgets.MARGIN)
 	scroll.add_child(mg)
 
 	_content_col = VBoxContainer.new()
-	_content_col.add_theme_constant_override("separation", 20)
+	_content_col.add_theme_constant_override("separation", 0)
 	_content_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mg.add_child(_content_col)
 
 	_action_bar = VBoxContainer.new()
 	_action_bar.add_theme_constant_override("separation", 0)
 	page.add_child(_action_bar)
+
+	if not wide:
+		page.add_child(_build_tabbar_portrait())  # portrait: nav bar no BOTTOM
 
 	_populate_tab(wide)
 
@@ -278,16 +283,19 @@ func _build_ranked(_wide: bool) -> void:
 		else:
 			break
 
-	# ── Emblema central ──────────────────────────────────────────────────────
+	# ── Card hero: emblema + nome do tier (full-width, sem margens externas) ──
 	var hero := GlowPanel.new()
 	hero.accent      = tc
 	hero.bg          = UIKit.SURFACE_DEEP
 	hero.pulse_speed = 0.7
+	# GlowPanel é MarginContainer — sobrescreve padding padrão (16) para 24
+	for s in ["left", "right", "top", "bottom"]:
+		hero.add_theme_constant_override("margin_" + s, Widgets.MARGIN)
 	var hv := VBoxContainer.new()
 	hv.add_theme_constant_override("separation", 16)
 	hero.add_child(hv)
 
-	# Círculo com romano (igual ao design de referência, sem arte de carta)
+	# Círculo com romano
 	var circle := Panel.new()
 	circle.custom_minimum_size   = Vector2(200, 200)
 	circle.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -306,35 +314,34 @@ func _build_ranked(_wide: bool) -> void:
 	circle.add_child(div_lbl)
 	hv.add_child(circle)
 
-	# Título do tier
+	# Título do tier + subtítulo tarot (dentro do mesmo card)
 	var tier_lbl := UIKit.label(str(t["label"]).to_upper(), 48, tc, HORIZONTAL_ALIGNMENT_CENTER)
 	tier_lbl.add_theme_color_override("font_outline_color", UIKit.OUTLINE)
 	tier_lbl.add_theme_constant_override("outline_size", 5)
 	hv.add_child(tier_lbl)
-
-	# Subtítulo tarot
 	var sub: String = _TAROT_SUBTITLES[clampi(int(t["tier"]), 0, _TAROT_SUBTITLES.size() - 1)]
 	hv.add_child(UIKit.label(sub, 26, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 
 	_content_col.add_child(hero)
 
-	# ── Stats grid ────────────────────────────────────────────────────────────
+	# ── Stats grid (full-width card) ──────────────────────────────────────────
 	var sp := GlowPanel.new()
 	sp.accent      = UIKit.VIOLET
 	sp.bg          = UIKit.SURFACE_DEEP
 	sp.pulse_speed = 0.0
+	for s in ["left", "right", "top", "bottom"]:
+		sp.add_theme_constant_override("margin_" + s, Widgets.MARGIN)
 	var sv := VBoxContainer.new()
 	sv.add_theme_constant_override("separation", 10)
 	sp.add_child(sv)
 
 	var stat_rows: Array[Array] = [
-		["MMR",         UIKit.fmt_int(int(rk["mmr"])),    UIKit.TURN],
-		["LP",          "%d / 100" % int(t["lp"]),        tc],
-		["VITÓRIAS",    str(wins),                         UIKit.OK],
-		["DERROTAS",    str(loss),                         UIKit.DANGER],
+		["WINSTREAK",   "%d 🔥" % streak if streak >= 2 else "—",  UIKit.MONEY if streak >= 2 else UIKit.MUTED],
+		["MMR",         UIKit.fmt_int(int(rk["mmr"])),              UIKit.TURN],
+		["PONTOS RANK", "%d / 100" % int(t["lp"]),                  tc],
+		["VITÓRIAS",    str(wins),                                   UIKit.OK],
+		["DERROTAS",    str(loss),                                   UIKit.DANGER],
 	]
-	if streak >= 2:
-		stat_rows.append(["WINSTREAK", "%d 🔥" % streak, UIKit.MONEY])
 	for sr in stat_rows:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 0)
@@ -344,7 +351,6 @@ func _build_ranked(_wide: bool) -> void:
 		row.add_child(UIKit.label(str(sr[1]), 24, sr[2] as Color))
 		sv.add_child(row)
 
-	# Barra de LP (fina, dentro do stat panel)
 	var bar := MeterBar.new()
 	bar.custom_minimum_size = Vector2(0, 12)
 	bar.set_colors(tc, UIKit.OUTLINE)
@@ -352,8 +358,10 @@ func _build_ranked(_wide: bool) -> void:
 	sv.add_child(bar)
 	_content_col.add_child(sp)
 
-	# ── Torneios (GlitchPanel estilo referência) ─────────────────────────────
+	# ── Torneios (GlitchPanel full-width) ────────────────────────────────────
 	var gp := GlitchPanel.new()
+	for s in ["left", "right", "top", "bottom"]:
+		gp.add_theme_constant_override("margin_" + s, Widgets.MARGIN)
 	var tv := VBoxContainer.new()
 	tv.add_theme_constant_override("separation", 12)
 	gp.add_child(tv)
@@ -376,19 +384,13 @@ func _build_ranked(_wide: bool) -> void:
 	tv.add_child(t_btn)
 	_content_col.add_child(gp)
 
-	# ── Botão fixo no action bar ──────────────────────────────────────────────
-	var ab_mg := MarginContainer.new()
-	for s in ["left", "right", "bottom"]:
-		ab_mg.add_theme_constant_override("margin_" + s, Widgets.MARGIN)
-	ab_mg.add_theme_constant_override("margin_top", 12)
-	_action_bar.add_child(ab_mg)
-
+	# ── Botão ENCONTRAR PARTIDA: full-width, sem margens laterais ─────────────
 	var find_btn := UIKit.button("⚔   ENCONTRAR PARTIDA", tc, 38)
 	find_btn.custom_minimum_size = Vector2(0, 88)
 	find_btn.add_theme_color_override("font_outline_color", tc.darkened(0.5))
 	find_btn.add_theme_constant_override("outline_size", 5)
 	find_btn.pressed.connect(_start_ranked_matchmaking)
-	ab_mg.add_child(find_btn)
+	_action_bar.add_child(find_btn)
 
 
 func _build_classic(wide: bool) -> void:
