@@ -1092,14 +1092,15 @@ func _run_round() -> void:
 	while not engine.is_round_over():
 		if not is_inside_tree() or finished:
 			return
-		await _trick_start()
-		if not is_inside_tree() or finished:
-			return
+		# Quebrou? O aviso vem antes da animação do modificador, não depois.
 		if not await _ensure_solvent():
 			return
 		if not bool(config.get("tournament", false)):
 			for q in engine.refill_bots():
 				await _new_player_sits(q)
+		await _trick_start()
+		if not is_inside_tree() or finished:
+			return
 		engine.begin_trick()
 		_reset_actions()
 		_refresh_hud()
