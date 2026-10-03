@@ -53,6 +53,7 @@ func _ready() -> void:
 	apply_settings()
 	get_tree().root.size_changed.connect(_update_content_scale)
 	_update_content_scale()
+	_eco_init()
 
 
 ## O navegador do celular não tem fonte com ♥ ♦ ♠ ♣ ✦ ✶ ♛ (o PC usa a fonte do sistema e
@@ -177,31 +178,118 @@ func ranked_rooms_open(fichas: int) -> Array:
 	return RANKED_ROOMS.filter(func(r: Dictionary) -> bool: return fichas >= ranked_room_buy_in(r))
 
 
-## Todas as 4 salas existem o tempo todo (bots jogam em background).
-## Retorna uma sala diferente de `exclude_blind`; se só existe uma, avisa com "only_room: true".
-## O saldo não bloqueia a descoberta — só bloqueia o botão ENTRAR na UI.
-## Cada sala retornada tem: blind, weight, players (4–6), rounds_left (0–7, rodadas da partida
-## atual que faltam antes de aceitar novos jogadores), affordable (bool).
+# ── Ecossistema ranqueado ────────────────────────────────────────────────────
+## Cada entrada: {blind, weight, tables: [{players, rounds_left}], waiting: int, tick_ms: int}
+## "tables" = partidas ativas nessa sala. "waiting" = bots aguardando a próxima partida.
+## O ecossistema é inicializado uma vez e avança no tempo a cada chamada de `find_ranked_room`.
+
+var _eco: Array = []   # uma entrada por RANKED_ROOMS, criada em _ready()
+
+
+func _eco_init() -> void:
+	_eco.clear()
+	for r in RANKED_ROOMS:
+		var blind := int(r["blind"])
+		var w := int(r["weight"])
+		# Salas movimentadas (weight alto) têm mais bots online
+		var online := randi_range(w * 4, w * 8)
+		var tables: Array = []
+		var rem := online
+		while rem >= 4:
+			var sz := mini(randi_range(4, 6), rem)
+			tables.append({"players": sz, "rounds_left": randi_range(1, 8)})
+			rem -= sz
+		_eco.append({"blind": blind, "weight": w, "tables": tables, "waiting": rem, "tick_ms": Time.get_ticks_msec()})
+
+
+## Avança o ecossistema com base no tempo real decorrido (cada ~3 s = 1 rodada simulada).
+func _eco_tick() -> void:
+	var now := Time.get_ticks_msec()
+	for room in _eco:
+		var elapsed_ms := now - int(room["tick_ms"])
+		var rounds_passed := elapsed_ms / 3000   # 1 rodada simulada a cada 3 segundos reais
+		if rounds_passed < 1:
+			continue
+		room["tick_ms"] = now
+		# Avança rodadas das partidas ativas
+		for table in (room["tables"] as Array):
+			table["rounds_left"] = maxi(0, int(table["rounds_left"]) - rounds_passed)
+		# Partidas encerradas: bots voltam pra fila de espera
+		var still_running: Array = []
+		for table in (room["tables"] as Array):
+			if int(table["rounds_left"]) > 0:
+				still_running.append(table)
+			else:
+				room["waiting"] = int(room["waiting"]) + int(table["players"])
+		room["tables"] = still_running
+		# Bots em espera formam novas partidas
+		while int(room["waiting"]) >= 4:
+			var sz := mini(randi_range(4, 6), int(room["waiting"]))
+			(room["tables"] as Array).append({"players": sz, "rounds_left": randi_range(5, 8)})
+			room["waiting"] = int(room["waiting"]) - sz
+		# Circulação natural: bots chegam e saem da sala
+		room["waiting"] = maxi(0, int(room["waiting"]) + randi_range(-1, 2))
+
+
+## Encontra a melhor mesa disponível numa sala (com vaga aberta ou prestes a começar nova partida).
+## Retorna {} se a sala não tem nada para oferecer.
+func _eco_best_table(room: Dictionary) -> Dictionary:
+	var best: Dictionary = {}
+	var best_rl := 9999
+	for table in (room["tables"] as Array):
+		# Mesa encerrada (rounds_left = 0) ou com vagas = pode entrar logo
+		var rl := int(table["rounds_left"])
+		if rl < best_rl:
+			best_rl = rl
+			best = table
+	# Bots suficientes em espera = nova partida começa já
+	if int(room["waiting"]) >= 3 and best_rl > 0:
+		return {"players": mini(int(room["waiting"]) + 1, 6), "rounds_left": 0}
+	return best
+
+
+## Consulta o ecossistema ao vivo. Retorna a sala mais acessível excluindo `exclude_blind`.
+## Campos do resultado: blind, players, rounds_left, affordable, only_room.
 func find_ranked_room(fichas: int, exclude_blind: int = -1) -> Dictionary:
-	var all: Array = RANKED_ROOMS  # todas as salas existem sempre
-	var others := all.filter(func(r: Dictionary) -> bool: return int(r["blind"]) != exclude_blind)
-	var pool: Array = others if not others.is_empty() else all
+	_eco_tick()
+	# Candidatos: salas com pelo menos uma mesa (ou fila) disponível, excluindo o blind recusado
+	var candidates: Array = []
+	for room in _eco:
+		if int(room["blind"]) == exclude_blind:
+			continue
+		var t := _eco_best_table(room)
+		if not t.is_empty():
+			candidates.append({"room": room, "table": t})
+	# Fallback: se todas as salas exceto a excluída estão vazias, usa qualquer uma
+	if candidates.is_empty():
+		for room in _eco:
+			if int(room["blind"]) == exclude_blind:
+				continue
+			candidates.append({"room": room, "table": {"players": randi_range(4, 6), "rounds_left": randi_range(2, 6)}})
+	# Último recurso: só existe a sala excluída
+	var only_room := candidates.is_empty()
+	if only_room:
+		for room in _eco:
+			candidates.append({"room": room, "table": {"players": randi_range(4, 6), "rounds_left": randi_range(2, 6)}})
+	# Sorteio ponderado pelo weight da sala
 	var total := 0
-	for r in pool:
-		total += int(r["weight"])
+	for c in candidates:
+		total += int((c["room"] as Dictionary)["weight"])
 	var pick := randi() % maxi(total, 1)
-	var chosen: Dictionary = pool[0]
-	for r in pool:
-		pick -= int(r["weight"])
+	var chosen: Dictionary = candidates[0]
+	for c in candidates:
+		pick -= int((c["room"] as Dictionary)["weight"])
 		if pick < 0:
-			chosen = r
+			chosen = c
 			break
-	var result := chosen.duplicate()
-	result["players"] = randi_range(4, 6)
-	result["rounds_left"] = randi_range(0, 7)   # 0 = aceita agora; >0 = aguardando rodada atual
-	result["affordable"] = fichas >= ranked_room_buy_in(result)
-	result["only_room"] = others.is_empty()      # UI pode avisar que não há outra opção
-	return result
+	var blind: int = int((chosen["room"] as Dictionary)["blind"])
+	return {
+		"blind":       blind,
+		"players":     int((chosen["table"] as Dictionary).get("players", 4)),
+		"rounds_left": int((chosen["table"] as Dictionary).get("rounds_left", 0)),
+		"affordable":  fichas >= blind * RANKED_STACK_BLINDS,
+		"only_room":   only_room,
+	}
 
 
 
