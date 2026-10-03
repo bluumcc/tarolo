@@ -150,19 +150,21 @@ func _make_tab_buttons(expand: bool) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 0)
 	for name in ["RANKEADA", "CLÁSSICO", "LOJA", "MENU"]:
-		var btn := _tab_btn(name, name == _active_tab)
+		var btn := _tab_btn(name, name == _active_tab, expand)
 		if expand:
 			btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(btn)
 	return row
 
 
-func _tab_btn(tab: String, active: bool) -> Button:
+func _tab_btn(tab: String, active: bool, tall: bool = false) -> Button:
 	var accent := _tab_accent(tab)
 	var face   := accent.darkened(0.18) if active else UIKit.SURFACE_DEEP
 	var b      := UIKit.button(tab, face, 22)
 	b.focus_mode      = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(0, 60)
+	b.custom_minimum_size = Vector2(0, 120 if tall else 60)
+	if tall:
+		b.add_theme_font_size_override("font_size", 19)
 	b.add_theme_constant_override("outline_size", 3 if active else 0)
 	b.add_theme_color_override("font_outline_color", accent.darkened(0.5))
 	for cn in ["font_color", "font_hover_color", "font_pressed_color"]:
@@ -267,7 +269,10 @@ func _build_ranked(_wide: bool) -> void:
 	var loss := int(rk["losses"])
 
 	# Título da página
-	var title := UIKit.label("TAROLO", 56, UIKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
+	var top_gap := Control.new()
+	top_gap.custom_minimum_size = Vector2(0, Widgets.MARGIN)
+	_content_col.add_child(top_gap)
+	var title := UIKit.label("TAROLO", 48, UIKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
 	title.add_theme_color_override("font_outline_color", UIKit.TITLE_OUTLINE)
 	title.add_theme_constant_override("outline_size", 8)
 	_content_col.add_child(title)
@@ -294,26 +299,17 @@ func _build_ranked(_wide: bool) -> void:
 	tier_lbl.add_theme_constant_override("outline_size", 6)
 	_content_col.add_child(tier_lbl)
 
-	# Card de métricas (largura total)
+	# Card de métricas: 75% da largura, centralizado, uma linha (razão V/D)
 	var ratio := float(wins) / float(maxi(loss, 1))
-	var stat_rows: Array[Array] = [
-		["MMR",      UIKit.fmt_int(int(rk["mmr"]))],
-		["PONTOS",   "%d / 100" % int(t["lp"])],
-		["V / D",    "%d / %d" % [wins, loss]],
-		["RAZÃO",    UIKit.fmt_dec(ratio, 2)],
-	]
 	var mp := UIKit.panel(UIKit.SURFACE_DEEP, UIKit.OUTLINE, 24)
-	mp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var mv := VBoxContainer.new()
-	mv.add_theme_constant_override("separation", 12)
-	mp.add_child(mv)
-	for sr in stat_rows:
-		var row := HBoxContainer.new()
-		var kl := UIKit.label(str(sr[0]), 26, UIKit.MUTED)
-		kl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(kl)
-		row.add_child(UIKit.label(str(sr[1]), 26, UIKit.BROWN))
-		mv.add_child(row)
+	mp.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	mp.custom_minimum_size   = Vector2(get_viewport_rect().size.x * 0.75, 0)
+	var mrow := HBoxContainer.new()
+	var mk := UIKit.label("V / D", 26, UIKit.MUTED)
+	mk.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mrow.add_child(mk)
+	mrow.add_child(UIKit.label(UIKit.fmt_dec(ratio, 2), 26, UIKit.BROWN))
+	mp.add_child(mrow)
 	_content_col.add_child(mp)
 
 	# Card de torneios (largura total) com um card por torneio aberto
@@ -349,10 +345,10 @@ func _build_ranked(_wide: bool) -> void:
 	ab_mg.add_theme_constant_override("margin_left",   Widgets.MARGIN)
 	ab_mg.add_theme_constant_override("margin_right",  Widgets.MARGIN)
 	ab_mg.add_theme_constant_override("margin_top",    12)
-	ab_mg.add_theme_constant_override("margin_bottom", 16)
+	ab_mg.add_theme_constant_override("margin_bottom", 32)
 	_action_bar.add_child(ab_mg)
-	var find_btn := UIKit.button("⚔   ENCONTRAR PARTIDA", tc, 38)
-	find_btn.custom_minimum_size = Vector2(0, 88)
+	var find_btn := UIKit.button("JOGAR RANKEADA", tc, 38)
+	find_btn.custom_minimum_size = Vector2(0, 154)
 	find_btn.add_theme_color_override("font_outline_color", tc.darkened(0.5))
 	find_btn.add_theme_constant_override("outline_size", 5)
 	find_btn.pressed.connect(_start_ranked_matchmaking)
