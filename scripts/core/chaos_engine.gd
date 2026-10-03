@@ -93,7 +93,7 @@ const BLITZ_DISCARD_SIZE := 2
 ## aumentar/desistir), com pote próprio (`trick_pot`) pago a quem vence a rodada — por cima do
 ## palpite do nível. A ante (o "pontapé" que todo mundo paga só pra rodada acontecer) é uma
 ## fração do blind, não o blind inteiro: já existe a entrada do palpite pesando por rodada.
-const BLITZ_TRICK_ANTE_FACTOR := 0.25
+const BLITZ_TRICK_ANTE_FACTOR := 0.2
 
 var hands: Array = []
 var plays: Array = []
