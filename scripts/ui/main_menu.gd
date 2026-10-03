@@ -406,12 +406,6 @@ func _build_classic(wide: bool) -> void:
 	var h := 150 if not wide else 132
 	var trk := GameState.tournaments()
 
-	var competitivo := Widgets.mode_card(
-			"COMPETITIVO",
-			"Palpite + aposta por rodada. Toda mesa vale Elo.",
-			UIKit.DANGER.darkened(0.12), h, "❖", _open_blitz_confirm, 38)
-	_content_col.add_child(competitivo)
-
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 18)
@@ -443,7 +437,6 @@ func _build_classic(wide: bool) -> void:
 				get_tree().change_scene_to_file("res://scenes/GameScene.tscn"), 38)
 	_content_col.add_child(tutorial)
 
-	competitivo.grab_focus.call_deferred()
 
 
 func _build_shop(_wide: bool) -> void:
@@ -660,17 +653,18 @@ func _reopen_settings() -> void:
 	_open_settings()
 
 
-func _open_blitz_confirm() -> void:
-	var v := _modal("MESA BLITZ")
-	var profile := SaveManager.section("profile")
-	var fichas  := int(profile["fichas"])
-	v.add_child(UIKit.label("Você tem %d fichas" % fichas, 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-	var txt := UIKit.label("Escolha a mesa. Você senta com uma stack de 40 blinds, palpita quantas rodadas vai ganhar e leva de volta a stack quando sair.", 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	txt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(txt)
-	var cheapest := GameState.chaos_buy_in(0)
-	if fichas < cheapest:
-		v.add_child(UIKit.label("Fichas insuficientes.", 22, UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER))
+func _start_ranked_matchmaking() -> void:
+	# A rankeada é o Blitz: a mesa (blind/stack) vem da sua liga — Bronze/Prata: Iniciante,
+	# Ouro/Platina: Regular, Diamante em diante: Alta.
+	var rk := GameState.ranked()
+	var tier := int(Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))["tier"])
+	var table := 0 if tier <= 1 else (1 if tier <= 3 else 2)
+	var cost := GameState.chaos_buy_in(table)
+	if int(SaveManager.section("profile")["fichas"]) < cost:
+		var v := _modal("FICHAS INSUFICIENTES")
+		var msg := UIKit.label("A mesa da sua liga (%s) pede ◎%s pra sentar." % [str(GameState.CHAOS_TABLES[table]["name"]), UIKit.fmt_int(cost)], 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+		msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(msg)
 		var shop := UIKit.button("RECARGA E PACOTES", UIKit.OK)
 		shop.pressed.connect(func(): _close_modal(); _open_fichas())
 		v.add_child(shop)
@@ -678,24 +672,8 @@ func _open_blitz_confirm() -> void:
 		cl.pressed.connect(_close_modal)
 		v.get_meta("modal_footer", v).add_child(cl)
 		return
-	for i in range(GameState.CHAOS_TABLES.size()):
-		var t: Dictionary = GameState.CHAOS_TABLES[i]
-		var cost := GameState.chaos_buy_in(i)
-		var b := UIKit.button(
-				"%s · entrada ◎%d · stack ◎%d" % [str(t["name"]).to_upper(), int(t["blind"]) * 2, cost],
-				UIKit.INFO if i == 0 else UIKit.PURPLE, 26)
-		b.disabled = fichas < cost
-		b.pressed.connect(func():
-			GameState.chaos_table = i
-			GameState.chaos_mode  = "blitz"
-			get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn"))
-		v.add_child(b)
-	var cl := UIKit.button("FECHAR", UIKit.MUTED)
-	cl.pressed.connect(_close_modal)
-	v.get_meta("modal_footer", v).add_child(cl)
-
-
-func _start_ranked_matchmaking() -> void:
+	GameState.chaos_table = table
+	GameState.chaos_mode = "blitz"
 	# Overlay de matchmaking inline: busca → nomes → inicia ChaosScene (modo blitz/rankeado)
 	var ov := UIKit.overlay()
 	_overlay.add_child(ov)
