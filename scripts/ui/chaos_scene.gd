@@ -1510,7 +1510,7 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 		["MÍN", lo],
 		["½ POTE", level + int(round(pot_now * 0.5 / blind)) * blind],
 		["POTE", level + int(round(float(pot_now) / blind)) * blind],
-		["ALL-IN", hi],
+		["ALL-IN" if float(hi) >= float(engine.stacks[0] + engine.contrib[0]) else "MÁX", hi],
 	]
 	for pr in presets:
 		var val := clampi(int(pr[1]), lo, hi)
@@ -1532,7 +1532,8 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 		st["to"] = maxi(int(st["to"]) - blind, lo)
 		(st["render"] as Callable).call())
 	row.add_child(minus)
-	var num := UIKit.label("◎ %d" % int(st["to"]), 52, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+	var mine_in := int(engine.contrib[0])   # o que você já pôs nesta rodada (ante e apostas anteriores)
+	var num := UIKit.label("◎ %d" % (int(st["to"]) - mine_in), 52, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
 	num.custom_minimum_size = Vector2(190, 0)
 	row.add_child(num)
 	var plus := UIKit.button("+", UIKit.MUTED, 40)
@@ -1542,7 +1543,10 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 		st["to"] = mini(int(st["to"]) + blind, hi)
 		(st["render"] as Callable).call())
 	row.add_child(plus)
-	var ok := UIKit.button("AUMENTAR PARA ◎%d" % int(st["to"]) + (" (ALL-IN)" if int(st["to"]) >= hi else ""), UIKit.MONEY, 30)
+	var total_l := UIKit.label("Você coloca ◎%d agora · total seu na rodada ◎%d (já pôs ◎%d)" % [int(st["to"]) - mine_in, int(st["to"]), mine_in], 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	total_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_child(total_l)
+	var ok := UIKit.button("COLOCAR ◎%d" % (int(st["to"]) - mine_in) + (" (ALL-IN)" if int(st["to"]) >= hi and hi >= int(engine.stacks[0]) + mine_in else ""), UIKit.MONEY, 30)
 	ok.pressed.connect(func(): done.call({"action": "raise", "to": float(st["to"])}))
 	body.add_child(ok)
 	var back := UIKit.button("VOLTAR", UIKit.MUTED, 26)
