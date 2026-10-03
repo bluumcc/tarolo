@@ -156,25 +156,48 @@ const CHAOS_TABLES := [
 ]
 var chaos_table := 0
 
-## Rankeada: uma escada de blinds e uma faixa de stack — sem níveis nomeados. O blind vem do saldo
-## de fichas (o maior que ainda deixa ~100 blinds de folga) e o stack é escolhido numa faixa.
-const BLIND_LADDER := [10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000]
-const RANKED_MIN_STACK_BLINDS := 20
-const RANKED_MAX_STACK_BLINDS := 100
-const RANKED_DEFAULT_STACK_BLINDS := 40
+## Rankeada = fila única com poucas salas (buy-in e blind fixos por sala). Quem busca partida cai
+## numa sala que tenha gente e que o saldo pague; os pontos valem igual em qualquer sala.
+const RANKED_ROOMS := [
+	{"blind": 10,   "weight": 4},
+	{"blind": 50,   "weight": 3},
+	{"blind": 250,  "weight": 2},
+	{"blind": 1000, "weight": 1},
+]
+const RANKED_STACK_BLINDS := 40   # buy-in de toda sala: 40 blinds
 var ranked_table := {}   # {blind, stack_blinds} da mesa rankeada que está sendo aberta
 
 
-func ranked_blind_for(fichas: int) -> int:
-	for i in range(BLIND_LADDER.size() - 1, -1, -1):
-		if fichas >= int(BLIND_LADDER[i]) * RANKED_MAX_STACK_BLINDS:
-			return int(BLIND_LADDER[i])
-	return int(BLIND_LADDER[0])
+func ranked_room_buy_in(room: Dictionary) -> int:
+	return int(room["blind"]) * RANKED_STACK_BLINDS
 
 
-## Maior stack (em blinds) que dá pra levar: até 100, limitado pelo saldo.
-func ranked_stack_max_blinds(blind: int, fichas: int) -> int:
-	return mini(RANKED_MAX_STACK_BLINDS, fichas / maxi(blind, 1))
+## Salas que o saldo paga.
+func ranked_rooms_open(fichas: int) -> Array:
+	return RANKED_ROOMS.filter(func(r: Dictionary) -> bool: return fichas >= ranked_room_buy_in(r))
+
+
+## Acha uma sala com gente (simulado): sorteia entre as que o saldo paga, as de blind menor com
+## mais chance (mais movimento). `exclude_blind` evita repetir a sala recusada, se houver outra.
+func find_ranked_room(fichas: int, exclude_blind: int = -1) -> Dictionary:
+	var open := ranked_rooms_open(fichas)
+	if open.is_empty():
+		return {}
+	var others := open.filter(func(r: Dictionary) -> bool: return int(r["blind"]) != exclude_blind)
+	var pool: Array = others if not others.is_empty() else open
+	var total := 0
+	for r in pool:
+		total += int(r["weight"])
+	var pick := randi() % maxi(total, 1)
+	for r in pool:
+		pick -= int(r["weight"])
+		if pick < 0:
+			return r
+	return pool[0]
+
+
+
+
 var chaos_mode := "blitz"    # só "blitz" existe hoje (Caos removido); campo mantido por compatibilidade de save
 
 

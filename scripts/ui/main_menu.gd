@@ -653,17 +653,19 @@ func _reopen_settings() -> void:
 	_open_settings()
 
 
-## Rankeada = Blitz. O blind vem do saldo (escada de blinds) e o stack é escolhido numa faixa
-## de 20 a 100 blinds, limitada pelo que você tem. Depois vem a busca de adversários.
+## Rankeada = Blitz, numa fila única: procura uma sala com gente (e que o saldo pague), mostra
+## buy-in e blind, e você escolhe ENTRAR, PROCURAR OUTRA ou SAIR. Os pontos valem igual em toda sala.
 func _start_ranked_matchmaking() -> void:
+	_ranked_search(-1)
+
+
+func _ranked_search(exclude_blind: int) -> void:
+	GameState.chaos_mode = "blitz"
 	var fichas := int(SaveManager.section("profile")["fichas"])
-	var blind := GameState.ranked_blind_for(fichas)
-	var max_b := GameState.ranked_stack_max_blinds(blind, fichas)
-	var min_b := GameState.RANKED_MIN_STACK_BLINDS
-	var v := _modal("MESA RANKEADA")
-	var footer: Node = v.get_meta("modal_footer", v)
-	if max_b < min_b:
-		var msg := UIKit.label("Você precisa de pelo menos ◎%s pra sentar (%d blinds de ◎%d)." % [UIKit.fmt_int(min_b * blind), min_b, blind], 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	if GameState.ranked_rooms_open(fichas).is_empty():
+		var cheapest := GameState.ranked_room_buy_in(GameState.RANKED_ROOMS[0])
+		var v := _modal("FICHAS INSUFICIENTES")
+		var msg := UIKit.label("A menor sala pede ◎%s pra sentar." % UIKit.fmt_int(cheapest), 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 		msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(msg)
 		var shop := UIKit.button("RECARGA E PACOTES", UIKit.OK)
@@ -671,116 +673,73 @@ func _start_ranked_matchmaking() -> void:
 		v.add_child(shop)
 		var cl := UIKit.button("FECHAR", UIKit.MUTED)
 		cl.pressed.connect(_close_modal)
-		footer.add_child(cl)
+		v.get_meta("modal_footer", v).add_child(cl)
 		return
-	var st := {"blinds": clampi(GameState.RANKED_DEFAULT_STACK_BLINDS, min_b, max_b)}
-	var info := UIKit.label("Blind ◎%s, definido pelo seu saldo de ◎%s. Escolha com quanto sentar." % [UIKit.fmt_int(blind), UIKit.fmt_int(fichas)], 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(info)
-	var body := VBoxContainer.new()
-	body.add_theme_constant_override("separation", 12)
-	v.add_child(body)
-	st["render"] = func() -> void:
-		for c in body.get_children():
-			body.remove_child(c)
-			c.queue_free()
-		var row := HBoxContainer.new()
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		row.add_theme_constant_override("separation", 14)
-		body.add_child(row)
-		var minus := UIKit.button("−", UIKit.MUTED, 40)
-		minus.custom_minimum_size = Vector2(88, 72)
-		minus.disabled = int(st["blinds"]) <= min_b
-		minus.pressed.connect(func():
-			st["blinds"] = maxi(int(st["blinds"]) - 5, min_b)
-			(st["render"] as Callable).call())
-		row.add_child(minus)
-		var num := UIKit.label("◎ %s" % UIKit.fmt_int(int(st["blinds"]) * blind), 46, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
-		num.custom_minimum_size = Vector2(190, 0)
-		row.add_child(num)
-		var plus := UIKit.button("+", UIKit.MUTED, 40)
-		plus.custom_minimum_size = Vector2(88, 72)
-		plus.disabled = int(st["blinds"]) >= max_b
-		plus.pressed.connect(func():
-			st["blinds"] = mini(int(st["blinds"]) + 5, max_b)
-			(st["render"] as Callable).call())
-		row.add_child(plus)
-		body.add_child(UIKit.label("%d blinds" % int(st["blinds"]), 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-		var presets := HBoxContainer.new()
-		presets.add_theme_constant_override("separation", 8)
-		body.add_child(presets)
-		for pr in [["MÍN", min_b], ["PADRÃO", clampi(GameState.RANKED_DEFAULT_STACK_BLINDS, min_b, max_b)], ["MÁX", max_b]]:
-			var val := int(pr[1])
-			var pb := UIKit.button(str(pr[0]), UIKit.OK if int(st["blinds"]) == val else UIKit.PURPLE, 22)
-			pb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			pb.pressed.connect(func():
-				st["blinds"] = val
-				(st["render"] as Callable).call())
-			presets.add_child(pb)
-	(st["render"] as Callable).call()
-	var go := UIKit.button("JOGAR", UIKit.RANK_PLAY_BG, 32)
-	go.pressed.connect(func():
-		GameState.ranked_table = {"blind": blind, "stack_blinds": int(st["blinds"])}
-		_close_modal()
-		_run_ranked_search())
-	footer.add_child(go)
-	var close := UIKit.button("FECHAR", UIKit.MUTED)
-	close.pressed.connect(_close_modal)
-	footer.add_child(close)
 
-
-func _run_ranked_search() -> void:
-	GameState.chaos_mode = "blitz"
-	# Overlay de matchmaking inline: busca → nomes → inicia ChaosScene (modo blitz/rankeado)
 	var ov := UIKit.overlay()
 	_overlay.add_child(ov)
-
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.DANGER, 24)
-	var bv  := VBoxContainer.new()
+	var bv := VBoxContainer.new()
 	bv.add_theme_constant_override("separation", 20)
 	bv.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 96.0, 520.0), 0)
 	box.add_child(bv)
-
 	bv.add_child(UIKit.label("RANKEADA", 38, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
-
-	var status_lbl := UIKit.label("Procurando adversários...", 26, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var status_lbl := UIKit.label("Procurando sala...", 26, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	status_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bv.add_child(status_lbl)
-
 	var cancel_btn := UIKit.button("CANCELAR", UIKit.MUTED, 24)
 	cancel_btn.custom_minimum_size = Vector2(0, 64)
 	cancel_btn.pressed.connect(func(): ov.queue_free())
 	bv.add_child(cancel_btn)
-
 	ov.add_child(UIKit.centered(box))
 	UIKit.fit.call_deferred(box)
 
-	# Animação de busca
 	var elapsed := 0.0
-	var wait    := randf_range(1.2, 2.6)
+	var wait := randf_range(1.2, 2.6)
 	while elapsed < wait:
 		if not is_instance_valid(ov):
 			return
-		status_lbl.text = "Procurando adversários...  %ds" % (int(elapsed) + 1)
+		status_lbl.text = "Procurando sala...  %ds" % (int(elapsed) + 1)
 		await get_tree().create_timer(GameState.anim(0.25)).timeout
 		elapsed += 0.25
-
 	if not is_instance_valid(ov):
 		return
 
-	# Partida encontrada
+	var room := GameState.find_ranked_room(fichas, exclude_blind)
 	var lobby := GameState.find_ranked_lobby()
 	var names := ", ".join(lobby.map(func(p: Dictionary) -> String: return str(p["name"])))
-	status_lbl.text = "Partida encontrada!\n%s" % names
 	UIKit.sfx("combo")
-	cancel_btn.queue_free()
-
-	await get_tree().create_timer(GameState.anim(1.2)).timeout
-	if not is_instance_valid(ov):
-		return
-
-	GameState.chaos_mode = "blitz"
-	get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn")
+	for c in bv.get_children():
+		c.queue_free()
+	var blind := int(room["blind"])
+	bv.add_child(UIKit.label("PARTIDA ENCONTRADA", 34, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+	bv.add_child(UIKit.label("Buy-in ◎%s  ·  Blind ◎%s" % [UIKit.fmt_int(GameState.ranked_room_buy_in(room)), UIKit.fmt_int(blind)], 28, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
+	var who := UIKit.label("Com %s" % names, 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	who.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	bv.add_child(who)
+	var enter := UIKit.button("ENTRAR", UIKit.OK, 34)
+	enter.custom_minimum_size = Vector2(0, 88)
+	enter.pressed.connect(func():
+		GameState.ranked_table = {"blind": blind, "stack_blinds": GameState.RANKED_STACK_BLINDS}
+		GameState.chaos_mode = "blitz"
+		get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn"))
+	bv.add_child(enter)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	bv.add_child(row)
+	var other := UIKit.button("PROCURAR OUTRA", UIKit.PURPLE, 22)
+	other.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	other.custom_minimum_size = Vector2(0, 64)
+	other.pressed.connect(func():
+		ov.queue_free()
+		_ranked_search(blind))
+	row.add_child(other)
+	var leave := UIKit.button("SAIR", UIKit.MUTED, 22)
+	leave.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	leave.custom_minimum_size = Vector2(0, 64)
+	leave.pressed.connect(func(): ov.queue_free())
+	row.add_child(leave)
+	UIKit.fit.call_deferred(box)
 
 
 func _open_rules() -> void:

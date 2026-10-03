@@ -1702,8 +1702,8 @@ func _show_round_summary() -> String:
 	next.pressed.connect(func(): item_chosen.emit(1))
 	v.add_child(next)
 	var profile := SaveManager.section("profile")
-	# Completar até o teto da faixa (100 blinds), com o que você tem de fichas fora da mesa.
-	var cap := maxi(engine.buy_in, engine.blind * GameState.RANKED_MAX_STACK_BLINDS) if engine.buy_in > 0 else 0
+	# Completar até o buy-in da sala, com o que você tem de fichas fora da mesa.
+	var cap := engine.buy_in
 	var missing := mini(cap - int(engine.stacks[0]), int(profile["fichas"]))
 	if missing >= engine.blind * 2:
 		var top := UIKit.button("COMPLETAR STACK  +◎%d" % missing, UIKit.OK)
