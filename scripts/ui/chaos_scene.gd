@@ -1842,7 +1842,7 @@ func _betting_phase() -> void:
 	shown_pot = 0.0
 	var first := engine.bet_actor()
 	_banner("APOSTAS", "Todos pagaram a ante (◎%d). DEALER (o D dourado): %s — joga a carta primeiro e fala por último. Fala primeiro: %s." % [int(engine.bet_level), str(config["names"][engine.button]).to_upper(), str(config["names"][first]).to_upper()], UIKit.MONEY)
-	status_label.text = "▶ Abre a rodada: %s" % _leader_name()
+	status_label.text = ""
 	_refresh_hud()
 	if not GameState.autoplay:
 		Sfx.play("chip")
@@ -2201,8 +2201,6 @@ func _human_predict() -> int:
 	box.add_child(v)
 	v.add_child(UIKit.label("QUANTAS RODADAS VOCÊ VAI GANHAR?", 26, UIKit.TEXT_ON_LIGHT, HORIZONTAL_ALIGNMENT_CENTER))
 	var hint := ChaosBot.suggested_predict(engine, 0)
-	var leader_lbl2 := UIKit.label("▶ ABRE A RODADA: %s" % _leader_name(), 22, UIKit.TURN, HORIZONTAL_ALIGNMENT_CENTER)
-	v.add_child(leader_lbl2)
 	var info := "Entrada ◎%d  ·  Pote ◎%d  ·  Sua mão: %s" % [int(engine.blitz_entry()), int(engine.carry), _hand_label_blitz()]
 	var info_l := UIKit.label(info, 19, UIKit.TEXT_ON_LIGHT, HORIZONTAL_ALIGNMENT_CENTER)
 	info_l.modulate.a = 0.7
@@ -2269,11 +2267,6 @@ func _hand_label_blitz() -> String:
 	if ex >= 1.5:
 		return "MÉDIA ★☆☆"
 	return "FRACA ☆☆☆"
-
-
-func _leader_name() -> String:
-	var l := engine.leader
-	return "VOCÊ" if l == 0 else str(config["names"][l]).to_upper()
 
 
 ## Dobrar/triplicar (seu próprio lance, `is_cover = false`) ou cobrir o lance de um rival (reage
