@@ -712,15 +712,16 @@ func _ranked_search(exclude_blind: int) -> void:
 	for c in bv.get_children():
 		c.queue_free()
 	var blind := int(room["blind"])
+	var n_found: int = int(room.get("players", 4))
 	bv.add_child(UIKit.label("PARTIDA ENCONTRADA", 34, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
-	bv.add_child(UIKit.label("Buy-in ◎%s  ·  Blind ◎%s" % [UIKit.fmt_int(GameState.ranked_room_buy_in(room)), UIKit.fmt_int(blind)], 28, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
+	bv.add_child(UIKit.label("Buy-in ◎%s  ·  Blind ◎%s  ·  %d jogadores" % [UIKit.fmt_int(GameState.ranked_room_buy_in(room)), UIKit.fmt_int(blind), n_found], 28, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
 	var who := UIKit.label("Com %s" % names, 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	who.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bv.add_child(who)
 	var enter := UIKit.button("ENTRAR", UIKit.OK, 34)
 	enter.custom_minimum_size = Vector2(0, 88)
 	enter.pressed.connect(func():
-		GameState.ranked_table = {"blind": blind, "stack_blinds": GameState.RANKED_STACK_BLINDS}
+		GameState.ranked_table = {"blind": blind, "stack_blinds": GameState.RANKED_STACK_BLINDS, "players": int(room.get("players", 4))}
 		GameState.chaos_mode = "blitz"
 		get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn"))
 	bv.add_child(enter)

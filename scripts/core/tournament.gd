@@ -16,7 +16,7 @@ const MAX_TABLE := 4
 const MIN_TABLE := 2
 const BUY_IN := 300             ## fichas, cobradas uma vez na inscrição (não por mesa/nível)
 const RAKE_PCT := 0.10          ## taxa da casa sobre o bolão total
-const PAYOUTS := [0.55, 0.28, 0.12, 0.05]   ## fração do bolão pros 4 melhores colocados
+const PAYOUTS := [0.60, 0.28, 0.12]   ## fração do bolão pros 3 primeiros colocados
 const STARTING_STACK := 400.0   ## mesmo de uma mesa Iniciante — igual pra todo mundo
 ## Blind sobe com o torneio (igual qualquer MTT de poker de verdade) — sem isso, com blind fixo
 ## em 10 e stack de 400 (40 blinds), quase ninguém quebra e o torneio nunca anda. Dobra a cada

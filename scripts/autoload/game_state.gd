@@ -179,6 +179,7 @@ func ranked_rooms_open(fichas: int) -> Array:
 
 ## Acha uma sala com gente (simulado): sorteia entre as que o saldo paga, as de blind menor com
 ## mais chance (mais movimento). `exclude_blind` evita repetir a sala recusada, se houver outra.
+## Retorna o room com um campo extra "players" (4–6) simulando o tamanho do lobby encontrado.
 func find_ranked_room(fichas: int, exclude_blind: int = -1) -> Dictionary:
 	var open := ranked_rooms_open(fichas)
 	if open.is_empty():
@@ -189,11 +190,15 @@ func find_ranked_room(fichas: int, exclude_blind: int = -1) -> Dictionary:
 	for r in pool:
 		total += int(r["weight"])
 	var pick := randi() % maxi(total, 1)
+	var chosen: Dictionary = pool[0]
 	for r in pool:
 		pick -= int(r["weight"])
 		if pick < 0:
-			return r
-	return pool[0]
+			chosen = r
+			break
+	var result := chosen.duplicate()
+	result["players"] = randi_range(4, 6)  # bots preenchem vagas restantes até ter jogadores reais
+	return result
 
 
 
@@ -223,23 +228,29 @@ func chaos_config() -> Dictionary:
 	var difficulty := [BotAI.Difficulty.NORMAL, int(t["bots"][0]), int(t["bots"][1]), int(t["bots"][2])]
 	var table_name := str(t["name"])
 	var stacks: Array = []
+	var n_players := 4
 	if not ranked_table.is_empty():
 		blind = int(ranked_table["blind"])
 		buy_in = blind * int(ranked_table["stack_blinds"])
+		n_players = clampi(int(ranked_table.get("players", 4)), 4, 6)
 		var d := Ranked.bot_difficulty_for_mmr(int(ranked()["mmr"]))
-		difficulty = [BotAI.Difficulty.NORMAL, d, d, d]
-		table_name = "Rankeada · blind ◎%d" % blind
+		# Slot 0 = humano; slots 1..n_players-1 = bots preenchendo a mesa
+		difficulty = [BotAI.Difficulty.NORMAL]
+		for _i in range(n_players - 1):
+			difficulty.append(d)
+		table_name = "Rankeada · blind ◎%d · %d jogadores" % [blind, n_players]
 		stacks = [float(buy_in)]
-		for i in range(3):
+		for _i in range(n_players - 1):
 			stacks.append(float(randi_range(int(ChaosEconomy.BOT_STACK_BLINDS[0]), int(ChaosEconomy.BOT_STACK_BLINDS[1])) * blind))
+	var bot_names: Array = names.slice(0, n_players - 1)
 	var entered := int(profile["fichas"]) >= buy_in
 	if entered:
 		profile["fichas"] = int(profile["fichas"]) - buy_in
 		SaveManager.save_game()
 	var cfg := {
-		"players": 4,
-		"start_leader": randi() % 4,   # quem abre o 1º nível é sorteado
-		"names": [player_name(), names[0], names[1], names[2]],
+		"players": n_players,
+		"start_leader": randi() % n_players,
+		"names": ([player_name()] as Array) + bot_names,
 		"difficulty": difficulty,
 		"blind": blind,
 		"buy_in": buy_in,
