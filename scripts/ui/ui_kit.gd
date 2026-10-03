@@ -33,6 +33,10 @@ const TEXT_ON_LIGHT := Color("#1A1240") ## texto sobre superfícies claras (dour
 ## Identidade (o dourado da marca): títulos e molduras de popup; e o jogador local.
 const BRAND := GOLD
 const BROWN := Color("#D9B48F")   ## marrom claro: títulos e valores do hub
+const RANK_PLAY_BG := Color("#4A0D1A")      ## botão JOGAR RANKEADA: vermelho escuro
+const RANK_PLAY_GLOW := Color("#FF2D55")    ## brilho/borda falhada do botão de jogar
+const ENTER_BLUE := Color("#2A4373")        ## botão ENTRAR dos torneios
+const ENTER_BLUE_EDGE := Color("#16264A")   ## borda suave do botão ENTRAR
 const ME := GOLD
 const CLEAR := Color(0, 0, 0, 0)
 
@@ -177,6 +181,27 @@ static func pop_in(node: Control, seconds: float = 0.2) -> void:
 	center.call()
 	var tw := node.create_tween()
 	tw.tween_property(node, "scale", Vector2.ONE, seconds).set_trans(Tween.TRANS_BACK)
+
+
+## Fundo opaco com borda suave (translúcida + sombra difusa), sem brilho.
+static func soft_box(bg: Color, edge: Color) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.set_corner_radius_all(18)
+	sb.set_border_width_all(3)
+	sb.border_color = Color(edge, 0.75)
+	sb.shadow_color = Color(edge, 0.5)
+	sb.shadow_size = 6
+	sb.content_margin_left = 12
+	sb.content_margin_right = 12
+	return sb
+
+
+## Véu translúcido pra estados hover/pressed de botões sem fundo.
+static func tint_box(alpha: float) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(1, 1, 1, alpha)
+	return sb
 
 
 static func button(text: String, accent: Color = ACTION, size: int = 30) -> Button:

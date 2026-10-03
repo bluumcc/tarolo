@@ -299,27 +299,45 @@ func _build_ranked(_wide: bool) -> void:
 	tier_lbl.add_theme_constant_override("outline_size", 6)
 	_content_col.add_child(tier_lbl)
 
-	# Card de métricas: 75% da largura, centralizado, uma linha (razão V/D)
+	# Card de métricas: 75% da largura, centralizado (MMR, pontos e razão V/D)
 	var ratio := float(wins) / float(maxi(loss, 1))
+	var stat_rows: Array[Array] = [
+		["MMR",  UIKit.fmt_int(int(rk["mmr"]))],
+		["LP",   "%d / 100" % int(t["lp"])],
+		["V / D", UIKit.fmt_dec(ratio, 2)],
+	]
 	var mp := UIKit.panel(UIKit.SURFACE_DEEP, UIKit.OUTLINE, 24)
 	mp.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	mp.custom_minimum_size   = Vector2(get_viewport_rect().size.x * 0.75, 0)
-	var mrow := HBoxContainer.new()
-	var mk := UIKit.label("V / D", 26, UIKit.MUTED)
-	mk.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	mrow.add_child(mk)
-	mrow.add_child(UIKit.label(UIKit.fmt_dec(ratio, 2), 26, UIKit.BROWN))
-	mp.add_child(mrow)
+	var mv := VBoxContainer.new()
+	mv.add_theme_constant_override("separation", 12)
+	mp.add_child(mv)
+	for sr in stat_rows:
+		var mrow := HBoxContainer.new()
+		var mk := UIKit.label(str(sr[0]), 26, UIKit.MUTED)
+		mk.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		mrow.add_child(mk)
+		mrow.add_child(UIKit.label(str(sr[1]), 26, UIKit.BROWN))
+		mv.add_child(mrow)
 	_content_col.add_child(mp)
 
-	# Card de torneios (largura total) com um card por torneio aberto
+	# Card de torneios: título centralizado e lista com rolagem (altura limitada)
 	var fichas := int(SaveManager.section("profile")["fichas"])
 	var tp := UIKit.panel(UIKit.SURFACE_DEEP, UIKit.OUTLINE, 24)
 	tp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var tv := VBoxContainer.new()
 	tv.add_theme_constant_override("separation", 16)
 	tp.add_child(tv)
-	tv.add_child(UIKit.label("TORNEIOS", 32, UIKit.BROWN))
+	tv.add_child(UIKit.label("TORNEIOS", 32, UIKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER))
+	var tscroll := ScrollContainer.new()
+	tscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	tscroll.custom_minimum_size = Vector2(0, clampf(get_viewport_rect().size.y * 0.38, 260.0, 480.0))
+	UIKit.suppress_click_on_scroll(tscroll)
+	tv.add_child(tscroll)
+	var tlist := VBoxContainer.new()
+	tlist.add_theme_constant_override("separation", 12)
+	tlist.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tscroll.add_child(tlist)
 	for ev in Tournament.OPEN_EVENTS:
 		var buy: int = int(ev["buy_in"])
 		var item := UIKit.panel(UIKit.SURFACE, UIKit.OUTLINE, 16)
@@ -329,15 +347,31 @@ func _build_ranked(_wide: bool) -> void:
 		item.add_child(ir)
 		var info := VBoxContainer.new()
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		info.add_child(UIKit.label(str(ev["name"]), 26, UIKit.BROWN))
-		info.add_child(UIKit.label("%d jogadores · 1º ◎%s" % [Tournament.FIELD_SIZE, UIKit.fmt_int(Tournament.payout_for(0, buy))], 20, UIKit.MUTED))
+		info.add_child(UIKit.label("%s (%d jogadores)" % [str(ev["name"]), Tournament.FIELD_SIZE], 24, UIKit.BROWN))
+		info.add_child(UIKit.label("Inscrição ◎%s" % UIKit.fmt_int(buy), 20, UIKit.MUTED))
+		var prizes := UIKit.label("1º ◎%s · 2º ◎%s · 3º ◎%s" % [
+			UIKit.fmt_int(Tournament.payout_for(0, buy)), UIKit.fmt_int(Tournament.payout_for(1, buy)),
+			UIKit.fmt_int(Tournament.payout_for(2, buy))], 20, UIKit.MUTED)
+		prizes.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		info.add_child(prizes)
 		ir.add_child(info)
-		var eb := UIKit.button("◎ %s" % UIKit.fmt_int(buy), UIKit.MONEY, 24)
+		var eb := UIKit.button("ENTRAR", UIKit.ENTER_BLUE, 24)
+		eb.focus_mode = Control.FOCUS_NONE
 		eb.custom_minimum_size = Vector2(150, 64)
+		eb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		eb.add_theme_constant_override("outline_size", 0)
+		for cn in ["font_color", "font_hover_color", "font_pressed_color"]:
+			eb.add_theme_color_override(cn, UIKit.BROWN)
+		eb.add_theme_color_override("font_disabled_color", UIKit.MUTED)
+		eb.add_theme_stylebox_override("normal",   UIKit.soft_box(UIKit.ENTER_BLUE, UIKit.ENTER_BLUE_EDGE))
+		eb.add_theme_stylebox_override("hover",    UIKit.soft_box(UIKit.ENTER_BLUE.lightened(0.1), UIKit.ENTER_BLUE_EDGE))
+		eb.add_theme_stylebox_override("pressed",  UIKit.soft_box(UIKit.ENTER_BLUE.darkened(0.1), UIKit.ENTER_BLUE_EDGE))
+		eb.add_theme_stylebox_override("disabled", UIKit.soft_box(UIKit.ENTER_BLUE.darkened(0.35), UIKit.ENTER_BLUE_EDGE))
+		eb.add_theme_stylebox_override("focus",    UIKit.soft_box(UIKit.ENTER_BLUE, UIKit.ENTER_BLUE_EDGE))
 		eb.disabled = fichas < buy
 		eb.pressed.connect(_open_tournament.bind(buy, str(ev["name"])))
 		ir.add_child(eb)
-		tv.add_child(item)
+		tlist.add_child(item)
 	_content_col.add_child(tp)
 
 	# Botão fixo no rodapé, largura total (com a margem global)
@@ -347,12 +381,25 @@ func _build_ranked(_wide: bool) -> void:
 	ab_mg.add_theme_constant_override("margin_top",    12)
 	ab_mg.add_theme_constant_override("margin_bottom", 32)
 	_action_bar.add_child(ab_mg)
-	var find_btn := UIKit.button("JOGAR RANKEADA", tc, 38)
-	find_btn.custom_minimum_size = Vector2(0, 154)
-	find_btn.add_theme_color_override("font_outline_color", tc.darkened(0.5))
-	find_btn.add_theme_constant_override("outline_size", 5)
+	var gp := GlitchPanel.new()
+	gp.accent        = UIKit.RANK_PLAY_GLOW
+	gp.bg            = UIKit.RANK_PLAY_BG
+	gp.glow_layers   = 9
+	ab_mg.add_child(gp)
+	for sd in ["left", "right", "top", "bottom"]:
+		gp.add_theme_constant_override("margin_" + sd, 4)
+	var find_btn := UIKit.button("JOGAR RANKEADA", UIKit.RANK_PLAY_BG, 57)
+	find_btn.add_theme_font_size_override("font_size", 57)
+	find_btn.custom_minimum_size = Vector2(0, 131)
+	find_btn.add_theme_constant_override("outline_size", 0)
+	var flat := StyleBoxEmpty.new()
+	var press := UIKit.tint_box(0.08)
+	find_btn.add_theme_stylebox_override("normal",  flat)
+	find_btn.add_theme_stylebox_override("focus",   flat)
+	find_btn.add_theme_stylebox_override("hover",   press)
+	find_btn.add_theme_stylebox_override("pressed", press)
 	find_btn.pressed.connect(_start_ranked_matchmaking)
-	ab_mg.add_child(find_btn)
+	gp.add_child(find_btn)
 
 
 func _build_classic(wide: bool) -> void:
