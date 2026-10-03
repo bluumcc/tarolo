@@ -15,6 +15,7 @@ const CARD_SCENE := preload("res://scenes/Card.tscn")
 
 var content: Control
 var ghost_layer: Control        # camada por cima de tudo, onde a carta arrastada aparece
+var throw_allowed: Callable     # a cena diz se arrastar a carta pra cima faz algo agora (inválido = sempre)
 var scroll_x := 0.0
 var _pressing := false
 var _mode := ""                 # "" = ainda decidindo · "scroll" · "card" · "none"
@@ -111,7 +112,7 @@ func _decide_gesture(d: Vector2) -> void:
 	var can_scroll := max_scroll() > 1.0
 	if can_scroll and absf(d.x) >= absf(d.y):
 		_mode = "scroll"
-	elif d.y < 0.0 and pressed != null and pressed.playable and ghost_layer != null and (absf(d.y) > absf(d.x) * 0.5 or not can_scroll):
+	elif d.y < 0.0 and pressed != null and pressed.playable and ghost_layer != null and (not throw_allowed.is_valid() or bool(throw_allowed.call())) and (absf(d.y) > absf(d.x) * 0.5 or not can_scroll):
 		_mode = "card"
 		_begin_card_drag(pressed)
 	else:

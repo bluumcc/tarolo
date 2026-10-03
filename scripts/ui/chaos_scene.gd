@@ -225,6 +225,7 @@ func _build_ui() -> void:
 
 	var hand_scroller := hand_container.get_parent() as HandScroller
 	hand_scroller.ghost_layer = popup_layer
+	hand_scroller.throw_allowed = func() -> bool: return phase == "discard" or human_turn
 	hand_scroller.throw_requested.connect(_on_card_thrown)
 
 	overlay_layer = Control.new()
@@ -1048,6 +1049,8 @@ func _on_card_thrown(view: CardView, drop_global: Vector2) -> void:
 		_commit_discard(view, drop_global)
 		return
 	if not human_turn or not view.playable:
+		if is_instance_valid(view):
+			view.visible = true   # arrasto recusado: a carta volta pra mão em vez de sumir
 		return
 	throw_from = drop_global
 	has_throw_from = true
@@ -2245,6 +2248,7 @@ func _human_discard_play() -> void:
 	discarding_now = true
 	await item_chosen
 	discarding_now = false
+	phase = "idle"   # cartas deixam de ser clicáveis/arrastáveis fora da vez
 	turn_bar.modulate.a = 0.0
 	turn_bar.max_value = TURN_SECONDS
 	status_label.text = ""
