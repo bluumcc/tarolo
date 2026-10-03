@@ -177,15 +177,15 @@ func ranked_rooms_open(fichas: int) -> Array:
 	return RANKED_ROOMS.filter(func(r: Dictionary) -> bool: return fichas >= ranked_room_buy_in(r))
 
 
-## Acha uma sala com gente (simulado): sorteia entre as que o saldo paga, as de blind menor com
-## mais chance (mais movimento). `exclude_blind` evita repetir a sala recusada, se houver outra.
-## Retorna o room com um campo extra "players" (4–6) simulando o tamanho do lobby encontrado.
+## Todas as 4 salas existem o tempo todo (bots jogam em background).
+## Retorna uma sala diferente de `exclude_blind`; se só existe uma, avisa com "only_room: true".
+## O saldo não bloqueia a descoberta — só bloqueia o botão ENTRAR na UI.
+## Cada sala retornada tem: blind, weight, players (4–6), rounds_left (0–7, rodadas da partida
+## atual que faltam antes de aceitar novos jogadores), affordable (bool).
 func find_ranked_room(fichas: int, exclude_blind: int = -1) -> Dictionary:
-	var open := ranked_rooms_open(fichas)
-	if open.is_empty():
-		return {}
-	var others := open.filter(func(r: Dictionary) -> bool: return int(r["blind"]) != exclude_blind)
-	var pool: Array = others if not others.is_empty() else open
+	var all: Array = RANKED_ROOMS  # todas as salas existem sempre
+	var others := all.filter(func(r: Dictionary) -> bool: return int(r["blind"]) != exclude_blind)
+	var pool: Array = others if not others.is_empty() else all
 	var total := 0
 	for r in pool:
 		total += int(r["weight"])
@@ -197,7 +197,10 @@ func find_ranked_room(fichas: int, exclude_blind: int = -1) -> Dictionary:
 			chosen = r
 			break
 	var result := chosen.duplicate()
-	result["players"] = randi_range(4, 6)  # bots preenchem vagas restantes até ter jogadores reais
+	result["players"] = randi_range(4, 6)
+	result["rounds_left"] = randi_range(0, 7)   # 0 = aceita agora; >0 = aguardando rodada atual
+	result["affordable"] = fichas >= ranked_room_buy_in(result)
+	result["only_room"] = others.is_empty()      # UI pode avisar que não há outra opção
 	return result
 
 

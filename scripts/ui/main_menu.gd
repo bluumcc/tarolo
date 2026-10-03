@@ -713,13 +713,24 @@ func _ranked_search(exclude_blind: int) -> void:
 		c.queue_free()
 	var blind := int(room["blind"])
 	var n_found: int = int(room.get("players", 4))
-	bv.add_child(UIKit.label("PARTIDA ENCONTRADA", 34, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
-	bv.add_child(UIKit.label("Buy-in ◎%s  ·  Blind ◎%s  ·  %d jogadores" % [UIKit.fmt_int(GameState.ranked_room_buy_in(room)), UIKit.fmt_int(blind), n_found], 28, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
-	var who := UIKit.label("Com %s" % names, 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	var affordable: bool = bool(room.get("affordable", true))
+	var rounds_left: int = int(room.get("rounds_left", 0))
+	var only_room: bool = bool(room.get("only_room", false))
+	bv.add_child(UIKit.label("SALA ENCONTRADA", 34, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+	var info_color := UIKit.MONEY if affordable else UIKit.MUTED
+	bv.add_child(UIKit.label("Buy-in ◎%s  ·  Blind ◎%s  ·  %d jogadores" % [UIKit.fmt_int(GameState.ranked_room_buy_in(room)), UIKit.fmt_int(blind), n_found], 26, info_color, HORIZONTAL_ALIGNMENT_CENTER))
+	if rounds_left > 0:
+		bv.add_child(UIKit.label("Partida em andamento — entra na próxima (%d rodadas)" % rounds_left, 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	else:
+		bv.add_child(UIKit.label("Aguardando jogadores", 22, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER))
+	var who := UIKit.label("Com %s" % names, 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	who.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bv.add_child(who)
-	var enter := UIKit.button("ENTRAR", UIKit.OK, 34)
+	if not affordable:
+		bv.add_child(UIKit.label("Saldo insuficiente (precisa de ◎%s)" % UIKit.fmt_int(GameState.ranked_room_buy_in(room)), 20, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+	var enter := UIKit.button("ENTRAR", UIKit.OK if affordable else UIKit.MUTED, 34)
 	enter.custom_minimum_size = Vector2(0, 88)
+	enter.disabled = not affordable
 	enter.pressed.connect(func():
 		GameState.ranked_table = {"blind": blind, "stack_blinds": GameState.RANKED_STACK_BLINDS, "players": int(room.get("players", 4))}
 		GameState.chaos_mode = "blitz"
@@ -731,6 +742,9 @@ func _ranked_search(exclude_blind: int) -> void:
 	var other := UIKit.button("PROCURAR OUTRA", UIKit.PURPLE, 22)
 	other.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	other.custom_minimum_size = Vector2(0, 64)
+	if only_room:
+		other.disabled = true
+		other.tooltip_text = "Só existe essa sala no momento"
 	other.pressed.connect(func():
 		ov.queue_free()
 		_ranked_search(blind))
