@@ -653,16 +653,17 @@ func _reopen_settings() -> void:
 	_open_settings()
 
 
+## Rankeada = Blitz. O blind vem do saldo (escada de blinds) e o stack é escolhido numa faixa
+## de 20 a 100 blinds, limitada pelo que você tem. Depois vem a busca de adversários.
 func _start_ranked_matchmaking() -> void:
-	# A rankeada é o Blitz: a mesa (blind/stack) vem da sua liga — Bronze/Prata: Iniciante,
-	# Ouro/Platina: Regular, Diamante em diante: Alta.
-	var rk := GameState.ranked()
-	var tier := int(Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))["tier"])
-	var table := 0 if tier <= 1 else (1 if tier <= 3 else 2)
-	var cost := GameState.chaos_buy_in(table)
-	if int(SaveManager.section("profile")["fichas"]) < cost:
-		var v := _modal("FICHAS INSUFICIENTES")
-		var msg := UIKit.label("A mesa da sua liga (%s) pede ◎%s pra sentar." % [str(GameState.CHAOS_TABLES[table]["name"]), UIKit.fmt_int(cost)], 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var fichas := int(SaveManager.section("profile")["fichas"])
+	var blind := GameState.ranked_blind_for(fichas)
+	var max_b := GameState.ranked_stack_max_blinds(blind, fichas)
+	var min_b := GameState.RANKED_MIN_STACK_BLINDS
+	var v := _modal("MESA RANKEADA")
+	var footer: Node = v.get_meta("modal_footer", v)
+	if max_b < min_b:
+		var msg := UIKit.label("Você precisa de pelo menos ◎%s pra sentar (%d blinds de ◎%d)." % [UIKit.fmt_int(min_b * blind), min_b, blind], 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 		msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(msg)
 		var shop := UIKit.button("RECARGA E PACOTES", UIKit.OK)
@@ -670,9 +671,65 @@ func _start_ranked_matchmaking() -> void:
 		v.add_child(shop)
 		var cl := UIKit.button("FECHAR", UIKit.MUTED)
 		cl.pressed.connect(_close_modal)
-		v.get_meta("modal_footer", v).add_child(cl)
+		footer.add_child(cl)
 		return
-	GameState.chaos_table = table
+	var st := {"blinds": clampi(GameState.RANKED_DEFAULT_STACK_BLINDS, min_b, max_b)}
+	var info := UIKit.label("Blind ◎%s, definido pelo seu saldo de ◎%s. Escolha com quanto sentar." % [UIKit.fmt_int(blind), UIKit.fmt_int(fichas)], 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(info)
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 12)
+	v.add_child(body)
+	st["render"] = func() -> void:
+		for c in body.get_children():
+			body.remove_child(c)
+			c.queue_free()
+		var row := HBoxContainer.new()
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_theme_constant_override("separation", 14)
+		body.add_child(row)
+		var minus := UIKit.button("−", UIKit.MUTED, 40)
+		minus.custom_minimum_size = Vector2(88, 72)
+		minus.disabled = int(st["blinds"]) <= min_b
+		minus.pressed.connect(func():
+			st["blinds"] = maxi(int(st["blinds"]) - 5, min_b)
+			(st["render"] as Callable).call())
+		row.add_child(minus)
+		var num := UIKit.label("◎ %s" % UIKit.fmt_int(int(st["blinds"]) * blind), 46, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+		num.custom_minimum_size = Vector2(190, 0)
+		row.add_child(num)
+		var plus := UIKit.button("+", UIKit.MUTED, 40)
+		plus.custom_minimum_size = Vector2(88, 72)
+		plus.disabled = int(st["blinds"]) >= max_b
+		plus.pressed.connect(func():
+			st["blinds"] = mini(int(st["blinds"]) + 5, max_b)
+			(st["render"] as Callable).call())
+		row.add_child(plus)
+		body.add_child(UIKit.label("%d blinds" % int(st["blinds"]), 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+		var presets := HBoxContainer.new()
+		presets.add_theme_constant_override("separation", 8)
+		body.add_child(presets)
+		for pr in [["MÍN", min_b], ["PADRÃO", clampi(GameState.RANKED_DEFAULT_STACK_BLINDS, min_b, max_b)], ["MÁX", max_b]]:
+			var val := int(pr[1])
+			var pb := UIKit.button(str(pr[0]), UIKit.OK if int(st["blinds"]) == val else UIKit.PURPLE, 22)
+			pb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			pb.pressed.connect(func():
+				st["blinds"] = val
+				(st["render"] as Callable).call())
+			presets.add_child(pb)
+	(st["render"] as Callable).call()
+	var go := UIKit.button("JOGAR", UIKit.RANK_PLAY_BG, 32)
+	go.pressed.connect(func():
+		GameState.ranked_table = {"blind": blind, "stack_blinds": int(st["blinds"])}
+		_close_modal()
+		_run_ranked_search())
+	footer.add_child(go)
+	var close := UIKit.button("FECHAR", UIKit.MUTED)
+	close.pressed.connect(_close_modal)
+	footer.add_child(close)
+
+
+func _run_ranked_search() -> void:
 	GameState.chaos_mode = "blitz"
 	# Overlay de matchmaking inline: busca → nomes → inicia ChaosScene (modo blitz/rankeado)
 	var ov := UIKit.overlay()

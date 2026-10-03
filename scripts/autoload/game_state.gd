@@ -155,6 +155,26 @@ const CHAOS_TABLES := [
 	{"name": "Alta", "blind": 200, "bots": [2, 2, 2]},       # Difícil x3
 ]
 var chaos_table := 0
+
+## Rankeada: uma escada de blinds e uma faixa de stack — sem níveis nomeados. O blind vem do saldo
+## de fichas (o maior que ainda deixa ~100 blinds de folga) e o stack é escolhido numa faixa.
+const BLIND_LADDER := [10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000]
+const RANKED_MIN_STACK_BLINDS := 20
+const RANKED_MAX_STACK_BLINDS := 100
+const RANKED_DEFAULT_STACK_BLINDS := 40
+var ranked_table := {}   # {blind, stack_blinds} da mesa rankeada que está sendo aberta
+
+
+func ranked_blind_for(fichas: int) -> int:
+	for i in range(BLIND_LADDER.size() - 1, -1, -1):
+		if fichas >= int(BLIND_LADDER[i]) * RANKED_MAX_STACK_BLINDS:
+			return int(BLIND_LADDER[i])
+	return int(BLIND_LADDER[0])
+
+
+## Maior stack (em blinds) que dá pra levar: até 100, limitado pelo saldo.
+func ranked_stack_max_blinds(blind: int, fichas: int) -> int:
+	return mini(RANKED_MAX_STACK_BLINDS, fichas / maxi(blind, 1))
 var chaos_mode := "blitz"    # só "blitz" existe hoje (Caos removido); campo mantido por compatibilidade de save
 
 
@@ -177,23 +197,38 @@ func chaos_config() -> Dictionary:
 	var t: Dictionary = CHAOS_TABLES[clampi(chaos_table, 0, CHAOS_TABLES.size() - 1)]
 	var blind := int(t["blind"])
 	var buy_in := chaos_buy_in()
+	var difficulty := [BotAI.Difficulty.NORMAL, int(t["bots"][0]), int(t["bots"][1]), int(t["bots"][2])]
+	var table_name := str(t["name"])
+	var stacks: Array = []
+	if not ranked_table.is_empty():
+		blind = int(ranked_table["blind"])
+		buy_in = blind * int(ranked_table["stack_blinds"])
+		var d := Ranked.bot_difficulty_for_mmr(int(ranked()["mmr"]))
+		difficulty = [BotAI.Difficulty.NORMAL, d, d, d]
+		table_name = "Rankeada · blind ◎%d" % blind
+		stacks = [float(buy_in)]
+		for i in range(3):
+			stacks.append(float(randi_range(int(ChaosEconomy.BOT_STACK_BLINDS[0]), int(ChaosEconomy.BOT_STACK_BLINDS[1])) * blind))
 	var entered := int(profile["fichas"]) >= buy_in
 	if entered:
 		profile["fichas"] = int(profile["fichas"]) - buy_in
 		SaveManager.save_game()
-	return {
+	var cfg := {
 		"players": 4,
 		"start_leader": randi() % 4,   # quem abre o 1º nível é sorteado
 		"names": [player_name(), names[0], names[1], names[2]],
-		"difficulty": [BotAI.Difficulty.NORMAL, int(t["bots"][0]), int(t["bots"][1]), int(t["bots"][2])],
+		"difficulty": difficulty,
 		"blind": blind,
 		"buy_in": buy_in,
-		"table_name": str(t["name"]),
+		"table_name": table_name,
 		"mode": chaos_mode,
 		"levels": 3 if autoplay else 0,
 		"entered": entered,
 		"onboarding_levels": maxi(0, ONBOARDING_LEVELS - int(profile.get("blitz_levels", 0))) if chaos_mode == "blitz" else 0,
 	}
+	if not stacks.is_empty():
+		cfg["stacks"] = stacks
+	return cfg
 
 
 ## Chamado a cada nível de Blitz concluído: conta pro fim das regras simplificadas dos primeiros
