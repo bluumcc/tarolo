@@ -443,6 +443,12 @@ func _build_rival_seat(p: int) -> Control:
 	card.add_child(_make_rival_info(p))
 	card.visible = false
 	seat.add_child(card)
+	var bet_l := UIKit.label("", 22, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)   # aposta da rodada, embaixo do nome
+	bet_l.add_theme_font_size_override("font_size", 22)
+	bet_l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	bet_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bet_l.visible = false
+	seat.add_child(bet_l)
 	hud_titles[p] = name_l
 	var token := {"n": 0}
 	wrap.gui_input.connect(func(event: InputEvent):
@@ -585,8 +591,12 @@ func _layout_seats() -> void:
 		wrap.position = Vector2((w - wrap.size.x) / 2.0, 0.0)
 		name_l.position = Vector2(0.0, wrap.size.y)
 		name_l.size = Vector2(w, name_h)
+		var bet_l := seat.get_child(3) as Control
+		var bet_h := bet_l.get_combined_minimum_size().y
+		bet_l.position = Vector2(0.0, wrap.size.y + name_h)
+		bet_l.size = Vector2(w, bet_h)
 		card.size = card.get_combined_minimum_size()
-		card.position = Vector2((w - card.size.x) / 2.0, wrap.size.y + name_h + 2.0)
+		card.position = Vector2((w - card.size.x) / 2.0, wrap.size.y + name_h + bet_h + 2.0)
 		var h := wrap.size.y + name_h
 		seat.size = Vector2(w, h)
 		var theta := TableEllipse.seat_angle(p, n)
@@ -1879,7 +1889,25 @@ func _refresh_hud() -> void:
 		var ob := order_badges[p] as PanelContainer
 		ob.visible = p != 0
 		if p != 0:
-			(ob.get_child(0) as Label).text = str(int(engine.wins[p]))
+			var wl := ob.get_child(0) as Label
+			wl.text = str(int(engine.wins[p]))
+			var fill := UIKit.PURPLE_DEEP
+			var edge := UIKit.MUTED
+			var ink := UIKit.INK
+			if blitz_showdown and engine.blitz:
+				var hit := engine.blitz_status(p) == "hit"
+				edge = UIKit.OK if hit else UIKit.LOSS
+				fill = edge.darkened(0.6)
+				ink = edge
+			ob.add_theme_stylebox_override("panel", UIKit.box_cached(fill, edge, 3, 20, 0))
+			wl.add_theme_color_override("font_color", ink)
+			# Aposta da rodada embaixo do nome, enquanto as apostas rolam (depois voa pro pote).
+			var seat := seat_nodes[p] as Control
+			var pile_l := seat.get_child(3) as Label
+			var pile := float(engine.contrib[p]) if phase == "bet" and not bets_gathered else 0.0
+			pile_l.visible = pile > 0.0
+			pile_l.text = "◎ %d" % int(pile)
+			pile_l.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[p] else UIKit.MONEY)
 		_refresh_bet_tags(p, idx)
 	info_label.text = "NÍVEL %d%s · %s ◎%d" % [engine.round_index + 1, ("/%d" % engine.levels) if engine.levels > 0 else "", "ENTRADA" if engine.blitz else "BLIND", int(engine.blitz_entry()) if engine.blitz else engine.blind]
 	Widgets.progress_dots(trick_dots, ChaosEngine.HAND_SIZE, engine.trick_number)

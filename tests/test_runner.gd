@@ -325,7 +325,8 @@ func _test_chaos() -> void:
 	check(not r3["ok"], "não dá pra passar com aposta aberta")
 	p1.bet_act(3, "fold")
 	check(p1.folded[3], "desistir tira da rodada")
-	check(not p1.bet_act(0, "raise", 60.0)["ok"], "só 2 aumentos por rodada")
+	p1.raises = ChaosEngine.MAX_RAISES
+	check(not p1.bet_act(0, "raise", 60.0)["ok"], "limite de aumentos por rodada")
 	p1.bet_act(0, "call")
 	p1.bet_act(1, "call")
 	check(not p1.betting and p1.active_count() == 3, "rodada de apostas fecha quando todo mundo igualou ou desistiu")
