@@ -32,6 +32,7 @@ const TEXT_ON_LIGHT := Color("#1A1240") ## texto sobre superfícies claras (dour
 
 ## Identidade (o dourado da marca): títulos e molduras de popup; e o jogador local.
 const BRAND := GOLD
+const BROWN := Color("#D9B48F")   ## marrom claro: títulos e valores do hub
 const ME := GOLD
 const CLEAR := Color(0, 0, 0, 0)
 

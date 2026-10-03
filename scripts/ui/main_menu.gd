@@ -62,14 +62,16 @@ func _build() -> void:
 	UIKit.suppress_click_on_scroll(scroll)
 
 	var mg := MarginContainer.new()
-	mg.add_theme_constant_override("margin_left", 0)
-	mg.add_theme_constant_override("margin_right", 0)
-	mg.add_theme_constant_override("margin_top", 0)
+	mg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mg.custom_minimum_size   = Vector2(get_viewport_rect().size.x, 0)
+	mg.add_theme_constant_override("margin_left",   Widgets.MARGIN)
+	mg.add_theme_constant_override("margin_right",  Widgets.MARGIN)
+	mg.add_theme_constant_override("margin_top",    Widgets.MARGIN)
 	mg.add_theme_constant_override("margin_bottom", Widgets.MARGIN)
 	scroll.add_child(mg)
 
 	_content_col = VBoxContainer.new()
-	_content_col.add_theme_constant_override("separation", 0)
+	_content_col.add_theme_constant_override("separation", 24)
 	_content_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mg.add_child(_content_col)
 
@@ -257,16 +259,6 @@ func _populate_tab(wide: bool) -> void:
 		"MENU":     _build_menu(wide)
 
 
-const _TAROT_SUBTITLES := [
-	"O LOUCO",        # Bronze
-	"O MAGO",         # Prata
-	"A IMPERATRIZ",   # Ouro
-	"A RODA",         # Platina
-	"O IMPERADOR",    # Diamante
-	"O HIEROFANTE",   # Mestre
-	"O MUNDO",        # Desafiante
-]
-
 func _build_ranked(_wide: bool) -> void:
 	var rk   := GameState.ranked()
 	var t    := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
@@ -274,123 +266,97 @@ func _build_ranked(_wide: bool) -> void:
 	var wins := int(rk["wins"])
 	var loss := int(rk["losses"])
 
-	# ── Winstreak a partir do histórico ──────────────────────────────────────
-	var hist: Array = rk["history"]
-	var streak := 0
-	for h in hist:
-		if int(h["placement"]) <= 1:
-			streak += 1
-		else:
-			break
+	# Título da página
+	var title := UIKit.label("TAROLO", 56, UIKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
+	title.add_theme_color_override("font_outline_color", UIKit.TITLE_OUTLINE)
+	title.add_theme_constant_override("outline_size", 8)
+	_content_col.add_child(title)
 
-	# ── Card hero: emblema + nome do tier (full-width, sem margens externas) ──
-	var hero := GlowPanel.new()
-	hero.accent      = tc
-	hero.bg          = UIKit.SURFACE_DEEP
-	hero.pulse_speed = 0.7
-	# GlowPanel é MarginContainer — sobrescreve padding padrão (16) para 24
-	for s in ["left", "right", "top", "bottom"]:
-		hero.add_theme_constant_override("margin_" + s, Widgets.MARGIN)
-	var hv := VBoxContainer.new()
-	hv.add_theme_constant_override("separation", 16)
-	hero.add_child(hv)
-
-	# Círculo com romano
+	# Badge do rank (sem card), 25% maior que antes (200 → 250)
 	var circle := Panel.new()
-	circle.custom_minimum_size   = Vector2(200, 200)
+	circle.custom_minimum_size   = Vector2(250, 250)
 	circle.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	var csb := UIKit.box(tc.darkened(0.1), tc.lightened(0.15), 5, 100, 0)
-	csb.border_width_left   = 5
-	csb.border_width_right  = 5
-	csb.border_width_top    = 5
-	csb.border_width_bottom = 5
+	var csb := UIKit.box(tc.darkened(0.1), tc.lightened(0.15), 6, 125, 0)
+	csb.set_border_width_all(6)
 	circle.add_theme_stylebox_override("panel", csb)
 	var div_txt := str(t["division"]) if str(t["division"]) != "" else "★"
-	var div_lbl := UIKit.label(div_txt, 80, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var div_lbl := UIKit.label(div_txt, 100, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	div_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	div_lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	div_lbl.add_theme_color_override("font_outline_color", tc.darkened(0.6))
-	div_lbl.add_theme_constant_override("outline_size", 6)
+	div_lbl.add_theme_constant_override("outline_size", 8)
 	circle.add_child(div_lbl)
-	hv.add_child(circle)
+	_content_col.add_child(circle)
 
-	# Título do tier + subtítulo tarot (dentro do mesmo card)
-	var tier_lbl := UIKit.label(str(t["label"]).to_upper(), 48, tc, HORIZONTAL_ALIGNMENT_CENTER)
+	# Nome do rank (sem card)
+	var tier_lbl := UIKit.label(str(t["label"]).to_upper(), 48, UIKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
 	tier_lbl.add_theme_color_override("font_outline_color", UIKit.OUTLINE)
-	tier_lbl.add_theme_constant_override("outline_size", 5)
-	hv.add_child(tier_lbl)
-	var sub: String = _TAROT_SUBTITLES[clampi(int(t["tier"]), 0, _TAROT_SUBTITLES.size() - 1)]
-	hv.add_child(UIKit.label(sub, 26, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	tier_lbl.add_theme_constant_override("outline_size", 6)
+	_content_col.add_child(tier_lbl)
 
-	_content_col.add_child(hero)
-
-	# ── Stats grid (full-width card) ──────────────────────────────────────────
-	var sp := GlowPanel.new()
-	sp.accent      = UIKit.VIOLET
-	sp.bg          = UIKit.SURFACE_DEEP
-	sp.pulse_speed = 0.0
-	for s in ["left", "right", "top", "bottom"]:
-		sp.add_theme_constant_override("margin_" + s, Widgets.MARGIN)
-	var sv := VBoxContainer.new()
-	sv.add_theme_constant_override("separation", 10)
-	sp.add_child(sv)
-
+	# Card de métricas (largura total)
+	var ratio := float(wins) / float(maxi(loss, 1))
 	var stat_rows: Array[Array] = [
-		["WINSTREAK",   "%d 🔥" % streak if streak >= 2 else "—",  UIKit.MONEY if streak >= 2 else UIKit.MUTED],
-		["MMR",         UIKit.fmt_int(int(rk["mmr"])),              UIKit.TURN],
-		["PONTOS RANK", "%d / 100" % int(t["lp"]),                  tc],
-		["VITÓRIAS",    str(wins),                                   UIKit.OK],
-		["DERROTAS",    str(loss),                                   UIKit.DANGER],
+		["MMR",      UIKit.fmt_int(int(rk["mmr"]))],
+		["PONTOS",   "%d / 100" % int(t["lp"])],
+		["V / D",    "%d / %d" % [wins, loss]],
+		["RAZÃO",    UIKit.fmt_dec(ratio, 2)],
 	]
+	var mp := UIKit.panel(UIKit.SURFACE_DEEP, UIKit.OUTLINE, 24)
+	mp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var mv := VBoxContainer.new()
+	mv.add_theme_constant_override("separation", 12)
+	mp.add_child(mv)
 	for sr in stat_rows:
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 0)
-		var kl := UIKit.label(str(sr[0]), 24, UIKit.MUTED)
+		var kl := UIKit.label(str(sr[0]), 26, UIKit.MUTED)
 		kl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(kl)
-		row.add_child(UIKit.label(str(sr[1]), 24, sr[2] as Color))
-		sv.add_child(row)
+		row.add_child(UIKit.label(str(sr[1]), 26, UIKit.BROWN))
+		mv.add_child(row)
+	_content_col.add_child(mp)
 
-	var bar := MeterBar.new()
-	bar.custom_minimum_size = Vector2(0, 12)
-	bar.set_colors(tc, UIKit.OUTLINE)
-	bar.set_values(float(t["progress"]), 1.0, false)
-	sv.add_child(bar)
-	_content_col.add_child(sp)
-
-	# ── Torneios (GlitchPanel full-width) ────────────────────────────────────
-	var gp := GlitchPanel.new()
-	for s in ["left", "right", "top", "bottom"]:
-		gp.add_theme_constant_override("margin_" + s, Widgets.MARGIN)
-	var tv := VBoxContainer.new()
-	tv.add_theme_constant_override("separation", 12)
-	gp.add_child(tv)
-	tv.add_child(UIKit.label("TORNEIOS AO VIVO", 28, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
-	var trk := GameState.tournaments()
-	var hist_t: Array = trk.get("history", [])
-	if hist_t.is_empty():
-		var nl := UIKit.label("Nenhum torneio disputado ainda.", 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-		nl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		tv.add_child(nl)
-	else:
-		for h in hist_t.slice(0, mini(3, hist_t.size())):
-			tv.add_child(UIKit.label(
-				"🏆 %s" % str(h["result"]).capitalize(), 22, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
+	# Card de torneios (largura total) com um card por torneio aberto
 	var fichas := int(SaveManager.section("profile")["fichas"])
-	var t_btn := UIKit.button("TORNEIO  ◎%d" % Tournament.BUY_IN, UIKit.MONEY, 24)
-	t_btn.custom_minimum_size = Vector2(0, 64)
-	t_btn.disabled = fichas < Tournament.BUY_IN
-	t_btn.pressed.connect(_open_tournament)
-	tv.add_child(t_btn)
-	_content_col.add_child(gp)
+	var tp := UIKit.panel(UIKit.SURFACE_DEEP, UIKit.OUTLINE, 24)
+	tp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var tv := VBoxContainer.new()
+	tv.add_theme_constant_override("separation", 16)
+	tp.add_child(tv)
+	tv.add_child(UIKit.label("TORNEIOS", 32, UIKit.BROWN))
+	for ev in Tournament.OPEN_EVENTS:
+		var buy: int = int(ev["buy_in"])
+		var item := UIKit.panel(UIKit.SURFACE, UIKit.OUTLINE, 16)
+		item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var ir := HBoxContainer.new()
+		ir.add_theme_constant_override("separation", 12)
+		item.add_child(ir)
+		var info := VBoxContainer.new()
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info.add_child(UIKit.label(str(ev["name"]), 26, UIKit.BROWN))
+		info.add_child(UIKit.label("%d jogadores · 1º ◎%s" % [Tournament.FIELD_SIZE, UIKit.fmt_int(Tournament.payout_for(0, buy))], 20, UIKit.MUTED))
+		ir.add_child(info)
+		var eb := UIKit.button("◎ %s" % UIKit.fmt_int(buy), UIKit.MONEY, 24)
+		eb.custom_minimum_size = Vector2(150, 64)
+		eb.disabled = fichas < buy
+		eb.pressed.connect(_open_tournament.bind(buy, str(ev["name"])))
+		ir.add_child(eb)
+		tv.add_child(item)
+	_content_col.add_child(tp)
 
-	# ── Botão ENCONTRAR PARTIDA: full-width, sem margens laterais ─────────────
+	# Botão fixo no rodapé, largura total (com a margem global)
+	var ab_mg := MarginContainer.new()
+	ab_mg.add_theme_constant_override("margin_left",   Widgets.MARGIN)
+	ab_mg.add_theme_constant_override("margin_right",  Widgets.MARGIN)
+	ab_mg.add_theme_constant_override("margin_top",    12)
+	ab_mg.add_theme_constant_override("margin_bottom", 16)
+	_action_bar.add_child(ab_mg)
 	var find_btn := UIKit.button("⚔   ENCONTRAR PARTIDA", tc, 38)
 	find_btn.custom_minimum_size = Vector2(0, 88)
 	find_btn.add_theme_color_override("font_outline_color", tc.darkened(0.5))
 	find_btn.add_theme_constant_override("outline_size", 5)
 	find_btn.pressed.connect(_start_ranked_matchmaking)
-	_action_bar.add_child(find_btn)
+	ab_mg.add_child(find_btn)
 
 
 func _build_classic(wide: bool) -> void:
@@ -559,13 +525,13 @@ func _close_modal() -> void:
 		_overlay.get_child(_overlay.get_child_count() - 1).queue_free()
 
 
-func _open_tournament() -> void:
-	var v   := _modal("TORNEIO")
+func _open_tournament(buy_in: int = Tournament.BUY_IN, ev_name: String = "TORNEIO") -> void:
+	var v   := _modal(ev_name.to_upper())
 	var prof := SaveManager.section("profile")
 	var trk := GameState.tournaments()
 	v.add_child(UIKit.label("16 jogadores · mesas de %d a %d, preenchidas com bots." % [Tournament.MIN_TABLE, Tournament.MAX_TABLE], 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("Entrada ◎%d  ·  Bolão ◎%d" % [Tournament.BUY_IN, Tournament.prize_pool()], 26, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UIKit.label("1º ◎%d · 2º ◎%d · 3º ◎%d · 4º ◎%d" % [Tournament.payout_for(0), Tournament.payout_for(1), Tournament.payout_for(2), Tournament.payout_for(3)], 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("Entrada ◎%d  ·  Bolão ◎%d" % [buy_in, Tournament.prize_pool(buy_in)], 26, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("1º ◎%d · 2º ◎%d · 3º ◎%d · 4º ◎%d" % [Tournament.payout_for(0, buy_in), Tournament.payout_for(1, buy_in), Tournament.payout_for(2, buy_in), Tournament.payout_for(3, buy_in)], 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	v.add_child(UIKit.label("🏆 %d troféu(s)" % int(trk.get("trophies", 0)), 24, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	var hist: Array = trk.get("history", [])
@@ -574,10 +540,10 @@ func _open_tournament() -> void:
 	for h in hist.slice(0, mini(5, hist.size())):
 		v.add_child(UIKit.label(str(h["result"]).capitalize(), 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	var footer: Node = v.get_meta("modal_footer", v)
-	var enter := UIKit.button("ENTRAR (◎%d)" % Tournament.BUY_IN, UIKit.ACTION)
-	enter.disabled = int(prof["fichas"]) < Tournament.BUY_IN
+	var enter := UIKit.button("ENTRAR (◎%d)" % buy_in, UIKit.ACTION)
+	enter.disabled = int(prof["fichas"]) < buy_in
 	enter.pressed.connect(func():
-		var t := GameState.start_tournament()
+		var t := GameState.start_tournament(buy_in)
 		if t.is_empty():
 			return
 		get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn"))

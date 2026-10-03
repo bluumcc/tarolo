@@ -155,12 +155,21 @@ static func simulate_level(entrants: Array, blind: int, rng: RandomNumberGenerat
 		entrants[p]["stack"] = maxf(eng.stacks[p], 0.0)
 
 
-static func prize_pool() -> int:
-	return int(round(float(BUY_IN * FIELD_SIZE) * (1.0 - RAKE_PCT)))
+## Torneios abertos no hub: nome, entrada (fichas) e selo de dificuldade. Mesmo formato (16 jogadores).
+const OPEN_EVENTS := [
+	{"name": "Freeroll Arcano",   "buy_in": 100},
+	{"name": "Torneio Clássico",  "buy_in": 300},
+	{"name": "Mesa dos Magos",    "buy_in": 600},
+	{"name": "Grande Arcano",     "buy_in": 1500},
+]
+
+
+static func prize_pool(buy_in: int = BUY_IN) -> int:
+	return int(round(float(buy_in * FIELD_SIZE) * (1.0 - RAKE_PCT)))
 
 
 ## placement: 0 = campeão, 1 = 2º lugar, ... (índice pronto pra PAYOUTS).
-static func payout_for(placement: int) -> int:
+static func payout_for(placement: int, buy_in: int = BUY_IN) -> int:
 	if placement < 0 or placement >= PAYOUTS.size():
 		return 0
-	return int(round(float(prize_pool()) * PAYOUTS[placement]))
+	return int(round(float(prize_pool(buy_in)) * PAYOUTS[placement]))

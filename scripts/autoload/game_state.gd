@@ -256,18 +256,18 @@ var _tournament_order: Array = []
 
 ## Inscreve, cobra o buy-in, sorteia o campo de 16 e monta as mesas iniciais (até
 ## `Tournament.MAX_TABLE` por mesa). Devolve {} se não tinha fichas pro buy-in.
-func start_tournament() -> Dictionary:
+func start_tournament(buy_in: int = Tournament.BUY_IN) -> Dictionary:
 	var profile := SaveManager.section("profile")
-	if int(profile["fichas"]) < Tournament.BUY_IN:
+	if int(profile["fichas"]) < buy_in:
 		return {}
-	profile["fichas"] = int(profile["fichas"]) - Tournament.BUY_IN
+	profile["fichas"] = int(profile["fichas"]) - buy_in
 	SaveManager.save_game()
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	var names: Array = BOT_NAMES.duplicate()
 	names += BOT_NAMES  # precisa de 15 bots, só há 12 nomes — repete, sem problema aqui
 	var field := Tournament.make_field(player_name(), names, rng)
-	tournament = {"tables": Tournament.split_into_tables(field), "total_entrants": field.size(), "level": 0}
+	tournament = {"tables": Tournament.split_into_tables(field), "total_entrants": field.size(), "level": 0, "buy_in": buy_in}
 	return tournament
 
 
@@ -354,7 +354,7 @@ func report_tournament_table(result: Dictionary) -> Dictionary:
 			human_alive = true
 	if not human_alive:
 		var placement := survivors.size() + 1   # 1 = campeão; empatou com quem mais quebrou junto
-		var prize := Tournament.payout_for(placement - 1)
+		var prize := Tournament.payout_for(placement - 1, int(tournament.get("buy_in", Tournament.BUY_IN)))
 		if prize > 0:
 			profile["fichas"] = int(profile["fichas"]) + prize
 			lines.append("%dº lugar — +◎%d do bolão" % [placement, prize])
@@ -365,7 +365,7 @@ func report_tournament_table(result: Dictionary) -> Dictionary:
 		next = "eliminated"
 		tournament = {}
 	elif survivors.size() == 1:
-		var prize := Tournament.payout_for(0)
+		var prize := Tournament.payout_for(0, int(tournament.get("buy_in", Tournament.BUY_IN)))
 		profile["fichas"] = int(profile["fichas"]) + prize
 		var trk2 := tournaments()
 		trk2["trophies"] = int(trk2.get("trophies", 0)) + 1
