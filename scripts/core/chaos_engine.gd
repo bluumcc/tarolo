@@ -44,6 +44,7 @@ var last_winner := -1
 var combo_count: Array = []
 var hand_no := 0              # rodadas de aposta jogadas na mesa (roda o botão)
 var button := 0               # "dealer": fala por último
+var start_leader := 0         # quem abre o 1º nível (sorteado pela cena; 0 nos testes)
 
 # Aposta da rodada atual.
 var pot := 0.0
@@ -109,6 +110,7 @@ func setup_match(config: Dictionary) -> void:
 	blind = int(config.get("blind", BLIND))
 	buy_in = int(config.get("buy_in", blind * BUY_IN_BLINDS))
 	levels = int(config.get("levels", 0))
+	start_leader = int(config.get("start_leader", 0)) % maxi(num_players, 1)
 	blitz = str(config.get("mode", "chaos")) == "blitz"
 	point_factor = float(config.get("point_factor", BLITZ_POINT_FACTOR))
 	onboarding_levels = int(config.get("onboarding_levels", 0))
@@ -156,7 +158,7 @@ func _setup_round() -> void:
 	Deck.shuffle(modifier_sequence, rng)
 	modifier = -1
 	weak_suit = -1
-	leader = round_index % num_players
+	leader = (start_leader + round_index) % num_players
 	current = leader
 	trick_number = 0
 	plays = []

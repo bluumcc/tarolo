@@ -183,6 +183,7 @@ func chaos_config() -> Dictionary:
 		SaveManager.save_game()
 	return {
 		"players": 4,
+		"start_leader": randi() % 4,   # quem abre o 1º nível é sorteado
 		"names": [player_name(), names[0], names[1], names[2]],
 		"difficulty": [BotAI.Difficulty.NORMAL, int(t["bots"][0]), int(t["bots"][1]), int(t["bots"][2])],
 		"blind": blind,
@@ -305,6 +306,7 @@ func tournament_table_config() -> Dictionary:
 		alive += (tb as Array).size()
 	return {
 		"players": _tournament_order.size(),
+		"start_leader": randi() % maxi(_tournament_order.size(), 1),
 		"names": names,
 		"difficulty": difficulty,
 		"blind": blind,
