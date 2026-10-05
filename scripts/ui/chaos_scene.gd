@@ -2633,14 +2633,21 @@ func _refresh_blitz_tag(p: int, idx: int) -> void:
 
 
 func _refresh_pot_blitz() -> void:
+	var in_trick := phase == "bet" or (phase == "play" and bets_gathered)
 	if not pot_locked:
 		if hold_pot >= 0.0:
 			shown_pot = hold_pot
+		elif in_trick:
+			shown_pot = engine.trick_pot
 		else:
 			shown_pot = engine.pot if engine.pot > 0.0 else engine.carry
 		pot_label.text = _pot_text(shown_pot)
 	var sub := ""
-	if phase == "predict":
+	if phase == "bet":
+		sub = "aposta da rodada"
+	elif phase == "play" and bets_gathered:
+		sub = "aposta da rodada"
+	elif phase == "predict":
 		sub = "quem acertar leva"
 	elif phase == "play" and engine.carry > 0.0:
 		sub = "inclui ◎ %d acumulado" % int(engine.carry)
