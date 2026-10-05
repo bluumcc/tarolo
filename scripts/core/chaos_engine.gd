@@ -54,6 +54,7 @@ var pot := 0.0
 var trick_pot := 0.0
 var contrib: Array = []       # quanto cada um pôs nessa rodada
 var folded: Array = []        # desistiu dessa rodada (não joga carta)
+var busted: Array = []        # stack zerou: fora do jogo até o fim da mesa
 var bet_level := 0.0          # valor que todos precisam igualar
 var raises := 0
 var to_act: Array = []        # fila de quem ainda precisa falar
@@ -129,9 +130,11 @@ func setup_match(config: Dictionary) -> void:
 	for p in range(num_players):
 		styles.append(int(cfg_styles[p]) if cfg_styles.size() > p else rng.randi_range(0, 2))
 	stacks = []
+	busted = []
 	session_stats = []
 	for p in range(num_players):
 		stacks.append(float((config.get("stacks", []) as Array)[p]) if (config.get("stacks", []) as Array).size() > p else float(buy_in))
+		busted.append(false)
 		session_stats.append({"pots": 0, "bluffs": 0, "folds": 0, "hits": 0, "near": 0, "levels": 0})
 	round_index = 0
 	hand_no = 0
@@ -243,9 +246,20 @@ func is_final_round() -> bool:
 func active_players() -> Array:
 	var out: Array = []
 	for p in range(num_players):
-		if not folded[p]:
+		if not folded[p] and not busted[p]:
 			out.append(p)
 	return out
+
+
+## Marca como busted todo jogador com stack ≤ 0. Retorna os índices recém-bustados.
+## Persiste entre níveis — não é resetado por _setup_round().
+func bust_broke() -> Array:
+	var newly: Array = []
+	for p in range(num_players):
+		if not busted[p] and stacks[p] <= 0.0:
+			busted[p] = true
+			newly.append(p)
+	return newly
 
 
 func active_count() -> int:
@@ -262,6 +276,7 @@ func refill_bots() -> Array:
 			stacks[p] = fresh
 			level_start_stacks[p] = fresh
 			streak[p] = 0
+			busted[p] = false   # novo jogador senta no lugar do que quebrou
 			styles[p] = rng.randi_range(0, 2)   # jogador novo, estilo novo (sorteado, nunca mostrado)
 			swapped.append(p)
 	return swapped

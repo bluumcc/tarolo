@@ -1287,12 +1287,18 @@ func _run_round() -> void:
 			return
 		if engine.walkover_player() != -1:
 			await _resolve_walkover(engine.resolve_walkover())
+			if bool(config.get("tournament", false)):
+				await _bust_broke_bots()
 			continue
 		await _play_cards()
+		if bool(config.get("tournament", false)):
+			await _bust_broke_bots()
 	if not is_inside_tree() or finished:
 		return
 	if engine.blitz:
 		await _blitz_settlement()
+		if bool(config.get("tournament", false)):
+			await _bust_broke_bots()
 		if not is_inside_tree() or finished:
 			return
 		GameState.blitz_level_played()
@@ -1395,6 +1401,21 @@ func _ensure_solvent() -> bool:
 		return true
 	_finish_match()
 	return false
+
+
+## Torneio: marca bots com stack zero como eliminados e exibe banner por cada um.
+## O jogador (p=0) é tratado por _ensure_solvent() — aqui só mostramos os bots.
+func _bust_broke_bots() -> void:
+	if not is_inside_tree() or finished:
+		return
+	for p in engine.bust_broke():
+		if p == 0:
+			continue
+		_banner("%s eliminado" % str(config["names"][p]).to_upper(), "Fichas esgotadas — fora do torneio", UIKit.DANGER)
+		_refresh_hud()
+		await _wait(0.9)
+		if not is_inside_tree() or finished:
+			return
 
 
 # ------------------------------------------------------------------ apostas
