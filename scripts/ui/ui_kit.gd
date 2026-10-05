@@ -6,18 +6,18 @@ extends RefCounted
 const MIN_FONT := 26
 const MIN_BUTTON_FONT := 30
 
-const NIGHT := Color("#150E45")
-const PURPLE := Color("#3A2A9C")
-const PURPLE_DEEP := Color("#241A70")
-const BLACK := Color("#0B0626")
-const INK := Color("#FFFFFF")
-const MUTED := Color("#A9A4E0")
-const GOLD := Color("#FFC933")
-const VIOLET := Color("#8B5CFF")  ## destaque principal (botão primário, barras)
-const DANGER := Color("#FF4D6A")
-const OK := Color("#36D97B")
-const CHIPS := Color("#3FA9FF")
-const MULT := Color("#FF5C7A")
+const NIGHT := Color("#08051C")      ## fundo principal: quase preto com toque violeta
+const PURPLE := Color("#2D1E8A")
+const PURPLE_DEEP := Color("#1A1060")
+const BLACK := Color("#04030F")
+const INK := Color("#EEE8FF")         ## branco levemente lilás (mais suave que branco puro)
+const MUTED := Color("#8880CC")
+const GOLD := Color("#FFD060")        ## dourado mais quente/âmbar
+const VIOLET := Color("#A87AFF")      ## destaque: roxo mais vivo
+const DANGER := Color("#FF3A5C")
+const OK := Color("#2EE87A")
+const CHIPS := Color("#2FB8FF")
+const MULT := Color("#FF4D78")
 
 # ---- Papéis de cor (cor = função; ver docs/DESIGN_CORES.md). Use estes nomes nas telas.
 const ACTION := VIOLET                  ## ação primária (um botão por tela)
@@ -41,18 +41,18 @@ const ME := GOLD
 const CLEAR := Color(0, 0, 0, 0)
 
 ## Superfícies e fundos (roxo profundo do jogo).
-const SURFACE := Color("#1B1258")          ## barras e caixas de informação
-const SURFACE_DEEP := Color("#0F0A33")     ## selos e pílulas escuras
-const SURFACE_POT := Color("#2A1B4D")      ## caixa do pote
-const TABLE_FILL := Color(0.10, 0.08, 0.30, 0.85)
-const TABLE_EDGE := Color("#5B4FC9")
-const SCRIM := Color(0.03, 0.02, 0.07, 0.97)      ## tela cheia de transição
-const SCRIM_SOFT := Color(0.04, 0.03, 0.06, 0.88)
-const OUTLINE := Color("#0B0626")           ## contorno escuro de textos e barras
-const BUTTON_MUTED := Color("#6B6BC4")      ## face de botão secundário
-const DOT_OFF := Color("#4A3FA0")           ## bolinha pendente
-const GOLD_LIGHT := Color("#FFE58A")
-const TITLE_OUTLINE := Color("#3A1FA0")
+const SURFACE := Color("#120D40")          ## barras e caixas de informação
+const SURFACE_DEEP := Color("#09071F")     ## selos e pílulas escuras
+const SURFACE_POT := Color("#1E1245")      ## caixa do pote
+const TABLE_FILL := Color(0.06, 0.04, 0.18, 0.93)  ## mesa: quase preto-violeta
+const TABLE_EDGE := Color("#4A3DBF")
+const SCRIM := Color(0.02, 0.01, 0.05, 0.97)      ## tela cheia de transição
+const SCRIM_SOFT := Color(0.03, 0.02, 0.05, 0.90)
+const OUTLINE := Color("#04030F")           ## contorno escuro de textos e barras
+const BUTTON_MUTED := Color("#5A5AB8")      ## face de botão secundário
+const DOT_OFF := Color("#3A318A")           ## bolinha pendente
+const GOLD_LIGHT := Color("#FFE999")
+const TITLE_OUTLINE := Color("#2A1490")
 const GOOD_ON_LIGHT := Color("#1E8A5C")     ## verde legível sobre carta clara
 const BAD_ON_LIGHT := Color("#D42A3C")
 ## Painéis do Vanilla (duelo chefe x defesa).
