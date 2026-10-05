@@ -30,13 +30,12 @@ layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 0
 
-[node name="Top" type="HBoxContainer" parent="Body/Margin/VBox"]
+[node name="Top" type="VBoxContainer" parent="Body/Margin/VBox"]
 layout_mode = 2
 mouse_filter = 2
 
 [node name="Rank" type="Label" parent="Body/Margin/VBox/Top"]
 layout_mode = 2
-size_flags_horizontal = 3
 clip_text = true
 theme_override_font_sizes/font_size = 42
 text = "A"
