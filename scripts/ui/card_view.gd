@@ -79,15 +79,29 @@ func _refresh() -> void:
 	if data == null:
 		return
 	if not face_up:
-		_card_tex.visible = false
 		var back_id := str(SaveManager.section("cosmetics")["equipped"])
-		var back_col := Color(UIKit.CARD_BACKS.get(back_id, UIKit.CARD_BACKS["noite"])["color"])
-		body.add_theme_stylebox_override("panel", UIKit.box(back_col, UIKit.BRAND.darkened(0.35), 3, 6, 6))
-		rank_label.text = ""
-		suit_small.text = ""
-		center_label.text = "✶"
-		center_label.add_theme_color_override("font_color", UIKit.BRAND)
-		name_label.text = ""
+		var back_def: Dictionary = UIKit.CARD_BACKS.get(back_id, UIKit.CARD_BACKS["noite"])
+		var cover_name: String = back_def.get("cover", "")
+		var cover_tex: Texture2D = null
+		if cover_name != "":
+			var path := "res://assets/cards/%s.png" % cover_name
+			if ResourceLoader.exists(path):
+				cover_tex = load(path) as Texture2D
+		if cover_tex != null:
+			_card_tex.texture = cover_tex
+			_card_tex.visible = true
+			body.add_theme_stylebox_override("panel", UIKit.box(Color(0, 0, 0, 0), UIKit.BRAND.darkened(0.35), 3, 6, 6))
+		else:
+			_card_tex.visible = false
+			var back_col := Color(back_def["color"])
+			body.add_theme_stylebox_override("panel", UIKit.box(back_col, UIKit.BRAND.darkened(0.35), 3, 6, 6))
+		rank_label.visible = false
+		suit_small.visible = false
+		center_label.visible = cover_tex == null
+		if cover_tex == null:
+			center_label.text = "✶"
+			center_label.add_theme_color_override("font_color", UIKit.BRAND)
+		name_label.visible = false
 		points_label.text = ""
 		bout_label.text = ""
 		return
