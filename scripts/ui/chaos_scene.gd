@@ -69,6 +69,7 @@ var hold_stacks: Array = []      # Blitz: stacks de antes da liquidação (a tel
 var hold_pot := -1.0
 var blitz_revealed: Array = []  # Blitz: entrada de cada um já paga (pote), pill visível na mesa
 var blitz_showdown := false     # Blitz: fim do nível — só aí o alvo dos rivais aparece pra você
+var blitz_sitting_out := false  # Blitz: jogador ficou sem fichas mid-nível (sentado fora)
 var double_btn: Button
 var discard_picks: Array = []   # Blitz: cartas marcadas na mão pra descartar (até BLITZ_DISCARD_SIZE)
 var discarding_now := false     # relógio do descarte rodando (reaproveita turn_bar)
@@ -1280,9 +1281,19 @@ func _run_round() -> void:
 	while not engine.is_round_over():
 		if not is_inside_tree() or finished:
 			return
-		# Quebrou? O aviso vem antes da animação do modificador, não depois.
-		if not await _ensure_solvent():
-			return
+		# Quebrou? No Blitz o check só acontece no início do nível (_blitz_open_level);
+		# mid-nível o jogador fica "sentado fora" (sem apostas, mas ainda joga cartas).
+		if engine.blitz:
+			if engine.stacks[0] == 0.0 and not blitz_sitting_out:
+				blitz_sitting_out = true
+				_refresh_hud()
+				_banner("FICHAS ESGOTADAS", "Você está sentado fora. Recompre no intervalo entre níveis.", UIKit.MUTED)
+				await _wait(2.0)
+				if not is_inside_tree() or finished:
+					return
+		else:
+			if not await _ensure_solvent():
+				return
 		if not bool(config.get("tournament", false)):
 			for q in engine.refill_bots():
 				await _new_player_sits(q)
@@ -1340,7 +1351,7 @@ func _play_cards() -> void:
 			if not is_inside_tree() or finished:
 				return
 		var card: CardData
-		if p == 0 and not GameState.autoplay:
+		if p == 0 and not GameState.autoplay and not blitz_sitting_out:
 			card = await _wait_human()
 		else:
 			await _wait(0.9 if p == 0 else (bot_rng.randf_range(0.55, 0.95) if engine.blitz else bot_rng.randf_range(0.9, 1.5)))
@@ -1918,7 +1929,8 @@ func _refresh_hud() -> void:
 			FX.pop(total_lbl, 1.3)
 			shown_totals[p] = new_total
 		var out: bool = phase != "idle" and engine.folded[p]
-		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 0.45 if out else 1.0)
+		var sitting: bool = engine.blitz and engine.stacks[p] == 0.0 and phase != "idle"
+		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 0.3 if sitting else (0.45 if out else 1.0))
 		(hud_titles[p] as Label).text = "VOCÊ" if p == 0 else str(config["names"][p]).to_upper()
 		(hud_titles[p] as Label).add_theme_color_override("font_color", UIKit.TURN if p == turn_player else UIKit.INK)
 		(dealer_badges[p] as Control).visible = engine.hand_no > 0 and engine.button == p
@@ -2085,9 +2097,14 @@ func _betting_phase() -> void:
 		_refresh_hud()
 		var act: Dictionary
 		if p == 0 and not GameState.autoplay:
-			var fold_tip := "Quem desiste descarta 1 carta aleatória da mão." if engine.blitz else "Quem desiste descarta a carta mais fraca, virada."
-			await _tip("bet", "SUA VEZ DE APOSTAR", "Todo mundo já pagou a ante. Você pode PASSAR, AUMENTAR, PAGAR ou DESISTIR. Só quem fica na rodada joga carta, e quem vence leva o pote. %s" % fold_tip)
-			act = await _human_bet()
+			if blitz_sitting_out:
+				# Sentado fora: checa se possível, desiste se alguém tiver apostado.
+				var opt0 := engine.bet_options(0)
+				act = {"action": "check"} if bool(opt0["can_check"]) else {"action": "fold"}
+			else:
+				var fold_tip := "Quem desiste descarta 1 carta aleatória da mão." if engine.blitz else "Quem desiste descarta a carta mais fraca, virada."
+				await _tip("bet", "SUA VEZ DE APOSTAR", "Todo mundo já pagou a ante. Você pode PASSAR, AUMENTAR, PAGAR ou DESISTIR. Só quem fica na rodada joga carta, e quem vence leva o pote. %s" % fold_tip)
+				act = await _human_bet()
 			if not is_inside_tree() or finished:
 				return
 		else:
@@ -2270,6 +2287,7 @@ func _blitz_open_level() -> bool:
 	_reset_actions()
 	hold_stacks = []
 	hold_pot = -1.0
+	blitz_sitting_out = false
 	for p in range(engine.num_players):
 		blitz_revealed[p] = false
 	blitz_showdown = false
