@@ -1929,7 +1929,7 @@ func _refresh_hud() -> void:
 			FX.pop(total_lbl, 1.3)
 			shown_totals[p] = new_total
 		var out: bool = phase != "idle" and engine.folded[p]
-		var sitting: bool = engine.blitz and engine.stacks[p] == 0.0 and phase != "idle"
+		var sitting: bool = p == 0 and blitz_sitting_out and phase != "idle"
 		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 0.3 if sitting else (0.45 if out else 1.0))
 		(hud_titles[p] as Label).text = "VOCÊ" if p == 0 else str(config["names"][p]).to_upper()
 		(hud_titles[p] as Label).add_theme_color_override("font_color", UIKit.TURN if p == turn_player else UIKit.INK)
@@ -2637,6 +2637,14 @@ func _refresh_double_button() -> void:
 func _refresh_blitz_tag(p: int, idx: int) -> void:
 	var pill := bet_pills[p] as PanelContainer
 	var lbl := bet_tags[p] as Label
+	# Para o jogador (p=0): durante a aposta, a pill mostra a contribuição atual (◎10)
+	# igual ao que o label nos assentos rivais já mostra para p≠0.
+	if p == 0 and phase == "bet" and not bets_gathered:
+		var pile := float(engine.contrib[0])
+		pill.modulate.a = 1.0 if pile > 0.0 else 0.0
+		lbl.text = "◎ %d" % int(pile)
+		lbl.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[0] else UIKit.MONEY)
+		return
 	var shown := bool(blitz_revealed[p])
 	pill.modulate.a = 1.0 if shown else 0.0
 	if not shown:
