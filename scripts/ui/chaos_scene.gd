@@ -62,6 +62,7 @@ var table_views: Array = []
 var pot_box: PanelContainer
 var pot_label: Label
 var pot_sub: Label
+var pot_prize_label: Label   # prêmio do palpite — visível quando o trick_pot está em destaque
 var bet_tags: Array = []       # "◎25 · 3" por assento
 var prog_tags: Array = []      # "1/3 ♨×1,5" ao vivo por assento
 var hold_stacks: Array = []      # Blitz: stacks de antes da liquidação (a tela só muda depois da animação)
@@ -627,9 +628,18 @@ func _build_pot() -> void:
 	pot_box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	pot_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pot_box.add_theme_stylebox_override("panel", UIKit.box(UIKit.CLEAR, UIKit.CLEAR, 0, 0, 0))
+	var pot_vbox := VBoxContainer.new()
+	pot_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	pot_vbox.add_theme_constant_override("separation", 2)
+	pot_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pot_box.add_child(pot_vbox)
 	pot_label = UIKit.label("POTE ◎ 0", 34, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
 	pot_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	pot_box.add_child(pot_label)
+	pot_vbox.add_child(pot_label)
+	pot_prize_label = UIKit.label("", 18, UIKit.ACTION, HORIZONTAL_ALIGNMENT_CENTER)
+	pot_prize_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	pot_prize_label.visible = false
+	pot_vbox.add_child(pot_prize_label)
 	pot_sub = UIKit.label("", 18, UIKit.MUTED)   # sem lugar na tela: o card só mostra o valor
 	pot_sub.visible = false
 
@@ -2642,6 +2652,12 @@ func _refresh_pot_blitz() -> void:
 		else:
 			shown_pot = engine.pot if engine.pot > 0.0 else engine.carry
 		pot_label.text = _pot_text(shown_pot)
+	# Quando o trick_pot está em destaque, mostra o prêmio do palpite abaixo como secundário.
+	if in_trick and engine.pot > 0.0:
+		pot_prize_label.text = "prêmio: ◎ %d" % int(engine.pot)
+		pot_prize_label.visible = true
+	else:
+		pot_prize_label.visible = false
 	var sub := ""
 	if phase == "bet":
 		sub = "aposta da rodada"
