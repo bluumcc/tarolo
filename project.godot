@@ -18,6 +18,7 @@ GameState="*res://scripts/autoload/game_state.gd"
 Sfx="*res://scripts/autoload/sfx.gd"
 FX="*res://scripts/autoload/fx.gd"
 TouchGuard="*res://scripts/autoload/touch_guard.gd"
+RankedEco="*res://scripts/autoload/ranked_eco.gd"
 
 [display]
 
