@@ -22,6 +22,7 @@ var _press_time := 0.0
 var _moved := false
 var _long_fired := false
 var _lift_tween: Tween
+var _card_tex: TextureRect  ## textura custom (assets/cards/); null = sem imagem carregada
 
 @onready var body: PanelContainer = $Body
 @onready var rank_label: Label = $Body/Margin/VBox/Top/Rank
@@ -39,6 +40,15 @@ func _ready() -> void:
 	body.pivot_offset = SIZE / 2.0
 	for n in [rank_label, suit_small, center_label, name_label, points_label, bout_label]:
 		(n as Label).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_card_tex = TextureRect.new()
+	_card_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	_card_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_card_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_card_tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_card_tex.clip_contents = true
+	_card_tex.visible = false
+	body.add_child(_card_tex)
+	body.move_child(_card_tex, 0)
 	_refresh()
 
 
@@ -69,6 +79,7 @@ func _refresh() -> void:
 	if data == null:
 		return
 	if not face_up:
+		_card_tex.visible = false
 		var back_id := str(SaveManager.section("cosmetics")["equipped"])
 		var back_col := Color(UIKit.CARD_BACKS.get(back_id, UIKit.CARD_BACKS["noite"])["color"])
 		body.add_theme_stylebox_override("panel", UIKit.box(back_col, UIKit.BRAND.darkened(0.35), 3, 6, 6))
@@ -80,8 +91,22 @@ func _refresh() -> void:
 		points_label.text = ""
 		bout_label.text = ""
 		return
-	var color := _ink_color()
 	_refresh_border()
+	var has_art := _load_card_texture()
+	_card_tex.visible = has_art
+	# Quando há arte, esconde os labels de texto (rank/naipe/centro).
+	# Mantém points e bout visíveis mesmo com arte para info rápida.
+	rank_label.visible = not has_art
+	suit_small.visible = not has_art
+	center_label.visible = not has_art
+	name_label.visible = not has_art
+	if has_art:
+		points_label.text = "%s pts" % UIKit.fmt_dec(data.points(), 1)
+		points_label.add_theme_color_override("font_color", UIKit.MUTED)
+		bout_label.text = "BOUT" if data.is_bout() else ""
+		bout_label.add_theme_color_override("font_color", UIKit.BRAND)
+		return
+	var color := _ink_color()
 	rank_label.text = data.rank_label()
 	rank_label.add_theme_color_override("font_color", color)
 	suit_small.text = data.suit_symbol()
@@ -93,6 +118,26 @@ func _refresh() -> void:
 	points_label.add_theme_color_override("font_color", UIKit.MUTED if _dark_face() else Color("#5B5670"))
 	bout_label.text = "BOUT" if data.is_bout() else ""
 	bout_label.add_theme_color_override("font_color", UIKit.BRAND if _dark_face() else Color("#B8860B"))
+
+
+## Caminho do PNG customizado para esta carta (convenção: assets/cards/).
+## Maiores: 0.png (Louco), 1–21.png (Trunfos).
+## Menores: o/p/c/e + rank. Ex.: e2.png, c9.png, o12.png.
+func _asset_path() -> String:
+	if data.is_louco():
+		return "res://assets/cards/0.png"
+	if data.is_trunfo():
+		return "res://assets/cards/%d.png" % data.rank
+	const PREFIXES := ["o", "p", "c", "e"]
+	return "res://assets/cards/%s%d.png" % [PREFIXES[data.suit], data.rank]
+
+
+func _load_card_texture() -> bool:
+	var path := _asset_path()
+	if not ResourceLoader.exists(path):
+		return false
+	_card_tex.texture = load(path) as Texture2D
+	return _card_tex.texture != null
 
 
 ## Trunfos e O Louco têm a face escura roxa; as demais cartas são brancas com tinta
