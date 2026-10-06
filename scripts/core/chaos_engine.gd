@@ -932,9 +932,11 @@ func _resolve_trick_blitz(idx: int, winner: int, ev: int) -> Dictionary:
 			prize += pay
 	var saque_amount := 0.0
 	var assalto_amount := 0.0
+	var assalto_from := -1
 	if ev == ChaosModifiers.Modifier.ASSALTO_LIDER:
 		var rich := _highest_player()
 		if rich != winner:
+			assalto_from = rich
 			assalto_amount = minf(chips_of(ASSALTO_AMOUNT), stacks[rich])
 			stacks[rich] -= assalto_amount
 	if ev == ChaosModifiers.Modifier.SAQUE:
@@ -964,7 +966,7 @@ func _resolve_trick_blitz(idx: int, winner: int, ev: int) -> Dictionary:
 	var result := {
 		"winner": winner, "winning_index": idx, "plays": plays.duplicate(), "points": base_points,
 		"base_points": base_points, "mult": 1.0, "prize": prize, "pot": pot, "combos": [], "streak": 0,
-		"streak_mult": 1.0, "bonus": 0.0, "saque_amount": saque_amount, "assalto_amount": assalto_amount,
+		"streak_mult": 1.0, "bonus": 0.0, "saque_amount": saque_amount, "assalto_amount": assalto_amount, "assalto_from": assalto_from,
 		"curse_amount": curse_amount, "walkover": false, "trick_number": trick_number, "modifier": ev,
 		"value": value, "wins": wins.duplicate(), "rake": 0.0, "trick_pot": trick_pot_total, "trick_gain": trick_gain,
 		"gain": prize + saque_amount + assalto_amount - curse_amount + trick_gain,

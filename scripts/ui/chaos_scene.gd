@@ -330,7 +330,7 @@ func _build_hand_zone(root: VBoxContainer) -> void:
 
 	# Avisos do jogo: aba na base do card roxo, em cima da barra de baixo (some quando vazia).
 	banner_box = PanelContainer.new()
-	banner_box.custom_minimum_size = Vector2(560, 0)
+	banner_box.custom_minimum_size = Vector2(0, 0)
 	banner_box.anchor_left = 0.5
 	banner_box.anchor_right = 0.5
 	banner_box.anchor_top = 1.0
@@ -795,9 +795,15 @@ func _banner(title: String, sub: String, color: Color) -> void:
 	banner_title.text = title
 	banner_title.add_theme_color_override("font_color", color)
 	banner_sub.text = sub
+	banner_sub.visible = sub != ""
 	banner_box.visible = title != "" or sub != ""
 	banner_box.modulate.a = 0.0
 	create_tween().tween_property(banner_box, "modulate:a", 1.0, GameState.anim(0.12))
+
+
+## Nome pro aviso: "Você" ou o nome do rival (só a inicial maiúscula).
+func _pname(p: int) -> String:
+	return "Você" if p == 0 else str(config["names"][p]).capitalize()
 
 
 func _banner_clear() -> void:
@@ -996,11 +1002,11 @@ func _wait_human() -> CardData:
 		await _tip("double", "PODE DOBRAR!", "A partir da 4ª jogada, o botão DOBRAR paga mais uma entrada e dobra o peso do seu palpite no pote; da 6ª em diante dá pra TRIPLICAR. Vale a pena quando você já está no alvo e a mão que sobrou é fraca demais pra ganhar mais uma jogada. Só dá pra dobrar até duas vezes por rodada.")
 	var ls := TrickRules.lead_suit(engine.plays)
 	if ls == -1:
-		_banner("SUA VEZ", "Abra com qualquer carta.", UIKit.TURN)
+		_banner("Sua vez", "", UIKit.TURN)
 	elif ls == CardData.Suit.TRUNFO:
-		_banner("SUA VEZ", "Jogue um Trunfo.", UIKit.TURN)
+		_banner("Sua vez · jogue Trunfo", "", UIKit.TURN)
 	else:
-		_banner("SUA VEZ", "Siga %s (ou Trunfo/Louco)." % CardData.SUIT_NAMES[ls], UIKit.TURN)
+		_banner("Sua vez · siga %s" % CardData.SUIT_NAMES[ls], "", UIKit.TURN)
 	_clock_start(TURN_SECONDS, _on_play_timeout)
 	_rebuild_hand()
 	var card: CardData = await human_card_chosen
@@ -1019,7 +1025,7 @@ func _on_play_timeout() -> void:
 		if (c as CardData).points() < weakest.points():
 			weakest = c
 	human_turn = false
-	_banner("TEMPO ESGOTADO", "Jogamos sua carta mais fraca.", UIKit.LOSS)
+	_banner("Tempo esgotado", "", UIKit.LOSS)
 	human_card_chosen.emit(weakest)
 
 
@@ -1089,7 +1095,7 @@ func _on_card_tapped(view: CardView) -> void:
 		return
 	if not human_turn or not view.playable:
 		if human_turn and not view.playable:
-			_banner("JOGADA ILEGAL", "Siga o naipe ou corte com Trunfo.", UIKit.LOSS)
+			_banner("Siga o naipe", "", UIKit.LOSS)
 		return
 	if view.selected:
 		_on_card_play(view)
@@ -1248,7 +1254,7 @@ func _run_round() -> void:
 			if engine.stacks[0] == 0.0 and not blitz_sitting_out:
 				blitz_sitting_out = true
 				_refresh_hud()
-				_banner("FICHAS ESGOTADAS", "Você está sentado fora. Recompre no intervalo entre rodadas.", UIKit.MUTED)
+				_banner("Sem fichas", "", UIKit.MUTED)
 				await _wait(2.0)
 				if not is_inside_tree() or finished:
 					return
@@ -1344,7 +1350,7 @@ func _new_player_sits(q: int) -> void:
 	if GameState.autoplay:
 		return
 	Sfx.play("chip")
-	_banner("NOVO JOGADOR", "%s sentou na mesa com ◎ %d." % [str(config["names"][q]).to_upper(), int(engine.stacks[q])], UIKit.MUTED)
+	_banner("%s entrou" % _pname(q), "", UIKit.MUTED)
 	await _wait(0.9)
 
 
@@ -1392,7 +1398,7 @@ func _bust_broke_bots() -> void:
 	for p in engine.bust_broke():
 		if p == 0:
 			continue
-		_banner("%s eliminado" % str(config["names"][p]).to_upper(), "Fichas esgotadas — fora do torneio", UIKit.DANGER)
+		_banner("%s eliminado" % _pname(p), "", UIKit.DANGER)
 		_refresh_hud()
 		await _wait(0.9)
 		if not is_inside_tree() or finished:
@@ -1420,10 +1426,7 @@ func _human_bet() -> Dictionary:
 	var can_check := bool(opt["can_check"])
 	var call_amt := int(opt["call"])
 	var all_in_call := not can_check and float(call_amt) >= float(engine.stacks[0])
-	var info := "Pote ◎%d · sua mão %s" % [int(engine.trick_pot), _hand_label()]
-	if not bool(opt["can_raise"]):
-		info += " · " + _no_raise_reason(opt)
-	_banner("SUA VEZ DE APOSTAR", info, UIKit.TURN)
+	_banner("Sua vez", "", UIKit.TURN)
 	var st := {"raising": false, "to": int(opt["min_to"])}
 	var done := func(result: Dictionary) -> void:
 		st["result"] = result
@@ -1981,7 +1984,6 @@ func _refresh_pot() -> void:
 	elif phase == "bet":
 		sub = "blind ◎ %d de cada" % engine.blind
 	pot_sub.text = sub
-	pot_box.reset_size.call_deferred()
 	_layout_table.call_deferred()
 
 
@@ -2038,7 +2040,6 @@ func _betting_phase() -> void:
 	pot_locked = false
 	shown_pot = 0.0
 	var first := engine.bet_actor()
-	_banner("APOSTAS", "Ante ◎%d · Dealer (D): %s · Fala primeiro: %s" % [int(engine.bet_level), str(config["names"][engine.button]).to_upper(), str(config["names"][first]).to_upper()], UIKit.MONEY)
 	status_label.text = ""
 	_refresh_hud()
 	if not GameState.autoplay:
@@ -2086,7 +2087,7 @@ func _betting_phase() -> void:
 
 ## Mostra o que cada um fez; as fichas ficam na frente do jogador até fechar a jogada de apostas.
 func _show_bet_action(p: int, r: Dictionary) -> void:
-	var pname := str(config["names"][p]).to_upper()
+	var pname := _pname(p)
 	var amount := float(r.get("amount", 0.0))
 	var title := ""
 	var sub := ""
@@ -2094,25 +2095,18 @@ func _show_bet_action(p: int, r: Dictionary) -> void:
 	match str(r.get("action", "")):
 		"check":
 			action_text[p] = "– PASSOU"
-			title = "%s PASSOU" % pname
-			sub = "Fica na jogada sem aumentar."
+			title = "%s passou" % pname
 		"call":
 			action_text[p] = "✓ PAGOU"
-			title = "%s PAGOU" % pname
-			sub = "Pagou ◎%d (aposta em ◎%d)." % [int(amount), int(engine.bet_level)]
+			title = "%s pagou" % pname
 			col = UIKit.INFO
 		"raise":
 			action_text[p] = "▲ AUMENTOU"
-			title = "%s AUMENTOU!" % pname
-			sub = "Aposta em ◎%d. Quem não pagar, desiste." % int(r["to"])
+			title = "%s aumentou ◎%d" % [pname, int(r["to"])]
 			col = UIKit.MONEY
 		"fold":
 			action_text[p] = "✕ DESISTIU"
-			title = "%s DESISTIU" % pname
-			sub = "Perde o que pôs e descarta 1 carta."
-			if p == 0 and not engine.last_discard.is_empty():
-				var dcard := (engine.last_discard["card"] as CardData).display_name()
-				sub = "Você descartou %s." % dcard
+			title = "%s desistiu" % pname
 			col = UIKit.LOSS
 	action_color[p] = col
 	_banner(title, sub, col if col != UIKit.MUTED else UIKit.INK)
@@ -2175,7 +2169,6 @@ func _gather_bets() -> void:
 				any = true
 				FX.fly_chips(popup_layer, _pill_center(p), _global_center(bottom_mid), _chips_for(float(engine.contrib[p])), UIKit.LOSS if engine.folded[p] else UIKit.MONEY)
 		if any:
-			_banner("APOSTAS FECHADAS", "Todas as fichas vão pro pote.", UIKit.MONEY)
 			Sfx.play("combo")
 	await _wait(0.6)
 	bets_gathered = true
@@ -2212,8 +2205,7 @@ func _collect_pot(winner: int, total: float, gain: float) -> void:
 ## Todo mundo desistiu: o último leva o pote sem jogar carta (o blefe funcionou).
 func _resolve_walkover(result: Dictionary) -> void:
 	var winner: int = result["winner"]
-	var wname := str(config["names"][winner]).to_upper()
-	_banner("%s LEVOU SEM JOGAR!" % wname, "Todo mundo desistiu. O pote é dele.", UIKit.ME if winner == 0 else UIKit.INK)
+	_banner("%s levou o pote" % _pname(winner), "", UIKit.ME if winner == 0 else UIKit.INK)
 	if winner == 0:
 		_rebuild_hand()
 	if winner == 0 and float(result.get("gain", 0.0)) > best_gain:
@@ -2274,8 +2266,6 @@ func _blitz_open_level() -> bool:
 	shown_pot = engine.carry
 	pot_label.text = _pot_text(shown_pot)
 	pot_box.modulate.a = 0.0   # só aparece depois do palpite, quando as entradas de verdade entram
-	var carry_txt := "  Pote acumulado: ◎%d." % int(engine.carry) if engine.carry > 0.0 else ""
-	_banner("PALPITES", "Quantas jogadas cada um vai ganhar?%s" % carry_txt, UIKit.MONEY)
 	_refresh_hud()
 	var pick: int
 	if GameState.autoplay:
@@ -2323,7 +2313,6 @@ func _blitz_reveal() -> void:
 	shown_pot = engine.pot
 	if not GameState.autoplay:
 		Sfx.play("combo")
-		_banner("ENTRADAS PAGAS", "Palpites em segredo até o fim. Bora jogar!", UIKit.MONEY)
 	await _wait(0.8)
 
 
@@ -2351,7 +2340,7 @@ func _human_discard_play() -> void:
 func _on_discard_timeout() -> void:
 	var auto: Array = ChaosBot.wants_discard(engine, 0, BotAI.Difficulty.NORMAL, bot_rng)
 	engine.apply_discard(0, auto)
-	_banner("TEMPO ESGOTADO", "Descartamos as 2 mais fracas.", UIKit.LOSS)
+	_banner("Tempo esgotado", "", UIKit.LOSS)
 	item_chosen.emit(1)
 
 
@@ -2495,8 +2484,7 @@ func _apply_double(p: int, is_cover := false) -> void:
 	action_text[p] = "▲ ×%d" % (1 + int(engine.doubles[p]))
 	action_color[p] = UIKit.MONEY
 	if not GameState.autoplay:
-		var pname := "VOCÊ" if p == 0 else str(config["names"][p]).to_upper()
-		_banner("%s %s!" % [pname, verb], "Pôs mais ◎%d no pote (aposta ×%d)." % [int(amt), 1 + int(engine.doubles[p])], UIKit.MONEY)
+		_banner("%s %s" % [_pname(p), verb.to_lower()], "", UIKit.MONEY)
 		Sfx.play("combo")
 		FX.fly_chips(popup_layer, _seat_center(p), _global_center(bottom_mid), 3)
 		FX.burst(popup_layer, _seat_center(p) - popup_layer.global_position, UIKit.MONEY, 14)
@@ -2656,7 +2644,6 @@ func _refresh_pot_blitz() -> void:
 	elif engine.carry > 0.0:
 		sub = "acumulado pra próxima rodada"
 	pot_sub.text = sub
-	pot_box.reset_size.call_deferred()
 	_layout_table.call_deferred()
 
 
@@ -2680,26 +2667,20 @@ func _resolve_trick_blitz(result: Dictionary) -> void:
 		return
 	if win_view:
 		FX.win_pulse(win_view, _table_scale())
-	var wname := str(config["names"][winner]).to_upper()
-	var sub := "Palpite: %d de %d" % [int(engine.wins[winner]), int(engine.predicts[winner])]
-	if int(result.get("value", 1)) == 2:
-		sub += "  ·  Jogada Dobrada: conta 2 vitórias"
 	var prize_amt := float(result.get("prize", 0.0))
-	if prize_amt > 0.0:
-		sub += "  ·  cartas +◎%d" % int(prize_amt)
 	var saque_amt := float(result.get("saque_amount", 0.0))
 	var assalto_amt := float(result.get("assalto_amount", 0.0))
 	var curse_amt := float(result.get("curse_amount", 0.0))
 	var trick_gain := float(result.get("trick_gain", 0.0))
+	# Uma mensagem só por jogada: quem venceu e, se o modificador mexeu em fichas, o que ele fez.
+	var title := "%s venceu" % _pname(winner)
 	if saque_amt > 0.0:
-		sub += "  ·  ⚔ saque +◎%d" % int(saque_amt)
-	if assalto_amt > 0.0:
-		sub += "  ·  ♛ assalto +◎%d" % int(assalto_amt)
-	if curse_amt > 0.0:
-		sub += "  ·  ☠ pagou ◎%d aos rivais" % int(curse_amt)
-	if trick_gain > 0.0:
-		sub += "  ·  aposta da jogada +◎%d" % int(trick_gain)
-	_banner("%s venceu a jogada!" % wname, sub, UIKit.ME if winner == 0 else UIKit.INK)
+		title = "%s roubou de todos" % _pname(winner)
+	elif assalto_amt > 0.0 and int(result.get("assalto_from", -1)) >= 0:
+		title = "%s roubou de %s" % [_pname(winner), _pname(int(result["assalto_from"]))]
+	elif curse_amt > 0.0:
+		title = "%s pagou aos rivais" % _pname(winner)
+	_banner(title, "", UIKit.ME if winner == 0 else UIKit.INK)
 	Sfx.play("chip")
 	FX.burst(popup_layer, _seat_center(winner) - popup_layer.global_position, UIKit.ME if winner == 0 else UIKit.CHIPS, 10)
 	if float(result.get("trick_pot", 0.0)) > 0.0:
@@ -2758,20 +2739,15 @@ func _blitz_settlement() -> void:
 		_refresh_hud()
 		return
 	var title := ""
-	var sub := ""
 	var col := UIKit.MONEY
 	if hits.is_empty():
-		title = "NINGUÉM ACERTOU!"
-		sub = "O pote de ◎%d fica acumulado pra próxima rodada." % int(br["carry_out"])
+		title = "Ninguém acertou"
 		col = UIKit.COMBO
 	else:
-		var names: Array = hits.map(func(q): return "VOCÊ" if int(q) == 0 else str(config["names"][q]).to_upper())
-		title = "%s ACERTOU!" % names[0] if names.size() == 1 else "ACERTARAM: %s" % " E ".join(names)
-		sub = "Pote de ◎%d dividido pelo peso: entrada × dificuldade do palpite." % int(br["pool"])
-		if float(br["rake"]) >= 1.0:
-			sub += "  Taxa da casa ◎%d." % int(br["rake"])
+		var names: Array = hits.map(func(q): return _pname(int(q)))
+		title = "%s acertou" % names[0] if names.size() == 1 else "Acertaram: %s" % " e ".join(names)
 		col = UIKit.OK if hits.has(0) else UIKit.INK
-	_banner(title, sub, col)
+	_banner(title, "", col)
 	Sfx.play("win" if hits.has(0) else ("lose" if hits.is_empty() else "chip"))
 	var pot_at := _global_center(bottom_mid)
 	for p in range(engine.num_players):
@@ -2793,7 +2769,6 @@ func _blitz_settlement() -> void:
 		best_gain = float(br["net"][0])
 	if float(br["bonus"]) > 0.0:
 		await _wait(0.4)
-		_banner("SEQUÊNCIA DE %d ACERTOS! +◎%d" % [int(br["streak"]), int(br["bonus"])], "Prêmio da casa por acertos seguidos.", UIKit.MONEY)
 		Sfx.play("jackpot")
 		FX.chip_rain(popup_layer, 26)
 		FX.float_text(popup_layer, _seat_center(0), "+◎ %d" % int(br["bonus"]), UIKit.MONEY, 44)

@@ -44,6 +44,7 @@ Em `scripts/ui/`, todos desenhados em código (sem textura/shader) e só com tok
 - `UIKit.serif()` / `UIKit.serif_label()` — serifada de títulos/legendas (DejaVu Serif Bold subset, ~28 KB, `assets/fonts/DejaVuSerif-Bold-Subset.ttf`). Legendas ≥ 20 px.
 - `TableEllipse` — mesa de runas (anéis neon + glifos). `fit()` ajusta a elipse: avatares na borda, mesa cresce até um avatar tocar a lateral/topo ou o de baixo chegar perto do card roxo.
 - Layout da mesa (`chaos_scene.gd`): topo = menu · título + `RoundDots` · `StatCard` fez/palpite; abaixo a `ModifierStrip`; seu avatar cruza o topo do card roxo, avisos ("fulano pagou") na faixa logo abaixo dele; mão em leque; prêmio no pé do card; barra de baixo = POTE · ações · TEMPO. A ajuda (antigo "?") mora na pausa.
+- **Avisos de ação** (`_banner`): só título curto, sempre citando o jogador ("Marcos pagou", "Marcos roubou de Ana"); uma mensagem por evento. Subtítulo é opcional e hoje não é usado no Blitz.
 
 ## Princípios do produto
 - **O Vanilla é sempre o modo mais fiel ao Jeu de Tarot lúdico (Tarot francês).** Regras oficiais (seguir naipe, cortar com Trunfo, obrigação de cobrir com Trunfo maior, Bouts, licitação, contratos) não devem ser alteradas pra "melhorar o jogo". Variações de regra pertencem ao Caos (ou a modos novos), nunca ao Vanilla.
