@@ -616,6 +616,31 @@ static func _boost_rec(n: Node) -> void:
 		_boost_rec(ch)
 
 
+## Fichas encurtadas pra caber no HUD: 999 → "999", 1.500 → "1,5K", 12.000 → "12K", 2.300.000 → "2,3M",
+## 1.200.000.000 → "1,2B". Até 3 algarismos significativos; vírgula decimal (PT-BR).
+static func fmt_short(n: float) -> String:
+	var a := absf(n)
+	var sign := "-" if n < 0.0 else ""
+	if a < 1000.0:
+		return sign + str(int(a))
+	var units := ["K", "M", "B", "T"]
+	var v := a
+	var i := -1
+	while v >= 1000.0 and i < units.size() - 1:
+		v /= 1000.0
+		i += 1
+	var txt: String
+	if v >= 100.0:
+		txt = str(int(v))
+	elif v >= 10.0:
+		txt = ("%.1f" % v)
+	else:
+		txt = ("%.2f" % v)
+	if txt.contains("."):
+		txt = txt.rstrip("0").rstrip(".")
+	return sign + txt.replace(".", ",") + units[i]
+
+
 ## Formato numérico PT-BR: 1.234.567
 static func fmt_int(n: int) -> String:
 	var neg := n < 0

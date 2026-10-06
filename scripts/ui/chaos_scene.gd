@@ -1886,11 +1886,11 @@ func _order_now() -> Array:
 
 
 func _fmt_chips(v: float) -> String:
-	return "%d" % int(v)
+	return UIKit.fmt_short(v)
 
 
 func _pot_text(v: float) -> String:
-	return "◎ %d" % int(v)
+	return "◎ " + UIKit.fmt_short(v)
 
 
 func _refresh_hud() -> void:
@@ -1922,6 +1922,16 @@ func _refresh_hud() -> void:
 			var fill := UIKit.PURPLE_DEEP
 			var edge := UIKit.MUTED
 			var ink := UIKit.INK
+			if p == 0 and engine.blitz and not blitz_showdown:
+				var need0 := engine.blitz_need(0)   # verde ao bater o palpite, vermelho se passar dele
+				if need0 == 0:
+					edge = UIKit.OK
+					fill = edge.darkened(0.6)
+					ink = edge
+				elif need0 < 0:
+					edge = UIKit.LOSS
+					fill = edge.darkened(0.6)
+					ink = edge
 			if blitz_showdown and engine.blitz:
 				var hit := engine.blitz_status(p) == "hit"
 				edge = UIKit.OK if hit else UIKit.LOSS
@@ -1933,7 +1943,7 @@ func _refresh_hud() -> void:
 			var pile_l := (seat_nodes[p] as SeatView).bet_label
 			var pile := float(engine.contrib[p]) if phase == "bet" and not bets_gathered else 0.0
 			pile_l.visible = pile > 0.0
-			pile_l.text = "◎ %d" % int(pile)
+			pile_l.text = "◎ " + UIKit.fmt_short(pile)
 			pile_l.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[p] else UIKit.MONEY)
 		_refresh_bet_tags(p, idx)
 	_refresh_round_dots()
@@ -1964,7 +1974,7 @@ func _refresh_bet_tags(p: int, idx: int) -> void:
 		flames = "%s×%s" % ["♨".repeat(ChaosCombos.flame_level(streak)), UIKit.fmt_dec(ChaosCombos.streak_mult(streak), 2)]
 	var pile := float(engine.contrib[p]) if not bets_gathered and phase != "idle" else 0.0
 	var pill := bet_pills[p] as Control
-	(bet_tags[p] as Label).text = "◎ %d" % int(pile)
+	(bet_tags[p] as Label).text = "◎ " + UIKit.fmt_short(pile)
 	(bet_tags[p] as Label).add_theme_color_override("font_color", UIKit.LOSS if engine.folded[p] else UIKit.BRAND)
 	pill.modulate.a = 1.0 if pile > 0.0 else 0.0
 	var status := ""
@@ -2634,7 +2644,7 @@ func _refresh_blitz_tag(p: int, _idx: int) -> void:
 		return
 	var pile := float(engine.contrib[0]) if (phase == "bet" and not bets_gathered) else 0.0   # some quando as apostas vão pro pote, igual aos rivais
 	my_bet_pill.modulate.a = 1.0 if pile > 0.0 else 0.0
-	my_bet_label.text = "◎ %d" % int(pile)
+	my_bet_label.text = "◎ " + UIKit.fmt_short(pile)
 	my_bet_label.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[0] else UIKit.MONEY)
 
 
@@ -2662,7 +2672,7 @@ func _refresh_pot_blitz() -> void:
 		pot_label.text = _pot_text(shown_pot)
 	# Quando o trick_pot está em destaque, mostra o prêmio do palpite abaixo como secundário.
 	if in_trick and engine.pot > 0.0:
-		pot_prize_label.text = "◎ %d" % int(engine.pot)
+		pot_prize_label.text = "◎ " + UIKit.fmt_short(engine.pot)
 		prize_shown = true
 	else:
 		prize_shown = false
@@ -2723,9 +2733,9 @@ func _resolve_trick_blitz(result: Dictionary) -> void:
 	if float(result.get("trick_pot", 0.0)) > 0.0:
 		FX.fly_chips(popup_layer, _global_center(pot_box), _seat_center(winner), _chips_for(float(result["trick_pot"])), UIKit.OK if winner == 0 else UIKit.MONEY)
 	if prize_amt + saque_amt + assalto_amt + trick_gain > 0.0:
-		FX.float_text(popup_layer, _seat_center(winner), "+◎ %d" % int(prize_amt + saque_amt + assalto_amt + maxf(trick_gain, 0.0)), UIKit.MONEY)
+		FX.float_text(popup_layer, _seat_center(winner), "+◎ " + UIKit.fmt_short(prize_amt + saque_amt + assalto_amt + maxf(trick_gain, 0.0)), UIKit.MONEY)
 	elif curse_amt > 0.0:
-		FX.float_text(popup_layer, _seat_center(winner), "−◎ %d" % int(curse_amt), UIKit.LOSS)
+		FX.float_text(popup_layer, _seat_center(winner), "−◎ " + UIKit.fmt_short(curse_amt), UIKit.LOSS)
 	_refresh_hud()
 	FX.pop(bet_pills[winner], 1.35)
 	var need := engine.blitz_need(winner)
@@ -2793,7 +2803,7 @@ func _blitz_settlement() -> void:
 		if payout > 0.0:
 			FX.fly_chips(popup_layer, pot_at, _seat_center(p), _chips_for(payout), UIKit.OK if p == 0 else UIKit.MONEY)
 			FX.burst(popup_layer, _seat_center(p) - popup_layer.global_position, UIKit.OK if p == 0 else UIKit.BRAND, 16)
-			FX.float_text(popup_layer, _seat_center(p), "+◎ %d" % int(net), UIKit.OK)
+			FX.float_text(popup_layer, _seat_center(p), "+◎ " + UIKit.fmt_short(net), UIKit.OK)
 			if p == 0:
 				FX.shake(main_area, clampf(payout / (float(engine.blind) * 20.0), 0.3, 0.9))
 				if float(br["carry_in"]) > 0.0:
@@ -2801,14 +2811,14 @@ func _blitz_settlement() -> void:
 					FX.chip_rain(popup_layer, 22)
 			await _wait(0.5)
 		elif net < 0.0:
-			FX.float_text(popup_layer, _seat_center(p), "−◎ %d" % absi(int(net)), UIKit.LOSS)
+			FX.float_text(popup_layer, _seat_center(p), "−◎ " + UIKit.fmt_short(absf(net)), UIKit.LOSS)
 	if float(br["net"][0]) > best_gain:
 		best_gain = float(br["net"][0])
 	if float(br["bonus"]) > 0.0:
 		await _wait(0.4)
 		Sfx.play("jackpot")
 		FX.chip_rain(popup_layer, 26)
-		FX.float_text(popup_layer, _seat_center(0), "+◎ %d" % int(br["bonus"]), UIKit.MONEY, 44)
+		FX.float_text(popup_layer, _seat_center(0), "+◎ " + UIKit.fmt_short(float(br["bonus"])), UIKit.MONEY, 44)
 		FX.burst(popup_layer, _seat_center(0) - popup_layer.global_position, UIKit.MONEY, 22)
 		await _wait(0.9)
 	_pot_to(engine.carry)
