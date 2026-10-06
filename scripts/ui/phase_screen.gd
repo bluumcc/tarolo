@@ -8,7 +8,7 @@ extends VBoxContainer
 ## na mesma altura.
 
 const TOP_GAP := 84.0          ## folga entre o fim do header e o título (única, vale pra todas as etapas)
-const TITLE_H := 177.0         ## faixa do título: 3 linhas a 46 px
+const TITLE_H := 170.0         ## faixa do título: 3 linhas no degrau H1
 const AVATAR_SCALE := 1.95
 const HOLDER_H := 212.0
 
@@ -26,15 +26,15 @@ func _init() -> void:
 	offset_right = -8.0
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
-	add_theme_constant_override("separation", 8)
-	title = UIKit.serif_label("", 46, UIKit.TR_GOLD.lightened(0.25), HORIZONTAL_ALIGNMENT_CENTER)
+	add_theme_constant_override("separation", DS.SP_M)
+	title = UIKit.serif_label("", DS.FS_H1, UIKit.TR_GOLD.lightened(0.25), HORIZONTAL_ALIGNMENT_CENTER)
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.add_theme_constant_override("outline_size", 4)
 	title.add_theme_constant_override("line_spacing", 6)
 	title.custom_minimum_size.y = TITLE_H
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER   # 2 linhas ficam centradas na faixa de 3
 	add_child(title)
-	subtitle = UIKit.serif_label("", 26, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
+	subtitle = UIKit.serif_label("", DS.FS_TITLE, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(subtitle)
 	_holder = Control.new()

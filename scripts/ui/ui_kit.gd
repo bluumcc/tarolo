@@ -101,24 +101,15 @@ const CARD_BACKS := {
 }
 
 
-## Painel "chapado" estilo Brawl/Clash: contorno escuro grosso e uma base mais espessa,
-## que dá volume sem precisar de arte. `border` colorido vira o contorno de destaque.
-static func box(bg: Color, border: Color = BLACK, border_w: int = 3, radius: int = 4, pad: int = 12) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = bg
-	if border == BLACK:
-		sb.border_color = OUTLINE
-		sb.set_border_width_all(3)
-		sb.border_width_bottom = 6
-	else:
-		sb.border_color = border
-		sb.set_border_width_all(mini(border_w, 4))
-	sb.set_corner_radius_all(maxi(radius, 18))
-	sb.content_margin_left = pad
-	sb.content_margin_right = pad
-	sb.content_margin_top = pad
-	sb.content_margin_bottom = pad + (3 if border == BLACK else 0)
-	sb.anti_aliasing = true
+## Superfície padrão (card/modal): fundo escuro, borda clara translúcida e brilho suave. Os fundos
+## "antigos" (roxos vivos) viram a superfície do design system; cores de estado (chefe, você...) ficam.
+static func box(bg: Color, border: Color = BLACK, _border_w: int = 3, radius: int = 4, pad: int = 12) -> StyleBoxFlat:
+	var fill := bg
+	for old in [PURPLE_DEEP, PURPLE, SURFACE, SURFACE_DEEP, SURFACE_POT, NIGHT]:
+		if bg == old:
+			fill = DS.surface()
+	var edge := DS.rim().lightened(0.2) if border == BLACK or border == MUTED else border
+	var sb := rim_box(fill, edge, edge.darkened(0.3), "small", maxi(radius, DS.R_CARD), pad, pad)
 	return sb
 
 
@@ -165,6 +156,7 @@ static func label(text: String, size: int = 22, color: Color = INK, align: int =
 	l.text = text
 	l.horizontal_alignment = align
 	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_constant_override("line_spacing", 2)
 	l.add_theme_color_override("font_color", color)
 	if size >= 24:
 		l.add_theme_constant_override("outline_size", maxi(size / 8, 3))
@@ -173,20 +165,10 @@ static func label(text: String, size: int = 22, color: Color = INK, align: int =
 	return l
 
 
-static var _serif: Font
-
-
-## Serifada de título (DejaVu Serif Bold, só Latin ≈ 28 KB): nomes, legendas, cabeçalho e botões
-## da mesa. Símbolos (◎ ★ ♛) vêm da DejaVu Sans, de reserva.
+## Família única do jogo (Lilita One, a do título TAROLO). `serif()` ficou só por compatibilidade:
+## devolve a mesma fonte, com a DejaVu Sans de reserva pros símbolos (◎ ★ ♛).
 static func serif() -> Font:
-	if _serif == null:
-		var f := load("res://assets/fonts/DejaVuSerif-Bold-Subset.ttf") as FontFile
-		var sym := load("res://assets/fonts/DejaVuSans.ttf") as Font
-		if f != null and sym != null:
-			var fb: Array[Font] = [sym]
-			f.fallbacks = fb
-		_serif = f
-	return _serif
+	return load("res://assets/fonts/LilitaOne-Regular.ttf") as Font
 
 
 ## Azul médio (nem escuro, nem bebê): o azul da paleta com o brilho no alto. Prêmio do palpite.
@@ -199,9 +181,20 @@ static func muted_lilac() -> Color:
 	return TR_PURPLE_LIGHT.lightened(0.6)
 
 
-## Rótulo em serifada com o tamanho exato pedido (nada de bônus +4 do `label`): legendas
+## Encaixa um tamanho qualquer no degrau mais próximo da escala tipográfica do design system.
+static func snap_font(size: int) -> int:
+	var steps := [DS.FS_LABEL, DS.FS_BODY, DS.FS_TITLE, DS.FS_H2, DS.FS_H1, DS.FS_DISPLAY, 60]
+	var best: int = steps[0]
+	for st in steps:
+		if absi(int(st) - size) <= absi(best - size):
+			best = int(st)
+	return best
+
+
+## Rótulo (família única) com tamanho do degrau da escala (nada de bônus +4 do `label`): legendas
 ## (≥ 20), nomes e títulos. Contorno fino pra ler em cima da mesa.
 static func serif_label(text: String, size: int = 22, color: Color = TR_WHITE, align: int = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
+	size = snap_font(size)
 	var l := label(text, size, color, align)
 	l.add_theme_font_override("font", serif())
 	l.add_theme_font_size_override("font_size", size)
@@ -347,27 +340,28 @@ static func tint_box(alpha: float) -> StyleBoxFlat:
 	return sb
 
 
-static func button(text: String, accent: Color = ACTION, size: int = 30) -> Button:
-	size = maxi(size, MIN_BUTTON_FONT)
+static func button(text: String, accent: Color = ACTION, size: int = 26) -> Button:
+	size = maxi(size, DS.FS_BODY)
+	var tn := DS.tone(accent)
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_ALL
 	b.mouse_filter = Control.MOUSE_FILTER_PASS  # não engole o arrasto de quem quer rolar a lista
-	b.custom_minimum_size = Vector2(0, 84)
+	b.custom_minimum_size = Vector2(0, DS.TAP_H)
 	b.add_theme_font_size_override("font_size", size)
-	var face0 := accent if accent != MUTED else BUTTON_MUTED
-	var fg := text_on(face0)
 	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		b.add_theme_color_override(c, fg)
-	b.add_theme_color_override("font_disabled_color", MUTED)
-	b.add_theme_constant_override("outline_size", 5 if fg == INK else 0)
-	b.add_theme_color_override("font_outline_color", accent.darkened(0.6))
-	var face := face0
-	b.add_theme_stylebox_override("normal", chunky(face))
-	b.add_theme_stylebox_override("hover", chunky(face.lightened(0.12)))
-	b.add_theme_stylebox_override("pressed", chunky(face.darkened(0.08), true))
-	b.add_theme_stylebox_override("focus", chunky(face.lightened(0.12)))
-	b.add_theme_stylebox_override("disabled", chunky(Color("#3A3570")))
+		b.add_theme_color_override(c, tn["ink"])
+	b.add_theme_color_override("font_disabled_color", TR_PURPLE_LIGHT)
+	b.add_theme_constant_override("outline_size", 3)
+	b.add_theme_color_override("font_outline_color", TR_BLACK)
+	var bg: Color = tn["bg"]
+	var rim: Color = tn["rim"]
+	var glow: Color = tn["glow"]
+	b.add_theme_stylebox_override("normal", rim_box(bg, rim, glow, "small", DS.R_BUTTON, DS.SP_L, DS.SP_S))
+	b.add_theme_stylebox_override("hover", rim_box(bg.lightened(0.1), rim, glow, "small", DS.R_BUTTON, DS.SP_L, DS.SP_S))
+	b.add_theme_stylebox_override("pressed", rim_box(bg.lightened(0.2), rim, glow, "small", DS.R_BUTTON, DS.SP_L, DS.SP_S))
+	b.add_theme_stylebox_override("focus", rim_box(bg, rim.lightened(0.3), glow, "small", DS.R_BUTTON, DS.SP_L, DS.SP_S))
+	b.add_theme_stylebox_override("disabled", rim_box(TR_PURPLE_DARK, TR_PURPLE_LIGHT, TR_PURPLE, "small", DS.R_BUTTON, DS.SP_L, DS.SP_S))
 	b.pressed.connect(func(): sfx("tick"))
 	# Feedback de toque: o botão "afunda" um pouco ao apertar.
 	b.resized.connect(func(): b.pivot_offset = b.size / 2.0)
@@ -685,10 +679,10 @@ static func modal(overlay_layer: Control, title: String, width: float = 660.0) -
 	overlay_layer.add_child(ov)
 	var box_p := panel(PURPLE_DEEP, GOLD, 30)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 10)
+	v.add_theme_constant_override("separation", DS.SP_L)
 	v.custom_minimum_size = Vector2(width, 0)
 	box_p.add_child(v)
-	v.add_child(label(title, 44, GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(label(title, DS.FS_H1, GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	ov.add_child(centered(box_p))
 	boost.call_deferred(box_p)
 	fit.call_deferred(box_p)
@@ -715,16 +709,17 @@ static func build_theme() -> Theme:
 	t.set_color("font_color", "Label", INK)
 	# Botões.
 	var face := BUTTON_MUTED
+	var tn := DS.tone(MUTED)
 	for cls in ["Button", "OptionButton", "MenuButton"]:
-		t.set_stylebox("normal", cls, chunky(face))
-		t.set_stylebox("hover", cls, chunky(face.lightened(0.12)))
-		t.set_stylebox("pressed", cls, chunky(face.darkened(0.08), true))
-		t.set_stylebox("focus", cls, chunky(face.lightened(0.12)))
-		t.set_stylebox("disabled", cls, chunky(Color("#3A3570")))
+		t.set_stylebox("normal", cls, rim_box(tn["bg"], tn["rim"], tn["glow"], "small", DS.R_BUTTON, DS.SP_L, DS.SP_S))
+		t.set_stylebox("hover", cls, rim_box((tn["bg"] as Color).lightened(0.1), tn["rim"], tn["glow"], "small", DS.R_BUTTON, DS.SP_L, DS.SP_S))
+		t.set_stylebox("pressed", cls, rim_box((tn["bg"] as Color).lightened(0.2), tn["rim"], tn["glow"], "small", DS.R_BUTTON, DS.SP_L, DS.SP_S))
+		t.set_stylebox("focus", cls, rim_box(tn["bg"], (tn["rim"] as Color).lightened(0.3), tn["glow"], "small", DS.R_BUTTON, DS.SP_L, DS.SP_S))
+		t.set_stylebox("disabled", cls, rim_box(TR_PURPLE_DARK, TR_PURPLE_LIGHT, TR_PURPLE, "small", DS.R_BUTTON, DS.SP_L, DS.SP_S))
 		for cn in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-			t.set_color(cn, cls, INK)
-		t.set_color("font_disabled_color", cls, MUTED)
-		t.set_font_size("font_size", cls, MIN_BUTTON_FONT)
+			t.set_color(cn, cls, tn["ink"])
+		t.set_color("font_disabled_color", cls, TR_PURPLE_LIGHT)
+		t.set_font_size("font_size", cls, DS.FS_BODY)
 	# Caixa de seleção / interruptor.
 	for cn in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		t.set_color(cn, "CheckButton", INK)

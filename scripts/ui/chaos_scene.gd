@@ -131,7 +131,7 @@ func _show_insufficient_fichas() -> void:
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.LOSS, 24)
 	box.custom_minimum_size = Vector2(664, 0)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 12)
+	v.add_theme_constant_override("separation", DS.SP_L)
 	box.add_child(v)
 	v.add_child(UIKit.label("FICHAS INSUFICIENTES", 28, UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER))
 	var l := UIKit.label("Você precisa de %d fichas pra sentar na Mesa %s. Jogue Vanilla ou Ranqueado, ou volte ao menu e peça um empréstimo da casa." % [int(config["buy_in"]), "Blitz" if str(config.get("mode", "chaos")) == "blitz" else "Caos"], 32, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
@@ -362,7 +362,7 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	root.add_child(bottom_bar)
 
 	# Esquerda: POTE. Meio: ações. Direita: PRÊMIO. (O relógio da vez é o anel do avatar.)
-	var pot := StatCard.new().setup("POTE", "◎ 0", UIKit.TR_GOLD, 26, 17)
+	var pot := StatCard.new().setup("POTE", "◎ 0", UIKit.TR_GOLD, DS.FS_TITLE, DS.FS_LABEL)
 	pot.custom_minimum_size = Vector2(SIDE_W, 0)
 	pot_box = pot
 	pot_label = pot.value
@@ -403,7 +403,7 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	mid.add_child(double_btn)
 
 	var blue := UIKit.prize_blue()
-	prize_card = StatCard.new().setup("PRÊMIO", "◎ 0", blue, 26, 17)
+	prize_card = StatCard.new().setup("PRÊMIO", "◎ 0", blue, DS.FS_TITLE, DS.FS_LABEL)
 	prize_card.custom_minimum_size = Vector2(SIDE_W, 0)
 	prize_card.caption.add_theme_color_override("font_color", blue.lerp(UIKit.TR_WHITE, 0.25))
 	pot_prize_label = prize_card.value
@@ -428,21 +428,23 @@ func _build_side_column() -> void:
 	side_col.offset_top = 16.0
 	side_col.offset_bottom = -20.0
 	side_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	side_col.clip_contents = true
+	side_col.custom_minimum_size = Vector2(SIDE_COL_W, 0)
 	add_child(side_col)
 	var panel_box := UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 12, UIKit.card_pad())
 	var reg := PanelContainer.new()
 	reg.add_theme_stylebox_override("panel", panel_box)
 	var rv := VBoxContainer.new()
-	rv.add_theme_constant_override("separation", 2)
+	rv.add_theme_constant_override("separation", DS.SP_XS)
 	reg.add_child(rv)
-	var cap := UIKit.serif_label("REGISTRO", 17, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_LEFT)
+	var cap := UIKit.serif_label("REGISTRO", DS.FS_LABEL, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_LEFT)
 	cap.autowrap_mode = TextServer.AUTOWRAP_OFF
 	rv.add_child(cap)
 	for i in range(LOG_LINES):
-		var l := UIKit.serif_label("", 22, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_LEFT)
+		var l := UIKit.serif_label("", DS.FS_BODY, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_LEFT)
 		l.autowrap_mode = TextServer.AUTOWRAP_OFF
 		l.clip_text = true
-		l.custom_minimum_size = Vector2(0, 28)
+		l.custom_minimum_size = Vector2(0, 32)
 		rv.add_child(l)
 		log_labels.append(l)
 	side_col.add_child(reg)
@@ -453,16 +455,16 @@ func _build_side_column() -> void:
 		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
 			_open_help())
 	var mv := VBoxContainer.new()
-	mv.add_theme_constant_override("separation", 2)
+	mv.add_theme_constant_override("separation", DS.SP_S)
 	mv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mod.add_child(mv)
-	var mcap := UIKit.serif_label("MODIFICADOR", 17, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
+	var mcap := UIKit.serif_label("MODIFICADOR", DS.FS_LABEL, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
 	mcap.autowrap_mode = TextServer.AUTOWRAP_OFF
 	mv.add_child(mcap)
-	mod_name_label = UIKit.serif_label("—", 28, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	mod_name_label = UIKit.serif_label("—", DS.FS_TITLE, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	mod_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	mv.add_child(mod_name_label)
-	mod_desc_label = UIKit.serif_label("", 19, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	mod_desc_label = UIKit.serif_label("", DS.FS_BODY, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
 	mod_desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	mod_desc_label.max_lines_visible = 3
 	mv.add_child(mod_desc_label)
@@ -1179,10 +1181,10 @@ func _modal_choice(title: String, sub: String, opts: Array, cancel := false) -> 
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 24)
 	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 40.0, 600.0), 0)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 12)
+	v.add_theme_constant_override("separation", DS.SP_L)
 	box.add_child(v)
-	v.add_child(UIKit.label(title, 32, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
-	var sl := UIKit.label(sub, 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	v.add_child(UIKit.label(title, DS.FS_H2, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
+	var sl := UIKit.label(sub, DS.FS_BODY, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
 	sl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(sl)
 	v.add_child(HSeparator.new())
@@ -1193,7 +1195,7 @@ func _modal_choice(title: String, sub: String, opts: Array, cancel := false) -> 
 		btn.pressed.connect(func(): item_chosen.emit(i))
 		v.add_child(btn)
 		if str(o.get("desc", "")) != "":
-			var desc := UIKit.label(str(o["desc"]), 30, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+			var desc := UIKit.label(str(o["desc"]), DS.FS_BODY, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 			desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			v.add_child(desc)
 	if cancel:
@@ -1845,8 +1847,11 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 		var cap_l := UIKit.label("Máximo ◎%d: é o que o rival mais forte ainda consegue cobrir." % hi, 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 		cap_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		body.add_child(cap_l)
-	var shortcuts := HBoxContainer.new()
-	shortcuts.add_theme_constant_override("separation", 6)
+	var shortcuts := GridContainer.new()
+	shortcuts.columns = 2 if docked_wide else 4   # na coluna estreita do desktop: 2×2
+	shortcuts.add_theme_constant_override("h_separation", DS.SP_S)
+	shortcuts.add_theme_constant_override("v_separation", DS.SP_S)
+	shortcuts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(shortcuts)
 	var presets: Array = [
 		["MÍN", lo],
@@ -1856,7 +1861,7 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 	]
 	for pr in presets:
 		var val := clampi(int(pr[1]), lo, hi)
-		var b := UIKit.button(str(pr[0]), UIKit.PURPLE if int(st["to"]) != val else UIKit.OK, 20 if docked_wide else 26)
+		var b := UIKit.button(str(pr[0]), UIKit.PURPLE if int(st["to"]) != val else UIKit.OK, DS.FS_BODY)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.custom_minimum_size = Vector2(0, 64)
 		b.pressed.connect(func():
@@ -2107,7 +2112,7 @@ func _show_tournament_results(summary: Dictionary) -> void:
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND if summary["won"] else UIKit.LOSS, 24)
 	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 40.0, 664.0), 0)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 10)
+	v.add_theme_constant_override("separation", DS.SP_L)
 	box.add_child(v)
 	var next := str(summary.get("next", "eliminated"))
 	var titles := {"advance": "VOCÊ AVANÇA!", "champion": "🏆 CAMPEÃO DO TORNEIO!", "eliminated": "ELIMINADO"}
@@ -2142,7 +2147,7 @@ func _show_results(summary: Dictionary) -> void:
 	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND if summary["won"] else UIKit.LOSS, 24)
 	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 40.0, 664.0), 0)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 10)
+	v.add_theme_constant_override("separation", DS.SP_L)
 	box.add_child(v)
 	var net := int(summary["net_fichas"])
 	var title := "VOCÊ SAIU NO LUCRO!" if summary["won"] else ("VOCÊ SAIU DA MESA" if net == 0 else "VOCÊ SAIU NO PREJUÍZO")

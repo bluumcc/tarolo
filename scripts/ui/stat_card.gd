@@ -12,7 +12,7 @@ func setup(cap: String, val: String, val_color: Color = UIKit.TR_GOLD, val_size:
 	add_theme_stylebox_override("panel", UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 12, UIKit.card_pad()))
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_theme_constant_override("separation", 0)
+	v.add_theme_constant_override("separation", DS.SP_XS)
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(v)
 	caption = UIKit.serif_label(cap, cap_size, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
