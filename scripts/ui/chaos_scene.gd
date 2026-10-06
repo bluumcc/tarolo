@@ -1242,8 +1242,8 @@ func _unhandled_input(event: InputEvent) -> void:
 # ------------------------------------------------------------------ HUD (stacks, pote, ações)
 
 # ------------------------------------------------------------------ loop de jogadas
-# Eliminação (torneio): só no fim da rodada, depois do rateio do palpite (que ainda pode devolver
-# fichas). No meio da rodada quem zerou só fica sem apostar, mas continua jogando as cartas.
+# Eliminação (torneio): zerou as fichas ao fim de uma jogada, sai da mesa na hora (você também). Na
+# última jogada espera o rateio do palpite, que ainda pode devolver fichas.
 
 func _run_round() -> void:
 	if engine.blitz:
@@ -1279,14 +1279,18 @@ func _run_round() -> void:
 			return
 		if engine.walkover_player() != -1:
 			await _resolve_walkover(engine.resolve_walkover())
+			if not engine.is_round_over() and await _bust_broke():
+				return
 			continue
 		await _play_cards()
+		if not engine.is_round_over() and await _bust_broke():
+			return
 	if not is_inside_tree() or finished:
 		return
 	if engine.blitz:
 		await _blitz_settlement()
 		if bool(config.get("tournament", false)):
-			await _bust_broke_bots()
+			await _bust_broke()
 		if not is_inside_tree() or finished:
 			return
 	var choice := await _show_round_summary()
@@ -1392,17 +1396,28 @@ func _ensure_solvent() -> bool:
 
 ## Torneio: marca bots com stack zero como eliminados e exibe banner por cada um.
 ## O jogador (p=0) é tratado por _ensure_solvent() — aqui só mostramos os bots.
-func _bust_broke_bots() -> void:
-	if not is_inside_tree() or finished:
-		return
-	for p in engine.bust_broke():
+## Torneio: quem ficou com 0 fichas está fora — bots saem da mesa com um aviso; se for você, a mesa
+## acaba na hora (colocação e prêmio vêm do resultado do torneio). Devolve true se a mesa acabou.
+func _bust_broke() -> bool:
+	if not bool(config.get("tournament", false)) or not is_inside_tree() or finished:
+		return false
+	var out: Array = engine.bust_broke()
+	for p in out:
 		if p == 0:
 			continue
 		_banner("%s eliminado" % _pname(p), "", UIKit.DANGER)
 		_refresh_hud()
 		await _wait(0.9)
 		if not is_inside_tree() or finished:
-			return
+			return true
+	if out.has(0):
+		_banner("Você foi eliminado", "", UIKit.DANGER)
+		_refresh_hud()
+		await _wait(1.2)
+		if is_inside_tree() and not finished:
+			_finish_match()
+		return true
+	return false
 
 
 # ------------------------------------------------------------------ apostas
