@@ -151,8 +151,9 @@ const HAND_RAISE := 28.0   ## o leque sobe um pouco da base da faixa da mão
 const BAR_H := 96.0       ## barra de ações embaixo
 const BANNER_H := 100.0    ## do topo da zona até a mão: faixa de avisos, abaixo do seu avatar
 const POT_H := 52.0        ## prêmio (card azul), no pé do card roxo
-const LANE_TOP := 56.0     ## topo da faixa de avisos, medido do topo do card roxo
+const LANE_TOP := 84.0     ## topo da faixa de avisos, medido do topo do card roxo
 const LANE_H := 76.0
+const CARD_RISE := 36.0    ## quanto o card roxo sobe acima da zona da mão (antes do encurtamento)
 const MY_SEAT_RISE := 21.0 ## quanto o centro do seu avatar fica acima do topo do card roxo
 const LEFT_W := 132.0
 const RIGHT_W := 108.0
@@ -317,7 +318,7 @@ func _build_hand_zone(root: VBoxContainer) -> void:
 	center_card.anchor_right = 0.9
 	center_card.anchor_top = 0.0
 	center_card.anchor_bottom = 1.0
-	center_card.offset_top = -36.0
+	center_card.offset_top = -CARD_RISE
 	center_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	zone.add_child(center_card)
 
@@ -357,7 +358,8 @@ func _build_hand_zone(root: VBoxContainer) -> void:
 	prize_card.anchor_bottom = 1.0
 	prize_card.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	prize_card.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	prize_card.offset_bottom = -18.0
+	prize_card.offset_bottom = -10.0
+	prize_card.z_index = 2   # por cima das pontas do leque, que agora descem até o pé do card
 	prize_card.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), blue, blue.darkened(0.4), "small", 12, 18, 4))
 	pot_prize_label = UIKit.serif_label("", 22, blue, HORIZONTAL_ALIGNMENT_CENTER)
 	pot_prize_label.autowrap_mode = TextServer.AUTOWRAP_OFF
@@ -373,11 +375,12 @@ func _build_hand_zone(root: VBoxContainer) -> void:
 	hand_scroller.anchor_right = 1.0
 	hand_scroller.anchor_top = 0.0
 	hand_scroller.anchor_bottom = 0.0
-	hand_scroller.offset_top = BANNER_H
-	hand_scroller.offset_bottom = BANNER_H + hand_h  # also kept in sync by _update_hand_scroller_margins
+	hand_scroller.offset_top = BANNER_H + _deck_drop()
+	hand_scroller.offset_bottom = BANNER_H + hand_h + _deck_drop()  # also kept in sync by _update_hand_scroller_margins
 	_update_hand_scroller_margins()
 	zone.add_child(hand_scroller)
 	hand_scroller.resized.connect(_layout_hand)
+	_update_hand_scroller_margins()
 	hand_container = Control.new()
 	hand_container.name = "HandContainer"
 	hand_container.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -457,6 +460,11 @@ func _hand_h() -> float:
 
 
 ## Mão usa a largura total da viewport (quebra a limitação de _max_ui_w).
+## O leque desce 20% da altura da carta (as pontas passam por trás da barra de baixo).
+func _deck_drop() -> float:
+	return 0.2 * CardView.SIZE.y * _hand_scale()
+
+
 func _update_hand_scroller_margins() -> void:
 	if hand_scroller == null:
 		return
@@ -465,9 +473,12 @@ func _update_hand_scroller_margins() -> void:
 	hand_scroller.offset_left = -side
 	hand_scroller.offset_right = side
 	var hand_h := _hand_h()
-	hand_scroller.offset_bottom = BANNER_H + hand_h
+	hand_scroller.offset_top = BANNER_H + _deck_drop()
+	hand_scroller.offset_bottom = BANNER_H + hand_h + _deck_drop()
 	if hand_zone != null:
 		hand_zone.custom_minimum_size = Vector2(0, BANNER_H + hand_h + POT_H)
+	if center_card != null:   # o card roxo é 10% mais baixo (encurta por cima; o pé fica onde estava)
+		center_card.offset_top = -CARD_RISE + 0.1 * (BANNER_H + hand_h + POT_H + CARD_RISE)
 
 
 ## Em tela larga o jogo fica numa coluna centralizada (não estica).
@@ -523,9 +534,7 @@ func _layout_seats() -> void:
 	if table_center == null or stage == null:
 		return
 	var n := engine.num_players
-	var card_top := stage.size.y - 28.0   # fallback: topo do card roxo no sistema do palco
-	if center_card != null and center_card.is_inside_tree() and center_card.size.y > 0.0:
-		card_top = center_card.global_position.y - stage.global_position.y
+	var card_top := stage.size.y + 8.0 + (center_card.offset_top if center_card != null else -CARD_RISE)   # topo do card roxo no sistema do palco
 	table_center.seat_count = n
 	table_center.seat_floor = card_top - 20.0
 	table_center.fit()

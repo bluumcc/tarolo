@@ -9,7 +9,7 @@ const POINTS := 80
 ## Folga entre o topo da área da mesa e o topo do avatar de cima (somada ao respiro de 8 px do
 ## layout, dá o triplo da folga que havia entre a faixa do modificador e o avatar).
 const TOP_GAP := 16.0
-const SIDE_GAP := 4.0
+const SIDE_GAP := 0.0
 ## Do centro do avatar pra baixo: parte de baixo do avatar + plaquinha de nome.
 const SEAT_BELOW := 78.0
 ## Quanto a mesa pode descer além da área do palco: o pedaço de baixo fica atrás do card roxo.
@@ -26,7 +26,7 @@ var _radii := Vector2(10, 10)
 ## baixo chegar perto do card roxo (`seat_floor`).
 func fit() -> void:
 	var r_av := HexAvatar.RADIUS
-	var half_w := SeatView.W / 2.0
+	var half_w := HexAvatar.SIZE_PX.x / 2.0 + HexAvatar.BADGE_PX / 2.0   # avatar + selo que sai do vértice
 	var topc := TOP_GAP + r_av
 	var max_cos := 0.0
 	var min_sin := 0.0
