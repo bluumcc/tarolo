@@ -346,7 +346,7 @@ func _build_ranked(_wide: bool) -> void:
 		["LP",   "%d / 100" % int(t["lp"])],
 		["V / D", UIKit.fmt_dec(ratio, 2)],
 	]
-	var mp := UIKit.panel(UIKit.SURFACE_DEEP, UIKit.OUTLINE, 24)
+	var mp := UIKit.panel(UIKit.TR_PURPLE, UIKit.TR_PURPLE.lightened(0.12), 10)
 	mp.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	mp.custom_minimum_size   = Vector2(get_viewport_rect().size.x * 0.75, 0)
 	var mv := VBoxContainer.new()
@@ -363,7 +363,7 @@ func _build_ranked(_wide: bool) -> void:
 
 	# Card de torneios: título centralizado e lista com rolagem (altura limitada)
 	var fichas := int(SaveManager.section("profile")["fichas"])
-	var tp := UIKit.panel(UIKit.SURFACE_DEEP, UIKit.OUTLINE, 24)
+	var tp := UIKit.panel(UIKit.TR_PURPLE, UIKit.TR_PURPLE.lightened(0.12), 10)
 	tp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var tv := VBoxContainer.new()
 	tv.add_theme_constant_override("separation", 16)
@@ -380,7 +380,7 @@ func _build_ranked(_wide: bool) -> void:
 	tscroll.add_child(tlist)
 	for ev in Tournament.OPEN_EVENTS:
 		var buy: int = int(ev["buy_in"])
-		var item := UIKit.panel(UIKit.SURFACE, UIKit.OUTLINE, 16)
+		var item := UIKit.panel(UIKit.TR_PURPLE.lightened(0.06), UIKit.TR_PURPLE.lightened(0.18), 8)
 		item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var ir := HBoxContainer.new()
 		ir.add_theme_constant_override("separation", 12)
@@ -421,25 +421,33 @@ func _build_ranked(_wide: bool) -> void:
 	ab_mg.add_theme_constant_override("margin_top",    12)
 	ab_mg.add_theme_constant_override("margin_bottom", 32)
 	_action_bar.add_child(ab_mg)
-	var gp := GlitchPanel.new()
-	gp.accent        = UIKit.RANK_PLAY_GLOW
-	gp.bg            = UIKit.RANK_PLAY_BG
-	gp.glow_layers   = 9
-	ab_mg.add_child(gp)
-	for sd in ["left", "right", "top", "bottom"]:
-		gp.add_theme_constant_override("margin_" + sd, 4)
-	var find_btn := UIKit.button("JOGAR RANKEADA", UIKit.RANK_PLAY_BG, 57)
-	find_btn.add_theme_font_size_override("font_size", 57)
-	find_btn.custom_minimum_size = Vector2(0, 131)
+	var find_btn := Button.new()
+	find_btn.text = "JOGAR RANKEADA"
+	find_btn.focus_mode = Control.FOCUS_NONE
+	find_btn.custom_minimum_size = Vector2(0, 112)
+	find_btn.add_theme_font_size_override("font_size", 44)
+	var glow_red := Color("#d63060")   ## vermelho mais claro pro glow
+	var mk_ranked := func(bg: Color) -> StyleBoxFlat:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = bg
+		sb.border_color = glow_red
+		sb.set_border_width_all(3)
+		sb.set_corner_radius_all(10)
+		sb.shadow_color = Color(glow_red.r, glow_red.g, glow_red.b, 0.55)
+		sb.shadow_size   = 10
+		sb.shadow_offset = Vector2.ZERO
+		sb.content_margin_left  = 20
+		sb.content_margin_right = 20
+		return sb
+	find_btn.add_theme_stylebox_override("normal",   mk_ranked.call(UIKit.TR_RED))
+	find_btn.add_theme_stylebox_override("hover",    mk_ranked.call(UIKit.TR_RED.lightened(0.10)))
+	find_btn.add_theme_stylebox_override("pressed",  mk_ranked.call(UIKit.TR_RED.darkened(0.08)))
+	find_btn.add_theme_stylebox_override("focus",    mk_ranked.call(UIKit.TR_RED))
+	for cn in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		find_btn.add_theme_color_override(cn, UIKit.TR_GOLD)
 	find_btn.add_theme_constant_override("outline_size", 0)
-	var flat := StyleBoxEmpty.new()
-	var press := UIKit.tint_box(0.08)
-	find_btn.add_theme_stylebox_override("normal",  flat)
-	find_btn.add_theme_stylebox_override("focus",   flat)
-	find_btn.add_theme_stylebox_override("hover",   press)
-	find_btn.add_theme_stylebox_override("pressed", press)
 	find_btn.pressed.connect(_start_ranked_matchmaking)
-	gp.add_child(find_btn)
+	ab_mg.add_child(find_btn)
 
 
 func _build_classic(wide: bool) -> void:
