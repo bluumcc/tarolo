@@ -55,6 +55,7 @@ var round_dots: RoundDots
 var bottom_mid: Control          # meio da barra de baixo: ações OU o card de pote/prêmio
 var prize_card: StatCard         # PRÊMIO, canto inferior direito
 var table_players := 0           # nº de jogadores com que a mesa foi dimensionada; só é refeito entre rodadas
+var discard_timer: Label         # contagem do descarte, embaixo do subtítulo
 var discard_head: VBoxContainer  # título grande + instrução da etapa de descarte, no topo do palco (fora do card)
 var chrome_discard := false      # etapa sem mesa (descarte/palpite): sem modificador na faixa
 var shown_totals: Array = []
@@ -262,6 +263,14 @@ func _build_ui() -> void:
 	var ds := UIKit.serif_label("Deslize a carta para cima ou toque nela duas vezes para descartar", 26, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
 	ds.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	discard_head.add_child(ds)
+	var gap := Control.new()   # bastante espaço entre o subtítulo e o relógio
+	gap.custom_minimum_size = Vector2(0, 70)
+	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	discard_head.add_child(gap)
+	discard_timer = UIKit.label("0:18", 84, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	discard_timer.add_theme_font_size_override("font_size", 84)
+	discard_timer.autowrap_mode = TextServer.AUTOWRAP_OFF
+	discard_head.add_child(discard_timer)
 	stage.add_child(discard_head)
 	table_center = TableEllipse.new()
 	table_center.name = "TableCenter"
@@ -1028,6 +1037,9 @@ func _process(delta: float) -> void:
 	if me == null:
 		return
 	me.set_timer(clock_left / clock_total if clock_on else -1.0)
+	if discard_head != null and discard_head.visible:
+		discard_timer.text = _mmss(clock_left if clock_on else DISCARD_SECONDS)
+		discard_timer.add_theme_color_override("font_color", UIKit.TR_RED_NEON if clock_on and clock_left <= 3.0 else UIKit.TR_WHITE)
 	if not clock_on or paused or finished or (modal_open and not clock_in_modal):
 		return
 	clock_left -= delta
