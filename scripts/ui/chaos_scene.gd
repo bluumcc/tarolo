@@ -138,6 +138,7 @@ func _show_insufficient_fichas() -> void:
 
 # ------------------------------------------------------------------ UI
 
+const HAND_RAISE := 28.0   ## o leque sobe um pouco da base da faixa da mão
 const BAR_H := 96.0       ## barra de ações embaixo
 const BANNER_H := 84.0     ## título + descrição do modificador, em cima da mão
 const POT_H := 48.0        ## pote, embaixo da mão
@@ -223,12 +224,12 @@ func _build_ui() -> void:
 	my_bet_pill.anchor_bottom = 1.0
 	my_bet_pill.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	my_bet_pill.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	my_bet_pill.offset_bottom = -6.0
+	my_bet_pill.offset_bottom = -30.0
 	my_bet_pill.z_index = 5
 	my_bet_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	my_bet_pill.add_theme_stylebox_override("panel", UIKit.box(UIKit.SURFACE_DEEP, UIKit.MONEY, 2, 20, 16))
-	my_bet_label = UIKit.label("", 34, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
-	my_bet_label.add_theme_font_size_override("font_size", 34)
+	my_bet_pill.add_theme_stylebox_override("panel", UIKit.box(UIKit.CLEAR, UIKit.CLEAR, 0, 0, 0))   # sem borda: só ficha + valor, como nos rivais
+	my_bet_label = UIKit.label("", 22, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+	my_bet_label.add_theme_font_size_override("font_size", 22)
 	my_bet_pill.add_child(my_bet_label)
 	my_bet_pill.modulate.a = 0.0
 	table_center = TableEllipse.new()
@@ -791,7 +792,7 @@ func _layout_hand() -> void:
 	# desligada cresce pra caber o conteúdo, criando um loop que empurra tudo pra ~800000 px.
 	var zone_h := _hand_h()
 	var avail_w := get_viewport_rect().size.x
-	var content_w := HandLayout.apply(cards, avail_w, zone_h, "fan", card_sz)
+	var content_w := HandLayout.apply(cards, avail_w, zone_h - HAND_RAISE, "fan", card_sz)
 	(parent as HandScroller).set_content_size(Vector2(content_w, zone_h))
 
 
