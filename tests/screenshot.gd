@@ -46,6 +46,9 @@ func _ready() -> void:
 					(b as Button).pressed.emit()
 					break
 	await get_tree().create_timer(float(args.get("wait", "1.0")), true, false, true).timeout
+	if args.has("calllate"):   # chama um método da cena só depois da espera (ex.: abrir um painel) e fotografa
+		inst.call(str(args["calllate"]))
+		await get_tree().create_timer(1.0, true, false, true).timeout
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(str(args.get("out", "/tmp/shot.png")))
 	get_tree().quit()

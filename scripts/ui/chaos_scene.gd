@@ -353,6 +353,10 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	pot_box = pot
 	pot_label = pot.value
 	pot_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	pot.mouse_filter = Control.MOUSE_FILTER_STOP   # toque no card abre o detalhe do pote (divisões, quem pôs quanto)
+	pot.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT and pot_box.modulate.a > 0.5:
+			_open_pot_details())
 	pot_sub = UIKit.label("", 18, UIKit.MUTED)   # sem lugar na tela
 	pot_sub.visible = false
 	pot.add_child(pot_sub)
@@ -1168,6 +1172,62 @@ func _open_help() -> void:
 
 ## Menu (hambúrguer): painel que desliza da esquerda, com as opções da pausa. O jogo fica pausado
 ## enquanto está aberto. Fecha pelo X, tocando fora ou com swipe pra esquerda.
+## Detalhe do pote (toque no card POTE): o card mostra só o total; aqui aparecem as divisões (pote
+## principal e laterais, quem concorre a cada um) quando há all-in de valores diferentes, e quanto
+## cada um pôs. Fora da aposta da jogada mostra a entrada do palpite de cada um.
+func _open_pot_details() -> void:
+	if finished or engine == null or overlay_layer.get_child_count() > 0:
+		return
+	var in_trick := phase == "bet" or (phase == "play" and bets_gathered)
+	var sp := SidePanel.open(overlay_layer, "POTE", true)
+	paused = true
+	sp.closed.connect(func(): paused = false)
+	var total := engine.trick_pot if in_trick else (engine.pot if engine.pot > 0.0 else engine.carry)
+	var head := UIKit.label("◎ %s" % UIKit.fmt_short(total), 46, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	sp.body.add_child(head)
+	sp.body.add_child(UIKit.label("aposta da jogada" if in_trick else "entradas do palpite", 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	var layers: Array = engine.pot_layers() if in_trick else []
+	if layers.size() > 1:
+		sp.body.add_child(UIKit.label("DIVISÃO DO POTE", 24, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
+		for i in range(layers.size()):
+			var layer: Dictionary = layers[i]
+			var elig: Array = layer["eligible"]
+			var names: Array = []
+			for q in elig:
+				names.append(_pname(q))
+			var title := "Pote principal" if i == 0 else "Lateral %d" % i
+			var who := ", ".join(names)
+			if elig.size() == 1 and i > 0:
+				title = "Sem cobertura"
+				who = "volta pra %s" % names[0]
+			_pot_row(sp.body, title, float(layer["amount"]), who)
+	else:
+		sp.body.add_child(UIKit.label("Sem divisão: todos concorrem ao pote inteiro." if in_trick else "Quem acertar o palpite leva.", 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	sp.body.add_child(UIKit.label("QUANTO CADA UM PÔS", 24, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
+	for p in range(engine.num_players):
+		if engine.busted[p]:
+			continue
+		var put: float = float(engine.contrib[p]) if in_trick else float(engine.stakes[p])
+		var note := "desistiu" if in_trick and engine.folded[p] else ""
+		_pot_row(sp.body, _pname(p), put, note)
+
+
+func _pot_row(parent: VBoxContainer, left: String, amount: float, note: String) -> void:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 0)
+	var row := HBoxContainer.new()
+	var l := UIKit.label(left, 26, UIKit.INK)
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(l)
+	row.add_child(UIKit.label("◎ %s" % UIKit.fmt_short(amount), 26, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_RIGHT))
+	box.add_child(row)
+	if note != "":
+		var n := UIKit.label(note, 20, UIKit.MUTED)
+		n.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(n)
+	parent.add_child(box)
+
+
 func _open_pause() -> void:
 	if finished:
 		return

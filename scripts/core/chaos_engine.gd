@@ -426,34 +426,48 @@ func bet_act(player: int, action: String, to := 0.0) -> Dictionary:
 ## soma à stack dele; as camadas dos outros vencedores já são pagas aqui.
 func _settle_side_pots(winner: int) -> void:
 	var order := _trick_order(winner)
+	var won := 0.0
+	for layer in pot_layers():
+		var taker := winner
+		for q in order:
+			if (layer["eligible"] as Array).has(q):
+				taker = q
+				break
+		if taker == winner:
+			won += float(layer["amount"])
+		else:
+			stacks[taker] += float(layer["amount"])
+	trick_pot = won
+
+
+## Camadas do pote da jogada (principal + laterais) pelo que cada um pôs até agora: cada uma tem o
+## valor e quem pode ganhá-la (não desistiu e cobriu a camada). Camada com 1 só elegível = sobra que
+## ninguém cobriu (volta pra ele). A sobra de quem desistiu acima de todos os níveis entra na última.
+func pot_layers() -> Array:
 	var levels: Array = []
 	for q in range(num_players):
 		if not folded[q] and contrib[q] > 0.0 and not levels.has(contrib[q]):
 			levels.append(contrib[q])
 	levels.sort()
+	var layers: Array = []
+	var prev := 0.0
+	var paid := 0.0
 	var total := 0.0
 	for q in range(num_players):
 		total += contrib[q]
-	var paid := 0.0
-	var won := 0.0
-	var prev := 0.0
 	for lv in levels:
 		var slice := 0.0
+		var elig: Array = []
 		for q in range(num_players):
 			slice += minf(contrib[q], lv) - minf(contrib[q], prev)
-		var taker := winner
-		for q in order:
 			if not folded[q] and contrib[q] >= lv:
-				taker = q
-				break
-		if taker == winner:
-			won += slice
-		else:
-			stacks[taker] += slice
+				elig.append(q)
+		layers.append({"amount": slice, "eligible": elig})
 		paid += slice
 		prev = lv
-	won += maxf(total - paid, 0.0)   # sobra de quem desistiu acima de todos os níveis: fica no pote do vencedor
-	trick_pot = won
+	if not layers.is_empty() and total - paid > 0.0:
+		layers[layers.size() - 1]["amount"] = float(layers[layers.size() - 1]["amount"]) + (total - paid)
+	return layers
 
 
 ## Jogadores do melhor pro pior na rodada de cartas, com `winner` sempre primeiro (os demais seguem
