@@ -128,7 +128,10 @@ static func box(bg: Color, border: Color = BLACK, border_w: int = 3, radius: int
 static func rim_box(bg: Color, rim_col: Color, glow_col: Color, size: String = "large", radius: int = 10, pad_h: int = 12) -> StyleBoxFlat:
 	var glow_size := 30 if size == "large" else 14
 	var shad_a    := 0.42 if size == "large" else 0.35
-	return glow_box(bg, glow_col, glow_size, 2, radius, pad_h, rim_col, shad_a)
+	# Borda semitransparente: linha visível mas suave (não dura). Godot não tem blur nativo
+	# em borda; reduzir o alpha da cor clara é a melhor aproximação de "blur".
+	var rim_soft  := Color(rim_col.r, rim_col.g, rim_col.b, 0.48)
+	return glow_box(bg, glow_col, glow_size, 2, radius, pad_h, rim_soft, shad_a)
 
 
 ## StyleBox com sombra/glow colorida — para botões primários e de destaque.

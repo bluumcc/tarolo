@@ -19,7 +19,7 @@ var human_turn := false
 var finished := false
 var paused := false
 
-const ARENA_SCALE := 0.66
+var arena_scale := 0.66   # reduzido para 0.40 em wide (desktop)
 const BID_SHORT := ["pega o monte", "vale o dobro", "monte conta pra você", "monte conta pra Defesa"]
 
 var root_box: VBoxContainer
@@ -71,6 +71,7 @@ var hint_suggest: Label
 var hint_counts: Label
 
 var my_portrait: Portrait
+var hand_scroll: HandScroller
 var hand_container: Control
 var turn_hint: Label
 var selected_view: CardView
@@ -215,7 +216,7 @@ func _build_ui() -> void:
 	# Mão — cartas sempre no tamanho real (nunca encolhidas pra caber); quando não cabem
 	# todas na tela (mão cheia do Vanilla, até 18 cartas), a mão rola de lado. Duas
 	# variantes (Configurações): fileira reta, ou leque em arco.
-	var hand_scroll := HandScroller.new()
+	hand_scroll = HandScroller.new()
 	hand_scroll.custom_minimum_size = Vector2(0, CardView.SIZE.y + CardView.MAX_LIFT + 6)
 	root_box.add_child(hand_scroll)
 	hand_scroll.resized.connect(_layout_hand)  # tamanho real só fica pronto depois do 1º sort — nunca confiar em call_deferred sozinho
@@ -590,6 +591,11 @@ func _apply_orientation() -> void:
 	bid_panel.custom_minimum_size.x = 1000.0 if wide else 0.0
 	bid_grid.columns = 4 if wide else 2
 	bid_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER if wide else Control.SIZE_FILL
+	# Escala das cartas por orientação
+	arena_scale = 0.40 if wide else 0.66
+	if hand_scroll != null:
+		var hs := _hand_scale()
+		hand_scroll.custom_minimum_size.y = CardView.SIZE.y * hs + CardView.MAX_LIFT + 6
 	_layout_table()
 
 
@@ -607,7 +613,7 @@ func _side_offset() -> float:
 func _slot_center(player: int) -> Vector2:
 	var s := arena.size
 	var c := s / 2.0
-	var half := CardView.SIZE * ARENA_SCALE / 2.0
+	var half := CardView.SIZE * arena_scale / 2.0
 	match player % 4:
 		0:
 			return Vector2(c.x, s.y - half.y - 4.0)
@@ -629,7 +635,7 @@ func _layout_table() -> void:
 	for v in table_views:
 		var cv: CardView = v["view"]
 		cv.position = _slot_pos(int(v["player"]))
-	var half := CardView.SIZE * ARENA_SCALE / 2.0
+	var half := CardView.SIZE * arena_scale / 2.0
 	for p in range(engine.num_players):
 		var tag: Label = arena_tags[p]
 		var ctr := _slot_center(p)
@@ -651,6 +657,10 @@ func _layout_table() -> void:
 ## As cartas nunca encolhem: fileira reta ou leque, escolhido em Configurações — nos dois
 ## casos a sobreposição cresce com a mão até um limite que ainda dá pra reconhecer cada
 ## carta, e se mesmo assim não couber, a rolagem horizontal cobre o resto.
+func _hand_scale() -> float:
+	return 0.65 if _is_wide() else 1.0
+
+
 func _layout_hand() -> void:
 	if hand_container == null:
 		return
@@ -664,8 +674,12 @@ func _layout_hand() -> void:
 	# vira um loop (aumenta a altura, o que aumenta o parent, que aumenta a altura de
 	# novo…) até estourar um limite interno do Godot (~800000px) e empurrar a mão e o
 	# rodapé pra bem fora da tela. A altura útil é sempre a da carta + a folga do lift.
-	var avail_h := CardView.SIZE.y + CardView.MAX_LIFT
-	var content_w := HandLayout.apply(cards, avail_w, avail_h, "fan", CardView.SIZE)
+	var s := _hand_scale()
+	var card_size := CardView.SIZE * s
+	for c in cards:
+		(c as CardView).scale = Vector2(s, s)
+	var avail_h := card_size.y + CardView.MAX_LIFT
+	var content_w := HandLayout.apply(cards, avail_w, avail_h, "fan", card_size)
 	(parent as HandScroller).set_content_size(Vector2(content_w, avail_h))
 
 
@@ -1470,7 +1484,7 @@ func _animate_play(player: int, card: CardData, from: Vector2) -> void:
 	var tw := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tw.tween_property(cv, "position", _slot_pos(player), GameState.anim(0.28))
 	tw.parallel().tween_property(cv, "rotation", randf_range(-0.06, 0.06), GameState.anim(0.28))
-	tw.parallel().tween_property(cv, "scale", Vector2(ARENA_SCALE, ARENA_SCALE), GameState.anim(0.28))
+	tw.parallel().tween_property(cv, "scale", Vector2(arena_scale, arena_scale), GameState.anim(0.28))
 	_refresh_hud()
 	await tw.finished
 
@@ -1486,7 +1500,7 @@ func _resolve_trick(result: Dictionary) -> void:
 	if not is_inside_tree():
 		return
 	if win_view:
-		FX.win_pulse(win_view, ARENA_SCALE)
+		FX.win_pulse(win_view, arena_scale)
 
 	trick_label.text = "%s venceu a rodada · +%s pts" % [str(config["names"][winner]).to_upper(), UIKit.fmt_dec(points, 1)]
 	Sfx.play("chip")

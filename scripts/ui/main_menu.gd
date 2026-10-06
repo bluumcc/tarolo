@@ -342,7 +342,8 @@ func _build_ranked(wide: bool) -> void:
 		spacer_fill.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		left.add_child(spacer_fill)
 		var pb_wide := _make_ranked_play_btn()
-		pb_wide.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		pb_wide.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		pb_wide.custom_minimum_size.x = get_viewport_rect().size.x * 0.6 * 0.75
 		left.add_child(pb_wide)
 
 		# Coluna direita (40%): torneios ocupa a coluna inteira
