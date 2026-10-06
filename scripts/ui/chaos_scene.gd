@@ -159,6 +159,9 @@ const AVATAR_TO_FAN := 38.0   ## do topo do leque (na zona) até a referência d
 const MY_SEAT_RISE := 21.0 ## quanto o centro do seu avatar fica acima do topo do card roxo
 const SIDE_W := 150.0     ## largura dos dois cards laterais (pote e prêmio)
 const LEFT_W := 132.0     ## largura dos dois cards laterais (palpite e tempo)
+const SIDE_COL_W := 420.0   ## desktop: coluna da direita (registro, modificador, prêmio, pote e ações)
+const SIDE_MARGIN := 24.0
+const LOG_LINES := 6
 const MAX_UI_W := 900.0    ## em tela larga o jogo não estica além disso
 
 var stage: Control
@@ -169,6 +172,12 @@ var hand_scroller: HandScroller
 var hand_zone: Control
 var my_bet_pill: Control        # aposta da jogada: o Label do seu assento, em cima do avatar
 var my_bet_label: Label
+var side_col: VBoxContainer     # desktop: coluna da direita
+var log_labels: Array = []
+var log_last := ""
+var mod_name_label: Label
+var mod_desc_label: Label
+var docked_wide := false
 
 
 func _build_ui() -> void:
@@ -267,6 +276,7 @@ func _build_ui() -> void:
 
 	_build_hand_zone(root)
 	_build_bottom_bar(root)
+	_build_side_column()
 
 	phase_layer = Control.new()
 	phase_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -398,6 +408,127 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	bottom_bar.add_child(prize_card)
 
 
+## Desktop (tela larga): coluna fixa à direita — Registro, Modificador, Prêmio, Pote e, embaixo, as
+## ações. Pote, prêmio e ações são os mesmos nós da barra de baixo do celular: `_dock_bottom` só
+## muda de pai conforme a orientação.
+func _build_side_column() -> void:
+	side_col = VBoxContainer.new()
+	side_col.visible = false
+	side_col.add_theme_constant_override("separation", 10)
+	side_col.anchor_left = 1.0
+	side_col.anchor_right = 1.0
+	side_col.anchor_top = 0.0
+	side_col.anchor_bottom = 1.0
+	side_col.offset_left = -SIDE_COL_W - SIDE_MARGIN
+	side_col.offset_right = -SIDE_MARGIN
+	side_col.offset_top = 16.0
+	side_col.offset_bottom = -20.0
+	side_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(side_col)
+	var panel_box := UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 12, 10)
+	var reg := PanelContainer.new()
+	reg.add_theme_stylebox_override("panel", panel_box)
+	var rv := VBoxContainer.new()
+	rv.add_theme_constant_override("separation", 2)
+	reg.add_child(rv)
+	var cap := UIKit.serif_label("REGISTRO", 17, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_LEFT)
+	cap.autowrap_mode = TextServer.AUTOWRAP_OFF
+	rv.add_child(cap)
+	for i in range(LOG_LINES):
+		var l := UIKit.serif_label("", 22, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_LEFT)
+		l.autowrap_mode = TextServer.AUTOWRAP_OFF
+		l.clip_text = true
+		l.custom_minimum_size = Vector2(0, 28)
+		rv.add_child(l)
+		log_labels.append(l)
+	side_col.add_child(reg)
+	var mod := PanelContainer.new()
+	mod.add_theme_stylebox_override("panel", panel_box)
+	mod.mouse_filter = Control.MOUSE_FILTER_STOP
+	mod.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			_open_help())
+	var mv := VBoxContainer.new()
+	mv.add_theme_constant_override("separation", 2)
+	mv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mod.add_child(mv)
+	var mcap := UIKit.serif_label("MODIFICADOR", 17, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
+	mcap.autowrap_mode = TextServer.AUTOWRAP_OFF
+	mv.add_child(mcap)
+	mod_name_label = UIKit.serif_label("—", 28, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	mod_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	mv.add_child(mod_name_label)
+	mod_desc_label = UIKit.serif_label("", 19, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	mod_desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	mod_desc_label.max_lines_visible = 3
+	mv.add_child(mod_desc_label)
+	side_col.add_child(mod)
+
+
+## Leva pote, prêmio e ações pra coluna da direita (tela larga) ou de volta pra barra de baixo.
+func _dock_bottom(wide: bool) -> void:
+	if side_col == null or bottom_bar == null or wide == docked_wide:
+		return
+	docked_wide = wide
+	side_col.visible = wide
+	bottom_bar.visible = not wide
+	if banner_title != null:
+		banner_title.visible = not wide   # no desktop os avisos vão pro Registro
+	for n in [prize_card, pot_box, bottom_mid]:
+		(n as Node).get_parent().remove_child(n)
+	if wide:
+		prize_card.custom_minimum_size = Vector2(0, 80)
+		pot_box.custom_minimum_size = Vector2(0, 80)
+		side_col.add_child(prize_card)
+		side_col.add_child(pot_box)
+		var gap := Control.new()
+		gap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		gap.name = "SideGap"
+		side_col.add_child(gap)
+		bottom_mid.size_flags_horizontal = Control.SIZE_FILL
+		side_col.add_child(bottom_mid)
+	else:
+		var gap_node := side_col.get_node_or_null("SideGap")
+		if gap_node != null:
+			side_col.remove_child(gap_node)
+			gap_node.queue_free()
+		pot_box.custom_minimum_size = Vector2(SIDE_W, 0)
+		prize_card.custom_minimum_size = Vector2(SIDE_W, 0)
+		bottom_bar.add_child(pot_box)
+		bottom_bar.add_child(bottom_mid)
+		bottom_bar.add_child(prize_card)
+		bottom_mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+
+## Registro de ações (desktop): as últimas linhas, a mais nova embaixo.
+func _log_push(text: String, col: Color) -> void:
+	if log_labels.is_empty() or text == "" or text == log_last or text.begins_with("Sua vez"):
+		return
+	log_last = text
+	for i in range(log_labels.size() - 1):
+		var a := log_labels[i] as Label
+		var b := log_labels[i + 1] as Label
+		a.text = b.text
+		a.add_theme_color_override("font_color", b.get_theme_color("font_color"))
+	var last := log_labels[log_labels.size() - 1] as Label
+	last.text = text
+	last.add_theme_color_override("font_color", col)
+
+
+func _refresh_mod_card() -> void:
+	if mod_name_label == null:
+		return
+	var m := engine.modifier
+	if m == -1:
+		mod_name_label.text = "—"
+		mod_desc_label.text = ""
+		return
+	mod_name_label.text = _modifier_label(m).to_upper()
+	mod_name_label.add_theme_color_override("font_color", _modifier_color(m))
+	mod_desc_label.text = ChaosModifiers.desc_of(m, engine.blitz)
+
+
 func _set_pot_cards(on: bool) -> void:
 	pot_box.modulate.a = 1.0 if on else 0.0
 	_refresh_idle_card()
@@ -420,6 +551,12 @@ func _max_ui_w() -> float:
 	return get_viewport_rect().size.x * (0.75 if _is_wide() else 1.0)
 
 
+## Largura da área da esquerda: no desktop é o que sobra ao lado da coluna da direita.
+func _left_area_w() -> float:
+	var vw := get_viewport_rect().size.x
+	return vw - SIDE_COL_W - SIDE_MARGIN * 3.0 if _is_wide() else vw
+
+
 ## Escala da carta na mão (ver CardView.hand_scale): cheia no celular, ~410 de altura no PC.
 func _hand_scale() -> float:
 	return CardView.hand_scale(_is_wide(), get_viewport_rect().size.y)
@@ -434,7 +571,7 @@ func _table_scale() -> float:
 ## da carta exibida — nunca de constantes soltas.
 func _hand_h() -> float:
 	var cs := CardView.SIZE * _hand_scale()
-	var avail_w := get_viewport_rect().size.x
+	var avail_w := _left_area_w()
 	var h := 0.0
 	for n in [8, 9, 10]:
 		h = maxf(h, HandLayout.fan_height(n, avail_w, cs))
@@ -445,6 +582,8 @@ func _hand_h() -> float:
 ## Espaço embaixo da mão: card do modificador + folga + o quanto o leque desce. Crescer isto empurra
 ## o leque e a mesa pra cima, mantendo as folgas.
 func _pot_h() -> float:
+	if _is_wide():
+		return 0.0   # desktop: sem barra de baixo — o leque desce até a margem e as pontas saem da tela
 	return MOD_GAP + _deck_drop()
 
 
@@ -455,7 +594,7 @@ func _card_offset_top() -> float:
 
 ## O leque desce 10% da altura da carta (as pontas passam por trás da barra de baixo).
 func _deck_drop() -> float:
-	return 0.1 * CardView.SIZE.y * _hand_scale()
+	return (0.3 if _is_wide() else 0.1) * CardView.SIZE.y * _hand_scale()
 
 
 func _update_hand_scroller_margins() -> void:
@@ -463,6 +602,8 @@ func _update_hand_scroller_margins() -> void:
 		return
 	var vp_w := get_viewport_rect().size.x
 	var side := maxf(float(Widgets.MARGIN), (vp_w - _max_ui_w()) / 2.0)
+	if _is_wide():
+		side = 0.0   # a mão ocupa exatamente a área da esquerda (a coluna da direita fica livre)
 	hand_scroller.offset_left = -side
 	hand_scroller.offset_right = side
 	var hand_h := _hand_h()
@@ -476,8 +617,11 @@ func _update_hand_scroller_margins() -> void:
 func _apply_orientation() -> void:
 	var max_w := _max_ui_w()
 	var side := maxf(float(Widgets.MARGIN), (get_viewport_rect().size.x - max_w) / 2.0)
-	margin_box.add_theme_constant_override("margin_left", int(side))
-	margin_box.add_theme_constant_override("margin_right", int(side))
+	var wide := _is_wide()
+	margin_box.add_theme_constant_override("margin_left", int(SIDE_MARGIN) if wide else int(side))
+	margin_box.add_theme_constant_override("margin_right", int(SIDE_COL_W + SIDE_MARGIN * 2.0) if wide else int(side))
+	round_dots.set_big(wide)
+	_dock_bottom(wide)
 	_update_hand_scroller_margins()
 	_refresh_hud()
 	_layout_table()
@@ -589,7 +733,7 @@ func _layout_hand() -> void:
 	# Altura fixa da zona. NÃO usar parent.size.y — ScrollContainer com rolagem vertical
 	# desligada cresce pra caber o conteúdo, criando um loop que empurra tudo pra ~800000 px.
 	var zone_h := _hand_h()
-	var avail_w := get_viewport_rect().size.x
+	var avail_w := _left_area_w()
 	var content_w := HandLayout.apply(cards, avail_w, zone_h - HAND_RAISE, "fan", card_sz)
 	(parent as HandScroller).set_content_size(Vector2(content_w, zone_h))
 
@@ -745,6 +889,8 @@ func _count_down(go: Button, lbl: Label, hold: float) -> void:
 ## Mensagem na aba em cima da barra de baixo. `color` pinta o título.
 func _banner(title: String, sub: String, color: Color) -> void:
 	var tone := _tone(color)
+	if docked_wide:
+		_log_push(title, tone)
 	banner_title.text = title
 	banner_title.add_theme_color_override("font_color", tone)
 	banner_title.modulate.a = 0.0
@@ -2002,6 +2148,7 @@ func _refresh_hud() -> void:
 	_update_turn_highlight(turn_player)
 	_refresh_double_button()
 	_refresh_idle_card()
+	_refresh_mod_card()
 
 
 func _reset_actions() -> void:
