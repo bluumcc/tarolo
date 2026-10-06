@@ -15,7 +15,7 @@ const HAND_SIZE := 8
 const ROUNDS := 5            # níveis de uma partida com fim (config "levels"); 0 = mesa sem fim
 const BLIND := 10
 const BUY_IN_BLINDS := ChaosEconomy.BUY_IN_BLINDS    # stack de entrada = 20 blinds
-const MAX_RAISES := 4        # aumentos por rodada (dá pra reaumentar em cima de quem aumentou)
+const MAX_RAISES := 10       # aumentos por rodada: na prática só o all-in limita (era 4 e travava o re-aumento)
 const PRIZE_PER_POINT := 0.25  # cada ponto das cartas vale 0,25 blind, pago pelos rivais
 const GOLD_MULT := 3.0       # Rodada Dourada
 const KING_CUT_BONUS := 3.0  # Corte de Rei (pontos)

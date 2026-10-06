@@ -65,34 +65,46 @@ static func split_into_tables(entrants: Array) -> Array:
 	return tables
 
 
-## Realocação depois que alguém quebra: se o que sobrou já cabe numa mesa só, colapsa tudo
-## nela (mesa final). Senão, desfaz as mesas que caíram abaixo de MIN_TABLE e espalha quem
-## sobrou nas mesas com vaga (a mais curta primeiro), igual balanceamento de torneio de poker.
+## Realocação depois que alguém quebra: o campo restante cabe em ceil(n / MAX_TABLE) mesas, todas
+## com tamanhos que diferem em no máximo 1 (16 → 4×4; 11 → 4/4/3; 5 → 3/2; ≤4 → mesa final única).
+## Mexe o mínimo possível: as maiores mesas ficam, as menores são desfeitas e seus jogadores vão
+## pras mesas mais vazias; depois, se ainda sobrar desnível, move bots (humano só em último caso)
+## da mesa mais cheia pra mais vazia.
 static func rebalance(tables: Array) -> Array:
 	var all: Array = []
+	var live: Array = []
 	for t in tables:
-		all += (t as Array)
+		if not (t as Array).is_empty():
+			live.append((t as Array).duplicate())
+			all += (t as Array)
 	if all.is_empty():
 		return []
 	if all.size() <= MAX_TABLE:
 		return [all]
-	var keep: Array = []
+	var want := ceili(float(all.size()) / float(MAX_TABLE))
+	live.sort_custom(func(a, b): return (a as Array).size() > (b as Array).size())
+	var keep: Array = live.slice(0, want)
 	var pool: Array = []
-	for t in tables:
-		if (t as Array).size() >= MIN_TABLE:
-			keep.append((t as Array).duplicate())
-		else:
-			pool += (t as Array)
+	for t in live.slice(want):
+		pool += (t as Array)
+	while keep.size() < want:
+		keep.append([])
 	for entrant in pool:
 		keep.sort_custom(func(a, b): return (a as Array).size() < (b as Array).size())
-		var placed := false
-		for t in keep:
-			if (t as Array).size() < MAX_TABLE:
-				(t as Array).append(entrant)
-				placed = true
+		(keep[0] as Array).append(entrant)
+	while true:
+		keep.sort_custom(func(a, b): return (a as Array).size() < (b as Array).size())
+		var small: Array = keep[0]
+		var big: Array = keep[keep.size() - 1]
+		if big.size() - small.size() <= 1:
+			break
+		var idx := big.size() - 1
+		for i in range(big.size() - 1, -1, -1):
+			if not bool((big[i] as Dictionary).get("human", false)):
+				idx = i
 				break
-		if not placed:
-			keep.append([entrant])
+		small.append(big[idx])
+		big.remove_at(idx)
 	return keep
 
 

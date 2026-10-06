@@ -1232,6 +1232,8 @@ func _run_round() -> void:
 		if not bool(config.get("tournament", false)):
 			for q in engine.refill_bots():
 				await _new_player_sits(q)
+		if await _fast_forward_if_alone():
+			break
 		await _trick_start()
 		if not is_inside_tree() or finished:
 			return
@@ -1360,6 +1362,33 @@ func _ensure_solvent() -> bool:
 
 ## Torneio: marca bots com stack zero como eliminados e exibe banner por cada um.
 ## O jogador (p=0) é tratado por _ensure_solvent() — aqui só mostramos os bots.
+## Torneio: todos os rivais quebraram no meio do nível e só você sobrou na mesa. Não faz sentido jogar as
+## jogadas que faltam sozinho: elas são resolvidas na hora (você leva cada uma, como walkover) e o
+## nível fecha; o torneio então realoca você numa mesa com gente (`Tournament.rebalance`).
+## Devolve true se fechou o nível.
+func _fast_forward_if_alone() -> bool:
+	if not bool(config.get("tournament", false)) or not engine.blitz or engine.is_round_over():
+		return false
+	var alive := 0
+	for p in range(engine.num_players):
+		if not engine.busted[p]:
+			alive += 1
+	if alive != 1 or engine.busted[0]:
+		return false
+	_banner("Mesa desfeita", "Você é o último da mesa. Vai pra outra mesa na próxima rodada.", UIKit.MUTED)
+	await _wait(1.8)
+	if not is_inside_tree() or finished:
+		return true
+	while not engine.is_round_over():
+		engine.draw_trick_modifier()
+		engine.begin_trick()
+		if engine.resolve_walkover().is_empty():
+			break
+	_banner_clear()
+	_refresh_hud()
+	return true
+
+
 ## Torneio: quem ficou com 0 fichas está fora — bots saem da mesa com um aviso; se for você, a mesa
 ## acaba na hora (colocação e prêmio vêm do resultado do torneio). Devolve true se a mesa acabou.
 func _bust_broke() -> bool:

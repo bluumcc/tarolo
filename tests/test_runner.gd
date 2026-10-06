@@ -309,6 +309,36 @@ func _test_chaos() -> void:
 	lg.plays.append({"player": 2, "card": c(CardData.Suit.TRUNFO, 15)})
 	check(lg.legal_for(0).size() == 2, "Caos: sem naipe, corta com qualquer Trunfo (mesmo menor que o cortado)")
 
+	# ---- Torneio: realocação equilibrada entre mesas
+	for rb in [[16, [4, 4, 4, 4]], [11, [4, 4, 3]], [9, [3, 3, 3]], [5, [3, 2]], [4, [4]], [2, [2]]]:
+		var rb_tables: Array = []
+		var rb_left := int(rb[0])
+		var rb_id := 0
+		while rb_left > 0:   # começa desbalanceado: mesas de 4 e uma ou duas sobras
+			var rb_n := mini(4, rb_left)
+			var rb_t: Array = []
+			for _i in range(rb_n):
+				rb_t.append({"id": rb_id, "human": rb_id == 0})
+				rb_id += 1
+			rb_tables.append(rb_t)
+			rb_left -= rb_n
+		if rb_tables.size() > 2:
+			(rb_tables[0] as Array).resize(1)   # uma mesa quase vazia
+		var rb_count := 0
+		for t in rb_tables:
+			rb_count += (t as Array).size()
+		var rb_out := Tournament.rebalance(rb_tables)
+		var rb_sizes: Array = []
+		var rb_sum := 0
+		for t in rb_out:
+			rb_sizes.append((t as Array).size())
+			rb_sum += (t as Array).size()
+		rb_sizes.sort()
+		rb_sizes.reverse()
+		var rb_ok: bool = rb_sum == rb_count and rb_sizes[0] - rb_sizes[rb_sizes.size() - 1] <= 1 and rb_sizes[0] <= Tournament.MAX_TABLE
+		check(rb_ok, "Torneio: %d jogadores realocados em mesas parelhas (%s)" % [rb_count, str(rb_sizes)])
+		check(rb_sizes.size() == ceili(float(rb_count) / 4.0), "Torneio: %d jogadores usam o mínimo de mesas" % rb_count)
+
 	# ---- Eliminado (torneio) sai da jogada: não ante, não fala, não ocupa vaga de carta
 	var bu := ChaosEngine.new()
 	bu.setup_match({"seed": 5})
