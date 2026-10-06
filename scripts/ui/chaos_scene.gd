@@ -57,10 +57,6 @@ var bottom_mid: Control          # meio da barra de baixo: ações OU o card de 
 var idle_card: PanelContainer    # PRÊMIO — ocupa o lugar dos botões enquanto não há ação
 var modifier_strip: ModifierStrip   # card do modificador, em cima da barra de baixo
 var banner_slot: Control
-var _slot_cache := {}
-var _fit_cache := {}
-var _assign_best: Array = []
-var _assign_best_cost := INF
 var table_players := 0           # nº de jogadores com que a mesa foi dimensionada; só é refeito entre rodadas
 var discard_head: VBoxContainer  # título grande + instrução da etapa de descarte, no topo do palco (fora do card)
 var chrome_discard := false      # etapa sem mesa (descarte/palpite): sem modificador na faixa
@@ -494,50 +490,7 @@ func _hand_scale() -> float:
 
 ## Escala da carta jogada na mesa (altura fixa por plataforma).
 func _table_scale() -> float:
-	return CardView.table_scale(_is_wide()) * _table_fit()
-
-
-## Fator (≤ 1) que encolhe as cartas da mesa só o bastante pra grade caber entre as plaquinhas dos
-## avatares (nos lados) e entre o avatar do topo e o seu — sem passar por cima de nome nenhum.
-func _table_fit() -> float:
-	if table_center == null or table_center.size.x <= 0.0:
-		return 1.0
-	var n := table_players if table_players > 0 else engine.num_players
-	var c := table_center.center_point()
-	var key := "%d|%d|%d|%d" % [n, int(c.y), int(table_center.border_point(PI / 2.0).y), int(table_center.size.x)]
-	if _fit_cache.has(key):
-		return _fit_cache[key]
-	var base := CardView.table_scale(_is_wide())
-	var rows: Array = _grid_rows(n)
-	var gap := 6.0
-	# Retângulos proibidos: avatar + plaquinha de cada rival e o seu avatar.
-	var seat_w := SeatView.PLATE_MIN_W
-	var blocks: Array = []
-	for p in range(n):
-		var pt := table_center.border_point(TableEllipse.seat_angle(p, n))
-		var top := pt.y - HexAvatar.RADIUS
-		var h := HexAvatar.RADIUS * 2.0 + 4.0 + (36.0 if p == 0 else 60.0)
-		blocks.append(Rect2(pt.x - seat_w / 2.0, top, seat_w, h))
-	var f := 0.6
-	var step := 1.0
-	while step >= 0.6:
-		var cs := CardView.SIZE * base * step
-		var ok := true
-		var half := Vector2(float(rows.max()) * (cs.x + gap) - gap, float(rows.size()) * (cs.y + gap) - gap) / 2.0
-		for cell in _slot_cells_for(n, cs):
-			var r := Rect2(c + (cell as Vector2) - cs / 2.0, cs)
-			for bl in blocks:
-				if r.intersects(bl):
-					ok = false
-					break
-			if not ok:
-				break
-		if ok:
-			f = step
-			break
-		step -= 0.02
-	_fit_cache[key] = f
-	return f
+	return CardView.table_scale(_is_wide())
 
 
 ## Altura da faixa da mão: o maior leque possível (8 a 10 cartas) + o lift. Vem do tamanho REAL
@@ -663,78 +616,30 @@ func _layout_table() -> void:
 		cv.position = _slot_pos(int(v["player"]))
 
 
-## Cartas jogadas: uma grade SEM sobreposição (4 → 2×2, 5 → 3+2, 6 → 3×3 em 2 linhas), cada carta
-## na célula mais perto do avatar do seu dono. Duas cartas que se sobrepõem sempre deixam uma
-## cobrir o canto superior esquerdo (o índice) da outra em alguma ordem de jogada — e a ordem muda
-## a cada rodada (o dealer é sorteado) —, então a única forma de nunca esconder um índice é não
-## sobrepor.
+## A carta de cada jogador fica do lado do avatar dele, formando um círculo (ou o mais perto
+## disso), agrupadas no centro e sobrepostas.
 func _slot_pos(player: int) -> Vector2:
 	var n := table_players if table_players > 0 else engine.num_players
-	var cell: Vector2 = _slot_cells(n)[player]
-	return table_center.center_point() + cell - CardView.SIZE / 2.0
+	var theta := TableEllipse.seat_angle(player, n)
+	var ts := _table_scale()
+	var off := Vector2(cos(theta) * CardView.SIZE.x * ts * 0.75, sin(theta) * CardView.SIZE.y * ts * 0.22)
+	return table_center.center_point() + off - CardView.SIZE / 2.0
 
 
-## Linhas da grade: 4 → 2×2, 5 → 3+2, 6 → 3+3.
-func _grid_rows(n: int) -> Array:
-	return [2, 2] if n <= 4 else ([3, 2] if n == 5 else [3, 3])
-
-
-## Centro de cada assento → centro da sua célula, relativo ao centro da mesa. Guardado até mudar
-## o nº de jogadores ou a escala das cartas.
-func _slot_cells(n: int) -> Array:
-	var cs := CardView.SIZE * _table_scale()
-	var key := "%d|%.3f|%d" % [n, cs.y, int(table_center.center_point().y)]
-	if _slot_cache.has(key):
-		return _slot_cache[key]
-	var out := _slot_cells_for(n, cs)
-	_slot_cache[key] = out
-	return out
-
-
-func _slot_cells_for(n: int, cs: Vector2) -> Array:
-	var rows: Array = _grid_rows(n)
-	var gap := 6.0
-	var cells: Array = []
-	for r in range(rows.size()):
-		var cols: int = rows[r]
-		for c in range(cols):
-			cells.append(Vector2((float(c) - (cols - 1) / 2.0) * (cs.x + gap), (float(r) - (rows.size() - 1) / 2.0) * (cs.y + gap)))
-	var half := Vector2(float(rows.max()) * (cs.x + gap), float(rows.size()) * (cs.y + gap)) / 2.0
-	var wants: Array = []
+## Camada da carta de cada assento, FIXA pela posição na tela (não pela ordem da jogada): de cima
+## pra baixo e da esquerda pra direita — 4: topo=1, esquerda=2, direita=3, você=4; 5: 1 2 / 3 4 / 5;
+## 6: 1 / 2 3 / 4 5 / 6. Quanto maior o número, mais por cima.
+func _slot_rank(player: int) -> int:
+	var n := table_players if table_players > 0 else engine.num_players
+	var order: Array = []
 	for p in range(n):
 		var th := TableEllipse.seat_angle(p, n)
-		wants.append(Vector2(cos(th) * half.x, sin(th) * half.y))
-	var perm: Array = []
-	var used: Array = []
-	used.resize(cells.size())
-	used.fill(false)
-	_assign_best_cost = INF
-	_assign_best = []
-	_assign_cells(0, n, cells, wants, perm, used, 0.0)
-	var out: Array = []
-	for p in range(n):
-		out.append(cells[_assign_best[p]])
-	return out
-
-
-## Busca exaustiva (n ≤ 6): a atribuição seat→célula de menor distância total aos pontos desejados.
-func _assign_cells(i: int, n: int, cells: Array, wants: Array, perm: Array, used: Array, cost: float) -> void:
-	if i == n:
-		if cost < _assign_best_cost:
-			_assign_best_cost = cost
-			_assign_best = perm.duplicate()
-		return
-	for k in range(cells.size()):
-		if used[k]:
-			continue
-		var d := ((cells[k] as Vector2) - (wants[i] as Vector2)).length_squared()
-		if cost + d >= _assign_best_cost:
-			continue
-		used[k] = true
-		perm.append(k)
-		_assign_cells(i + 1, n, cells, wants, perm, used, cost + d)
-		perm.pop_back()
-		used[k] = false
+		order.append([int(round(sin(th) * 100.0 / 35.0)), cos(th), p])   # linha (y agrupado), x, assento
+	order.sort_custom(func(a, b): return a[0] < b[0] or (a[0] == b[0] and a[1] < b[1]))
+	for i in range(order.size()):
+		if int(order[i][2]) == player:
+			return i + 1
+	return 1
 
 
 ## As cartas nunca encolhem: fileira reta ou leque, escolhido em Configurações — nos dois
@@ -1325,7 +1230,7 @@ func _animate_play(player: int, card: CardData, from: Vector2) -> void:
 	cv.global_position = from
 	cv.scale = Vector2(0.9, 0.9)
 	cv.rotation = randf_range(-0.25, 0.25)
-	cv.z_index = table_views.size()   # a carta que vem depois (sentido horário) cobre a anterior
+	cv.z_index = _slot_rank(player)   # camada fixa pela posição na mesa
 	table_views.append({"player": player, "view": cv})
 	Sfx.play("card", randf_range(0.9, 1.15))
 	var tw := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
