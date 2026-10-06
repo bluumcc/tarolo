@@ -2423,7 +2423,7 @@ func _human_predict() -> int:
 	banner_title.modulate.a = 1.0
 	_open_phase("QUANTAS JOGADAS VOCÊ VAI GANHAR?",
 		"Entrada ◎%s  ·  Pote ◎%s" % [UIKit.fmt_short(engine.blitz_entry()), UIKit.fmt_short(engine.carry)],
-		"", 1.5, 130.0)   # sem nome: o espaço é do seletor
+		"", 1.3, 130.0)   # sem nome: o espaço é do seletor
 	var picker := PredictPicker.new().setup(ChaosBot.suggested_predict(engine, 0), ChaosEngine.HAND_SIZE,
 		func(n: int) -> float: return ChaosEngine.blitz_weight(n), get_viewport_rect().size.x - 48.0)
 	phase_screen.content.add_child(picker)

@@ -63,6 +63,7 @@ func _process(delta: float) -> void:
 			finished = true
 			await get_tree().create_timer(0.8).timeout
 			print("viewport ", get_viewport().get_visible_rect().size)
+			get_viewport().get_texture().get_image().save_png("/tmp/phase_predict_%d.png" % int(get_viewport().get_visible_rect().size.y))
 			_check(d_title >= 0.0, "etapa de descarte medida")
 			_check(is_equal_approx(ps.title.get_global_rect().position.y, d_title), "título do palpite na mesma altura do descarte")
 			_check(is_equal_approx(ps.subtitle.get_global_rect().position.y, d_sub), "subtítulo do palpite na mesma altura do descarte")

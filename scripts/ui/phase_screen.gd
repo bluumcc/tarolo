@@ -32,7 +32,7 @@ func _init() -> void:
 	title.add_theme_constant_override("outline_size", 4)
 	title.add_theme_constant_override("line_spacing", 6)
 	title.custom_minimum_size.y = TITLE_H
-	title.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER   # 2 linhas ficam centradas na faixa de 3
 	add_child(title)
 	subtitle = UIKit.serif_label("", 26, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
