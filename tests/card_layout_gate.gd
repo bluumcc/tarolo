@@ -16,8 +16,7 @@ func check(cond: bool, msg: String) -> void:
 
 func _ready() -> void:
 	SaveManager.persist = false
-	for mode in ["compact", "large"]:
-		CardView.apply_size_mode(mode)
+	for mode in ["188x313"]:
 		for vp in [Vector2(720, 1280), Vector2(799, 1280), Vector2(720, 1565), Vector2(1920, 1226)]:
 			for n in [8, 10]:
 				await _case(mode, vp, n)
@@ -27,7 +26,7 @@ func _ready() -> void:
 
 func _case(mode: String, vp: Vector2, n: int) -> void:
 	var wide := vp.x > vp.y
-	var hs := CardView.hand_scale(wide, vp.x, vp.y)
+	var hs := CardView.hand_scale(wide, vp.y)
 	var cs := CardView.SIZE * hs
 	var avail_w := vp.x
 	var zone_h := 0.0

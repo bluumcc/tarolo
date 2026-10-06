@@ -417,7 +417,7 @@ func _max_ui_w() -> float:
 
 ## Escala da carta na mão (ver CardView.hand_scale): cheia no celular, ~410 de altura no PC.
 func _hand_scale() -> float:
-	return CardView.hand_scale(_is_wide(), get_viewport_rect().size.x, get_viewport_rect().size.y)
+	return CardView.hand_scale(_is_wide(), get_viewport_rect().size.y)
 
 
 ## Escala da carta jogada na mesa (altura fixa por plataforma).
@@ -720,7 +720,7 @@ func _layout_hand() -> void:
 	var card_sz := CardView.SIZE * hs
 	for c in cards:
 		(c as CardView).scale = Vector2(hs, hs)
-	(parent as HandScroller).ghost_scale_mult = maxf(1.0, CardView.focus_scale(_is_wide(), get_viewport_rect().size.x, get_viewport_rect().size.y) / hs)
+	(parent as HandScroller).ghost_scale_mult = maxf(1.0, CardView.focus_scale(_is_wide(), get_viewport_rect().size.y) / hs)
 	# Altura fixa da zona. NÃO usar parent.size.y — ScrollContainer com rolagem vertical
 	# desligada cresce pra caber o conteúdo, criando um loop que empurra tudo pra ~800000 px.
 	var zone_h := _hand_h()

@@ -93,7 +93,6 @@ func apply_settings() -> void:
 	_ensure_bus("SFX")
 	_set_bus_volume("Music", float(s["music_volume"]))
 	_set_bus_volume("SFX", float(s["sfx_volume"]))
-	CardView.apply_size_mode(str(s.get("card_size", "compact")))
 	if not OS.has_feature("mobile") and DisplayServer.get_name() != "headless":
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if s["fullscreen"] else DisplayServer.WINDOW_MODE_WINDOWED)
 

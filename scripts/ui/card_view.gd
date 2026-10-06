@@ -8,42 +8,30 @@ signal zoom_requested(view: CardView)
 
 ## Proporção da arte (PNGs 540x900). O tamanho da carta SEMPRE deriva dela: nunca esticar nem cortar.
 const ART_ASPECT := 540.0 / 900.0
-## Modos de tamanho (Ajustes): "compact" mantém a altura de antes das imagens (270);
-## "large" mantém a largura de antes (188). Os dois seguem ART_ASPECT.
-const SIZE_COMPACT := Vector2(270.0 * ART_ASPECT, 270.0)
-const SIZE_LARGE := Vector2(188.0, 188.0 / ART_ASPECT)
+## Tamanho base da carta (escala 1.0): largura 188, altura pela proporção da arte (188x313).
+const SIZE := Vector2(188.0, 188.0 / ART_ASPECT)
 const TABLE_H_MOBILE := 135.0   ## altura da carta jogada na mesa (celular)
 const TABLE_H_WIDE := 180.0     ## idem em tela larga (PC)
-const HAND_H_WIDE := 320.0      ## altura da carta na mão em tela larga (modo compact)
+const HAND_H_WIDE := 320.0      ## altura máxima da carta na mão em tela larga
 const FOCUS_H_WIDE := 410.0     ## altura da carta destacada (arrastada no swipe) em tela larga
+const FOCUS_MOBILE := 1.75      ## carta arrastada no celular = mão +75%
 const MAX_LIFT := 44.0  ## até onde a carta sobe visualmente ao selecionar/passar o mouse
 const LONG_PRESS := 0.45
 
-## Tamanho base da carta (escala 1.0). Muda só via apply_size_mode().
-static var SIZE := SIZE_COMPACT
 
-
-static func apply_size_mode(mode: String) -> void:
-	SIZE = SIZE_LARGE if mode == "large" else SIZE_COMPACT
-
-
-## Escala da carta na mão. Celular: largura = fração da tela (compact 28%, large 31%), as cartas
-## se sobrepõem mais pra caber o leque. PC: altura-alvo limitada a 25% da viewport (a zona da
-## mão tem que caber junto com a barra de baixo).
-static func hand_scale(wide: bool, vp_w: float, vp_h: float) -> float:
+## Escala da carta na mão: 1.0 no celular; em tela larga, altura-alvo limitada a 25% da viewport
+## (a zona da mão tem que caber junto com a barra de baixo).
+static func hand_scale(wide: bool, vp_h: float) -> float:
 	if not wide:
-		var frac := 0.31 if SIZE.y > 300.0 else 0.28
-		return frac * vp_w / SIZE.x
-	var target := minf(HAND_H_WIDE * SIZE.y / SIZE_COMPACT.y, vp_h * 0.25)
-	return target / SIZE.y
+		return 1.0
+	return minf(HAND_H_WIDE, vp_h * 0.25) / SIZE.y
 
 
-## Escala da carta destacada (a que acompanha o dedo no swipe): celular = mão +75%;
-## PC = altura fixa de 410 (limitada a 34% da viewport).
-static func focus_scale(wide: bool, vp_w: float, vp_h: float) -> float:
+## Escala da carta destacada (a que acompanha o dedo no swipe).
+static func focus_scale(wide: bool, vp_h: float) -> float:
 	if not wide:
-		return hand_scale(false, vp_w, vp_h) * 1.75
-	return minf(FOCUS_H_WIDE * SIZE.y / SIZE_COMPACT.y, vp_h * 0.34) / SIZE.y
+		return FOCUS_MOBILE
+	return minf(FOCUS_H_WIDE, vp_h * 0.34) / SIZE.y
 
 
 ## Escala da carta jogada na mesa (altura fixa, independente do modo).
