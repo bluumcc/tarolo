@@ -152,6 +152,7 @@ var bottom_bar: HBoxContainer
 var bet_row: HBoxContainer
 var timer_label: Label
 var center_card: PanelContainer
+var hand_scroller: HandScroller
 
 
 func _build_ui() -> void:
@@ -227,7 +228,6 @@ func _build_ui() -> void:
 	popup_layer.z_index = 20
 	add_child(popup_layer)
 
-	var hand_scroller := hand_container.get_parent() as HandScroller
 	hand_scroller.ghost_layer = popup_layer
 	hand_scroller.throw_allowed = func() -> bool: return phase == "discard" or human_turn
 	hand_scroller.throw_requested.connect(_on_card_thrown)
@@ -245,7 +245,7 @@ func _build_ui() -> void:
 ## Card central (60% da largura): título e descrição do modificador em cima, a mão em arco no
 ## meio (por cima do card, as cartas passam das bordas) e o pote embaixo.
 func _build_hand_zone(root: VBoxContainer) -> void:
-	var hand_h := CardView.SIZE.y + CardView.MAX_LIFT + 60.0
+	var hand_h := CardView.SIZE.y + CardView.MAX_LIFT + 72.0
 	var zone := Control.new()
 	zone.custom_minimum_size = Vector2(0, BANNER_H + hand_h + POT_H)
 	root.add_child(zone)
@@ -298,21 +298,20 @@ func _build_hand_zone(root: VBoxContainer) -> void:
 	cv.add_child(pot_box)
 
 	# Mão em arco leve, sempre no tamanho real; rola de lado só se não couber.
-	var hand_scroll := HandScroller.new()
-	hand_scroll.anchor_left = 0.0
-	hand_scroll.anchor_right = 1.0
-	hand_scroll.anchor_top = 0.0
-	hand_scroll.anchor_bottom = 0.0
-	hand_scroll.offset_left = -float(Widgets.MARGIN)    # a mão vai até a borda da tela
-	hand_scroll.offset_right = float(Widgets.MARGIN)
-	hand_scroll.offset_top = BANNER_H
-	hand_scroll.offset_bottom = BANNER_H + hand_h
-	zone.add_child(hand_scroll)
-	hand_scroll.resized.connect(_layout_hand)
+	hand_scroller = HandScroller.new()
+	hand_scroller.anchor_left = 0.0
+	hand_scroller.anchor_right = 1.0
+	hand_scroller.anchor_top = 0.0
+	hand_scroller.anchor_bottom = 0.0
+	hand_scroller.offset_top = BANNER_H
+	hand_scroller.offset_bottom = BANNER_H + hand_h
+	_update_hand_scroller_margins()
+	zone.add_child(hand_scroller)
+	hand_scroller.resized.connect(_layout_hand)
 	hand_container = Control.new()
 	hand_container.name = "HandContainer"
 	hand_container.mouse_filter = Control.MOUSE_FILTER_PASS
-	hand_scroll.set_content(hand_container)
+	hand_scroller.set_content(hand_container)
 
 
 ## Barra de baixo: stack e vazas à esquerda, ações no centro, relógio da jogada à direita.
@@ -410,11 +409,21 @@ func _is_wide() -> bool:
 	return sz.x > sz.y
 
 
+## Mão usa a largura total da viewport (quebra a limitação de MAX_UI_W).
+func _update_hand_scroller_margins() -> void:
+	if hand_scroller == null:
+		return
+	var side := maxf(float(Widgets.MARGIN), (get_viewport_rect().size.x - MAX_UI_W) / 2.0)
+	hand_scroller.offset_left = -side
+	hand_scroller.offset_right = side
+
+
 ## Em tela larga o jogo fica numa coluna centralizada (não estica).
 func _apply_orientation() -> void:
 	var side := maxf(float(Widgets.MARGIN), (get_viewport_rect().size.x - MAX_UI_W) / 2.0)
 	margin_box.add_theme_constant_override("margin_left", int(side))
 	margin_box.add_theme_constant_override("margin_right", int(side))
+	_update_hand_scroller_margins()
 	_refresh_hud()
 	_layout_table()
 
@@ -674,13 +683,13 @@ func _layout_hand() -> void:
 	if cards.is_empty():
 		return
 	var parent := hand_container.get_parent() as Control
-	var avail_w := parent.size.x - 8.0
+	var avail_w := get_viewport_rect().size.x - 8.0
 	# Nunca usar parent.size.y aqui: com rolagem vertical desligada, o ScrollContainer
 	# cresce pra caber o conteúdo — usar o próprio tamanho dele como altura disponível
 	# vira um loop (aumenta a altura, o que aumenta o parent, que aumenta a altura de
 	# novo…) até estourar um limite interno do Godot (~800000px) e empurrar a mão e o
 	# rodapé pra bem fora da tela. A altura útil é sempre a da carta + a folga do lift.
-	var avail_h := CardView.SIZE.y + CardView.MAX_LIFT + 60.0
+	var avail_h := CardView.SIZE.y + CardView.MAX_LIFT + 72.0
 	var content_w := HandLayout.apply(cards, avail_w, avail_h, "fan", CardView.SIZE)
 	(parent as HandScroller).set_content_size(Vector2(content_w, avail_h))
 
@@ -1182,13 +1191,14 @@ func _show_zoom(view: CardView) -> void:
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_theme_constant_override("separation", 18)
+	var zoom_scale := 1.65 if _is_wide() else 2.2
 	var holder := Control.new()
-	holder.custom_minimum_size = CardView.SIZE * 2.2
+	holder.custom_minimum_size = CardView.SIZE * zoom_scale
 	var big: CardView = CARD_SCENE.instantiate()
 	big.setup(view.data, true)
 	big.interactive = false
 	holder.add_child(big)
-	big.scale = Vector2(2.2, 2.2)
+	big.scale = Vector2(zoom_scale, zoom_scale)
 	big.pivot_offset = Vector2.ZERO
 	v.add_child(holder)
 	var desc := UIKit.label(view.describe(), 32, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)

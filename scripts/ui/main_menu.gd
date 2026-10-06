@@ -52,8 +52,6 @@ func _build() -> void:
 
 	var wide := _is_wide()
 	page.add_child(_build_topbar(wide))
-	if wide:
-		page.add_child(_build_tabbar_portrait())  # landscape: abas abaixo do topbar
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -94,36 +92,39 @@ func _build() -> void:
 
 func _build_topbar(wide: bool) -> PanelContainer:
 	var head := PanelContainer.new()
-	var hsb := UIKit.box(UIKit.SURFACE, UIKit.BLACK, 3, 0, 12)
-	hsb.set_corner_radius_all(0)
-	if not wide:
-		hsb.corner_radius_bottom_left  = 20
-		hsb.corner_radius_bottom_right = 20
+	var hsb := UIKit.box(UIKit.TR_BLACK, UIKit.TR_BLACK, 0, 0, 0)
 	hsb.content_margin_left  = Widgets.MARGIN
 	hsb.content_margin_right = Widgets.MARGIN
+	hsb.content_margin_top    = 0
+	hsb.content_margin_bottom = 0
 	head.add_theme_stylebox_override("panel", hsb)
 	head.custom_minimum_size = Vector2(0, Widgets.TOPBAR_H)
 
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 16)
+	row.add_theme_constant_override("separation", 0)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	head.add_child(row)
 
-	# Logo
-	var logo := UIKit.label("TAROLO", 38, UIKit.BRAND)
+	# Logo esquerda
+	var logo := UIKit.label("TAROLO", 36, UIKit.TR_GOLD)
 	logo.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	logo.add_theme_color_override("font_outline_color", UIKit.TITLE_OUTLINE)
-	logo.add_theme_constant_override("outline_size", 7)
+	logo.add_theme_color_override("font_outline_color", UIKit.TR_PURPLE)
+	logo.add_theme_constant_override("outline_size", 5)
 	row.add_child(logo)
 
 	if wide:
-		# Abas no centro da barra superior
-		var spacer := Control.new()
-		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(spacer)
-		row.add_child(_make_tab_buttons(false))
-		var spacer2 := Control.new()
-		spacer2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(spacer2)
+		var gap1 := Control.new()
+		gap1.custom_minimum_size = Vector2(28, 0)
+		row.add_child(gap1)
+
+		# Botões de nav esticam pra preencher o espaço central
+		var btn_row := _make_topbar_nav()
+		btn_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(btn_row)
+
+		var gap2 := Control.new()
+		gap2.custom_minimum_size = Vector2(28, 0)
+		row.add_child(gap2)
 	else:
 		var spacer := Control.new()
 		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -133,6 +134,44 @@ func _build_topbar(wide: bool) -> PanelContainer:
 	row.add_child(_wallet)
 
 	return head
+
+
+## Botões de navegação embutidos na topbar (só no wide/PC).
+func _make_topbar_nav() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	for tab in ["RANKEADA", "CLÁSSICO", "LOJA", "AJUSTES"]:
+		var btn := _topbar_nav_btn(tab, tab == _active_tab)
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(btn)
+	return row
+
+
+func _topbar_nav_btn(tab: String, active: bool) -> Button:
+	var bg   := UIKit.TR_RED   if tab == "RANKEADA" else UIKit.TR_PURPLE
+	var text := UIKit.TR_GOLD  if tab == "RANKEADA" else UIKit.TR_WHITE
+	if active:
+		bg = bg.lightened(0.12)
+	var b := Button.new()
+	b.text = tab
+	b.focus_mode = Control.FOCUS_NONE
+	b.add_theme_font_size_override("font_size", 22)
+	var mk := func(c: Color) -> StyleBoxFlat:
+		var sb := UIKit.box(c, UIKit.TR_GOLD if active else UIKit.CLEAR, 0, 0, 0)
+		sb.border_width_bottom = 4 if active else 0
+		sb.content_margin_left  = 10
+		sb.content_margin_right = 10
+		sb.content_margin_top    = 0
+		sb.content_margin_bottom = 0
+		return sb
+	b.add_theme_stylebox_override("normal",  mk.call(bg))
+	b.add_theme_stylebox_override("hover",   mk.call(bg.lightened(0.10)))
+	b.add_theme_stylebox_override("pressed", mk.call(bg.darkened(0.08)))
+	b.add_theme_stylebox_override("focus",   mk.call(bg))
+	for cn in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		b.add_theme_color_override(cn, text)
+	b.pressed.connect(func(): _switch_tab(tab))
+	return b
 
 
 func _build_tabbar_portrait() -> Control:
@@ -149,7 +188,7 @@ func _build_tabbar_portrait() -> Control:
 func _make_tab_buttons(expand: bool) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 0)
-	for name in ["RANKEADA", "CLÁSSICO", "LOJA", "MENU"]:
+	for name in ["RANKEADA", "CLÁSSICO", "LOJA", "AJUSTES"]:
 		var btn := _tab_btn(name, name == _active_tab, expand)
 		if expand:
 			btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -188,10 +227,10 @@ func _tab_btn(tab: String, active: bool, tall: bool = false) -> Button:
 
 func _tab_accent(tab: String) -> Color:
 	match tab:
-		"RANKEADA": return UIKit.DANGER
-		"CLÁSSICO": return UIKit.ACTION
-		"LOJA":     return UIKit.MONEY
-		_:          return UIKit.MUTED
+		"RANKEADA": return UIKit.TR_RED
+		"CLÁSSICO": return UIKit.TR_WHITE
+		"LOJA":     return UIKit.TR_WHITE
+		_:          return UIKit.TR_WHITE
 
 
 func _switch_tab(tab: String) -> void:
@@ -210,7 +249,7 @@ func _build_wallet() -> HBoxContainer:
 
 	var prof := SaveManager.section("profile")
 
-	var chip_p := _pill("◎ " + UIKit.fmt_int(int(prof["fichas"])), UIKit.CHIPS, "ChipsLabel")
+	var chip_p := _pill("◎ " + UIKit.fmt_int(int(prof["fichas"])), UIKit.TR_CYAN, "ChipsLabel")
 	chip_p.mouse_filter = Control.MOUSE_FILTER_STOP
 	chip_p.gui_input.connect(func(e: InputEvent):
 		if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT and e.pressed:
@@ -218,20 +257,21 @@ func _build_wallet() -> HBoxContainer:
 			_open_fichas())
 	row.add_child(chip_p)
 
-	row.add_child(_pill("◆ " + UIKit.fmt_int(int(prof["gems"])), UIKit.MODIFIER, "GemsLabel"))
+	row.add_child(_pill("◆ " + UIKit.fmt_int(int(prof["gems"])), UIKit.TR_GOLD, "GemsLabel"))
 
 	return row
 
 
 func _pill(text: String, color: Color, label_name: String) -> PanelContainer:
-	var p   := UIKit.panel(UIKit.SURFACE_DEEP, color.darkened(0.3), 8)
+	var bg  := UIKit.TR_PURPLE.lightened(0.08)
+	var p   := UIKit.panel(bg, color.darkened(0.1), 2)
 	var sb  := p.get_theme_stylebox("panel") as StyleBoxFlat
-	sb.set_corner_radius_all(28)
+	sb.set_corner_radius_all(24)
 	sb.content_margin_left  = 16
 	sb.content_margin_right = 20
-	sb.content_margin_top   = 8
-	sb.content_margin_bottom = 8
-	p.custom_minimum_size = Vector2(0, 52)
+	sb.content_margin_top   = 6
+	sb.content_margin_bottom = 6
+	p.custom_minimum_size = Vector2(0, 48)
 	var lbl := UIKit.label(text, 22, color)
 	lbl.name = label_name
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -258,10 +298,10 @@ func _populate_tab(wide: bool) -> void:
 		"RANKEADA": _build_ranked(wide)
 		"CLÁSSICO": _build_classic(wide)
 		"LOJA":     _build_shop(wide)
-		"MENU":     _build_menu(wide)
+		"AJUSTES":  _build_menu(wide)
 
 
-func _build_ranked(_wide: bool) -> void:
+func _build_ranked(wide: bool) -> void:
 	var rk   := GameState.ranked()
 	var t    := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
 	var tc   := Color(Ranked.TIER_COLORS[int(t["tier"])])
@@ -277,7 +317,36 @@ func _build_ranked(_wide: bool) -> void:
 	title.add_theme_constant_override("outline_size", 8)
 	_content_col.add_child(title)
 
-	# Badge do rank (sem card), 25% maior que antes (200 → 250)
+	# Conteúdo principal: 2 colunas no PC, coluna única no mobile
+	var fichas := int(SaveManager.section("profile")["fichas"])
+	if wide:
+		var cols := HBoxContainer.new()
+		cols.add_theme_constant_override("separation", Widgets.MARGIN)
+		cols.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_content_col.add_child(cols)
+
+		# Coluna esquerda (60%): badge + tier + métricas
+		var left := VBoxContainer.new()
+		left.add_theme_constant_override("separation", 16)
+		left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		left.size_flags_stretch_ratio = 0.6
+		cols.add_child(left)
+		_ranked_badge_block(left, t, tc, 72, UIKit.TR_WHITE)
+		_ranked_stats_block(left, rk, wins, loss)
+
+		# Coluna direita (40%): torneios ocupa a coluna inteira
+		var right := VBoxContainer.new()
+		right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		right.size_flags_stretch_ratio = 0.4
+		cols.add_child(right)
+		_ranked_tournament_block(right, fichas, true)
+	else:
+		_ranked_badge_block(_content_col, t, tc, 48, UIKit.BROWN)
+		_ranked_stats_block(_content_col, rk, wins, loss)
+		_ranked_tournament_block(_content_col, fichas, false)
+
+
+func _ranked_badge_block(col: VBoxContainer, t: Dictionary, tc: Color, tier_size: int, tier_color: Color) -> void:
 	var circle := Panel.new()
 	circle.custom_minimum_size   = Vector2(250, 250)
 	circle.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -291,24 +360,22 @@ func _build_ranked(_wide: bool) -> void:
 	div_lbl.add_theme_color_override("font_outline_color", tc.darkened(0.6))
 	div_lbl.add_theme_constant_override("outline_size", 8)
 	circle.add_child(div_lbl)
-	_content_col.add_child(circle)
-
-	# Nome do rank (sem card)
-	var tier_lbl := UIKit.label(str(t["label"]).to_upper(), 48, UIKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
+	col.add_child(circle)
+	var tier_lbl := UIKit.label(str(t["label"]).to_upper(), tier_size, tier_color, HORIZONTAL_ALIGNMENT_CENTER)
 	tier_lbl.add_theme_color_override("font_outline_color", UIKit.OUTLINE)
 	tier_lbl.add_theme_constant_override("outline_size", 6)
-	_content_col.add_child(tier_lbl)
+	col.add_child(tier_lbl)
 
-	# Card de métricas: 75% da largura, centralizado (MMR, pontos e razão V/D)
+
+func _ranked_stats_block(col: VBoxContainer, rk: Dictionary, wins: int, loss: int) -> void:
 	var ratio := float(wins) / float(maxi(loss, 1))
 	var stat_rows: Array[Array] = [
 		["MMR",  UIKit.fmt_int(int(rk["mmr"]))],
-		["LP",   "%d / 100" % int(t["lp"])],
+		["LP",   "%d / 100" % int(Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))["lp"])],
 		["V / D", UIKit.fmt_dec(ratio, 2)],
 	]
-	var mp := UIKit.panel(UIKit.SURFACE_DEEP, UIKit.OUTLINE, 24)
-	mp.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	mp.custom_minimum_size   = Vector2(get_viewport_rect().size.x * 0.75, 0)
+	var mp := UIKit.panel(UIKit.TR_PURPLE, UIKit.TR_PURPLE.lightened(0.12), 10)
+	mp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var mv := VBoxContainer.new()
 	mv.add_theme_constant_override("separation", 12)
 	mp.add_child(mv)
@@ -319,19 +386,23 @@ func _build_ranked(_wide: bool) -> void:
 		mrow.add_child(mk)
 		mrow.add_child(UIKit.label(str(sr[1]), 26, UIKit.BROWN))
 		mv.add_child(mrow)
-	_content_col.add_child(mp)
+	col.add_child(mp)
 
-	# Card de torneios: título centralizado e lista com rolagem (altura limitada)
-	var fichas := int(SaveManager.section("profile")["fichas"])
-	var tp := UIKit.panel(UIKit.SURFACE_DEEP, UIKit.OUTLINE, 24)
+
+func _ranked_tournament_block(col: VBoxContainer, fichas: int, fill_height: bool) -> void:
+	var tp := UIKit.panel(UIKit.TR_PURPLE, UIKit.TR_PURPLE.lightened(0.12), 10)
 	tp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if fill_height:
+		tp.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var tv := VBoxContainer.new()
 	tv.add_theme_constant_override("separation", 16)
 	tp.add_child(tv)
 	tv.add_child(UIKit.label("TORNEIOS", 32, UIKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER))
 	var tscroll := ScrollContainer.new()
 	tscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	tscroll.custom_minimum_size = Vector2(0, clampf(get_viewport_rect().size.y * 0.38, 260.0, 480.0))
+	tscroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	if not fill_height:
+		tscroll.custom_minimum_size = Vector2(0, clampf(get_viewport_rect().size.y * 0.38, 260.0, 480.0))
 	UIKit.suppress_click_on_scroll(tscroll)
 	tv.add_child(tscroll)
 	var tlist := VBoxContainer.new()
@@ -340,7 +411,7 @@ func _build_ranked(_wide: bool) -> void:
 	tscroll.add_child(tlist)
 	for ev in Tournament.OPEN_EVENTS:
 		var buy: int = int(ev["buy_in"])
-		var item := UIKit.panel(UIKit.SURFACE, UIKit.OUTLINE, 16)
+		var item := UIKit.panel(UIKit.TR_PURPLE.lightened(0.06), UIKit.TR_PURPLE.lightened(0.18), 8)
 		item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var ir := HBoxContainer.new()
 		ir.add_theme_constant_override("separation", 12)
@@ -372,7 +443,7 @@ func _build_ranked(_wide: bool) -> void:
 		eb.pressed.connect(_open_tournament.bind(buy, str(ev["name"])))
 		ir.add_child(eb)
 		tlist.add_child(item)
-	_content_col.add_child(tp)
+	col.add_child(tp)
 
 	# Botão fixo no rodapé, largura total (com a margem global)
 	var ab_mg := MarginContainer.new()
@@ -381,25 +452,33 @@ func _build_ranked(_wide: bool) -> void:
 	ab_mg.add_theme_constant_override("margin_top",    12)
 	ab_mg.add_theme_constant_override("margin_bottom", 32)
 	_action_bar.add_child(ab_mg)
-	var gp := GlitchPanel.new()
-	gp.accent        = UIKit.RANK_PLAY_GLOW
-	gp.bg            = UIKit.RANK_PLAY_BG
-	gp.glow_layers   = 9
-	ab_mg.add_child(gp)
-	for sd in ["left", "right", "top", "bottom"]:
-		gp.add_theme_constant_override("margin_" + sd, 4)
-	var find_btn := UIKit.button("JOGAR RANKEADA", UIKit.RANK_PLAY_BG, 57)
-	find_btn.add_theme_font_size_override("font_size", 57)
-	find_btn.custom_minimum_size = Vector2(0, 131)
+	var find_btn := Button.new()
+	find_btn.text = "JOGAR RANKEADA"
+	find_btn.focus_mode = Control.FOCUS_NONE
+	find_btn.custom_minimum_size = Vector2(0, 112)
+	find_btn.add_theme_font_size_override("font_size", 44)
+	var glow_red := Color("#d63060")   ## vermelho mais claro pro glow
+	var mk_ranked := func(bg: Color) -> StyleBoxFlat:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = bg
+		sb.border_color = glow_red
+		sb.set_border_width_all(3)
+		sb.set_corner_radius_all(10)
+		sb.shadow_color = Color(glow_red.r, glow_red.g, glow_red.b, 0.55)
+		sb.shadow_size   = 10
+		sb.shadow_offset = Vector2.ZERO
+		sb.content_margin_left  = 20
+		sb.content_margin_right = 20
+		return sb
+	find_btn.add_theme_stylebox_override("normal",   mk_ranked.call(UIKit.TR_RED))
+	find_btn.add_theme_stylebox_override("hover",    mk_ranked.call(UIKit.TR_RED.lightened(0.10)))
+	find_btn.add_theme_stylebox_override("pressed",  mk_ranked.call(UIKit.TR_RED.darkened(0.08)))
+	find_btn.add_theme_stylebox_override("focus",    mk_ranked.call(UIKit.TR_RED))
+	for cn in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		find_btn.add_theme_color_override(cn, UIKit.TR_GOLD)
 	find_btn.add_theme_constant_override("outline_size", 0)
-	var flat := StyleBoxEmpty.new()
-	var press := UIKit.tint_box(0.08)
-	find_btn.add_theme_stylebox_override("normal",  flat)
-	find_btn.add_theme_stylebox_override("focus",   flat)
-	find_btn.add_theme_stylebox_override("hover",   press)
-	find_btn.add_theme_stylebox_override("pressed", press)
 	find_btn.pressed.connect(_start_ranked_matchmaking)
-	gp.add_child(find_btn)
+	ab_mg.add_child(find_btn)
 
 
 func _build_classic(wide: bool) -> void:

@@ -68,6 +68,15 @@ const HUD_DIM := Color(0.8, 0.78, 0.86, 1.0)
 const HINT_BG := Color(0.10, 0.08, 0.14, 0.9)
 const TOAST_BG := Color(0.03, 0.03, 0.07, 0.92)
 
+## Paleta Tarot Royale — nova identidade visual do jogo.
+const TR_BLACK  := Color("#080413")   ## fundo principal
+const TR_WHITE  := Color("#e7e7e3")   ## texto principal / face de carta
+const TR_GOLD   := Color("#bead84")   ## dourado âmbar (recompensas, destaque)
+const TR_CYAN   := Color("#6cbfc5")   ## ciano (info, seleção, ação secundária)
+const TR_RED    := Color("#a61b44")   ## vermelho (perigo, naipes vermelhos)
+const TR_BLUE   := Color("#236592")   ## azul (defesa, elementos de fundo)
+const TR_PURPLE := Color("#0c0a1a")   ## roxo escuro (superfícies profundas, modais)
+
 ## Duelo do Vanilla: o Atacante é o "chefe" (vermelho), a Defesa é o time contra ele (azul).
 const BOSS := Color("#E2463B")
 const DEF := Color("#5AA9FF")
