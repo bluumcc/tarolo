@@ -147,21 +147,55 @@ func _make_topbar_nav() -> HBoxContainer:
 
 
 func _topbar_nav_btn(tab: String, active: bool) -> Button:
-	var bg   := UIKit.TR_RED    if tab == "RANKEADA" else UIKit.TR_PURPLE
-	var text := UIKit.TR_GOLD   if tab == "RANKEADA" else UIKit.TR_WHITE
-	if active:
-		bg = bg.lightened(0.12)
 	var is_ranked := tab == "RANKEADA"
-	# Sem border_color sólido — o shadow já é feathered e faz o glow; borda dura ficava "too solid".
-	var glow_col  := UIKit.TR_RED_GLOW if is_ranked else UIKit.TR_PURPLE.lightened(0.30)
-	var glow_size := 18 if is_ranked else 6
-	var border_w  := 2  if is_ranked else 1
-	var shad_a    := 0.88 if is_ranked else 0.55
+	var text_col  := UIKit.TR_GOLD if is_ranked else UIKit.TR_WHITE
+
+	# Cores e glow variam por tipo×estado:
+	var bg: Color
+	var glow_col: Color
+	var glow_size: int
+	var border_col: Color
+	var border_w: int
+	var shad_a: float
+
+	if is_ranked:
+		if active:
+			bg         = UIKit.TR_RED.lightened(0.22)   # fundo bem mais claro/vivo
+			glow_col   = UIKit.TR_RED_GLOW
+			glow_size  = 18
+			border_col = Color.TRANSPARENT              # shadow feathered faz o glow
+			border_w   = 2
+			shad_a     = 0.88
+		else:
+			bg         = UIKit.TR_RED.darkened(0.40)    # opaco/muted, sem destaque
+			glow_col   = UIKit.TR_RED_GLOW
+			glow_size  = 2
+			border_col = UIKit.TR_RED.darkened(0.10)    # só a borda dim, quase sem glow
+			border_w   = 2
+			shad_a     = 0.18
+	else:
+		# roxo bem clarinho para o glow/border dos outros botões
+		var purple_rim := Color("#9080e8")
+		if active:
+			bg         = Color("#2D1E8A")               # PURPLE vivo (não cinza)
+			glow_col   = purple_rim
+			glow_size  = 10
+			border_col = Color.TRANSPARENT
+			border_w   = 1
+			shad_a     = 0.72
+		else:
+			bg         = UIKit.TR_PURPLE                # #0c0a1a quase preto
+			glow_col   = purple_rim
+			glow_size  = 6
+			border_col = Color.TRANSPARENT              # shadow feathered como "borda blur"
+			border_w   = 1
+			shad_a     = 0.52
+
 	var b := UIKit.button(tab, bg, 28)
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(0, 64)
 	var mk := func(c: Color) -> StyleBoxFlat:
-		var sb := UIKit.glow_box(c, glow_col, glow_size, border_w, 10, 10, Color.TRANSPARENT, shad_a)
+		var sb := UIKit.glow_box(c, glow_col, glow_size, border_w, 10, 10, border_col, shad_a)
 		sb.content_margin_top    = 16
 		sb.content_margin_bottom = 16
 		return sb
@@ -170,7 +204,7 @@ func _topbar_nav_btn(tab: String, active: bool) -> Button:
 	b.add_theme_stylebox_override("pressed", mk.call(bg.darkened(0.08)))
 	b.add_theme_stylebox_override("focus",   mk.call(bg))
 	for cn in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		b.add_theme_color_override(cn, text)
+		b.add_theme_color_override(cn, text_col)
 	b.pressed.connect(func(): _switch_tab(tab))
 	return b
 
