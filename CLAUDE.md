@@ -38,7 +38,6 @@ Em `scripts/ui/`, todos desenhados em código (sem textura/shader) e só com tok
 - `HexAvatar` — avatar hexagonal com moldura neon (`set_active` = vez), selo de vitórias (vértice de baixo à esquerda) e D do dealer (à direita). `make_badge()` cria o selo.
 - `SeatView` — assento: `HexAvatar` + plaquinha com o nome. Rival: tocar no avatar **ou** no nome troca o nome pelo stack por 7 s. `always_stack` = você (nome + stack sempre visíveis). Tamanho fixo `W×H`.
 - `StatCard` — card legenda + número (POTE, TEMPO, FEZ/PALPITE, APOSTA). `value` é o Label a atualizar.
-- `ModifierStrip` — card do modificador da rodada (legenda + nome) em cima da barra de baixo; tocar abre a regra (`tapped`). Os avisos de ação ficam numa faixa reservada no topo (`banner_slot`).
 - `RoundDots` — losangos das jogadas: concluídos preenchidos (verde = venceu, vermelho = perdeu); os próximos `need` (vitórias que faltam pro palpite) com borda forte dourada; o resto borda normal (`set_state(total, results, need)`).
 - `SidePanel.open(layer, título, from_right)` — painel lateral deslizante (menu à esquerda, ajuda à direita): X, toque fora ou swipe pro lado de origem fecham, com animação de saída; preencha `body`.
 - `UIKit.action_button(texto, UIKit.ActionKind.DANGER|OK|GOLD)` — botões de ação (padrão `rim_box`, serifada).

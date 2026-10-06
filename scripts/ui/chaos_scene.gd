@@ -54,8 +54,6 @@ var first_round_done := false
 var round_dots: RoundDots
 var bottom_mid: Control          # meio da barra de baixo: ações OU o card de pote/prêmio
 var prize_card: StatCard         # PRÊMIO, canto inferior direito
-var prize_shown := false         # existe prêmio em jogo (o card só aparece então)
-var modifier_strip: ModifierStrip   # card do modificador, em cima da barra de baixo
 var table_players := 0           # nº de jogadores com que a mesa foi dimensionada; só é refeito entre rodadas
 var discard_head: VBoxContainer  # título grande + instrução da etapa de descarte, no topo do palco (fora do card)
 var chrome_discard := false      # etapa sem mesa (descarte/palpite): sem modificador na faixa
@@ -148,12 +146,12 @@ func _show_insufficient_fichas() -> void:
 # ------------------------------------------------------------------ UI
 
 const HAND_RAISE := 28.0   ## o leque sobe um pouco da base da faixa da mão
-const BAR_H := 76.0       ## altura da barra de baixo: cards laterais (palpite, tempo), botões de ação e card do prêmio — todos iguais
+const BAR_H := 83.6       ## altura da barra de baixo: cards laterais (palpite, tempo), botões de ação e card do prêmio — todos iguais
 const ACT_H := BAR_H
 const HEADER_H := 82.5       ## altura dos três cards do header (menu, dots, ajuda): +10%
 const POT_CARD_W := 300.0   ## largura fixa do card do pote (cabe "POTE ◎ 99999")
 const BANNER_SLOT_H := 46.0   ## faixa dos avisos de ação, logo abaixo do topo
-const MOD_GAP := 10.0       ## folga entre o leque e o card do modificador
+const MOD_GAP := 10.0       ## folga embaixo do leque, em cima da barra de baixo
 const BANNER_H := 100.0    ## do topo da zona até a mão: faixa de avisos, abaixo do seu avatar
 const AVATAR_TO_FAN := 38.0   ## do topo do leque (na zona) até a referência do seu avatar; dá folga entre o stack e as cartas
 const MY_SEAT_RISE := 21.0 ## quanto o centro do seu avatar fica acima do topo do card roxo
@@ -328,13 +326,6 @@ func _build_hand_zone(root: VBoxContainer) -> void:
 	root.add_child(zone)
 
 	# Card do modificador (nome; tocar abre a regra) na base da zona, em cima da barra de baixo.
-	modifier_strip = ModifierStrip.new()
-	modifier_strip.anchor_right = 1.0
-	modifier_strip.anchor_top = 1.0
-	modifier_strip.anchor_bottom = 1.0
-	modifier_strip.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	modifier_strip.tapped.connect(_show_modifier_info)
-	zone.add_child(modifier_strip)
 
 	# Mão em arco leve, sempre no tamanho real; rola de lado só se não couber.
 	hand_scroller = HandScroller.new()
@@ -410,11 +401,16 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	bottom_bar.add_child(prize_card)
 
 
-## Prêmio só aparece quando existe e fora do descarte/palpite; o espaço fica reservado (alpha).
+func _set_pot_cards(on: bool) -> void:
+	pot_box.modulate.a = 1.0 if on else 0.0
+	_refresh_idle_card()
+
+
+## Pote e prêmio sempre juntos (o prêmio acompanha a visibilidade do pote, mesmo valendo 0).
 func _refresh_idle_card() -> void:
 	if prize_card == null:
 		return
-	prize_card.modulate.a = 1.0 if (prize_shown and phase != "discard" and phase != "predict" and not chrome_discard) else 0.0
+	prize_card.modulate.a = pot_box.modulate.a   # pote e prêmio sempre juntos
 
 
 func _is_wide() -> bool:
@@ -452,7 +448,7 @@ func _hand_h() -> float:
 ## Espaço embaixo da mão: card do modificador + folga + o quanto o leque desce. Crescer isto empurra
 ## o leque e a mesa pra cima, mantendo as folgas.
 func _pot_h() -> float:
-	return ModifierStrip.HEIGHT + MOD_GAP + _deck_drop()
+	return MOD_GAP + _deck_drop()
 
 
 ## Referência do seu avatar, relativa ao topo da zona da mão.
@@ -672,53 +668,9 @@ func _announce_round() -> void:
 	_banner_clear()
 
 
-## Modificador da jogada na faixa fixa do topo (nome + efeito curto, cor pela função).
-func _refresh_modifier_strip() -> void:
-	var m := engine.modifier
-	if m == -1 or chrome_discard:
-		modifier_strip.show_modifier("", UIKit.TR_RED)
-		return
-	modifier_strip.show_modifier(_modifier_label(m).to_upper(), _modifier_color(m))
-
-
 ## Cor da faixa: perigo/perda em vermelho, o resto em dourado (tokens da paleta).
 func _modifier_color(m: int) -> Color:
 	return UIKit.TR_RED if ChaosModifiers.color_of(m) == UIKit.LOSS else UIKit.TR_GOLD
-
-
-## Toque na faixa: explicação completa do modificador.
-func _show_modifier_info() -> void:
-	var m := engine.modifier
-	if m == -1 or overlay_layer == null:
-		return
-	var tone := _modifier_color(m)
-	var ov := UIKit.overlay()
-	overlay_layer.add_child(ov)
-	var box := PanelContainer.new()
-	box.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.2), tone.lightened(0.15), tone.darkened(0.3), "large", 16, 24, 22))
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 14)
-	v.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 120.0, 560.0), 0)
-	box.add_child(v)
-	var cap := UIKit.serif_label("MODIFICADOR DA RODADA", 18, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
-	cap.autowrap_mode = TextServer.AUTOWRAP_OFF
-	v.add_child(cap)
-	var title := UIKit.serif_label(_modifier_label(m).to_upper(), 34, tone, HORIZONTAL_ALIGNMENT_CENTER)
-	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(title)
-	var desc := UIKit.serif_label(ChaosModifiers.desc_of(m, engine.blitz), 26, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
-	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(desc)
-	var hint := UIKit.serif_label("toque para fechar", 18, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
-	hint.autowrap_mode = TextServer.AUTOWRAP_OFF
-	v.add_child(hint)
-	ov.add_child(UIKit.centered(box))
-	UIKit.pop_in(box, GameState.anim(0.18))
-	var close := func(e: InputEvent):
-		if e is InputEventMouseButton and e.pressed:
-			ov.queue_free()
-	ov.gui_input.connect(close)
-	box.gui_input.connect(close)   # tocar no próprio popup também fecha
 
 
 ## Nome do modificador, incluindo o naipe sorteado quando ele tiver um (e já traduzido pro
@@ -855,7 +807,6 @@ func _trick_start() -> void:
 	var color := ChaosModifiers.color_of(m)
 	await _modifier_transition(m, color)
 	if is_inside_tree():
-		_refresh_modifier_strip()
 		_banner_clear()
 
 
@@ -1958,7 +1909,6 @@ func _refresh_hud() -> void:
 			pile_l.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[p] else UIKit.MONEY)
 		_refresh_bet_tags(p, idx)
 	_refresh_round_dots()
-	_refresh_modifier_strip()
 	_refresh_pot()
 	_update_turn_highlight(turn_player)
 	_refresh_double_button()
@@ -2280,7 +2230,7 @@ func _resolve_walkover(result: Dictionary) -> void:
 func _set_discard_chrome(active: bool) -> void:
 	chrome_discard = active
 	if active:
-		pot_box.modulate.a = 0.0   # sem pote no descarte e no palpite; volta quando as entradas entram
+		_set_pot_cards(false)   # sem pote nem prêmio no descarte e no palpite; voltam juntos
 	table_center.visible = not active
 	for p in range(engine.num_players):
 		(seat_nodes[p] as Control).visible = not active   # você também: todos entram juntos, depois do descarte
@@ -2324,7 +2274,7 @@ func _blitz_open_level() -> bool:
 	pot_locked = true
 	shown_pot = engine.carry
 	pot_label.text = _pot_text(shown_pot)
-	pot_box.modulate.a = 0.0   # só aparece depois do palpite, quando as entradas de verdade entram
+	_set_pot_cards(false)   # só aparecem (juntos) depois do palpite, quando as entradas de verdade entram
 	_refresh_hud()
 	var pick: int
 	if GameState.autoplay:
@@ -2351,7 +2301,7 @@ func _blitz_open_level() -> bool:
 
 ## Revela os palpites um a um: a entrada voa pro pote e o palpite aparece na frente do jogador.
 func _blitz_reveal() -> void:
-	pot_box.modulate.a = 1.0
+	_set_pot_cards(true)
 	var running := engine.carry
 	for p in range(engine.num_players):
 		blitz_revealed[p] = true
@@ -2667,7 +2617,9 @@ func _refresh_round_dots() -> void:
 		results.append(int(h["winner"]) == 0)
 	var need := 0
 	if engine.blitz and bool(blitz_revealed[0]):
-		need = clampi(engine.blitz_need(0), 0, engine.tricks_left())
+		need = engine.blitz_need(0)
+		if need > engine.tricks_left():
+			need = 0   # não dá mais pra bater o palpite: nada de iluminar os dots
 	round_dots.set_state(ChaosEngine.HAND_SIZE, results, need)
 
 
@@ -2682,11 +2634,7 @@ func _refresh_pot_blitz() -> void:
 			shown_pot = engine.pot if engine.pot > 0.0 else engine.carry
 		pot_label.text = _pot_text(shown_pot)
 	# Quando o trick_pot está em destaque, mostra o prêmio do palpite abaixo como secundário.
-	if in_trick and engine.pot > 0.0:
-		pot_prize_label.text = "◎ " + UIKit.fmt_short(engine.pot)
-		prize_shown = true
-	else:
-		prize_shown = false
+	pot_prize_label.text = "◎ " + UIKit.fmt_short(engine.pot)
 	var sub := ""
 	if phase == "bet":
 		sub = "aposta da jogada"

@@ -62,27 +62,27 @@ func _draw() -> void:
 	var col := UIKit.TR_CYAN.lightened(0.1) if active else accent
 	var w := 6.0 if active else 4.0
 	draw_colored_polygon(_pts, UIKit.TR_PURPLE_DARK.darkened(0.35))
-	var ring := _pts.duplicate()
-	ring.append(_pts[0])
-	draw_polyline(ring, Color(col, 0.14), w + 16.0, true)   # halo largo e fraco
-	draw_polyline(ring, Color(col, 0.30), w + 7.0, true)    # halo curto
-	draw_polyline(ring, col, w, true)
+	# Com o relógio rodando, a borda vai SUMINDO: só o trecho que resta é desenhado (a partir do
+	# vértice de cima, esgotando no sentido anti-horário).
+	var ring := _perimeter(timer_frac) if timer_frac >= 0.0 else _perimeter(1.0)
+	if timer_frac < 0.0:
+		ring = _pts.duplicate()
+		ring.append(_pts[0])
+	if ring.size() > 1:
+		draw_polyline(ring, Color(col, 0.14), w + 16.0, true)   # halo largo e fraco
+		draw_polyline(ring, Color(col, 0.30), w + 7.0, true)    # halo curto
+		draw_polyline(ring, col, w, true)
 
 
-	if timer_frac >= 0.0:
-		_draw_timer_ring()
-
-
-## Anel de tempo: contorna o hexágono a partir do vértice de cima, esgotando no sentido anti-horário.
-func _draw_timer_ring() -> void:
+## Pontos do contorno do hexágono cobrindo a fração `f` (0..1) do perímetro, a partir do vértice de cima.
+func _perimeter(f: float) -> PackedVector2Array:
 	var total := 0.0
 	var seg: Array = []
 	for i in range(6):
 		var l := _pts[i].distance_to(_pts[(i + 1) % 6])
 		seg.append(l)
 		total += l
-	var left := total * clampf(timer_frac, 0.0, 1.0)
-	var col := UIKit.TR_RED_NEON if timer_frac <= 0.3 else UIKit.TR_CYAN.lightened(0.2)
+	var left := total * clampf(f, 0.0, 1.0)
 	var pts := PackedVector2Array([_pts[0]])
 	for i in range(6):
 		if left <= 0.0:
@@ -96,9 +96,7 @@ func _draw_timer_ring() -> void:
 		else:
 			pts.append(a.lerp(b, left / l))
 			left = 0.0
-	if pts.size() > 1:
-		draw_polyline(pts, Color(col, 0.35), 12.0, true)
-		draw_polyline(pts, col, 7.0, true)
+	return pts
 
 
 ## Selo redondo com texto (vitórias, dealer). O texto é o primeiro filho (os HUDs recolorem).
