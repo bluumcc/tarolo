@@ -2646,7 +2646,9 @@ func _refresh_blitz_tag(p: int, _idx: int) -> void:
 func _refresh_round_dots() -> void:
 	var results: Array = []
 	for h in engine.history:
-		results.append(int(h["winner"]) == 0)
+		var won := int(h["winner"]) == 0
+		var dobrada := int(h.get("modifier", -1)) == ChaosModifiers.Modifier.VAZA_DOURADA
+		results.append(2 if (won and dobrada) else (1 if won else 0))   # 2 = vitória que valia por duas (dourado)
 	var need := 0
 	if engine.blitz and bool(blitz_revealed[0]):
 		need = engine.blitz_need(0)

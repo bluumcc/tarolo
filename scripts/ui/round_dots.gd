@@ -1,7 +1,8 @@
 class_name RoundDots
 extends Control
 ## Losangos das jogadas da rodada (N). Cada um tem um destes estados:
-## - jogada concluída: PREENCHIDO — verde se você venceu, vermelho se perdeu;
+## - jogada concluída: PREENCHIDO — verde se você venceu, vermelho se perdeu, DOURADO se venceu uma
+##   jogada que valia por duas (resultado 2);
 ## - ainda por jogar e FALTANDO vencer (o palpite): vazio com borda forte e clara;
 ## - ainda por jogar, sem meta: vazio com borda normal.
 ## A meta se redistribui sozinha: `need` vitórias que faltam marcam os próximos `need` losangos.
@@ -11,7 +12,7 @@ const DOT := 14.0
 const GAP := 26.0
 
 var total := 8
-var results: Array = []   ## uma entrada por jogada concluída: true = você venceu
+var results: Array = []   ## uma entrada por jogada concluída: 0 perdeu, 1 venceu, 2 venceu uma jogada dobrada
 var need := 0             ## vitórias que ainda faltam pro palpite (0 = sem meta / já bateu)
 
 
@@ -41,7 +42,10 @@ func _draw() -> void:
 		var ring := pts.duplicate()
 		ring.append(pts[0])
 		if i < results.size():
-			var col := UIKit.OK if bool(results[i]) else UIKit.TR_RED
+			var r := int(results[i])
+			var col := UIKit.TR_GOLD if r >= 2 else (UIKit.OK if r == 1 else UIKit.TR_RED)
+			if r >= 2:
+				draw_polyline(ring, Color(col, 0.35), 7.0, true)   # halo: a vitória que vale por duas se destaca
 			draw_colored_polygon(pts, col)
 			draw_polyline(ring, col.lightened(0.25), 2.0, true)
 		elif i - results.size() < need:
