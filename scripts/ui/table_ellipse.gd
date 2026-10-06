@@ -39,55 +39,68 @@ func border_point(theta: float, s: float = 1.0) -> Vector2:
 	return _center + d * t2
 
 
-## Encaixa a mesa na área: a pílula é a mais larga que cabe (avatar tocando a lateral) e vai
-## ficando mais alta até o avatar do topo estar a `TOP_GAP` do topo e o de baixo chegar perto do
-## card roxo (`seat_floor`) — ou a mesa descer `TABLE_DROP` além da área.
+## Jogadores possíveis numa mesa: a geometria é a MESMA pra todos (a mesa não muda de tamanho
+## entre jogos nem no meio de uma partida) — vale a que cabe no pior caso.
+const PLAYER_COUNTS := [4, 5, 6]
+
+
+## Meia-largura do que mais se afasta do centro de um assento: a plaquinha do nome (fixa, 150% da
+## largura do avatar), o avatar e os selos (vitórias / dealer) que saem dos vértices.
+static func seat_half_extent() -> float:
+	var plate := HexAvatar.SIZE_PX.x * SeatView.PLATE_RATIO / 2.0
+	var badge := HexAvatar.SIZE_PX.x / 2.0 + HexAvatar.BADGE_PX / 2.0
+	return maxf(plate, badge)
+
+
+## Encaixa a mesa na área, com tamanho fixo: a largura é a maior que cabe (o que estiver mais
+## perto da margem — avatar, borda, plaquinha ou selo — encosta nela) e a altura é a maior que
+## serve pra TODOS os números de jogadores (avatar do topo a `TOP_GAP` do topo, o seu avatar no
+## limite `my_seat_y` e os rivais de baixo acima de `seat_floor`).
 func fit() -> void:
-	var half_w := HexAvatar.SIZE_PX.x / 2.0 + HexAvatar.BADGE_PX / 2.0   # avatar + selo que sai do vértice
 	var topc := TOP_GAP + HexAvatar.RADIUS
-	var r_avail := maxf(size.x / 2.0 - half_w - SIDE_GAP, 10.0)
+	var r_avail := maxf(size.x / 2.0 - seat_half_extent() - SIDE_GAP, 10.0)
 	var ry_cap := maxf((size.y + TABLE_DROP - topc) / 2.0, 20.0)
 	if my_seat_y > 0.0:
-		ry_cap = maxf(ry_cap, (my_seat_y - topc) / 2.0)   # a mesa desce até o seu avatar, onde ele estiver
-	var lo := 20.0
-	var hi := ry_cap
-	if _fits(r_avail, hi, topc):
-		lo = hi
-	else:
-		for _i in range(30):
-			var mid := (lo + hi) / 2.0
-			if _fits(r_avail, mid, topc):
-				lo = mid
-			else:
-				hi = mid
-	_r = minf(r_avail, lo)
-	_half = maxf(lo - _r, 0.0)
-	_center = Vector2(size.x / 2.0, 0.0)
-	var span := _seat_dy_range()
-	_center.y = topc - span.x
+		ry_cap = maxf(ry_cap, (my_seat_y - topc) / 2.0)
+	var counts := PLAYER_COUNTS.duplicate()
+	if not counts.has(seat_count):
+		counts.append(seat_count)
+	var ry := ry_cap
+	for n in counts:
+		ry = minf(ry, _max_ry(r_avail, ry_cap, topc, int(n)))
+	_r = minf(r_avail, ry)
+	_half = maxf(ry - _r, 0.0)
+	_center = Vector2(size.x / 2.0, topc + ry)
 	queue_redraw()
 
 
-func _fits(r_avail: float, ry: float, topc: float) -> bool:
+## Maior altura (raio vertical) que serve pra `n` jogadores (bisseção: cada teste é monotônico).
+func _max_ry(r_avail: float, ry_cap: float, topc: float, n: int) -> float:
+	if _fits(r_avail, ry_cap, topc, n):
+		return ry_cap
+	var lo := 20.0
+	var hi := ry_cap
+	for _i in range(30):
+		var mid := (lo + hi) / 2.0
+		if _fits(r_avail, mid, topc, n):
+			lo = mid
+		else:
+			hi = mid
+	return lo
+
+
+func _fits(r_avail: float, ry: float, topc: float, n: int) -> bool:
 	_r = minf(r_avail, ry)
 	_half = maxf(ry - _r, 0.0)
-	_center = Vector2.ZERO
-	var span := _seat_dy_range()
-	if my_seat_y > 0.0 and topc + (span.y - span.x) > my_seat_y:
-		return false   # o avatar de baixo (você) passaria do limite
-	var rivals_hi := _seat_dy_range(1).y
-	return seat_floor <= 0.0 or topc + (rivals_hi - span.x) + SEAT_BELOW <= seat_floor
-
-
-## (menor dy, maior dy) dos centros dos avatares (a partir de `first`; 0 = você) em relação ao centro da mesa.
-func _seat_dy_range(first: int = 0) -> Vector2:
-	var lo := 0.0
-	var hi := 0.0
-	for p in range(first, seat_count):
-		var dy := border_point(seat_angle(p, seat_count)).y - _center.y
-		lo = minf(lo, dy)
-		hi = maxf(hi, dy)
-	return Vector2(lo, hi)
+	_center = Vector2(size.x / 2.0, topc + ry)
+	if my_seat_y > 0.0 and _center.y + ry > my_seat_y:
+		return false   # o seu avatar (embaixo da pílula) passaria do limite
+	if seat_floor <= 0.0:
+		return true
+	for p in range(1, n):
+		if border_point(seat_angle(p, n)).y + SEAT_BELOW > seat_floor:
+			return false
+	return true
 
 
 func center_point() -> Vector2:

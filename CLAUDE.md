@@ -42,7 +42,7 @@ Em `scripts/ui/`, todos desenhados em código (sem textura/shader) e só com tok
 - `RoundDots` — losangos de progresso (`set_progress(total, atual)`), um único `_draw`.
 - `UIKit.action_button(texto, UIKit.ActionKind.DANGER|OK|GOLD)` — botões de ação (padrão `rim_box`, serifada).
 - `UIKit.serif()` / `UIKit.serif_label()` — serifada de títulos/legendas (DejaVu Serif Bold subset, ~28 KB, `assets/fonts/DejaVuSerif-Bold-Subset.ttf`). Legendas ≥ 20 px.
-- `TableEllipse` — mesa de runas em pílula (cápsula) com anéis neon + glifos. `fit()` faz a pílula mais larga que cabe (avatar tocando a lateral), cresce em altura até o avatar do topo estar a `TOP_GAP` e o de baixo ficar perto do card roxo; `border_point(theta)` dá onde cada avatar senta.
+- `TableEllipse` — mesa de runas em pílula (cápsula), **tamanho fixo** pra 4, 5 e 6 jogadores: `fit()` usa a largura em que o que estiver mais perto da margem (plaquinha fixa de 150% do avatar, avatar ou selo) encosta, e a altura que serve pro pior caso. `border_point(theta)` dá onde cada avatar senta. Gate: `godot --headless --path . -s res://tests/table_gate.gd`.
 - Layout da mesa (`chaos_scene.gd`): topo = menu · título + `RoundDots` · `StatCard` fez/palpite; abaixo a `ModifierStrip`; seu avatar cruza o topo do card roxo, avisos ("fulano pagou") na faixa logo abaixo dele; mão em leque; prêmio no pé do card; barra de baixo = POTE · ações · TEMPO. A ajuda (antigo "?") mora na pausa.
 - **Avisos de ação** (`_banner`): só título curto, sempre citando o jogador ("Marcos pagou", "Marcos roubou de Ana"); uma mensagem por evento. Subtítulo é opcional e hoje não é usado no Blitz.
 

@@ -7,7 +7,8 @@ extends Control
 
 const W := 130.0
 const H := 127.0
-const PLATE_MIN_W := 112.0
+const PLATE_RATIO := 1.5      ## largura fixa da plaquinha de nome: 150% da largura do avatar
+const PLATE_MIN_W := HexAvatar.SIZE_PX.x * PLATE_RATIO
 const AVATAR_TOP := 2.0
 const AVATAR_CENTER_Y := AVATAR_TOP + HexAvatar.SIZE_PX.y / 2.0   ## centro do avatar, medido do topo do assento
 const STACK_SECONDS := 7.0
@@ -43,6 +44,9 @@ func setup(p: int, accent: Color, always_stack: bool = false) -> SeatView:
 	_plate.add_child(row)
 	name_label = UIKit.serif_label("", 19, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
 	name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	if not _always:   # rival: nome comprido é cortado, a plaquinha tem largura fixa
+		name_label.clip_text = true
+		name_label.custom_minimum_size = Vector2(PLATE_MIN_W - 16.0, 0)
 	row.add_child(name_label)
 
 	var stack_row := HBoxContainer.new()   # ◎ + stack: no card (rival) ou na plaquinha (você)
@@ -76,7 +80,7 @@ func setup(p: int, accent: Color, always_stack: bool = false) -> SeatView:
 ## embaixo da plaquinha; a sua (`always_stack`), no mesmo estilo, em cima do avatar.
 func layout() -> void:
 	var ps := _plate.get_combined_minimum_size()
-	_plate.size = Vector2(maxf(ps.x, PLATE_MIN_W), ps.y)
+	_plate.size = Vector2(maxf(ps.x, PLATE_MIN_W) if _always else PLATE_MIN_W, ps.y)   # rival: largura fixa
 	_plate.position = Vector2((W - _plate.size.x) / 2.0, avatar.position.y + avatar.size.y + 4.0)
 	var bh := bet_label.get_combined_minimum_size().y
 	bet_label.size = Vector2(W, bh)
