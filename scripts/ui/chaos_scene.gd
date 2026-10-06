@@ -697,13 +697,18 @@ func _layout_table() -> void:
 		cv.position = _slot_pos(int(v["player"]))
 
 
-## A carta de cada jogador fica na direção do assento dele, perto do centro da mesa.
+## Cartas da mesa em cascata, na ordem em que foram jogadas: cada carta é deslocada pra direita
+## (e um pouco pra baixo) da anterior, então o canto superior esquerdo de todas fica visível.
 func _slot_pos(player: int) -> Vector2:
-	var c := table_center.center_point()
-	var r := table_center.seat_radii()
-	var theta := TableEllipse.seat_angle(player, engine.num_players)
-	var center := c + Vector2(cos(theta) * r.x * 0.34, sin(theta) * r.y * 0.36)
-	return center - CardView.SIZE / 2.0
+	var idx := 0
+	for i in range(table_views.size()):
+		if int(table_views[i]["player"]) == player:
+			idx = i
+			break
+	var ts := _table_scale()
+	var step := float(idx) - (float(maxi(engine.num_players, 1)) - 1.0) / 2.0
+	var off := Vector2(step * CardView.SIZE.x * ts * 0.42, step * CardView.SIZE.y * ts * 0.10)
+	return table_center.center_point() + off - CardView.SIZE / 2.0
 
 
 ## As cartas nunca encolhem: fileira reta ou leque, escolhido em Configurações — nos dois
