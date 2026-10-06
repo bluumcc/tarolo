@@ -57,7 +57,8 @@ var round_dots: RoundDots
 var prog_card: StatCard         # PALPITE (fez/palpite), no canto de baixo à esquerda
 var bottom_mid: Control          # meio da barra de baixo: ações OU o card de pote/prêmio
 var idle_card: PanelContainer    # PRÊMIO — ocupa o lugar dos botões enquanto não há ação
-var modifier_strip: ModifierStrip
+var modifier_strip: ModifierStrip   # card do modificador, em cima da barra de baixo
+var banner_slot: Control
 var discard_head: VBoxContainer  # título grande + instrução da etapa de descarte, no topo do palco (fora do card)
 var chrome_discard := false      # etapa sem mesa (descarte/palpite): sem modificador na faixa
 var shown_totals: Array = []
@@ -151,10 +152,10 @@ func _show_insufficient_fichas() -> void:
 const HAND_RAISE := 28.0   ## o leque sobe um pouco da base da faixa da mão
 const BAR_H := 96.0       ## barra de baixo (cards laterais: palpite e tempo)
 const ACT_H := BAR_H * 0.75   ## botões de ação e card de pote/prêmio: 75% dos cards laterais
+const BANNER_SLOT_H := 46.0   ## faixa dos avisos de ação, logo abaixo do topo
+const MOD_GAP := 10.0       ## folga entre o leque e o card do modificador
 const BANNER_H := 100.0    ## do topo da zona até a mão: faixa de avisos, abaixo do seu avatar
-const POT_H := 36.0        ## folga embaixo da mão (a aba de avisos mora aqui)
-const CARD_SHRINK := 0.20   ## quanto a área do seu avatar encolhe por cima da zona da mão; dá folga mínima entre o stack e o topo do leque
-const CARD_RISE := 36.0    ## quanto o card roxo sobe acima da zona da mão (antes do encurtamento)
+const AVATAR_TO_FAN := 38.0   ## do topo do leque (na zona) até a referência do seu avatar; dá folga entre o stack e as cartas
 const MY_SEAT_RISE := 21.0 ## quanto o centro do seu avatar fica acima do topo do card roxo
 const LEFT_W := 132.0     ## largura dos dois cards laterais (palpite e tempo)
 const MAX_UI_W := 900.0    ## em tela larga o jogo não estica além disso
@@ -247,9 +248,11 @@ func _build_ui() -> void:
 	topbar.add_child(help_btn)
 
 	# Modificador da jogada: faixa fixa, largura total — nenhum aviso passa por cima dela.
-	modifier_strip = ModifierStrip.new()
-	modifier_strip.tapped.connect(_show_modifier_info)
-	root.add_child(modifier_strip)
+	banner_slot = Control.new()   # faixa reservada: os avisos de ação aparecem aqui, sem empurrar nada
+	banner_slot.custom_minimum_size = Vector2(0, BANNER_SLOT_H)
+	banner_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(banner_slot)
+	_build_banner(banner_slot)
 
 	# Palco: a mesa de runas com os rivais sentados na borda, a distâncias iguais; você embaixo.
 	stage = Control.new()
@@ -311,11 +314,36 @@ func _build_ui() -> void:
 	overlay_layer = Control.new()
 	overlay_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	overlay_layer.z_index = 30
+	overlay_layer.z_index = 100   # por cima de tudo, inclusive do seu avatar (z 50)
 	add_child(overlay_layer)
 
 	_apply_orientation()
 	_layout_table.call_deferred()
+
+
+## Aviso de ação (título curto, borda e texto na cor do tipo de ação), centrado na faixa do topo.
+func _build_banner(slot: Control) -> void:
+	banner_box = PanelContainer.new()
+	banner_box.anchor_left = 0.5
+	banner_box.anchor_right = 0.5
+	banner_box.anchor_top = 0.0
+	banner_box.anchor_bottom = 1.0
+	banner_box.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	banner_box.visible = false
+	banner_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bv := VBoxContainer.new()
+	bv.alignment = BoxContainer.ALIGNMENT_CENTER
+	bv.add_theme_constant_override("separation", 0)
+	bv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner_box.add_child(bv)
+	banner_title = UIKit.serif_label("", 24, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	banner_title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	bv.add_child(banner_title)
+	banner_sub = UIKit.serif_label("", 18, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
+	banner_sub.autowrap_mode = TextServer.AUTOWRAP_OFF
+	banner_sub.visible = false
+	bv.add_child(banner_sub)
+	slot.add_child(banner_box)
 
 
 ## Card central: a faixa de avisos fica logo abaixo do seu avatar (que cruza o topo do card), a
@@ -324,35 +352,17 @@ func _build_hand_zone(root: VBoxContainer) -> void:
 	var hand_h := _hand_h()
 	var zone := Control.new()
 	hand_zone = zone
-	zone.custom_minimum_size = Vector2(0, BANNER_H + hand_h + POT_H)
+	zone.custom_minimum_size = Vector2(0, BANNER_H + hand_h + _pot_h())
 	root.add_child(zone)
 
-	# Avisos do jogo: aba na base do card roxo, em cima da barra de baixo (some quando vazia).
-	banner_box = PanelContainer.new()
-	banner_box.custom_minimum_size = Vector2(0, 0)
-	banner_box.anchor_left = 0.5
-	banner_box.anchor_right = 0.5
-	banner_box.anchor_top = 1.0
-	banner_box.anchor_bottom = 1.0
-	banner_box.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	banner_box.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	banner_box.offset_bottom = 2.0
-	banner_box.z_index = 60   # por cima do leque (as cartas usam z_index próprio)
-	banner_box.visible = false
-	banner_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	banner_box.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT.lightened(0.25), UIKit.TR_PURPLE, "small", 10, 14, 6))
-	var bv := VBoxContainer.new()
-	bv.add_theme_constant_override("separation", 0)
-	bv.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	banner_box.add_child(bv)
-	banner_title = UIKit.serif_label("", 22, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	banner_title.autowrap_mode = TextServer.AUTOWRAP_OFF
-	bv.add_child(banner_title)
-	banner_sub = UIKit.serif_label("", 18, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
-	banner_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	banner_sub.max_lines_visible = 2
-	bv.add_child(banner_sub)
-	zone.add_child(banner_box)
+	# Card do modificador (nome; tocar abre a regra) na base da zona, em cima da barra de baixo.
+	modifier_strip = ModifierStrip.new()
+	modifier_strip.anchor_right = 1.0
+	modifier_strip.anchor_top = 1.0
+	modifier_strip.anchor_bottom = 1.0
+	modifier_strip.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	modifier_strip.tapped.connect(_show_modifier_info)
+	zone.add_child(modifier_strip)
 
 	# Mão em arco leve, sempre no tamanho real; rola de lado só se não couber.
 	hand_scroller = HandScroller.new()
@@ -483,9 +493,15 @@ func _hand_h() -> float:
 
 
 ## Mão usa a largura total da viewport (quebra a limitação de _max_ui_w).
-## Topo da área do seu avatar, relativo ao topo da zona da mão (a zona encolhe `CARD_SHRINK` por cima).
+## Espaço embaixo da mão: card do modificador + folga + o quanto o leque desce. Crescer isto empurra
+## o leque e a mesa pra cima, mantendo as folgas.
+func _pot_h() -> float:
+	return ModifierStrip.HEIGHT + MOD_GAP + _deck_drop()
+
+
+## Referência do seu avatar, relativa ao topo da zona da mão.
 func _card_offset_top() -> float:
-	return -CARD_RISE + CARD_SHRINK * (BANNER_H + _hand_h() + POT_H + CARD_RISE)
+	return BANNER_H + _deck_drop() - AVATAR_TO_FAN   # preso ao topo do leque: a folga não depende da altura da zona
 
 
 ## O leque desce 10% da altura da carta (as pontas passam por trás da barra de baixo).
@@ -504,7 +520,7 @@ func _update_hand_scroller_margins() -> void:
 	hand_scroller.offset_top = BANNER_H + _deck_drop()
 	hand_scroller.offset_bottom = BANNER_H + hand_h + _deck_drop()
 	if hand_zone != null:
-		hand_zone.custom_minimum_size = Vector2(0, BANNER_H + hand_h + POT_H)
+		hand_zone.custom_minimum_size = Vector2(0, BANNER_H + hand_h + _pot_h())
 
 
 ## Em tela larga o jogo fica numa coluna centralizada (não estica).
@@ -668,9 +684,9 @@ func _announce_round() -> void:
 func _refresh_modifier_strip() -> void:
 	var m := engine.modifier
 	if m == -1 or chrome_discard:
-		modifier_strip.show_modifier("", "", UIKit.TR_RED)
+		modifier_strip.show_modifier("", UIKit.TR_RED)
 		return
-	modifier_strip.show_modifier(_modifier_label(m).to_upper(), ChaosModifiers.short_of(m, engine.blitz), _modifier_color(m))
+	modifier_strip.show_modifier(_modifier_label(m).to_upper(), _modifier_color(m))
 
 
 ## Cor da faixa: perigo/perda em vermelho, o resto em dourado (tokens da paleta).
@@ -683,11 +699,32 @@ func _show_modifier_info() -> void:
 	var m := engine.modifier
 	if m == -1 or overlay_layer == null:
 		return
-	var v := UIKit.modal(overlay_layer, _modifier_label(m).to_upper(), 640.0)
-	var t := UIKit.label(ChaosModifiers.tip_of(m, engine.blitz), 28, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(t)
-	UIKit.close_button(overlay_layer, v)
+	var tone := _modifier_color(m)
+	var ov := UIKit.overlay()
+	overlay_layer.add_child(ov)
+	var box := PanelContainer.new()
+	box.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.2), tone.lightened(0.15), tone.darkened(0.3), "large", 16, 24, 22))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 14)
+	v.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 120.0, 560.0), 0)
+	box.add_child(v)
+	var cap := UIKit.serif_label("MODIFICADOR DA RODADA", 18, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
+	cap.autowrap_mode = TextServer.AUTOWRAP_OFF
+	v.add_child(cap)
+	var title := UIKit.serif_label(_modifier_label(m).to_upper(), 34, tone, HORIZONTAL_ALIGNMENT_CENTER)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(title)
+	var desc := UIKit.serif_label(ChaosModifiers.desc_of(m, engine.blitz), 26, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(desc)
+	var hint := UIKit.serif_label("toque para fechar", 18, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
+	hint.autowrap_mode = TextServer.AUTOWRAP_OFF
+	v.add_child(hint)
+	ov.add_child(UIKit.centered(box))
+	UIKit.pop_in(box, GameState.anim(0.18))
+	ov.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed:
+			ov.queue_free())
 
 
 ## Nome do modificador, incluindo o naipe sorteado quando ele tiver um (e já traduzido pro
