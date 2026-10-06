@@ -167,7 +167,7 @@ const MAX_UI_W := 900.0    ## em tela larga o jogo não estica além disso
 var stage: Control
 var margin_box: MarginContainer
 var bottom_bar: HBoxContainer
-var bet_row: HBoxContainer
+var bet_row: BoxContainer   # horizontal no celular; empilhada (vertical) no desktop
 var hand_scroller: HandScroller
 var hand_zone: Control
 var my_bet_pill: Control        # aposta da jogada: o Label do seu assento, em cima do avatar
@@ -386,7 +386,7 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	status_label.visible = false
 	mid.add_child(status_label)
-	bet_row = HBoxContainer.new()
+	bet_row = BoxContainer.new()
 	bet_row.add_theme_constant_override("separation", 6)
 	bet_row.custom_minimum_size = Vector2(0, ACT_H)
 	bet_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -470,6 +470,7 @@ func _dock_bottom(wide: bool) -> void:
 	if side_col == null or bottom_bar == null or wide == docked_wide:
 		return
 	docked_wide = wide
+	bet_row.vertical = wide   # desktop: botões sempre empilhados
 	side_col.visible = wide
 	bottom_bar.visible = not wide
 	if banner_title != null:
@@ -762,6 +763,7 @@ func _rebuild_hand() -> void:
 			cv.modulate = Color.WHITE   # olhando a mão pra escolher o palpite: sem apagar
 		cv.tapped.connect(_on_card_tapped)
 		cv.zoom_enabled = false
+		cv.hover_zoom = _is_wide()
 	_layout_hand.call_deferred()
 
 

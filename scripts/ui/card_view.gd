@@ -44,6 +44,12 @@ var face_up := true
 var playable := false
 var selected := false
 var interactive := true
+var hover_zoom := false   ## desktop (mão): o mouse em cima amplia a carta
+const HOVER_SCALE := 1.22
+var _hovered := false
+## Tela larga: a arte (540×900) encolhe pouco, e a mistura de dois níveis de mipmap deixa a carta
+## borrada. Um viés de -0.5 na leitura da textura escolhe o nível mais nítido (medido: +23% de nitidez).
+static var _sharp_mat: ShaderMaterial
 var zoom_enabled := true   ## segurar / botão direito abre o zoom (a mesa Blitz desliga)
 
 var _pressing := false
@@ -71,6 +77,8 @@ func _ready() -> void:
 	body.pivot_offset = SIZE / 2.0
 	for n in [rank_label, suit_small, center_label, name_label, points_label, bout_label]:
 		(n as Label).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mouse_entered.connect(_on_hover.bind(true))
+	mouse_exited.connect(_on_hover.bind(false))
 	_card_tex = TextureRect.new()
 	_card_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE  ## NUNCA KEEP_SIZE: o PNG (540x900) inflaria a carta
 	_card_tex.stretch_mode = TextureRect.STRETCH_SCALE
@@ -79,6 +87,14 @@ func _ready() -> void:
 	_card_tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_card_tex.clip_contents = true
 	_card_tex.visible = false
+	var vp := get_viewport_rect().size
+	if vp.x > vp.y:
+		if _sharp_mat == null:
+			var sh := Shader.new()
+			sh.code = "shader_type canvas_item;\nvoid fragment() { COLOR = texture(TEXTURE, UV, -0.5); }"
+			_sharp_mat = ShaderMaterial.new()
+			_sharp_mat.shader = sh
+		_card_tex.material = _sharp_mat
 	body.add_child(_card_tex)
 	body.move_child(_card_tex, 0)
 	_refresh()
@@ -97,6 +113,21 @@ func set_playable(value: bool) -> void:
 	if not value:
 		set_selected(false)
 	modulate = Color(1, 1, 1, 1) if value or not interactive else Color(0.55, 0.52, 0.62, 1)
+
+
+func _on_hover(on: bool) -> void:
+	if not hover_zoom or not interactive or _hovered == on:
+		return
+	_hovered = on
+	var tw := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT).set_parallel(true)
+	var s := HOVER_SCALE if on else 1.0
+	tw.tween_property(body, "scale", Vector2(s, s), GameState.anim(0.12))
+	if not selected:   # a carta selecionada já está levantada; as outras sobem junto com a ampliação
+		tw.tween_property(body, "position", Vector2(0, -SIZE.y * 0.14 if on else 0.0), GameState.anim(0.12))
+	if on:
+		body.z_index = 40
+	elif not selected:
+		body.z_index = 0
 
 
 func set_selected(value: bool) -> void:
