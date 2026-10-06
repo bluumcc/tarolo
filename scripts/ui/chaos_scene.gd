@@ -57,6 +57,9 @@ var prize_card: StatCard         # PRÊMIO, canto inferior direito
 var table_players := 0           # nº de jogadores com que a mesa foi dimensionada; só é refeito entre rodadas
 var discard_avatar: HexAvatar     # seu avatar grande na etapa de descarte (com o anel do relógio)
 var discard_name: Label
+var discard_title: Label
+var discard_sub: Label
+var discard_holder: Control
 var discard_head: VBoxContainer  # título grande + instrução da etapa de descarte, no topo do palco (fora do card)
 var chrome_discard := false      # etapa sem mesa (descarte/palpite): sem modificador na faixa
 var shown_totals: Array = []
@@ -256,15 +259,16 @@ func _build_ui() -> void:
 	discard_head.add_theme_constant_override("separation", 8)
 	discard_head.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	discard_head.visible = false
-	var dt := UIKit.serif_label("ESCOLHA DUAS CARTAS PARA DESCARTAR", 46, UIKit.TR_GOLD.lightened(0.25), HORIZONTAL_ALIGNMENT_CENTER)
-	dt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	dt.add_theme_constant_override("outline_size", 4)
-	dt.add_theme_constant_override("line_spacing", 6)
-	discard_head.add_child(dt)
-	var ds := UIKit.serif_label("Deslize a carta para cima ou toque nela duas vezes para descartar", 26, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
-	ds.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	discard_head.add_child(ds)
-	var holder := Control.new()   # avatar grande (escala 2,4), com bastante espaço em volta
+	discard_title = UIKit.serif_label("ESCOLHA DUAS CARTAS PARA DESCARTAR", 46, UIKit.TR_GOLD.lightened(0.25), HORIZONTAL_ALIGNMENT_CENTER)
+	discard_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	discard_title.add_theme_constant_override("outline_size", 4)
+	discard_title.add_theme_constant_override("line_spacing", 6)
+	discard_head.add_child(discard_title)
+	discard_sub = UIKit.serif_label("Deslize a carta para cima ou toque nela duas vezes para descartar", 26, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
+	discard_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	discard_head.add_child(discard_sub)
+	var holder := Control.new()
+	discard_holder = holder   # avatar grande (escala 2,4), com bastante espaço em volta
 	holder.custom_minimum_size = Vector2(0, 212)
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	discard_head.add_child(holder)
@@ -2422,35 +2426,31 @@ func _commit_discard(view: CardView, drop_global := Vector2.ZERO) -> void:
 		item_chosen.emit(1)
 
 
-## Card do palpite: claro, sem fundo escurecido — vira o próprio conteúdo do card da mesa
-## (table_center), que está vazio nessa etapa (nem pote nem cartas ainda). A mão continua à
-## vista e interagível embaixo. Seletor de
-## quantidade em −/+ com o palpite sugerido em destaque, em vez de uma fileira de botões de 0 a 8.
+## Etapa do palpite: mesma tela do descarte (header com o título da fase, pergunta e dados da mão
+## fora do card, seu avatar com o anel do relógio) e, embaixo, o card do seletor −/+ com o
+## palpite sugerido em destaque. Mesa, pote e rivais só aparecem depois do lance.
 func _human_predict() -> int:
 	modal_open = true
-	var holder := CenterContainer.new()
-	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	holder.mouse_filter = Control.MOUSE_FILTER_PASS
-	stage.add_child(holder)
-	var box := UIKit.panel(UIKit.SURFACE_DEEP, UIKit.BRAND, 20)
+	round_dots.visible = false
+	banner_title.text = "DÊ O SEU PALPITE"
+	banner_title.add_theme_color_override("font_color", UIKit.TR_GOLD)
+	banner_title.modulate.a = 1.0
+	discard_title.text = "QUANTAS JOGADAS VOCÊ VAI GANHAR?"
+	discard_title.add_theme_font_size_override("font_size", 36)
+	discard_sub.text = "Entrada ◎%s  ·  Pote ◎%s" % [UIKit.fmt_short(engine.blitz_entry()), UIKit.fmt_short(engine.carry)]
+	discard_holder.custom_minimum_size = Vector2(0, 130)
+	discard_avatar.scale = Vector2(1.5, 1.5)
+	discard_name.visible = false   # aqui o espaço é do seletor
+	discard_head.visible = true
+	var box := PanelContainer.new()
+	box.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT.lightened(0.2), UIKit.TR_PURPLE, "small", 18, 20, 16))
 	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x * 0.8, 640.0), 0)
-	holder.add_child(box)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 8)
-	box.add_child(v)
-	v.add_child(UIKit.label("QUANTAS JOGADAS VOCÊ VAI GANHAR?", 26, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
-	var hint := ChaosBot.suggested_predict(engine, 0)
-	var info := "Entrada ◎%d  ·  Pote ◎%d  ·  Sua mão: %s" % [int(engine.blitz_entry()), int(engine.carry), _hand_label_blitz()]
-	var info_l := UIKit.label(info, 19, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-	info_l.modulate.a = 1.0
-	info_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(info_l)
-	v.add_child(HSeparator.new())
+	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 48.0, 640.0), 0)
+	discard_head.add_child(box)
 	var body := VBoxContainer.new()
-	body.add_theme_constant_override("separation", 8)
-	v.add_child(body)
+	body.add_theme_constant_override("separation", 10)
+	box.add_child(body)
+	var hint := ChaosBot.suggested_predict(engine, 0)
 	var st := {"pick": hint}
 	st["render"] = func():
 		for c in body.get_children():
@@ -2460,33 +2460,28 @@ func _human_predict() -> int:
 		stepper.alignment = BoxContainer.ALIGNMENT_CENTER
 		stepper.add_theme_constant_override("separation", 20)
 		body.add_child(stepper)
-		var minus := UIKit.button("−", UIKit.BUTTON_MUTED, 36)
-		minus.custom_minimum_size = Vector2(76, 76)
+		var minus := UIKit.action_button("−", UIKit.ActionKind.GOLD, 36)
+		minus.custom_minimum_size = Vector2(64, 64)
 		minus.disabled = int(st["pick"]) <= 0
 		minus.pressed.connect(func():
 			st["pick"] = maxi(0, int(st["pick"]) - 1)
 			(st["render"] as Callable).call())
 		stepper.add_child(minus)
-		var count_l := UIKit.label(str(int(st["pick"])), 60, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+		var count_l := UIKit.serif_label(str(int(st["pick"])), 60, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
 		count_l.custom_minimum_size = Vector2(110, 0)
 		stepper.add_child(count_l)
-		var plus := UIKit.button("+", UIKit.BUTTON_MUTED, 36)
-		plus.custom_minimum_size = Vector2(76, 76)
+		var plus := UIKit.action_button("+", UIKit.ActionKind.GOLD, 36)
+		plus.custom_minimum_size = Vector2(64, 64)
 		plus.disabled = int(st["pick"]) >= ChaosEngine.HAND_SIZE
 		plus.pressed.connect(func():
 			st["pick"] = mini(ChaosEngine.HAND_SIZE, int(st["pick"]) + 1)
 			(st["render"] as Callable).call())
 		stepper.add_child(plus)
 		var is_hint: bool = int(st["pick"]) == hint
-		var rec_l := UIKit.label("★ RECOMENDADO PELA SUA MÃO" if is_hint else "Recomendado pela sua mão: %d" % hint, 18, UIKit.OK if is_hint else UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-		rec_l.modulate.a = 1.0
-		body.add_child(rec_l)
-		var w := ChaosEngine.blitz_weight(int(st["pick"]))
-		var legend := UIKit.label("Peso do palpite no pote: ×%s   (0–2 ×1 · 3–4 ×1,5 · 5+ ×2)" % UIKit.fmt_dec(w, 1), 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-		legend.modulate.a = 1.0
-		legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		body.add_child(legend)
-		var go := UIKit.button("CONFIRMAR: %d %s" % [int(st["pick"]), "JOGADA" if int(st["pick"]) == 1 else "JOGADAS"], UIKit.OK, 28)
+		body.add_child(UIKit.serif_label("★ RECOMENDADO PELA SUA MÃO" if is_hint else "Recomendado pela sua mão: %d" % hint, 20, UIKit.TR_CYAN if is_hint else UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER))
+		body.add_child(UIKit.serif_label("Peso no pote ×%s" % UIKit.fmt_dec(ChaosEngine.blitz_weight(int(st["pick"])), 1), 18, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER))
+		var go := UIKit.action_button("CONFIRMAR: %d %s" % [int(st["pick"]), "JOGADA" if int(st["pick"]) == 1 else "JOGADAS"], UIKit.ActionKind.OK, 28)
+		go.custom_minimum_size = Vector2(0, 68)
 		go.pressed.connect(func(): item_chosen.emit(1))
 		body.add_child(go)
 	(st["render"] as Callable).call()
@@ -2497,7 +2492,16 @@ func _human_predict() -> int:
 	_clock_stop()
 	modal_open = false
 	if is_inside_tree():
-		holder.queue_free()
+		discard_head.visible = false
+		box.queue_free()
+		round_dots.visible = true
+		_banner_clear()
+		discard_title.text = "ESCOLHA DUAS CARTAS PARA DESCARTAR"
+		discard_title.add_theme_font_size_override("font_size", 46)
+		discard_sub.text = "Deslize a carta para cima ou toque nela duas vezes para descartar"
+		discard_name.visible = true
+		discard_holder.custom_minimum_size = Vector2(0, 212)
+		discard_avatar.scale = Vector2(2.16, 2.16)
 	return int(st["pick"])
 
 
