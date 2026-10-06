@@ -294,7 +294,7 @@ func begin_trick() -> void:
 	button = leader  # aposta começa do jogador após o líder da vaza
 	var ante_size := float(blind) * (BLITZ_TRICK_ANTE_FACTOR if blitz else 1.0)
 	for p in range(num_players):
-		folded[p] = false
+		folded[p] = busted[p]   # eliminado (torneio) fica fora da jogada: sem ante, sem fala e sem carta
 		var ante := minf(ante_size, stacks[p])
 		contrib[p] = ante
 		stacks[p] -= ante

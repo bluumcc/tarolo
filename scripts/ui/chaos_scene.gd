@@ -1890,6 +1890,7 @@ func _refresh_hud() -> void:
 			FX.count(total_lbl, float(shown_totals[p]), new_total, _fmt_chips)
 			FX.pop(total_lbl, 1.3)
 			shown_totals[p] = new_total
+		(seat_nodes[p] as Control).visible = p == 0 or not engine.busted[p]   # eliminado sai da mesa
 		var out: bool = phase != "idle" and engine.folded[p]
 		var sitting: bool = p == 0 and blitz_sitting_out and phase != "idle"
 		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 0.3 if sitting else (0.45 if out else 1.0))

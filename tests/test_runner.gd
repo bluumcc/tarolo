@@ -309,6 +309,23 @@ func _test_chaos() -> void:
 	lg.plays.append({"player": 2, "card": c(CardData.Suit.TRUNFO, 15)})
 	check(lg.legal_for(0).size() == 2, "Caos: sem naipe, corta com qualquer Trunfo (mesmo menor que o cortado)")
 
+	# ---- Eliminado (torneio) sai da jogada: não ante, não fala, não ocupa vaga de carta
+	var bu := ChaosEngine.new()
+	bu.setup_match({"seed": 5})
+	bu.stacks[1] = 0.0
+	bu.bust_broke()
+	bu.begin_trick()
+	check(bu.folded[1] and bu.bet_actor() != 1 and is_equal_approx(bu.trick_pot, 30.0), "eliminado não paga ante nem fala")
+	while bu.betting:
+		bu.bet_act(bu.bet_actor(), "check")
+	var bu_order: Array = []
+	var bu_done := false
+	while not bu_done:
+		var bu_cur := bu.current
+		bu_order.append(bu_cur)
+		bu_done = bu.play(bu_cur, (bu.legal_for(bu_cur) as Array)[0])["trick_complete"]
+	check(bu_order.size() == 3 and not bu_order.has(1) and bu_order.has(0), "com um eliminado, jogam os outros 3 (você incluído) e a vaza fecha certo")
+
 	# ---- Aposta estilo poker
 	var p1 := ChaosEngine.new()
 	p1.setup_match({"seed": 3})
