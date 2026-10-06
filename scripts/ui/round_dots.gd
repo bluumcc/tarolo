@@ -3,8 +3,8 @@ extends Control
 ## Losangos de progresso (rodada X de N): feitas em dourado, a atual em rosa-neon, as demais
 ## só no contorno. Um único Control com `_draw` — nada de um nó por bolinha.
 
-const DOT := 18.0
-const GAP := 16.0
+const DOT := 14.0
+const GAP := 26.0
 
 var total := 8
 var current := 0   ## índice (0-based) da rodada atual; as anteriores contam como feitas

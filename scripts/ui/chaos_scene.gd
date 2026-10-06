@@ -151,7 +151,7 @@ func _show_insufficient_fichas() -> void:
 const HAND_RAISE := 28.0   ## o leque sobe um pouco da base da faixa da mão
 const BAR_H := 96.0       ## barra de baixo (cards laterais: palpite e tempo)
 const ACT_H := BAR_H * 0.75   ## botões de ação e card de pote/prêmio: 75% dos cards laterais
-const HEADER_H := 75.0       ## altura dos três cards do header (menu, dots, ajuda): +10%
+const HEADER_H := 82.5       ## altura dos três cards do header (menu, dots, ajuda): +10%
 const POT_CARD_W := 300.0   ## largura fixa do card do pote (cabe "POTE ◎ 99999")
 const BANNER_SLOT_H := 46.0   ## faixa dos avisos de ação, logo abaixo do topo
 const MOD_GAP := 10.0       ## folga entre o leque e o card do modificador
@@ -236,6 +236,11 @@ func _build_ui() -> void:
 	help_btn.add_theme_color_override("font_color", UIKit.TR_WHITE)
 	help_btn.pressed.connect(_open_help)
 	topbar.add_child(help_btn)
+	# Os dois cards laterais acompanham a altura do header e ficam sempre quadrados.
+	topbar.resized.connect(func():
+		for b in [menu_btn, help_btn]:
+			if not is_equal_approx(b.custom_minimum_size.x, topbar.size.y):
+				b.custom_minimum_size = Vector2(topbar.size.y, HEADER_H))
 
 	# Faixa logo abaixo: o POTE (largura fixa) fica aqui e dá lugar aos avisos de ação enquanto
 	# há um aviso. Altura fixa: nada se mexe quando troca.
@@ -2276,6 +2281,8 @@ func _resolve_walkover(result: Dictionary) -> void:
 ## avatares com nome e stack, pra não confundir com informação de uma jogada que nem começou.
 func _set_discard_chrome(active: bool) -> void:
 	chrome_discard = active
+	if active:
+		pot_box.modulate.a = 0.0   # sem pote no descarte e no palpite; volta quando as entradas entram
 	table_center.visible = not active
 	for p in range(engine.num_players):
 		(seat_nodes[p] as Control).visible = not active   # você também: todos entram juntos, depois do descarte
