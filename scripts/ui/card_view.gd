@@ -6,9 +6,46 @@ extends Control
 signal tapped(view: CardView)
 signal zoom_requested(view: CardView)
 
-const SIZE := Vector2(188, 270)
+## Proporção da arte (PNGs 540x900). O tamanho da carta SEMPRE deriva dela: nunca esticar nem cortar.
+const ART_ASPECT := 540.0 / 900.0
+## Modos de tamanho (Ajustes): "compact" mantém a altura de antes das imagens (270);
+## "large" mantém a largura de antes (188). Os dois seguem ART_ASPECT.
+const SIZE_COMPACT := Vector2(270.0 * ART_ASPECT, 270.0)
+const SIZE_LARGE := Vector2(188.0, 188.0 / ART_ASPECT)
+const TABLE_H_MOBILE := 135.0   ## altura da carta jogada na mesa (celular)
+const TABLE_H_WIDE := 180.0     ## idem em tela larga (PC)
+const HAND_H_WIDE := 320.0      ## altura da carta na mão em tela larga (modo compact)
+const FOCUS_H_WIDE := 410.0     ## altura da carta destacada (arrastada no swipe) em tela larga
 const MAX_LIFT := 44.0  ## até onde a carta sobe visualmente ao selecionar/passar o mouse
 const LONG_PRESS := 0.45
+
+## Tamanho base da carta (escala 1.0). Muda só via apply_size_mode().
+static var SIZE := SIZE_COMPACT
+
+
+static func apply_size_mode(mode: String) -> void:
+	SIZE = SIZE_LARGE if mode == "large" else SIZE_COMPACT
+
+
+## Escala da carta na mão: 1.0 no celular; em tela larga, altura-alvo limitada a 25% da viewport
+## (a zona da mão tem que caber junto com a barra de baixo).
+static func hand_scale(wide: bool, vp_h: float) -> float:
+	if not wide:
+		return 1.0
+	var target := minf(HAND_H_WIDE * SIZE.y / SIZE_COMPACT.y, vp_h * 0.25)
+	return target / SIZE.y
+
+
+## Escala da carta destacada (a que acompanha o dedo no swipe): maior que a da mão em tela larga.
+static func focus_scale(wide: bool, vp_h: float) -> float:
+	if not wide:
+		return 1.0
+	return minf(FOCUS_H_WIDE * SIZE.y / SIZE_COMPACT.y, vp_h * 0.34) / SIZE.y
+
+
+## Escala da carta jogada na mesa (altura fixa, independente do modo).
+static func table_scale(wide: bool) -> float:
+	return (TABLE_H_WIDE if wide else TABLE_H_MOBILE) / SIZE.y
 
 var data: CardData
 var face_up := true
@@ -37,11 +74,12 @@ func _ready() -> void:
 	custom_minimum_size = SIZE
 	size = SIZE
 	pivot_offset = SIZE / 2.0
+	body.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	body.pivot_offset = SIZE / 2.0
 	for n in [rank_label, suit_small, center_label, name_label, points_label, bout_label]:
 		(n as Label).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_card_tex = TextureRect.new()
-	_card_tex.expand_mode = TextureRect.EXPAND_KEEP_SIZE
+	_card_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE  ## NUNCA KEEP_SIZE: o PNG (540x900) inflaria a carta
 	_card_tex.stretch_mode = TextureRect.STRETCH_SCALE
 	_card_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_card_tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -71,6 +109,7 @@ func set_selected(value: bool) -> void:
 	if selected == value:
 		return
 	selected = value
+	body.z_index = 50 if value else 0   # a carta focada fica acima das vizinhas do leque
 	_lift(-32.0 if value else 0.0)
 	_refresh_border()
 

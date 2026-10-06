@@ -728,6 +728,14 @@ func _open_settings() -> void:
 	speed.selected = maxi(speeds.find(float(s["anim_speed"])), 1)
 	speed.item_selected.connect(func(i: int): s["anim_speed"] = speeds[i])
 	v.add_child(speed)
+	v.add_child(UIKit.label("Tamanho das cartas", 20))
+	var csz := OptionButton.new()
+	var csizes := ["compact", "large"]
+	csz.add_item("Compacta (162×270)")
+	csz.add_item("Grande (188×313)")
+	csz.selected = maxi(csizes.find(str(s.get("card_size", "compact"))), 0)
+	csz.item_selected.connect(func(i: int): s["card_size"] = csizes[i]; GameState.apply_settings())
+	v.add_child(csz)
 	if not OS.has_feature("mobile"):
 		var fs := CheckButton.new()
 		fs.text = "Tela cheia"

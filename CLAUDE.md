@@ -26,6 +26,13 @@ Helper: `UIKit.rim_box(bg, rim_col, glow_col, size)` — borda na cor **clara** 
 
 Aplicação das cores: vermelho → `rim_box(TR_RED_DARK, TR_RED_LIGHT, TR_RED)`. Roxo → `box(bg, TR_PURPLE_LIGHT)` (sem glow). Godot não suporta blur em borda — o efeito vem do contraste da cor clara + shadow esparsa na cor normal. Ver `docs/PALETA.md` para detalhes.
 
+## Tamanho das cartas (regra para não repetir o erro)
+- Arte das cartas: PNG 540×900 (proporção `CardView.ART_ASPECT` = 0,6). `CardView.SIZE` **sempre deriva dela**: modo `compact` 162×270, `large` 188×313 (Ajustes → "Tamanho das cartas", `settings.card_size`).
+- `TextureRect` da arte: **nunca `EXPAND_KEEP_SIZE`** (o PNG inflaria a carta 3×). Usar `EXPAND_IGNORE_SIZE`.
+- **Nunca compensar tamanho com escala "no olho".** Tamanhos por plataforma vêm de `CardView.hand_scale()`, `focus_scale()` e `table_scale()`; a zona da mão vem de `HandLayout.fan_height()`.
+- Escala de Control: pivô = `size/2` e posição = `centro - size/2` (tamanho sem escala). Ver `HandLayout._place`.
+- Gate: `godot --headless --path . res://tests/card_layout_gate.tscn` (corpo = SIZE, leque inteiro e centralizado, nos dois modos).
+
 ## Princípios do produto
 - **O Vanilla é sempre o modo mais fiel ao Jeu de Tarot lúdico (Tarot francês).** Regras oficiais (seguir naipe, cortar com Trunfo, obrigação de cobrir com Trunfo maior, Bouts, licitação, contratos) não devem ser alteradas pra "melhorar o jogo". Variações de regra pertencem ao Caos (ou a modos novos), nunca ao Vanilla.
 - O Caos é o modo dinâmico/experimental: poker de rodadas (blind, stack, apostas), modificadores e combos. Ver `docs/MESA_CAOS.md`.

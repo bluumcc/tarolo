@@ -9,50 +9,33 @@ extends RefCounted
 const ROW_MAX_OVERLAP := 0.5    # fileira: no máximo 50% de uma carta escondida atrás da outra
 const FAN_STEP_RAD := 0.036     # leque: abertura angular entre cartas vizinhas
 const FAN_MAX_HALF_ANGLE := 0.40 # leque: metade da abertura máxima (rad)
-const FAN_MAX_GAP := 1.3         # leque: distância máxima entre centros, em larguras de carta
+const FAN_EDGE_PAD := 8.0       # leque: folga simétrica até a borda da faixa
+const FAN_MAX_GAP := 0.62        # leque: distância máxima entre centros, em larguras de carta
 
 
-## Maior escala (≤ 1.0) onde N cartas cabem em avail_w × avail_h com gap mínimo legível.
-## Chame antes de apply(); depois limite o resultado ao máximo da plataforma (0.5 wide, 1.0 mobile).
-static func fit_scale_fan(n: int, avail_w: float, avail_h: float, base_size: Vector2) -> float:
+## Altura que o leque de N cartas (tamanho exibido card_size) ocupa, sem contar o lift.
+## Use pra dimensionar a zona da mão: é a mesma conta do _apply_fan.
+static func fan_height(n: int, avail_w: float, card_size: Vector2) -> float:
 	if n <= 1:
-		return 1.0
-	var lo := 0.08
-	var hi := 1.0
-	for _i in range(24):
-		var mid := (lo + hi) * 0.5
-		if _fan_fits(n, avail_w, avail_h, base_size * mid):
-			lo = mid
-		else:
-			hi = mid
-	return lo
+		return card_size.y + 6.0
+	var g := _fan_geometry(n, avail_w, card_size)
+	return g["drop"] + 2.0 * g["half_h"] + 4.0
 
 
-## Verifica se um leque de N cartas com card_size cabe em avail_w × avail_h
-## com altura e espaçamento suficientes.
-static func _fan_fits(n: int, avail_w: float, avail_h: float, card_size: Vector2) -> bool:
-	if n == 1:
-		return card_size.y + 6.0 <= avail_h
+## Arco de verdade: centros das cartas num círculo. Devolve raio, queda do arco e meias-caixas.
+static func _fan_geometry(n: int, avail_w: float, card_size: Vector2) -> Dictionary:
 	var alpha := clampf(FAN_STEP_RAD * float(n - 1), 0.12, FAN_MAX_HALF_ANGLE)
-	var c   := cos(alpha)
-	var sa  := sin(alpha)
-	var half_w := card_size.x * 0.5 * c + card_size.y * 0.5 * sa
-	var half_h := card_size.y * 0.5 * c + card_size.x * 0.5 * sa
-	var span := maxf(avail_w * 0.75 - 2.0 * half_w, card_size.x * 0.5)
-	var radius := span / (2.0 * sa)
-	var max_gap_dist := card_size.x * FAN_MAX_GAP
+	var s := sin(alpha)
+	var c := cos(alpha)
+	var half_w := card_size.x / 2.0 * c + card_size.y / 2.0 * s   # meia largura da carta da ponta, já girada
+	var half_h := card_size.y / 2.0 * c + card_size.x / 2.0 * s
+	var span := maxf(avail_w - 2.0 * half_w - 2.0 * FAN_EDGE_PAD, card_size.x * 0.5)
+	var radius := span / (2.0 * s)
+	var max_gap := card_size.x * FAN_MAX_GAP   # poucas cartas: não abre demais
 	var gap := radius * 2.0 * alpha / float(n - 1)
-	if gap > max_gap_dist:
-		radius = max_gap_dist * float(n - 1) / (2.0 * alpha)
-		gap = max_gap_dist
-	var drop := radius * (1.0 - c)
-	# Restrição de altura: todas as cartas inteiramente visíveis.
-	if avail_h < drop + 2.0 * half_h + 4.0:
-		return false
-	# Restrição de espaçamento: cada carta mostra ao menos 25% da largura.
-	if gap < card_size.x * 0.25:
-		return false
-	return true
+	if gap > max_gap:
+		radius = max_gap * float(n - 1) / (2.0 * alpha)
+	return {"alpha": alpha, "radius": radius, "drop": radius * (1.0 - c), "half_h": half_h}
 
 
 ## Posiciona/rotaciona cada CardView em `cards` (já filhos de `hand_container`) dentro da
@@ -66,6 +49,16 @@ static func apply(cards: Array, avail_w: float, avail_h: float, mode: String, ca
 	return _apply_row(cards, avail_w, avail_h, card_size)
 
 
+## Cada CardView mantém tamanho de controle = CardView.SIZE e é escalada em torno do centro:
+## pivô = size/2 e posição = centro - size/2, QUALQUER que seja a escala (card_size é o tamanho
+## EXIBIDO, só pra geometria). Usar o tamanho exibido no pivô desloca a carta.
+static func _place(cv: CardView, center: Vector2, rot: float, z: int) -> void:
+	cv.pivot_offset = cv.size / 2.0
+	cv.rotation = rot
+	cv.position = center - cv.size / 2.0
+	cv.z_index = z
+
+
 static func _apply_row(cards: Array, avail_w: float, avail_h: float, card_size: Vector2) -> float:
 	var n := cards.size()
 	var card_w := card_size.x
@@ -77,48 +70,24 @@ static func _apply_row(cards: Array, avail_w: float, avail_h: float, card_size: 
 			sep = maxf(-max_overlap, (avail_w - n * card_w) / float(n - 1))
 	var total_w := n * card_w + (n - 1) * sep
 	var start_x := maxf((avail_w - total_w) / 2.0, 0.0)
-	var y := avail_h - card_size.y
+	var cy := avail_h - card_size.y / 2.0
 	for i in range(n):
-		var cv: CardView = cards[i]
-		cv.position = Vector2(start_x + i * (card_w + sep), y)
-		cv.rotation = 0.0
-		cv.pivot_offset = card_size / 2.0
-		cv.z_index = i
+		_place(cards[i], Vector2(start_x + i * (card_w + sep) + card_w / 2.0, cy), 0.0, i)
 	return maxf(total_w, avail_w)
 
 
 static func _apply_fan(cards: Array, avail_w: float, avail_h: float, card_size: Vector2) -> float:
-	# Arco de verdade (tipo arco-íris): os centros das cartas ficam num círculo, cada carta
-	# girada pela tangente. O raio é calculado pra mão inteira caber na largura disponível.
 	var n := cards.size()
 	var cx := avail_w / 2.0
 	if n == 1:
-		var only: CardView = cards[0]
-		only.pivot_offset = card_size / 2.0
-		only.rotation = 0.0
-		only.position = Vector2(cx - card_size.x / 2.0, avail_h - card_size.y - 6.0)
-		only.z_index = 0
+		_place(cards[0], Vector2(cx, avail_h - card_size.y / 2.0 - 6.0), 0.0, 0)
 		return avail_w
-	var alpha := clampf(FAN_STEP_RAD * float(n - 1), 0.12, FAN_MAX_HALF_ANGLE)
-	var s := sin(alpha)
-	var c := cos(alpha)
-	var half_w := card_size.x / 2.0 * c + card_size.y / 2.0 * s   # meia largura da carta da ponta, já girada
-	var half_h := card_size.y / 2.0 * c + card_size.x / 2.0 * s
-	var span := maxf(avail_w * 0.75 - 2.0 * half_w, card_size.x * 0.5)
-	var radius := span / (2.0 * s)
-	var max_gap := card_size.x * FAN_MAX_GAP   # poucas cartas: não abre demais
-	var gap := radius * 2.0 * alpha / float(n - 1)
-	if gap > max_gap:
-		radius = max_gap * float(n - 1) / (2.0 * alpha)
-	var drop := radius * (1.0 - c)
-	var y_peak := avail_h - drop - half_h - 2.0   # centro da carta do meio
+	var g := _fan_geometry(n, avail_w, card_size)
+	var alpha: float = g["alpha"]
+	var radius: float = g["radius"]
+	var y_peak: float = avail_h - float(g["drop"]) - float(g["half_h"]) - 2.0   # centro da carta do meio
 	for i in range(n):
-		var cv: CardView = cards[i]
 		var t := float(i) / float(n - 1)
 		var a := lerpf(-alpha, alpha, t)
-		var center := Vector2(cx + radius * sin(a), y_peak + radius * (1.0 - cos(a)))
-		cv.pivot_offset = card_size / 2.0
-		cv.rotation = a
-		cv.position = center - card_size / 2.0
-		cv.z_index = i
+		_place(cards[i], Vector2(cx + radius * sin(a), y_peak + radius * (1.0 - cos(a))), a, i)
 	return avail_w

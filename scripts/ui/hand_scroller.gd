@@ -25,6 +25,7 @@ var _card: CardView
 var _ghost: CardView
 var _ghost_origin := Vector2.ZERO
 var _base_scale := Vector2.ONE
+var ghost_scale_mult := 1.0     # a carta arrastada aparece maior que a da mão (tamanho "destacado")
 var _armed := false
 
 
@@ -135,11 +136,11 @@ func _begin_card_drag(c: CardView) -> void:
 	ghost_layer.add_child(_ghost)
 	_ghost.pivot_offset = c.pivot_offset
 	_ghost.rotation = c.rotation
-	_ghost.scale = c.scale
+	_ghost.scale = c.scale * ghost_scale_mult
 	_ghost.global_position = c.global_position
 	_ghost.set_selected(c.selected)
 	_ghost_origin = c.global_position
-	_base_scale = c.scale
+	_base_scale = c.scale * ghost_scale_mult
 	_armed = false
 	c.visible = false
 
@@ -174,7 +175,7 @@ func _finish_card_drag() -> void:
 	var tw := create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tw.tween_property(g, "global_position", _ghost_origin, 0.22)
 	tw.tween_property(g, "rotation", c.rotation, 0.22)
-	tw.tween_property(g, "scale", _base_scale, 0.22)
+	tw.tween_property(g, "scale", c.scale, 0.22)
 	tw.chain().tween_callback(func():
 		if is_instance_valid(c):
 			c.visible = true

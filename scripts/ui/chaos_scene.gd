@@ -13,7 +13,6 @@ signal match_finished(summary: Dictionary)
 const CARD_SCENE := preload("res://scenes/Card.tscn")
 
 ## As cartas da mão têm o tamanho cheio; as da mesa ficam menores pra caber 4 lado a lado.
-const TABLE_SCALE := 0.50
 const TURN_SECONDS := 10.0   # tempo pra jogar; estourou, joga a carta mais fraca
 const DISCARD_SECONDS := 15.0   # tempo pro descarte inicial (10 cartas pra olhar); estourou, descarta as 2 mais fracas
 
@@ -153,6 +152,7 @@ var bet_row: HBoxContainer
 var timer_label: Label
 var center_card: PanelContainer
 var hand_scroller: HandScroller
+var hand_zone: Control
 
 
 func _build_ui() -> void:
@@ -245,9 +245,9 @@ func _build_ui() -> void:
 ## Card central (60% da largura): título e descrição do modificador em cima, a mão em arco no
 ## meio (por cima do card, as cartas passam das bordas) e o pote embaixo.
 func _build_hand_zone(root: VBoxContainer) -> void:
-	var hs := _hand_scale()
-	var hand_h := CardView.SIZE.y * hs + CardView.MAX_LIFT * hs + 72.0
+	var hand_h := _hand_h()
 	var zone := Control.new()
+	hand_zone = zone
 	zone.custom_minimum_size = Vector2(0, BANNER_H + hand_h + POT_H)
 	root.add_child(zone)
 
@@ -415,9 +415,25 @@ func _max_ui_w() -> float:
 	return get_viewport_rect().size.x * (0.75 if _is_wide() else 1.0)
 
 
-## Cartas a 50% em PC (mais espaço na tela), tamanho cheio no mobile.
+## Escala da carta na mão (ver CardView.hand_scale): cheia no celular, ~410 de altura no PC.
 func _hand_scale() -> float:
-	return 0.5 if _is_wide() else 1.0
+	return CardView.hand_scale(_is_wide(), get_viewport_rect().size.y)
+
+
+## Escala da carta jogada na mesa (altura fixa por plataforma).
+func _table_scale() -> float:
+	return CardView.table_scale(_is_wide())
+
+
+## Altura da faixa da mão: o maior leque possível (8 a 10 cartas) + o lift. Vem do tamanho REAL
+## da carta exibida — nunca de constantes soltas.
+func _hand_h() -> float:
+	var cs := CardView.SIZE * _hand_scale()
+	var avail_w := get_viewport_rect().size.x
+	var h := 0.0
+	for n in [8, 9, 10]:
+		h = maxf(h, HandLayout.fan_height(n, avail_w, cs))
+	return h + CardView.MAX_LIFT * _hand_scale() + 8.0
 
 
 ## Mão usa a largura total da viewport (quebra a limitação de _max_ui_w).
@@ -428,9 +444,10 @@ func _update_hand_scroller_margins() -> void:
 	var side := maxf(float(Widgets.MARGIN), (vp_w - _max_ui_w()) / 2.0)
 	hand_scroller.offset_left = -side
 	hand_scroller.offset_right = side
-	var hs := _hand_scale()
-	var hand_h := CardView.SIZE.y * hs + CardView.MAX_LIFT * hs + 72.0
+	var hand_h := _hand_h()
 	hand_scroller.offset_bottom = BANNER_H + hand_h
+	if hand_zone != null:
+		hand_zone.custom_minimum_size = Vector2(0, BANNER_H + hand_h + POT_H)
 
 
 ## Em tela larga o jogo fica numa coluna centralizada (não estica).
@@ -699,18 +716,15 @@ func _layout_hand() -> void:
 	if cards.is_empty():
 		return
 	var parent := hand_container.get_parent() as Control
-	var max_hs := _hand_scale()
-	# Altura fixa da zona (igual ao que _build_hand_zone alocou).
-	# NÃO usar parent.size.y — ScrollContainer com rolagem vertical desligada cresce pra
-	# caber o conteúdo, criando um loop que empurra tudo pra ~800000 px.
-	var zone_h := CardView.SIZE.y * max_hs + CardView.MAX_LIFT * max_hs + 72.0
-	var avail_w := get_viewport_rect().size.x - 8.0
-	# Escala que faz todas as N cartas caberem com espaçamento legível; limitada ao max da plataforma.
-	var hs := minf(HandLayout.fit_scale_fan(cards.size(), avail_w, zone_h, CardView.SIZE), max_hs)
+	var hs := _hand_scale()
 	var card_sz := CardView.SIZE * hs
 	for c in cards:
 		(c as CardView).scale = Vector2(hs, hs)
-	# Passa zone_h pra aplicar as cartas na base da zona, independente de hs.
+	(parent as HandScroller).ghost_scale_mult = maxf(1.0, CardView.focus_scale(_is_wide(), get_viewport_rect().size.y) / hs)
+	# Altura fixa da zona. NÃO usar parent.size.y — ScrollContainer com rolagem vertical
+	# desligada cresce pra caber o conteúdo, criando um loop que empurra tudo pra ~800000 px.
+	var zone_h := _hand_h()
+	var avail_w := get_viewport_rect().size.x
 	var content_w := HandLayout.apply(cards, avail_w, zone_h, "fan", card_sz)
 	(parent as HandScroller).set_content_size(Vector2(content_w, zone_h))
 
@@ -1195,7 +1209,7 @@ func _animate_play(player: int, card: CardData, from: Vector2) -> void:
 	var tw := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tw.tween_property(cv, "position", _slot_pos(player), GameState.anim(0.28))
 	tw.parallel().tween_property(cv, "rotation", randf_range(-0.06, 0.06), GameState.anim(0.28))
-	tw.parallel().tween_property(cv, "scale", Vector2(TABLE_SCALE, TABLE_SCALE), GameState.anim(0.28))
+	tw.parallel().tween_property(cv, "scale", Vector2(_table_scale(), _table_scale()), GameState.anim(0.28))
 	_refresh_hud()
 	await tw.finished
 
@@ -1212,7 +1226,7 @@ func _show_zoom(view: CardView) -> void:
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_theme_constant_override("separation", 18)
-	var zoom_scale := 1.65 if _is_wide() else 2.2
+	var zoom_scale := minf(2.2, get_viewport_rect().size.y * 0.5 / CardView.SIZE.y)
 	var holder := Control.new()
 	holder.custom_minimum_size = CardView.SIZE * zoom_scale
 	var big: CardView = CARD_SCENE.instantiate()
@@ -1647,7 +1661,7 @@ func _resolve_trick(result: Dictionary) -> void:
 	if not is_inside_tree():
 		return
 	if win_view:
-		FX.win_pulse(win_view, TABLE_SCALE)
+		FX.win_pulse(win_view, _table_scale())
 
 	var pot_amt := float(result["pot"])
 	var prize := float(result["prize"])
@@ -2752,7 +2766,7 @@ func _resolve_trick_blitz(result: Dictionary) -> void:
 	if not is_inside_tree():
 		return
 	if win_view:
-		FX.win_pulse(win_view, TABLE_SCALE)
+		FX.win_pulse(win_view, _table_scale())
 	var wname := str(config["names"][winner]).to_upper()
 	var sub := "Palpite: %d de %d" % [int(engine.wins[winner]), int(engine.predicts[winner])]
 	if int(result.get("value", 1)) == 2:
