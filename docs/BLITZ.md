@@ -198,10 +198,11 @@ cena em `phase == "discard"`, `_rebuild_hand()` deixa as 10 cartas tocáveis, `_
 sobe a carta tocada (`CardView.set_selected`) e marca pra descarte, toca de novo pra desmarcar. O
 botão DESCARTAR (no lugar do DOBRAR, que essa hora do nível ainda não existe) só libera com
 exatamente `BLITZ_DISCARD_SIZE` marcadas; `_on_discard_pressed()` aplica e segue o nível.
-Tem relógio próprio: `DISCARD_SECONDS` (15s, reaproveita a mesma `turn_bar` do relógio de jogar
-carta). Estourou sem confirmar, descarta as 2 mais fracas por você (mesma heurística do bot,
-`ChaosBot.wants_discard`), igual ao "jogamos sua carta mais fraca" de quando o relógio de jogar
-carta estoura. Sempre ativo, **inclusive no onboarding** — é a única etapa nova que não se esconde
+Tem relógio próprio: `DISCARD_SECONDS` (18s). Todos os relógios da mesa passam pelo mesmo
+`_clock_start` / `_clock_stop` (card TEMPO): jogar carta `TURN_SECONDS` 10s (joga a mais fraca),
+descarte 18s, lance de vitórias `PREDICT_SECONDS` 15s (confirma o palpite que estiver na tela) e
+apostas `BET_SECONDS` 12s (passa, ou desiste se tiver que pagar). Estourou sem confirmar no descarte,
+descarta as 2 mais fracas por você (mesma heurística do bot, `ChaosBot.wants_discard`). Sempre ativo, **inclusive no onboarding** — é a única etapa nova que não se esconde
 nas primeiras mesas de conta nova, porque molda a mão, não adiciona uma regra de aposta ou de
 rodada.
 

@@ -13,8 +13,11 @@ signal match_finished(summary: Dictionary)
 const CARD_SCENE := preload("res://scenes/Card.tscn")
 
 ## As cartas da mão têm o tamanho cheio; as da mesa ficam menores pra caber 4 lado a lado.
-const TURN_SECONDS := 10.0   # tempo pra jogar; estourou, joga a carta mais fraca
-const DISCARD_SECONDS := 15.0   # tempo pro descarte inicial (10 cartas pra olhar); estourou, descarta as 2 mais fracas
+## Relógios da mesa (um só, `_clock_start`): estourou, jogamos por você.
+const TURN_SECONDS := 10.0      # jogar a carta; estourou, joga a mais fraca
+const DISCARD_SECONDS := 18.0   # descarte inicial; estourou, descarta as 2 mais fracas
+const PREDICT_SECONDS := 15.0   # lance de vitórias; estourou, confirma o palpite que estiver na tela
+const BET_SECONDS := 12.0       # apostar/passar/pagar/aumentar/desistir; estourou, passa (ou desiste se tiver que pagar)
 
 var engine := ChaosEngine.new()
 var config: Dictionary = {}
@@ -37,8 +40,11 @@ var status_label: Label
 var banner_box: Panel
 var banner_title: Label
 var banner_sub: Label
-var turn_bar: ProgressBar
-var turn_left := 0.0
+var clock_on := false          # relógio da vez rodando (card TEMPO)
+var clock_left := 0.0
+var clock_total := TURN_SECONDS
+var clock_in_modal := false    # palpite e aposta rodam com `modal_open` ligado: o relógio não pausa por isso
+var clock_timeout := Callable()
 var main_area: Control
 var seat_nodes: Array = []
 var bet_pills: Array = []      # fichas apostadas na frente de cada jogador
@@ -74,8 +80,6 @@ var blitz_showdown := false     # Blitz: fim do nível — só aí o alvo dos ri
 var blitz_sitting_out := false  # Blitz: jogador ficou sem fichas mid-nível (sentado fora)
 var double_btn: Button
 var discard_picks: Array = []   # Blitz: cartas marcadas na mão pra descartar (até BLITZ_DISCARD_SIZE)
-var discarding_now := false     # relógio do descarte rodando (reaproveita turn_bar)
-var discard_left := 0.0
 var shown_pot := 0.0
 var pot_locked := false        # contador do pote rolando: o refresh não sobrescreve
 
@@ -389,16 +393,6 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	tempo.custom_minimum_size = Vector2(RIGHT_W, 0)
 	timer_label = tempo.value
 	timer_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	turn_bar = ProgressBar.new()
-	turn_bar.show_percentage = false
-	turn_bar.min_value = 0.0
-	turn_bar.max_value = TURN_SECONDS
-	turn_bar.custom_minimum_size = Vector2(0, 10)
-	turn_bar.modulate.a = 0.0
-	turn_bar.add_theme_stylebox_override("background", UIKit.box(UIKit.PURPLE_DEEP, UIKit.PURPLE, 2, 7, 0))
-	turn_bar.add_theme_stylebox_override("fill", UIKit.box(UIKit.BRAND, UIKit.BRAND, 0, 7, 0))
-	turn_bar.visible = false   # o card do tempo mostra só os segundos
-	timer_label.get_parent().add_child(turn_bar)
 	bottom_bar.add_child(tempo)
 
 
@@ -940,14 +934,26 @@ func _wait_human() -> CardData:
 		_banner("SUA VEZ", "Jogue um Trunfo.", UIKit.TURN)
 	else:
 		_banner("SUA VEZ", "Siga %s (ou Trunfo/Louco)." % CardData.SUIT_NAMES[ls], UIKit.TURN)
-	turn_left = TURN_SECONDS
-	turn_bar.modulate.a = 1.0
+	_clock_start(TURN_SECONDS, _on_play_timeout)
 	_rebuild_hand()
 	var card: CardData = await human_card_chosen
 	human_turn = false
-	turn_bar.modulate.a = 0.0
+	_clock_stop()
 	_banner_clear()
 	return card
+
+
+func _on_play_timeout() -> void:
+	var legal := engine.legal_for(0)
+	if not human_turn or legal.is_empty():
+		return
+	var weakest: CardData = legal[0]
+	for c in legal:
+		if (c as CardData).points() < weakest.points():
+			weakest = c
+	human_turn = false
+	_banner("TEMPO ESGOTADO", "Jogamos sua carta mais fraca.", UIKit.LOSS)
+	human_card_chosen.emit(weakest)
 
 
 func _mmss(seconds: float) -> String:
@@ -955,40 +961,38 @@ func _mmss(seconds: float) -> String:
 	return "%d:%02d" % [t / 60, t % 60]
 
 
+## Relógio único da vez: liga com `_clock_start`, desliga com `_clock_stop`. O card TEMPO mostra os
+## segundos (vermelho nos últimos 3). Pausa no menu; só os modais "de tela" (tips, zoom) também
+## pausam, a menos que a etapa rode dentro de um modal (palpite, aposta: `in_modal`).
+func _clock_start(seconds: float, on_timeout: Callable, in_modal: bool = false) -> void:
+	clock_total = seconds
+	clock_left = seconds
+	clock_timeout = on_timeout
+	clock_in_modal = in_modal
+	clock_on = true
+
+
+func _clock_stop() -> void:
+	clock_on = false
+	clock_timeout = Callable()
+
+
 func _process(delta: float) -> void:
-	if timer_label != null and turn_bar != null:
-		var live := turn_bar.modulate.a > 0.5
-		timer_label.modulate.a = 1.0 if live else 0.35
-		timer_label.text = _mmss(turn_bar.value if live else TURN_SECONDS)
-	if discarding_now and not paused and not modal_open and not finished and turn_bar != null:
-		discard_left -= delta
-		turn_bar.value = maxf(discard_left, 0.0)
-		var urgent_d := discard_left <= 3.0
-		turn_bar.add_theme_stylebox_override("fill", UIKit.box(UIKit.LOSS if urgent_d else UIKit.BRAND, UIKit.BRAND, 0, 7, 0))
-		if discard_left <= 0.0:
-			discarding_now = false
-			var auto: Array = ChaosBot.wants_discard(engine, 0, BotAI.Difficulty.NORMAL, bot_rng)
-			engine.apply_discard(0, auto)
-			_banner("TEMPO ESGOTADO", "Descartamos as 2 mais fracas.", UIKit.LOSS)
-			item_chosen.emit(1)
+	if timer_label == null:
 		return
-	if not human_turn or paused or modal_open or finished or turn_bar == null:
+	timer_label.modulate.a = 1.0 if clock_on else 0.35
+	timer_label.text = _mmss(clock_left if clock_on else TURN_SECONDS)
+	if not clock_on or paused or finished or (modal_open and not clock_in_modal):
 		return
-	turn_left -= delta
-	turn_bar.value = maxf(turn_left, 0.0)
-	var urgent := turn_left <= 3.0
-	turn_bar.add_theme_stylebox_override("fill", UIKit.box(UIKit.LOSS if urgent else UIKit.BRAND, UIKit.BRAND, 0, 7, 0))
-	if turn_left <= 0.0:
-		var legal := engine.legal_for(0)
-		if legal.is_empty():
-			return
-		var weakest: CardData = legal[0]
-		for c in legal:
-			if (c as CardData).points() < weakest.points():
-				weakest = c
-		human_turn = false
-		_banner("TEMPO ESGOTADO", "Jogamos sua carta mais fraca.", UIKit.LOSS)
-		human_card_chosen.emit(weakest)
+	clock_left -= delta
+	var urgent := clock_left <= 3.0
+	timer_label.add_theme_color_override("font_color", UIKit.LOSS if urgent else UIKit.TR_WHITE)
+	if clock_left <= 0.0:
+		var cb := clock_timeout
+		_clock_stop()
+		timer_label.add_theme_color_override("font_color", UIKit.TR_WHITE)
+		if cb.is_valid():
+			cb.call()
 
 
 ## Tocar fora das cartas cancela a seleção (a carta volta pra mão).
@@ -1427,7 +1431,10 @@ func _human_bet() -> Dictionary:
 			st["picker"] = holder
 	bet_row.visible = true
 	(st["render"] as Callable).call()
+	_clock_start(BET_SECONDS, func():
+		done.call({"action": "check"} if can_check else {"action": "fold"}), true)   # estourou: passa, ou desiste se tem que pagar
 	await item_chosen
+	_clock_stop()
 	modal_open = false
 	bet_row.visible = false
 	for c in bet_row.get_children():
@@ -1701,8 +1708,7 @@ func _finish_match() -> void:
 	var lost: bool = not bool(summary["won"]) and (not is_tournament or str(summary.get("next", "")) == "eliminated")
 	Sfx.play("lose" if lost else "win")
 	status_label.text = ""
-	if turn_bar:
-		turn_bar.modulate.a = 0.0
+	_clock_stop()
 	if is_tournament:
 		_show_tournament_results(summary)
 	else:
@@ -2291,19 +2297,21 @@ func _human_discard_play() -> void:
 	_rebuild_hand()
 	_banner("ESCOLHA 2 CARTAS PRA DESCARTAR", "Toque na carta pra focar, toque de novo pra descartar.", UIKit.BRAND)
 	status_label.text = "0/%d descartadas" % ChaosEngine.BLITZ_DISCARD_SIZE
-	discard_left = DISCARD_SECONDS
-	turn_bar.max_value = DISCARD_SECONDS
-	turn_bar.modulate.a = 1.0
-	discarding_now = true
+	_clock_start(DISCARD_SECONDS, _on_discard_timeout)
 	await item_chosen
-	discarding_now = false
+	_clock_stop()
 	phase = "idle"   # cartas deixam de ser clicáveis/arrastáveis fora da vez
-	turn_bar.modulate.a = 0.0
-	turn_bar.max_value = TURN_SECONDS
 	status_label.text = ""
 	discard_picks = []
 	_banner_clear()
 	_rebuild_hand()
+
+
+func _on_discard_timeout() -> void:
+	var auto: Array = ChaosBot.wants_discard(engine, 0, BotAI.Difficulty.NORMAL, bot_rng)
+	engine.apply_discard(0, auto)
+	_banner("TEMPO ESGOTADO", "Descartamos as 2 mais fracas.", UIKit.LOSS)
+	item_chosen.emit(1)
 
 
 func _on_discard_tapped(view: CardView) -> void:
@@ -2340,7 +2348,7 @@ func _commit_discard(view: CardView, drop_global := Vector2.ZERO) -> void:
 		view.queue_free()
 	_layout_hand()
 	if discard_picks.size() == ChaosEngine.BLITZ_DISCARD_SIZE:
-		discarding_now = false
+		_clock_stop()
 		engine.apply_discard(0, discard_picks)
 		item_chosen.emit(1)
 
@@ -2415,7 +2423,9 @@ func _human_predict() -> int:
 	(st["render"] as Callable).call()
 	UIKit.pop_in(box, GameState.anim(0.15))
 	Sfx.play("chip")
+	_clock_start(PREDICT_SECONDS, func(): item_chosen.emit(1), true)   # estourou: vale o palpite da tela
 	await item_chosen
+	_clock_stop()
 	modal_open = false
 	if is_inside_tree():
 		holder.queue_free()
