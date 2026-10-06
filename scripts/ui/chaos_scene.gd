@@ -37,9 +37,7 @@ var selected_view: CardView
 var throw_from := Vector2.ZERO
 var has_throw_from := false
 var status_label: Label
-var banner_box: PanelContainer   # avisos do jogo ("fulano pagou", sua vez...): aba em cima da barra de baixo
-var banner_title: Label
-var banner_sub: Label
+var banner_title: Label         # aviso de ação ("Fulano pagou", "Sua vez"...): linha no card do header, embaixo dos losangos
 var clock_on := false          # relógio da vez rodando (card TEMPO)
 var clock_left := 0.0
 var clock_total := TURN_SECONDS
@@ -223,8 +221,13 @@ func _build_ui() -> void:
 	info_box.add_theme_stylebox_override("panel", UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 14, 6))
 	round_dots = RoundDots.new()
 	round_dots.set_progress(ChaosEngine.HAND_SIZE, 0)
-	round_dots.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	info_box.add_child(round_dots)
+	var info_v := VBoxContainer.new()
+	info_v.alignment = BoxContainer.ALIGNMENT_CENTER
+	info_v.add_theme_constant_override("separation", 0)
+	info_v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	info_box.add_child(info_v)
+	info_v.add_child(round_dots)
+	_build_banner(info_v)
 	topbar.add_child(info_box)
 	var help_btn := Widgets.icon_button("?")
 	help_btn.custom_minimum_size = Vector2(HEADER_H, HEADER_H)
@@ -241,7 +244,6 @@ func _build_ui() -> void:
 	banner_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(banner_slot)
 	_build_pot_card(banner_slot)
-	_build_banner(banner_slot)
 
 	# Palco: a mesa de runas com os rivais sentados na borda, a distâncias iguais; você embaixo.
 	stage = Control.new()
@@ -341,29 +343,13 @@ func _build_pot_card(slot: Control) -> void:
 	slot.add_child(card)
 
 
-## Aviso de ação (título curto, borda e texto na cor do tipo de ação), centrado na faixa do topo.
-func _build_banner(slot: Control) -> void:
-	banner_box = PanelContainer.new()
-	banner_box.anchor_left = 0.5
-	banner_box.anchor_right = 0.5
-	banner_box.anchor_top = 0.0
-	banner_box.anchor_bottom = 1.0
-	banner_box.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	banner_box.visible = false
-	banner_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var bv := VBoxContainer.new()
-	bv.alignment = BoxContainer.ALIGNMENT_CENTER
-	bv.add_theme_constant_override("separation", 0)
-	bv.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	banner_box.add_child(bv)
-	banner_title = UIKit.serif_label("", 24, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+## Aviso de ação: título curto, na cor do tipo de ação, numa linha dentro do card do header (embaixo dos losangos).
+func _build_banner(parent: Control) -> void:
+	banner_title = UIKit.serif_label("", 22, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	banner_title.autowrap_mode = TextServer.AUTOWRAP_OFF
-	bv.add_child(banner_title)
-	banner_sub = UIKit.serif_label("", 18, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
-	banner_sub.autowrap_mode = TextServer.AUTOWRAP_OFF
-	banner_sub.visible = false
-	bv.add_child(banner_sub)
-	slot.add_child(banner_box)
+	banner_title.custom_minimum_size = Vector2(0, 30)   # altura reservada: nada se mexe quando o aviso aparece
+	banner_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	parent.add_child(banner_title)
 
 
 ## Card central: a faixa de avisos fica logo abaixo do seu avatar (que cruza o topo do card), a
@@ -840,13 +826,8 @@ func _banner(title: String, sub: String, color: Color) -> void:
 	var tone := _tone(color)
 	banner_title.text = title
 	banner_title.add_theme_color_override("font_color", tone)
-	banner_sub.text = sub
-	banner_sub.visible = sub != ""
-	banner_box.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), tone, tone.darkened(0.45), "small", 10, 14, 6))
-	banner_box.visible = title != "" or sub != ""
-	pot_box.visible = not banner_box.visible   # o aviso ocupa o lugar do pote
-	banner_box.modulate.a = 0.0
-	create_tween().tween_property(banner_box, "modulate:a", 1.0, GameState.anim(0.12))
+	banner_title.modulate.a = 0.0
+	create_tween().tween_property(banner_title, "modulate:a", 1.0, GameState.anim(0.12))
 
 
 ## Poucas cores, cada uma com um sentido (todas legíveis sobre o roxo escuro): ciano = sua vez,
@@ -874,9 +855,6 @@ func _pname(p: int) -> String:
 func _banner_clear() -> void:
 	# Sem aviso: volta o pote.
 	banner_title.text = ""
-	banner_sub.text = ""
-	banner_box.visible = false
-	pot_box.visible = true
 
 
 # ------------------------------------------------------------------ loop de turnos
