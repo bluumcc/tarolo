@@ -1,6 +1,6 @@
 extends Control
-## ChaosScene.tscn — mesa do modo Caos: 5 níveis curtos de 8 cartas, todo mundo joga
-## pra si (sem Atacante/Defesa), com um modificador novo a cada nível e um bônus de
+## ChaosScene.tscn — mesa do modo Caos: 5 rodadas curtas de 8 cartas, todo mundo joga
+## pra si (sem Atacante/Defesa), com um modificador novo a cada rodada e um bônus de
 ## Fôlego pra quem estiver por baixo no total. Layout pensado pra celular (retrato):
 ## uma pilha vertical — status dos jogadores no topo, área de jogo compacta no meio,
 ## sua mão embaixo — em vez de uma mesa oval espalhada, que só faz sentido em paisagem.
@@ -63,7 +63,7 @@ var shown_totals: Array = []
 var modal_open := false      # modal de poder/aposta aberto — o relógio da jogada pausa
 var best_gain := 0.0         # maior pote que o jogador levou na sessão
 var total_in := 0            # fichas que o jogador pôs na mesa (buy-in + recompras)
-var action_text: Array = []  # última ação de cada assento nessa rodada
+var action_text: Array = []  # última ação de cada assento nessa jogada
 var action_color: Array = []
 var popup_layer: Control
 var overlay_layer: Control
@@ -78,8 +78,8 @@ var prog_tags: Array = []      # "1/3 ♨×1,5" ao vivo por assento
 var hold_stacks: Array = []      # Blitz: stacks de antes da liquidação (a tela só muda depois da animação)
 var hold_pot := -1.0
 var blitz_revealed: Array = []  # Blitz: entrada de cada um já paga (pote), pill visível na mesa
-var blitz_showdown := false     # Blitz: fim do nível — só aí o alvo dos rivais aparece pra você
-var blitz_sitting_out := false  # Blitz: jogador ficou sem fichas mid-nível (sentado fora)
+var blitz_showdown := false     # Blitz: fim da rodada — só aí o alvo dos rivais aparece pra você
+var blitz_sitting_out := false  # Blitz: jogador ficou sem fichas mid-rodada (sentado fora)
 var double_btn: Button
 var discard_picks: Array = []   # Blitz: cartas marcadas na mão pra descartar (até BLITZ_DISCARD_SIZE)
 var shown_pot := 0.0
@@ -167,7 +167,7 @@ var timer_label: Label
 var center_card: Panel
 var hand_scroller: HandScroller
 var hand_zone: Control
-var my_bet_pill: Control        # aposta da rodada: o Label do seu assento, em cima do avatar
+var my_bet_pill: Control        # aposta da jogada: o Label do seu assento, em cima do avatar
 var my_bet_label: Label
 
 
@@ -202,7 +202,7 @@ func _build_ui() -> void:
 	dealer_badges.resize(engine.num_players)
 	seat_nodes.resize(engine.num_players)
 
-	# Topo: menu · título com os losangos das rodadas · fez/palpite (no lugar da ajuda, que
+	# Topo: menu · título com os losangos das jogadas · fez/palpite (no lugar da ajuda, que
 	# agora fica dentro da pausa).
 	var topbar := HBoxContainer.new()
 	topbar.add_theme_constant_override("separation", 12)
@@ -231,7 +231,7 @@ func _build_ui() -> void:
 	prog_card = StatCard.new().setup("FEZ/PALPITE", "–", UIKit.TR_WHITE, 34)
 	topbar.add_child(prog_card)
 
-	# Modificador da rodada: faixa fixa, largura total — nenhum aviso passa por cima dela.
+	# Modificador da jogada: faixa fixa, largura total — nenhum aviso passa por cima dela.
 	modifier_strip = ModifierStrip.new()
 	modifier_strip.tapped.connect(_show_modifier_info)
 	root.add_child(modifier_strip)
@@ -267,7 +267,7 @@ func _build_ui() -> void:
 	table_center.resized.connect(_layout_table)
 	for p in range(engine.num_players):
 		stage.add_child(_build_seat(p))
-	# Sua aposta da rodada: o mesmo texto de fichas dos rivais, em cima do seu avatar.
+	# Sua aposta da jogada: o mesmo texto de fichas dos rivais, em cima do seu avatar.
 	var me_seat := seat_nodes[0] as SeatView
 	my_bet_label = me_seat.bet_label
 	my_bet_pill = my_bet_label
@@ -632,30 +632,30 @@ func _plural(n: int, one: String, many: String) -> String:
 	return "%d %s" % [n, one if n == 1 else many]
 
 
-# ------------------------------------------------------------------ níveis / modificador
+# ------------------------------------------------------------------ rodadas / modificador
 
-## Tela de transição de início de nível: só orienta (nível, mesa) — o modificador de cada
-## rodada é anunciado à parte, na hora, por `_trick_start()`.
+## Tela de transição de início de rodada: só orienta (rodada, mesa) — o modificador de cada
+## jogada é anunciado à parte, na hora, por `_trick_start()`.
 func _announce_round() -> void:
 	if engine.blitz:
 		_set_discard_chrome(true)
 	_refresh_hud()
 	_rebuild_hand()
-	var kicker := "NÍVEL %d%s" % [engine.round_index + 1, (" DE %d" % engine.levels) if engine.levels > 0 else ""]
+	var kicker := "RODADA %d%s" % [engine.round_index + 1, (" DE %d" % engine.levels) if engine.levels > 0 else ""]
 	var lines: Array = []
 	if engine.round_index == 0 and engine.blitz:
-		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "ENTRADA ◎%d" % int(engine.blitz_entry()), "text": "Em cada nível você palpita quantas rodadas vai ganhar e paga a entrada. Acertou o número exato, leva o pote. Cada rodada ainda paga fichas pelos pontos das cartas. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.MONEY})
+		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "ENTRADA ◎%d" % int(engine.blitz_entry()), "text": "Em cada rodada você palpita quantas jogadas vai ganhar e paga a entrada. Acertou o número exato, leva o pote. Cada jogada ainda paga fichas pelos pontos das cartas. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.MONEY})
 	elif engine.round_index == 0:
-		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "BLIND ◎%d" % engine.blind, "text": "Todo mundo paga o blind a cada rodada. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.MONEY})
+		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "BLIND ◎%d" % engine.blind, "text": "Todo mundo paga o blind a cada jogada. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.MONEY})
 	else:
-		lines.append({"head": "CARTAS NOVAS", "title": "NÍVEL %d" % (engine.round_index + 1), "text": "Mão nova, 8 rodadas — cada uma com o seu próprio modificador, anunciado antes de começar.", "color": UIKit.MODIFIER})
+		lines.append({"head": "CARTAS NOVAS", "title": "RODADA %d" % (engine.round_index + 1), "text": "Mão nova, 8 jogadas — cada uma com o seu próprio modificador, anunciado antes de começar.", "color": UIKit.MODIFIER})
 	var hold := 0.0 if (engine.round_index == 0 and engine.blitz and not first_round_done) else (2.6 if not first_round_done else 2.2)
 	await _transition(kicker, lines, hold)
 	first_round_done = true
 	_banner_clear()
 
 
-## Modificador da rodada na faixa fixa do topo (nome + efeito curto, cor pela função).
+## Modificador da jogada na faixa fixa do topo (nome + efeito curto, cor pela função).
 func _refresh_modifier_strip() -> void:
 	var m := engine.modifier
 	if m == -1 or chrome_discard:
@@ -777,9 +777,9 @@ func _banner_clear() -> void:
 
 # ------------------------------------------------------------------ loop de turnos
 
-## Começo de rodada: se o modificador de rodada (surpresa) vale agora, revela numa tela cheia
-## (surpresa) ou só na faixa (1ª/última, já conhecidas); deixa o aviso fixo durante a rodada.
-## Começo de toda rodada: sorteia o modificador dessa vaza e explica em tela cheia, sem
+## Começo de jogada: se o modificador de jogada (surpresa) vale agora, revela numa tela cheia
+## (surpresa) ou só na faixa (1ª/última, já conhecidas); deixa o aviso fixo durante a jogada.
+## Começo de toda jogada: sorteia o modificador dessa vaza e explica em tela cheia, sem
 ## distração nenhuma por trás — só o conteúdo e a contagem até começar. Sempre acontece, nunca
 ## é surpresa: o jogador (e, no Blitz, o palpite) sempre sabe a regra antes de decidir.
 func _trick_start() -> void:
@@ -788,7 +788,7 @@ func _trick_start() -> void:
 		return
 	var m := engine.modifier
 	if m == -1:
-		# Defensivo: toda rodada de Blitz/Caos sorteia modificador, sem exceção — isto nunca
+		# Defensivo: toda jogada de Blitz/Caos sorteia modificador, sem exceção — isto nunca
 		# deveria disparar, mas evita travar a tela cheia se `modifier_sequence` vier vazio.
 		_banner_clear()
 		return
@@ -799,7 +799,7 @@ func _trick_start() -> void:
 		_banner_clear()
 
 
-## Sorteio do modificador da rodada: em vez de texto trocando sozinho, um item fechado carrega,
+## Sorteio do modificador da jogada: em vez de texto trocando sozinho, um item fechado carrega,
 ## estoura em partículas e revela o efeito sorteado — a mesma tela cheia e o mesmo avanço
 ## automático/por toque de `_transition`, só que com uma animação própria no lugar do bloco.
 func _modifier_transition(m: int, color: Color) -> void:
@@ -812,7 +812,7 @@ func _modifier_transition(m: int, color: Color) -> void:
 	ov.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay_layer.add_child(ov)
 	# Kicker lá no topo da tela (não no meio, junto do resto) — é só contexto, não o assunto.
-	var kicker := UIKit.label("RODADA %d DE %d" % [engine.trick_number + 1, ChaosEngine.HAND_SIZE], 26, UIKit.ACTION, HORIZONTAL_ALIGNMENT_CENTER)
+	var kicker := UIKit.label("JOGADA %d DE %d" % [engine.trick_number + 1, ChaosEngine.HAND_SIZE], 26, UIKit.ACTION, HORIZONTAL_ALIGNMENT_CENTER)
 	kicker.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	kicker.offset_top = 56.0
 	ov.add_child(kicker)
@@ -961,7 +961,7 @@ func _wait_human() -> CardData:
 	human_turn = true
 	await _tip("turn", "SUA VEZ!", "Toque numa carta pra selecioná-la (ela sobe) e toque de novo pra jogar. Você tem 10 segundos por jogada.")
 	if engine.blitz and engine.can_double(0):
-		await _tip("double", "PODE DOBRAR!", "A partir da 4ª rodada, o botão DOBRAR paga mais uma entrada e dobra o peso do seu palpite no pote; da 6ª em diante dá pra TRIPLICAR. Vale a pena quando você já está no alvo e a mão que sobrou é fraca demais pra ganhar mais uma rodada. Só dá pra dobrar até duas vezes por nível.")
+		await _tip("double", "PODE DOBRAR!", "A partir da 4ª jogada, o botão DOBRAR paga mais uma entrada e dobra o peso do seu palpite no pote; da 6ª em diante dá pra TRIPLICAR. Vale a pena quando você já está no alvo e a mão que sobrou é fraca demais pra ganhar mais uma jogada. Só dá pra dobrar até duas vezes por rodada.")
 	var ls := TrickRules.lead_suit(engine.plays)
 	if ls == -1:
 		_banner("SUA VEZ", "Abra com qualquer carta.", UIKit.TURN)
@@ -1125,7 +1125,7 @@ func _animate_play(player: int, card: CardData, from: Vector2) -> void:
 	await tw.finished
 
 
-# ------------------------------------------------------------------ resumo de nível / fim
+# ------------------------------------------------------------------ resumo de rodada / fim
 
 # ------------------------------------------------------------------ ajuda / pausa
 
@@ -1201,7 +1201,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # ------------------------------------------------------------------ HUD (stacks, pote, ações)
 
-# ------------------------------------------------------------------ loop de rodadas
+# ------------------------------------------------------------------ loop de jogadas
 
 func _run_round() -> void:
 	if engine.blitz:
@@ -1210,13 +1210,13 @@ func _run_round() -> void:
 	while not engine.is_round_over():
 		if not is_inside_tree() or finished:
 			return
-		# Quebrou? No Blitz o check só acontece no início do nível (_blitz_open_level);
-		# mid-nível o jogador fica "sentado fora" (sem apostas, mas ainda joga cartas).
+		# Quebrou? No Blitz o check só acontece no início da rodada (_blitz_open_level);
+		# mid-rodada o jogador fica "sentado fora" (sem apostas, mas ainda joga cartas).
 		if engine.blitz:
 			if engine.stacks[0] == 0.0 and not blitz_sitting_out:
 				blitz_sitting_out = true
 				_refresh_hud()
-				_banner("FICHAS ESGOTADAS", "Você está sentado fora. Recompre no intervalo entre níveis.", UIKit.MUTED)
+				_banner("FICHAS ESGOTADAS", "Você está sentado fora. Recompre no intervalo entre rodadas.", UIKit.MUTED)
 				await _wait(2.0)
 				if not is_inside_tree() or finished:
 					return
@@ -1251,7 +1251,6 @@ func _run_round() -> void:
 			await _bust_broke_bots()
 		if not is_inside_tree() or finished:
 			return
-		GameState.blitz_level_played()
 	var choice := await _show_round_summary()
 	if not is_inside_tree() or finished:
 		return
@@ -1500,7 +1499,7 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 		st["to"] = maxi(int(st["to"]) - blind, lo)
 		(st["render"] as Callable).call())
 	row.add_child(minus)
-	var mine_in := int(engine.contrib[0])   # o que você já pôs nesta rodada (ante e apostas anteriores)
+	var mine_in := int(engine.contrib[0])   # o que você já pôs nesta jogada (ante e apostas anteriores)
 	var num := UIKit.label("◎ %d" % (int(st["to"]) - mine_in), 52, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
 	num.custom_minimum_size = Vector2(190, 0)
 	row.add_child(num)
@@ -1511,7 +1510,7 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 		st["to"] = mini(int(st["to"]) + blind, hi)
 		(st["render"] as Callable).call())
 	row.add_child(plus)
-	var total_l := UIKit.label("Você coloca ◎%d agora · total seu na rodada ◎%d (já pôs ◎%d)" % [int(st["to"]) - mine_in, int(st["to"]), mine_in], 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	var total_l := UIKit.label("Você coloca ◎%d agora · total seu na jogada ◎%d (já pôs ◎%d)" % [int(st["to"]) - mine_in, int(st["to"]), mine_in], 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	total_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_child(total_l)
 	var ok := UIKit.button("COLOCAR ◎%d" % (int(st["to"]) - mine_in) + (" (ALL-IN)" if int(st["to"]) >= hi and hi >= int(engine.stacks[0]) + mine_in else ""), UIKit.MONEY, 30)
@@ -1527,7 +1526,7 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 
 # ------------------------------------------------------------------ pote
 
-# ------------------------------------------------------------------ rodada resolvida
+# ------------------------------------------------------------------ jogada resolvida
 
 func _resolve_trick(result: Dictionary) -> void:
 	if engine.blitz:
@@ -1552,7 +1551,7 @@ func _resolve_trick(result: Dictionary) -> void:
 	var wname := str(config["names"][winner]).to_upper()
 	var notes: Array = []
 	if int(result.get("modifier", -1)) == ChaosModifiers.Modifier.VAZA_DOURADA:
-		notes.append("rodada dourada ×3")
+		notes.append("jogada dourada ×3")
 	var sub := "Pote ◎%d" % int(pot_amt)
 	if absf(prize) >= 1.0:
 		sub += "  ·  bônus dos rivais %s◎%d" % ["+" if prize >= 0.0 else "−", absi(int(prize))]
@@ -1575,7 +1574,7 @@ func _resolve_trick(result: Dictionary) -> void:
 	var extras: Array = []
 	var streak_n := int(result.get("streak", 0))
 	if streak_n >= 2 and not ("MAO_QUENTE" in result.get("combos", [])):
-		extras.append(["♨ SEQUÊNCIA ×%s!" % UIKit.fmt_dec(float(result.get("streak_mult", 1.0)), 2), "%s ganhou %d rodadas seguidas" % [wname, streak_n], FLAME])
+		extras.append(["♨ SEQUÊNCIA ×%s!" % UIKit.fmt_dec(float(result.get("streak_mult", 1.0)), 2), "%s ganhou %d jogadas seguidas" % [wname, streak_n], FLAME])
 	for id in result.get("combos", []):
 		extras.append([str(ChaosModifiers.COMBO_NAMES[id]) + "!", "%s — %s" % [wname, ChaosModifiers.COMBO_DESCRIPTIONS[id]], UIKit.COMBO])
 	if float(result.get("saque_amount", 0.0)) > 0.0:
@@ -1583,7 +1582,7 @@ func _resolve_trick(result: Dictionary) -> void:
 	if float(result.get("assalto_amount", 0.0)) > 0.0:
 		extras.append(["⚔ ASSALTO!", "%s roubou ◎%d de quem tinha mais fichas" % [wname, int(result["assalto_amount"])], UIKit.LOSS])
 	if int(result.get("modifier", -1)) == ChaosModifiers.Modifier.VAZA_MALDITA:
-		extras.append(["☠ RODADA MALDITA!", "%s paga aos rivais por vencer essa rodada" % wname, UIKit.LOSS])
+		extras.append(["☠ JOGADA MALDITA!", "%s paga aos rivais por vencer essa jogada" % wname, UIKit.LOSS])
 	for e in extras:
 		_banner(e[0], e[1], e[2])
 		Sfx.play("combo")
@@ -1612,9 +1611,9 @@ func _resolve_trick(result: Dictionary) -> void:
 	_refresh_hud()
 
 
-# ------------------------------------------------------------------ resumo de nível / fim
+# ------------------------------------------------------------------ resumo de rodada / fim
 
-## Resumo do nível. Devolve "continue" ou "leave" (sair da mesa levando a stack).
+## Resumo da rodada. Devolve "continue" ou "leave" (sair da mesa levando a stack).
 func _show_round_summary() -> String:
 	if GameState.autoplay:
 		await _wait(0.05)
@@ -1627,16 +1626,16 @@ func _show_round_summary() -> String:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	box.add_child(v)
-	v.add_child(UIKit.label("FIM DO NÍVEL %d" % (int(r["round"]) + 1), 30, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("FIM DA RODADA %d" % (int(r["round"]) + 1), 30, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	var stacks: Array = r["stacks"]
 	var deltas: Array = r["deltas"]
 	# Saldo do próprio jogador, bem grande e com sinal, antes de qualquer outra coisa — o número
-	# que mais importa pra saber "ganhei ou perdi esse nível", sem precisar ler a lista toda.
+	# que mais importa pra saber "ganhei ou perdi essa rodada", sem precisar ler a lista toda.
 	var my_delta := int(deltas[0])
 	var saldo_color := UIKit.OK if my_delta >= 0 else UIKit.LOSS
 	var saldo := UIKit.label("%s◎%d" % ["+" if my_delta >= 0 else "−", absi(my_delta)], 56, saldo_color, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(saldo)
-	var saldo_cap := UIKit.label("SEU SALDO NESSE NÍVEL", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	var saldo_cap := UIKit.label("SEU SALDO NESSA RODADA", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(saldo_cap)
 	v.add_child(HSeparator.new())
 	var won: Array = r["tricks_won"]
@@ -1644,7 +1643,7 @@ func _show_round_summary() -> String:
 	order.sort_custom(func(a: int, b: int) -> bool: return float(stacks[a]) > float(stacks[b]))
 	for p in order:
 		var d := int(deltas[p])
-		var line := "%s%s  ◎%d  (%s◎%d)  ·  %d rodadas" % ["♛ " if p == order[0] else "", str(config["names"][p]).to_upper(), int(stacks[p]), "+" if d >= 0 else "−", absi(d), int(won[p])]
+		var line := "%s%s  ◎%d  (%s◎%d)  ·  %d jogadas" % ["♛ " if p == order[0] else "", str(config["names"][p]).to_upper(), int(stacks[p]), "+" if d >= 0 else "−", absi(d), int(won[p])]
 		if r.has("blitz"):
 			line = "%s%s  ◎%d  (%s◎%d)" % ["♛ " if p == order[0] else "", str(config["names"][p]).to_upper(), int(stacks[p]), "+" if d >= 0 else "−", absi(d)]
 		var lab := UIKit.label(line, 28, (UIKit.ME if p == 0 else UIKit.INK), HORIZONTAL_ALIGNMENT_CENTER)
@@ -1662,11 +1661,11 @@ func _show_round_summary() -> String:
 		bl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(bl)
 	if r.has("blitz") and float(r["blitz"]["carry_out"]) > 0.0:
-		var cl := UIKit.label("Ninguém acertou: ◎%d acumulam pro próximo nível" % int(r["blitz"]["carry_out"]), 24, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+		var cl := UIKit.label("Ninguém acertou: ◎%d acumulam pra próxima rodada" % int(r["blitz"]["carry_out"]), 24, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
 		cl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(cl)
 	var result := {"choice": "continue"}
-	var next := UIKit.button("PRÓXIMO NÍVEL")
+	var next := UIKit.button("PRÓXIMA RODADA")
 	next.pressed.connect(func(): item_chosen.emit(1))
 	v.add_child(next)
 	var profile := SaveManager.section("profile")
@@ -1746,7 +1745,7 @@ func _show_tournament_results(summary: Dictionary) -> void:
 		ll.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(ll)
 	if next == "advance":
-		var go := UIKit.button("PRÓXIMO NÍVEL", UIKit.OK)
+		var go := UIKit.button("PRÓXIMA RODADA", UIKit.OK)
 		go.pressed.connect(func(): get_tree().reload_current_scene())
 		v.add_child(go)
 	var btn := UIKit.button("MENU PRINCIPAL", UIKit.MUTED)
@@ -1777,9 +1776,9 @@ func _show_results(summary: Dictionary) -> void:
 		v.add_child(UIKit.label(line, 32, UIKit.ME if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	var st: Dictionary = engine.session_stats[0]
-	var stat := "%d rodadas na mesa · %d potes ganhos · %d blefes vencidos · %d desistências" % [engine.hand_no, int(st["pots"]), int(st["bluffs"]), int(st["folds"])]
+	var stat := "%d jogadas na mesa · %d potes ganhos · %d blefes vencidos · %d desistências" % [engine.hand_no, int(st["pots"]), int(st["bluffs"]), int(st["folds"])]
 	if engine.blitz:
-		stat = "%d níveis · %d palpites certos · %d por 1 de diferença" % [int(st["levels"]), int(st["hits"]), int(st["near"])]
+		stat = "%d rodadas · %d palpites certos · %d por 1 de diferença" % [int(st["levels"]), int(st["hits"]), int(st["near"])]
 	var stat_l := UIKit.label(stat, 26, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	stat_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(stat_l)
@@ -1873,14 +1872,14 @@ func _refresh_hud() -> void:
 				ink = edge
 			ob.add_theme_stylebox_override("panel", UIKit.box_cached(fill, edge, 3, 20, 0))
 			wl.add_theme_color_override("font_color", ink)
-			# Aposta da rodada embaixo do nome, enquanto as apostas rolam (depois voa pro pote).
+			# Aposta da jogada embaixo do nome, enquanto as apostas rolam (depois voa pro pote).
 			var pile_l := (seat_nodes[p] as SeatView).bet_label
 			var pile := float(engine.contrib[p]) if phase == "bet" and not bets_gathered else 0.0
 			pile_l.visible = pile > 0.0
 			pile_l.text = "◎ %d" % int(pile)
 			pile_l.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[p] else UIKit.MONEY)
 		_refresh_bet_tags(p, idx)
-	title_label.text = "NÍVEL %d%s · %s ◎%d" % [engine.round_index + 1, ("/%d" % engine.levels) if engine.levels > 0 else "", "ENTRADA" if engine.blitz else "BLIND", int(engine.blitz_entry()) if engine.blitz else engine.blind]
+	title_label.text = "RODADA %d%s · %s ◎%d" % [engine.round_index + 1, ("/%d" % engine.levels) if engine.levels > 0 else "", "ENTRADA" if engine.blitz else "BLIND", int(engine.blitz_entry()) if engine.blitz else engine.blind]
 	round_dots.set_progress(ChaosEngine.HAND_SIZE, engine.trick_number)
 	_refresh_modifier_strip()
 	_refresh_pot()
@@ -2028,7 +2027,7 @@ func _betting_phase() -> void:
 				act = {"action": "check"} if bool(opt0["can_check"]) else {"action": "fold"}
 			else:
 				var fold_tip := "Quem desiste descarta 1 carta aleatória da mão." if engine.blitz else "Quem desiste descarta a carta mais fraca, virada."
-				await _tip("bet", "SUA VEZ DE APOSTAR", "Todo mundo já pagou a ante. Você pode PASSAR, AUMENTAR, PAGAR ou DESISTIR. Só quem fica na rodada joga carta, e quem vence leva o pote. %s" % fold_tip)
+				await _tip("bet", "SUA VEZ DE APOSTAR", "Todo mundo já pagou a ante. Você pode PASSAR, AUMENTAR, PAGAR ou DESISTIR. Só quem fica na jogada joga carta, e quem vence leva o pote. %s" % fold_tip)
 				act = await _human_bet()
 			if not is_inside_tree() or finished:
 				return
@@ -2050,7 +2049,7 @@ func _betting_phase() -> void:
 	_refresh_hud()
 
 
-## Mostra o que cada um fez; as fichas ficam na frente do jogador até fechar a rodada de apostas.
+## Mostra o que cada um fez; as fichas ficam na frente do jogador até fechar a jogada de apostas.
 func _show_bet_action(p: int, r: Dictionary) -> void:
 	var pname := str(config["names"][p]).to_upper()
 	var amount := float(r.get("amount", 0.0))
@@ -2061,7 +2060,7 @@ func _show_bet_action(p: int, r: Dictionary) -> void:
 		"check":
 			action_text[p] = "– PASSOU"
 			title = "%s PASSOU" % pname
-			sub = "Fica na rodada sem aumentar."
+			sub = "Fica na jogada sem aumentar."
 		"call":
 			action_text[p] = "✓ PAGOU"
 			title = "%s PAGOU" % pname
@@ -2193,7 +2192,7 @@ func _resolve_walkover(result: Dictionary) -> void:
 # ------------------------------------------------------------------ Blitz
 
 ## Descarte inicial: etapa própria, sem mesa, sem modificador, sem indicador de vez — só os
-## avatares com nome e stack, pra não confundir com informação de uma rodada que nem começou.
+## avatares com nome e stack, pra não confundir com informação de uma jogada que nem começou.
 func _set_discard_chrome(active: bool) -> void:
 	chrome_discard = active
 	table_center.visible = not active
@@ -2206,7 +2205,7 @@ func _set_discard_chrome(active: bool) -> void:
 		(dealer_badges[p] as PanelContainer).visible = not active
 
 
-## Começo do nível no Blitz: garante saldo, troca bots quebrados, coleta os palpites (o seu e os
+## Começo da rodada no Blitz: garante saldo, troca bots quebrados, coleta os palpites (o seu e os
 ## dos bots), revela todos juntos e joga as entradas no pote. Devolve false se a mesa acabou.
 func _blitz_open_level() -> bool:
 	_set_discard_chrome(true)   # antes de qualquer espera: a mesa não pisca na tela
@@ -2241,13 +2240,13 @@ func _blitz_open_level() -> bool:
 	pot_label.text = _pot_text(shown_pot)
 	pot_box.modulate.a = 0.0   # só aparece depois do palpite, quando as entradas de verdade entram
 	var carry_txt := "  Pote acumulado: ◎%d." % int(engine.carry) if engine.carry > 0.0 else ""
-	_banner("PALPITES", "Quantas rodadas cada um vai ganhar?%s" % carry_txt, UIKit.MONEY)
+	_banner("PALPITES", "Quantas jogadas cada um vai ganhar?%s" % carry_txt, UIKit.MONEY)
 	_refresh_hud()
 	var pick: int
 	if GameState.autoplay:
 		pick = ChaosBot.blitz_pick(engine, 0, int(config["difficulty"][0]), bot_rng)
 	else:
-		await _tip("predict", "SEU PALPITE", "Todo nível você diz quantas rodadas vai ganhar (de 0 a 8) e paga a entrada. Quem acertar o número exato leva o pote. Errou por 1? Recebe metade da entrada de volta. A estrela ★ marca o palpite que combina com a sua mão.")
+		await _tip("predict", "SEU PALPITE", "Toda rodada você diz quantas jogadas vai ganhar (de 0 a 8) e paga a entrada. Quem acertar o número exato leva o pote. Errou por 1? Recebe metade da entrada de volta. A estrela ★ marca o palpite que combina com a sua mão.")
 		pick = await _human_predict()
 		if not is_inside_tree() or finished:
 			return false
@@ -2378,7 +2377,7 @@ func _human_predict() -> int:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	box.add_child(v)
-	v.add_child(UIKit.label("QUANTAS RODADAS VOCÊ VAI GANHAR?", 26, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("QUANTAS JOGADAS VOCÊ VAI GANHAR?", 26, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	var hint := ChaosBot.suggested_predict(engine, 0)
 	var info := "Entrada ◎%d  ·  Pote ◎%d  ·  Sua mão: %s" % [int(engine.blitz_entry()), int(engine.carry), _hand_label_blitz()]
 	var info_l := UIKit.label(info, 19, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
@@ -2424,7 +2423,7 @@ func _human_predict() -> int:
 		legend.modulate.a = 1.0
 		legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		body.add_child(legend)
-		var go := UIKit.button("CONFIRMAR: %d %s" % [int(st["pick"]), "RODADA" if int(st["pick"]) == 1 else "RODADAS"], UIKit.OK, 28)
+		var go := UIKit.button("CONFIRMAR: %d %s" % [int(st["pick"]), "JOGADA" if int(st["pick"]) == 1 else "JOGADAS"], UIKit.OK, 28)
 		go.pressed.connect(func(): item_chosen.emit(1))
 		body.add_child(go)
 	(st["render"] as Callable).call()
@@ -2451,7 +2450,7 @@ func _hand_label_blitz() -> String:
 
 
 ## Dobrar/triplicar (seu próprio lance, `is_cover = false`) ou cobrir o lance de um rival (reage
-## na hora, sem esperar a rodada). Depois de um lance próprio (não de uma cobertura), oferece a
+## na hora, sem esperar a jogada). Depois de um lance próprio (não de uma cobertura), oferece a
 ## janela de cobertura aos outros 3.
 func _apply_double(p: int, is_cover := false) -> void:
 	if not (engine.cover_double(p) if is_cover else engine.double_down(p)):
@@ -2476,7 +2475,7 @@ func _apply_double(p: int, is_cover := false) -> void:
 
 
 ## Depois que `actor` dobra ou triplica, os outros 3 podem cobrir: pagar mais uma entrada pra
-## igualar o peso dele no pote (custa um dos 2 lances do nível de quem cobre). Bots decidem na
+## igualar o peso dele no pote (custa um dos 2 lances da rodada de quem cobre). Bots decidem na
 ## hora; você tem uma janela curta pra tocar COBRIR, senão a resposta vira DEIXAR.
 func _offer_cover(actor: int) -> void:
 	for q in range(engine.num_players):
@@ -2565,9 +2564,9 @@ func _refresh_double_button() -> void:
 
 
 ## Seu placar ao vivo e sua aposta. Fez/palpite fica no card do topo (verde no alvo, vermelho
-## estourou ou sem tempo de chegar lá, neutro enquanto ainda dá). A aposta da rodada, no card
-## ao lado do seu avatar, enquanto a rodada vale. Rivais: só o selo de vitórias do avatar — o
-## alvo deles é segredo até o fim do nível.
+## estourou ou sem tempo de chegar lá, neutro enquanto ainda dá). A aposta da jogada, no card
+## ao lado do seu avatar, enquanto a jogada vale. Rivais: só o selo de vitórias do avatar — o
+## alvo deles é segredo até o fim da rodada.
 func _refresh_blitz_tag(p: int, _idx: int) -> void:
 	if p != 0:
 		return
@@ -2609,9 +2608,9 @@ func _refresh_pot_blitz() -> void:
 		pot_prize_label.visible = false
 	var sub := ""
 	if phase == "bet":
-		sub = "aposta da rodada"
+		sub = "aposta da jogada"
 	elif phase == "play" and bets_gathered:
-		sub = "aposta da rodada"
+		sub = "aposta da jogada"
 	elif phase == "predict":
 		sub = "quem acertar leva"
 	elif phase == "play" and engine.carry > 0.0:
@@ -2619,13 +2618,13 @@ func _refresh_pot_blitz() -> void:
 	elif phase == "play":
 		sub = "quem acertar leva"
 	elif engine.carry > 0.0:
-		sub = "acumulado pro próximo nível"
+		sub = "acumulado pra próxima rodada"
 	pot_sub.text = sub
 	pot_box.reset_size.call_deferred()
 	_layout_table.call_deferred()
 
 
-## Fim de uma rodada no Blitz: a carta vencedora pulsa, o palpite de quem venceu sobe um e a
+## Fim de uma jogada no Blitz: a carta vencedora pulsa, o palpite de quem venceu sobe um e a
 ## faixa avisa se chegou no alvo ou estourou.
 func _resolve_trick_blitz(result: Dictionary) -> void:
 	var winner: int = result["winner"]
@@ -2634,7 +2633,7 @@ func _resolve_trick_blitz(result: Dictionary) -> void:
 		if int(v["player"]) == winner:
 			win_view = v["view"]
 	if engine.is_round_over() and not engine.blitz_result.is_empty():
-		# O nível acabou e o motor já liquidou o pote: a tela segura os números antigos até a animação.
+		# A rodada acabou e o motor já liquidou o pote: a tela segura os números antigos até a animação.
 		var br := engine.blitz_result
 		hold_stacks = []
 		for p in range(engine.num_players):
@@ -2648,7 +2647,7 @@ func _resolve_trick_blitz(result: Dictionary) -> void:
 	var wname := str(config["names"][winner]).to_upper()
 	var sub := "Palpite: %d de %d" % [int(engine.wins[winner]), int(engine.predicts[winner])]
 	if int(result.get("value", 1)) == 2:
-		sub += "  ·  Rodada Dobrada: conta 2 vitórias"
+		sub += "  ·  Jogada Dobrada: conta 2 vitórias"
 	var prize_amt := float(result.get("prize", 0.0))
 	if prize_amt > 0.0:
 		sub += "  ·  cartas +◎%d" % int(prize_amt)
@@ -2663,8 +2662,8 @@ func _resolve_trick_blitz(result: Dictionary) -> void:
 	if curse_amt > 0.0:
 		sub += "  ·  ☠ pagou ◎%d aos rivais" % int(curse_amt)
 	if trick_gain > 0.0:
-		sub += "  ·  aposta da rodada +◎%d" % int(trick_gain)
-	_banner("%s venceu a rodada!" % wname, sub, UIKit.ME if winner == 0 else UIKit.INK)
+		sub += "  ·  aposta da jogada +◎%d" % int(trick_gain)
+	_banner("%s venceu a jogada!" % wname, sub, UIKit.ME if winner == 0 else UIKit.INK)
 	Sfx.play("chip")
 	FX.burst(popup_layer, _seat_center(winner) - popup_layer.global_position, UIKit.ME if winner == 0 else UIKit.CHIPS, 10)
 	if float(result.get("trick_pot", 0.0)) > 0.0:
@@ -2710,7 +2709,7 @@ func _sum(a: Array) -> float:
 	return t
 
 
-## Resultado do nível: quem acertou leva o pote (fichas voam até a stack), quem errou vê as
+## Resultado da rodada: quem acertou leva o pote (fichas voam até a stack), quem errou vê as
 ## fichas irem embora, e sem acertos o pote fica acumulado.
 func _blitz_settlement() -> void:
 	blitz_showdown = true
@@ -2727,7 +2726,7 @@ func _blitz_settlement() -> void:
 	var col := UIKit.MONEY
 	if hits.is_empty():
 		title = "NINGUÉM ACERTOU!"
-		sub = "O pote de ◎%d fica acumulado pro próximo nível." % int(br["carry_out"])
+		sub = "O pote de ◎%d fica acumulado pra próxima rodada." % int(br["carry_out"])
 		col = UIKit.COMBO
 	else:
 		var names: Array = hits.map(func(q): return "VOCÊ" if int(q) == 0 else str(config["names"][q]).to_upper())

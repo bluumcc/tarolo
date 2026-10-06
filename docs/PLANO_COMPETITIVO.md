@@ -81,7 +81,7 @@ Cada fase: regra exata → motor → bots → testes → simulação → critér
 
 ### Fase 4 — Recebe 10, descarta 2 (substituiu a 1ª versão, que era uma carta aberta trocável)
 - Todo mundo recebe 10 cartas; antes de saber a regra da 1ª rodada, cada um descarta 2 (decisão
-  simultânea, sem ver o que os outros descartaram). Sempre ativo, inclusive no onboarding.
+  simultânea, sem ver o que os outros descartaram). Sempre ativo.
 - Bots decidem pelas 2 cartas mais fracas da mão crua (`ChaosBot.wants_discard`).
 - Risco considerado: aumenta a força média das mãos (e portanto os acertos) → mitigar recalibrando
   os bots se a simulação mostrar desvio.
@@ -143,20 +143,14 @@ tutorial guiado, cosméticos, torneios, novos modificadores.
   quebrou a escada de dificuldade (Difícil passou a perder de Normal); mantido como estava.
   Pesos do palpite (×1/×1,5/×2) revalidados com o código atual (pontos + estilos): nenhum
   palpite fixo é lucrativo, sem mudança necessária (`tests/blitz_diag_sim.gd`). Camadas de regra
-  pros primeiros níveis: feito (ver "Onboarding" abaixo).
+  pros primeiros níveis: feito e depois removido (ver "Onboarding" abaixo).
 - **Fase 3 (palpite oculto):** feito. Rivais em segredo até o showdown; sem mudança nos bots
   (eles já não liam o palpite alheio).
 - **Fase 4 (recebe 10, descarta 2):** feito, refeito uma vez. A 1ª versão era uma carta aberta
   trocável (`engine.swap_cards`); substituída por pedido: todo mundo recebe `BLITZ_DEAL_SIZE`
-  (10) e descarta `BLITZ_DISCARD_SIZE` (2) antes de saber a regra da 1ª rodada — sempre, inclusive
-  no onboarding. `engine.can_discard/apply_discard`, bot em `ChaosBot.wants_discard`, UI em
+  (10) e descarta `BLITZ_DISCARD_SIZE` (2) antes de saber a regra da 1ª rodada — sempre. `engine.can_discard/apply_discard`, bot em `ChaosBot.wants_discard`, UI em
   `_human_discard_play()` (seleciona direto da mão, sem popup).
-- **Onboarding (camadas de regra):** feito, fora do plano original de 6 fases, junto da Fase 2.
-  Revertido em parte: modificador escondido nos primeiros níveis virou bug reportado 2x ("sumiu?")
-  sem eu ter avisado que era intencional — voltou a valer sempre, em toda conta, todo nível.
-  `ChaosEngine.onboarding_levels` (config, contado por `GameState.ONBOARDING_LEVELS = 3`, salvo
-  em `profile.blitz_levels`): as primeiras mesas de Blitz de uma conta nova só escondem
-  dobrar/cobrir — modificador e o descarte inicial valem sempre.
+- **Onboarding (camadas de regra):** removido — dobrar/cobrir valem desde a 1ª mesa, em toda conta.
 - **Fase 5 (economia vs bots):** medida, não calibrada. `tests/blitz_economy_check.gd`: um
   jogador nível Oráculo, mesmo com a taxa da casa ligada (4%), ainda lucra em média — mas pouco
   (+0,39 blind/nível, 6 sessões de 10 níveis, bem ruidoso: de −2,2 a +1,75 por sessão; o Oráculo

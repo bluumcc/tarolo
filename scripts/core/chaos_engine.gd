@@ -44,7 +44,7 @@ var last_winner := -1
 var combo_count: Array = []
 var hand_no := 0              # rodadas de aposta jogadas na mesa (roda o botão)
 var button := 0               # "dealer": fala por último
-var start_leader := 0         # quem abre o 1º nível (sorteado pela cena; 0 nos testes)
+var start_leader := 0         # quem abre a 1ª rodada (sorteado pela cena; 0 nos testes); as demais sorteiam de novo
 
 # Aposta da rodada atual.
 var pot := 0.0
@@ -87,7 +87,6 @@ var human_bonus := 0.0        # total de prêmios da casa recebidos pelo jogador
 var blitz_result: Dictionary = {}
 var point_factor := BLITZ_POINT_FACTOR   # ajustável (simulação)
 var styles: Array = []                  # estilo de cada bot (ChaosBot.Style), fixo enquanto ele estiver na mesa
-var onboarding_levels := 0              # níveis restantes sem dobrar/cobrir (Blitz, contas novas — modificador sempre ativo)
 const BLITZ_DEAL_SIZE := 10             # recebe 10, descarta 2 (ver DISCARD_SIZE), fica com HAND_SIZE (8)
 const BLITZ_DISCARD_SIZE := 2
 ## Aposta por rodada: cada uma das 8 rodadas tem sua própria mini-aposta (passar/apostar/
@@ -117,7 +116,6 @@ func setup_match(config: Dictionary) -> void:
 	start_leader = int(config.get("start_leader", 0)) % maxi(num_players, 1)
 	blitz = str(config.get("mode", "chaos")) == "blitz"
 	point_factor = float(config.get("point_factor", BLITZ_POINT_FACTOR))
-	onboarding_levels = int(config.get("onboarding_levels", 0))
 	carry = 0.0
 	hit_streak = 0
 	human_bonus = 0.0
@@ -158,13 +156,14 @@ func _setup_round() -> void:
 		streak.append(0)
 		captured.append([])
 		combo_count.append(0)
-	# Embaralha os modificadores: as 8 vazas do nível usam os 8 primeiros, sem repetir. Sempre
-	# ativo, mesmo no onboarding — toda mesa de Blitz tem modificador em toda rodada, sem exceção.
+	# Embaralha os modificadores: as 8 vazas do nível usam os 8 primeiros, sem repetir. Toda
+	# mesa de Blitz tem modificador em toda jogada, sem exceção.
 	modifier_sequence = (ChaosModifiers.blitz_pool() if blitz else ChaosModifiers.ALL).duplicate()
 	Deck.shuffle(modifier_sequence, rng)
 	modifier = -1
 	weak_suit = -1
-	leader = (start_leader + round_index) % num_players
+	# 1ª rodada: quem a cena sorteou; nas seguintes, novo sorteio do dealer (sem rodízio).
+	leader = start_leader if round_index == 0 else rng.randi() % num_players
 	current = leader
 	trick_number = 0
 	plays = []
@@ -744,7 +743,6 @@ func clone_for_sim() -> ChaosEngine:
 	c.blitz = blitz
 	c.point_factor = point_factor
 	c.styles = styles.duplicate()
-	c.onboarding_levels = onboarding_levels
 	c.rake_on = rake_on
 	c.bonus_on = bonus_on
 	c.stacks = stacks.duplicate()
@@ -835,7 +833,7 @@ func can_double(player: int) -> bool:
 ## Cobrir a dobra/triplicada de um rival: mesmo efeito de `double_down`, mas sem a espera da
 ## rodada — é uma resposta imediata ao lance de outro jogador.
 func can_cover(player: int) -> bool:
-	if not doubles_enabled or not blitz or is_round_over() or int(doubles[player]) >= BLITZ_MAX_DOUBLES or onboarding_levels > 0:
+	if not doubles_enabled or not blitz or is_round_over() or int(doubles[player]) >= BLITZ_MAX_DOUBLES:
 		return false
 	var need := blitz_need(player)
 	return need >= 0 and need <= tricks_left() and stacks[player] >= blitz_entry()
@@ -1117,7 +1115,6 @@ func tricks_won_by(player: int) -> int:
 ## Chamado pela UI depois do resumo do nível: distribui o próximo (a mesa não acaba).
 func advance_round() -> void:
 	round_index += 1
-	onboarding_levels = maxi(0, onboarding_levels - 1)
 	if levels == 0 or round_index < levels:
 		_setup_round()
 

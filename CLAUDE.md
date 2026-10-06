@@ -51,7 +51,7 @@ Em `scripts/ui/`, todos desenhados em código (sem textura/shader) e só com tok
 - **Ranqueado é o Blitz, fila única** (não o Vanilla): toda mesa real de Blitz vale fichas E LP/MMR ao mesmo tempo, sem distinção casual/ranqueada. Vanilla é 100% recreativo, nunca mexe em elo. Ver `docs/BLITZ.md`.
 
 ## Vocabulário
-Partida → Nível → Rodada → Vez (uma "rodada" tem 4 cartas; um "nível" tem 8 rodadas no Caos).
+Partida → Rodada → Jogada (uma "jogada" tem 4 cartas, uma de cada jogador; uma "rodada" tem 8 jogadas: mão nova, descarte, palpite e sorteio do dealer).
 
 ## Fluxo
 - Godot 4.3, UI em código. Testes: `godot --headless --path . -s res://tests/test_runner.gd` e `res://tests/Smoke.tscn`.

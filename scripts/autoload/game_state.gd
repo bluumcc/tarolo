@@ -196,7 +196,6 @@ func chaos_buy_in(table: int = -1) -> int:
 ## Configuração da mesa pra ChaosScene / ChaosEngine — todo mundo joga pra si. Já cobra o
 ## buy-in das fichas do jogador (config["entered"] = false se não tinha saldo); ele volta
 ## como stack final quando você sai da mesa.
-const ONBOARDING_LEVELS := 3   # 1ª, 2ª e 3ª mesas de Blitz: sem dobrar/cobrir, pra aprender o palpite sozinho (modificador continua ativo sempre)
 
 
 func chaos_config() -> Dictionary:
@@ -240,19 +239,10 @@ func chaos_config() -> Dictionary:
 		"mode": chaos_mode,
 		"levels": 3 if autoplay else 0,
 		"entered": entered,
-		"onboarding_levels": maxi(0, ONBOARDING_LEVELS - int(profile.get("blitz_levels", 0))) if chaos_mode == "blitz" else 0,
 	}
 	if not stacks.is_empty():
 		cfg["stacks"] = stacks
 	return cfg
-
-
-## Chamado a cada nível de Blitz concluído: conta pro fim das regras simplificadas dos primeiros
-## níveis (ver `ONBOARDING_LEVELS`). Não faz nada fora do Blitz.
-func blitz_level_played() -> void:
-	var profile := SaveManager.section("profile")
-	profile["blitz_levels"] = int(profile.get("blitz_levels", 0)) + 1
-	SaveManager.save_game()
 
 
 ## Fecha uma sessão de mesa Blitz real (você saiu, quebrou ou a partida de teste acabou): devolve
@@ -332,7 +322,7 @@ func _tournament_player_table() -> Array:
 	return []
 
 
-## Config pra ChaosScene jogar 1 NÍVEL da mesa atual do jogador no torneio — stacks são as
+## Config pra ChaosScene jogar 1 RODADA da mesa atual do jogador no torneio — stacks são as
 ## reais do torneio (viajam com cada jogador entre mesas), mas o buy-in já foi cobrado na
 ## inscrição, então não mexe nas fichas de verdade até o prêmio final
 ## (`report_tournament_table`). A mesa toca só esse nível; o resultado decide a próxima.
@@ -368,7 +358,6 @@ func tournament_table_config() -> Dictionary:
 		"mode": "blitz",
 		"levels": 1,
 		"entered": true,
-		"onboarding_levels": 0,
 		"tournament": true,
 	}
 
@@ -434,7 +423,7 @@ func report_tournament_table(result: Dictionary) -> Dictionary:
 		tournament["total_entrants"] = survivors.size()
 		tournament["level"] = int(tournament.get("level", 0)) + 1
 		if busted_count > 0:
-			lines.append("%d jogador(es) eliminado(s) nesse nível — %d restantes." % [busted_count, survivors.size()])
+			lines.append("%d jogador(es) eliminado(s) nessa rodada — %d restantes." % [busted_count, survivors.size()])
 		else:
 			lines.append("%d jogadores restantes." % survivors.size())
 		next = "advance"

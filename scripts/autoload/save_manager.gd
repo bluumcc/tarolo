@@ -17,7 +17,7 @@ func defaults() -> Dictionary:
 	return {
 		"version": SAVE_VERSION,
 		"settings": {"music_volume": 0.8, "sfx_volume": 0.9, "fullscreen": false, "anim_speed": 1.0, "hand_layout": "row", "difficulty": 1},
-		"profile": {"name": "Arcanista", "gems": 0, "matches": 0, "wins": 0, "fichas": 1500, "blitz_levels": 0, "cash_balance": 0},
+		"profile": {"name": "Arcanista", "gems": 0, "matches": 0, "wins": 0, "fichas": 1500, "cash_balance": 0},
 		"tournaments": {"titles": [], "trophies": 0, "history": []},
 		"ranked": {"season": 1, "points": 0, "mmr": Ranked.BASE_MMR, "peak_points": 0, "wins": 0, "losses": 0, "history": []},
 		"tips": {},

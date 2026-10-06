@@ -202,19 +202,7 @@ Tem relógio próprio: `DISCARD_SECONDS` (18s). Todos os relógios da mesa passa
 `_clock_start` / `_clock_stop` (card TEMPO): jogar carta `TURN_SECONDS` 10s (joga a mais fraca),
 descarte 18s, lance de vitórias `PREDICT_SECONDS` 15s (confirma o palpite que estiver na tela) e
 apostas `BET_SECONDS` 12s (passa, ou desiste se tiver que pagar). Estourou sem confirmar no descarte,
-descarta as 2 mais fracas por você (mesma heurística do bot, `ChaosBot.wants_discard`). Sempre ativo, **inclusive no onboarding** — é a única etapa nova que não se esconde
-nas primeiras mesas de conta nova, porque molda a mão, não adiciona uma regra de aposta ou de
-rodada.
-
-## Onboarding: camadas de regra pros primeiros níveis
-**Toda rodada de Blitz tem modificador, sempre — sem exceção, nem na conta nova, nem no nível 1.**
-Isso já foi tentado ao contrário (modificador escondido nos primeiros níveis) e revertido: virou
-bug reportado duas vezes ("sumiu?") sem eu nunca ter avisado que era onboarding, e modificador é
-parte central do jogo, não uma camada avançada pra esconder. O que o onboarding esconde hoje:
-primeiras `GameState.ONBOARDING_LEVELS` (3) mesas de Blitz de conta nova, **só dobrar/cobrir**
-ficam fora — o descarte inicial e os modificadores valem sempre, em toda mesa, em toda rodada.
-Contado por `profile.blitz_levels` (save), passado como `onboarding_levels` no config do motor.
-`_test_blitz_phase4` (`test_runner.gd`) cobre o comportamento.
+descarta as 2 mais fracas por você (mesma heurística do bot, `ChaosBot.wants_discard`). Sempre ativo.
 
 ## Fase 5: economia vs bots (medida, ver `docs/PLANO_COMPETITIVO.md`)
 Um jogador nível Oráculo lucra em média mesmo com a taxa ligada, mas pouco (+0,39 blind/nível,
