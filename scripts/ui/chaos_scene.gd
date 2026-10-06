@@ -84,6 +84,7 @@ var hold_stacks: Array = []      # Blitz: stacks de antes da liquidação (a tel
 var hold_pot := -1.0
 var blitz_revealed: Array = []  # Blitz: entrada de cada um já paga (pote), pill visível na mesa
 var blitz_showdown := false     # Blitz: fim da rodada — só aí o alvo dos rivais aparece pra você
+var human_bet_timed_out := false  # a ação da aposta veio do relógio, não de um toque: o banner avisa
 var blitz_sitting_out := false  # Blitz: jogador ficou sem fichas mid-rodada (sentado fora)
 var double_btn: Button
 var discard_picks: Array = []   # Blitz: cartas marcadas na mão pra descartar (até BLITZ_DISCARD_SIZE)
@@ -1048,7 +1049,7 @@ func _process(delta: float) -> void:
 		discard_avatar.set_timer(clock_left / clock_total if clock_on else -1.0)
 	if not clock_on or paused or finished or (modal_open and not clock_in_modal):
 		return
-	clock_left -= delta
+	clock_left -= minf(delta, 0.25)   # app em segundo plano/travada devolve um delta enorme: não pode estourar o relógio de uma vez
 	if clock_left <= 0.0:
 		var cb := clock_timeout
 		_clock_stop()
@@ -1472,6 +1473,7 @@ func _human_bet() -> Dictionary:
 	_refresh_idle_card()
 	(st["render"] as Callable).call()
 	_clock_start(BET_SECONDS, func():
+		human_bet_timed_out = true
 		done.call({"action": "check"} if can_check else {"action": "fold"}), true)   # estourou: passa, ou desiste se tem que pagar
 	await item_chosen
 	_clock_stop()
@@ -2119,6 +2121,8 @@ func _betting_phase() -> void:
 func _show_bet_action(p: int, r: Dictionary) -> void:
 	var pname := _pname(p)
 	var amount := float(r.get("amount", 0.0))
+	var by_clock := p == 0 and human_bet_timed_out
+	human_bet_timed_out = false
 	var title := ""
 	var sub := ""
 	var col := UIKit.MUTED
@@ -2138,6 +2142,8 @@ func _show_bet_action(p: int, r: Dictionary) -> void:
 			action_text[p] = "✕ DESISTIU"
 			title = "%s desistiu" % pname
 			col = UIKit.LOSS
+	if by_clock:
+		sub = "tempo esgotado"
 	action_color[p] = col
 	_banner(title, sub, col if col != UIKit.MUTED else UIKit.INK)
 	_refresh_hud()
