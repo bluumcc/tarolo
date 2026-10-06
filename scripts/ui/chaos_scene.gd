@@ -16,10 +16,6 @@ const CARD_SCENE := preload("res://scenes/Card.tscn")
 ## Relógios da mesa (um só, `_clock_start`): estourou, jogamos por você.
 const TURN_SECONDS := 10.0      # jogar a carta; estourou, joga a mais fraca
 const DISCARD_SECONDS := 18.0   # descarte inicial; estourou, descarta as 2 mais fracas
-const PHASE_TITLE_H := 177.0         # faixa do título (3 linhas a 46 px) das etapas sem mesa: descarte e palpite
-const DISCARD_HEAD_TOP := 84.0        # topo do bloco título+avatar das etapas de descarte e palpite
-const PREDICT_CARD_H := 298.0       # card do seletor de palpite (antes ~248, +20%)
-const DISCARD_AVATAR_SCALE := 1.95  # avatar grande do descarte (antes 2,16: colava no subtítulo)
 const PREDICT_SECONDS := 15.0   # lance de vitórias; estourou, confirma o palpite que estiver na tela
 const BET_SECONDS := 12.0       # apostar/passar/pagar/aumentar/desistir; estourou, passa (ou desiste se tiver que pagar)
 
@@ -59,12 +55,8 @@ var round_dots: RoundDots
 var bottom_mid: Control          # meio da barra de baixo: ações OU o card de pote/prêmio
 var prize_card: StatCard         # PRÊMIO, canto inferior direito
 var table_players := 0           # nº de jogadores com que a mesa foi dimensionada; só é refeito entre rodadas
-var discard_avatar: HexAvatar     # seu avatar grande na etapa de descarte (com o anel do relógio)
-var discard_name: Label
-var discard_title: Label
-var discard_sub: Label
-var discard_holder: Control
-var discard_head: VBoxContainer  # título grande + instrução da etapa de descarte, no topo do palco (fora do card)
+var phase_layer: Control        # camada acima da mesa e da mão: etapas sem mesa (descarte, palpite)
+var phase_screen: PhaseScreen   # título, subtítulo e seu avatar grande com o anel do relógio
 var chrome_discard := false      # etapa sem mesa (descarte/palpite): sem modificador na faixa
 var shown_totals: Array = []
 var modal_open := false      # modal de poder/aposta aberto — o relógio da jogada pausa
@@ -256,47 +248,6 @@ func _build_ui() -> void:
 	stage.custom_minimum_size = Vector2(0, 300)
 	root.add_child(stage)
 	main_area = stage
-	discard_head = VBoxContainer.new()
-	discard_head.anchor_right = 1.0
-	discard_head.offset_top = DISCARD_HEAD_TOP   # respiro do header
-	discard_head.offset_left = 8.0
-	discard_head.offset_right = -8.0
-	discard_head.add_theme_constant_override("separation", 8)
-	discard_head.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	discard_head.visible = false
-	discard_title = UIKit.serif_label("ESCOLHA DUAS CARTAS PARA DESCARTAR", 46, UIKit.TR_GOLD.lightened(0.25), HORIZONTAL_ALIGNMENT_CENTER)
-	discard_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	discard_title.add_theme_constant_override("outline_size", 4)
-	discard_title.add_theme_constant_override("line_spacing", 6)
-	discard_title.custom_minimum_size.y = PHASE_TITLE_H   # mesma faixa de título em todas as fases sem mesa: o que vem depois começa na mesma altura
-	discard_title.vertical_alignment = VERTICAL_ALIGNMENT_TOP
-	discard_head.add_child(discard_title)
-	discard_sub = UIKit.serif_label("Deslize a carta para cima ou toque nela duas vezes para descartar", 26, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
-	discard_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	discard_head.add_child(discard_sub)
-	var holder := Control.new()
-	discard_holder = holder   # avatar grande (escala 2,4), com bastante espaço em volta
-	holder.custom_minimum_size = Vector2(0, 212)
-	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	discard_head.add_child(holder)
-	discard_avatar = HexAvatar.new().setup(0)
-	discard_avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	discard_avatar.set_active(true)
-	discard_avatar.scale = Vector2(DISCARD_AVATAR_SCALE, DISCARD_AVATAR_SCALE)
-	discard_avatar.anchor_left = 0.5
-	discard_avatar.anchor_right = 0.5
-	discard_avatar.anchor_top = 0.5
-	discard_avatar.anchor_bottom = 0.5
-	discard_avatar.offset_left = -HexAvatar.SIZE_PX.x / 2.0
-	discard_avatar.offset_right = HexAvatar.SIZE_PX.x / 2.0
-	discard_avatar.offset_top = -HexAvatar.SIZE_PX.y / 2.0
-	discard_avatar.offset_bottom = HexAvatar.SIZE_PX.y / 2.0
-	discard_avatar.wins_badge.visible = false
-	holder.add_child(discard_avatar)
-	discard_name = UIKit.serif_label("", 34, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
-	discard_name.autowrap_mode = TextServer.AUTOWRAP_OFF
-	discard_head.add_child(discard_name)
-	stage.add_child(discard_head)
 	table_center = TableEllipse.new()
 	table_center.name = "TableCenter"
 	table_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -316,6 +267,14 @@ func _build_ui() -> void:
 
 	_build_hand_zone(root)
 	_build_bottom_bar(root)
+
+	phase_layer = Control.new()
+	phase_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	phase_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	phase_layer.z_index = 60   # acima do seu assento (z 50); a camada fica depois da mão na árvore, então também recebe o toque primeiro
+	add_child(phase_layer)
+	phase_screen = PhaseScreen.new()
+	phase_layer.add_child(phase_screen)
 
 	popup_layer = Control.new()
 	popup_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -1050,8 +1009,8 @@ func _process(delta: float) -> void:
 	if me == null:
 		return
 	me.set_timer(clock_left / clock_total if clock_on else -1.0)
-	if discard_avatar != null and discard_head.visible:   # no descarte o anel de tempo fica no avatar grande
-		discard_avatar.set_timer(clock_left / clock_total if clock_on else -1.0)
+	if phase_screen != null and phase_screen.visible:   # nas etapas sem mesa o anel de tempo fica no avatar grande
+		phase_screen.set_timer(clock_left / clock_total if clock_on else -1.0)
 	if not clock_on or paused or finished or (modal_open and not clock_in_modal):
 		return
 	clock_left -= minf(delta, 0.25)   # app em segundo plano/travada devolve um delta enorme: não pode estourar o relógio de uma vez
@@ -2381,8 +2340,7 @@ func _human_discard_play() -> void:
 	phase = "discard"
 	discard_picks = []
 	_rebuild_hand()
-	discard_head.visible = true
-	discard_name.text = str(config["names"][0]).capitalize()
+	_open_phase("ESCOLHA DUAS CARTAS PARA DESCARTAR", "Deslize a carta para cima ou toque nela duas vezes para descartar", str(config["names"][0]).capitalize())
 	_banner_clear()
 	round_dots.visible = false   # no descarte o card do header mostra só o título da fase
 	banner_title.text = "FASE DE DESCARTE"
@@ -2392,7 +2350,7 @@ func _human_discard_play() -> void:
 	_clock_start(DISCARD_SECONDS, _on_discard_timeout)
 	await item_chosen
 	_clock_stop()
-	discard_head.visible = false
+	phase_screen.dismiss()
 	round_dots.visible = true
 	phase = "idle"   # cartas deixam de ser clicáveis/arrastáveis fora da vez
 	status_label.text = ""
@@ -2447,98 +2405,40 @@ func _commit_discard(view: CardView, drop_global := Vector2.ZERO) -> void:
 		item_chosen.emit(1)
 
 
-## Etapa do palpite: mesma tela do descarte (header com o título da fase, pergunta e dados da mão
-## fora do card, seu avatar com o anel do relógio) e, embaixo, o card do seletor −/+ com o
-## palpite sugerido em destaque. Mesa, pote e rivais só aparecem depois do lance.
-## Liga/desliga o toque na mão (cartas, contêiner e rolagem). Usado quando um card passa por cima
-## dela: nenhuma carta pode capturar o toque que é de um botão.
-func _hand_inert(on: bool) -> void:
-	for n in hand_scroller.find_children("*", "Control", true, false) + [hand_scroller]:
-		var c := n as Control
-		if on:
-			if not c.has_meta("mf"):
-				c.set_meta("mf", c.mouse_filter)
-			c.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		elif c.has_meta("mf"):
-			c.mouse_filter = c.get_meta("mf")
-			c.remove_meta("mf")
+## Abre a etapa sem mesa (descarte/palpite): o cabeçalho fica abaixo do header, na mesma altura em
+## todas elas (`PhaseScreen.TOP_GAP`).
+func _open_phase(title: String, subtitle: String, player_name := "", avatar_scale := PhaseScreen.AVATAR_SCALE, holder_h := PhaseScreen.HOLDER_H) -> void:
+	phase_screen.place(stage.global_position.y - phase_layer.global_position.y)
+	phase_screen.present(title, subtitle, player_name, avatar_scale, holder_h)
 
 
+## Etapa do palpite: mesma tela do descarte (título da fase no header, pergunta e dados da mão, seu
+## avatar com o anel do relógio) e, embaixo, o card do seletor. Mesa, pote e rivais só aparecem
+## depois do lance. O card mora na camada acima da mão: nenhuma carta captura o toque dele.
 func _human_predict() -> int:
 	modal_open = true
 	round_dots.visible = false
 	banner_title.text = "DÊ O SEU PALPITE"
 	banner_title.add_theme_color_override("font_color", UIKit.TR_GOLD)
 	banner_title.modulate.a = 1.0
-	discard_title.text = "QUANTAS JOGADAS VOCÊ VAI GANHAR?"
-	discard_sub.text = "Entrada ◎%s  ·  Pote ◎%s" % [UIKit.fmt_short(engine.blitz_entry()), UIKit.fmt_short(engine.carry)]
-	discard_holder.custom_minimum_size = Vector2(0, 130)
-	discard_avatar.scale = Vector2(1.5, 1.5)
-	discard_name.visible = false   # aqui o espaço é do seletor
-	discard_head.visible = true
-	_hand_inert(true)   # em telas baixas a mão fica sob o card do palpite e engolia o toque do CONFIRMAR
-	var box := PanelContainer.new()
-	box.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT.lightened(0.2), UIKit.TR_PURPLE, "small", 18, 20, 16))
-	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 48.0, 640.0), PREDICT_CARD_H)
-	discard_head.add_child(box)
-	var body := VBoxContainer.new()
-	body.alignment = BoxContainer.ALIGNMENT_CENTER
-	body.add_theme_constant_override("separation", 14)
-	box.add_child(body)
-	var hint := ChaosBot.suggested_predict(engine, 0)
-	var st := {"pick": hint}
-	st["render"] = func():
-		for c in body.get_children():
-			body.remove_child(c)
-			c.queue_free()
-		var stepper := HBoxContainer.new()
-		stepper.alignment = BoxContainer.ALIGNMENT_CENTER
-		stepper.add_theme_constant_override("separation", 20)
-		body.add_child(stepper)
-		var minus := UIKit.action_button("−", UIKit.ActionKind.GOLD, 36)
-		minus.custom_minimum_size = Vector2(64, 64)
-		minus.disabled = int(st["pick"]) <= 0
-		minus.pressed.connect(func():
-			st["pick"] = maxi(0, int(st["pick"]) - 1)
-			(st["render"] as Callable).call())
-		stepper.add_child(minus)
-		var count_l := UIKit.serif_label(str(int(st["pick"])), 60, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
-		count_l.custom_minimum_size = Vector2(110, 0)
-		stepper.add_child(count_l)
-		var plus := UIKit.action_button("+", UIKit.ActionKind.GOLD, 36)
-		plus.custom_minimum_size = Vector2(64, 64)
-		plus.disabled = int(st["pick"]) >= ChaosEngine.HAND_SIZE
-		plus.pressed.connect(func():
-			st["pick"] = mini(ChaosEngine.HAND_SIZE, int(st["pick"]) + 1)
-			(st["render"] as Callable).call())
-		stepper.add_child(plus)
-		var is_hint: bool = int(st["pick"]) == hint
-		body.add_child(UIKit.serif_label("★ RECOMENDADO PELA SUA MÃO" if is_hint else "Recomendado pela sua mão: %d" % hint, 20, UIKit.TR_CYAN if is_hint else UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER))
-		body.add_child(UIKit.serif_label("Peso no pote ×%s" % UIKit.fmt_dec(ChaosEngine.blitz_weight(int(st["pick"])), 1), 18, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER))
-		var go := UIKit.action_button("CONFIRMAR: %d %s" % [int(st["pick"]), "JOGADA" if int(st["pick"]) == 1 else "JOGADAS"], UIKit.ActionKind.OK, 28)
-		go.custom_minimum_size = Vector2(0, 68)
-		go.pressed.connect(func(): item_chosen.emit(1))
-		body.add_child(go)
-	(st["render"] as Callable).call()
-	UIKit.pop_in(box, GameState.anim(0.15))
+	_open_phase("QUANTAS JOGADAS VOCÊ VAI GANHAR?",
+		"Entrada ◎%s  ·  Pote ◎%s" % [UIKit.fmt_short(engine.blitz_entry()), UIKit.fmt_short(engine.carry)],
+		"", 1.5, 130.0)   # sem nome: o espaço é do seletor
+	var picker := PredictPicker.new().setup(ChaosBot.suggested_predict(engine, 0), ChaosEngine.HAND_SIZE,
+		func(n: int) -> float: return ChaosEngine.blitz_weight(n), get_viewport_rect().size.x - 48.0)
+	phase_screen.content.add_child(picker)
+	picker.confirmed.connect(func(n: int): item_chosen.emit(n))
+	UIKit.pop_in(picker, GameState.anim(0.15))
 	Sfx.play("chip")
-	_clock_start(PREDICT_SECONDS, func(): item_chosen.emit(1), true)   # estourou: vale o palpite da tela
-	await item_chosen
+	_clock_start(PREDICT_SECONDS, func(): item_chosen.emit(picker.pick), true)   # estourou: vale o palpite da tela
+	var pick: int = await item_chosen
 	_clock_stop()
 	modal_open = false
 	if is_inside_tree():
-		_hand_inert(false)
-		discard_head.visible = false
-		box.queue_free()
+		phase_screen.dismiss()
 		round_dots.visible = true
 		_banner_clear()
-		discard_title.text = "ESCOLHA DUAS CARTAS PARA DESCARTAR"
-		discard_sub.text = "Deslize a carta para cima ou toque nela duas vezes para descartar"
-		discard_name.visible = true
-		discard_holder.custom_minimum_size = Vector2(0, 212)
-		discard_avatar.scale = Vector2(DISCARD_AVATAR_SCALE, DISCARD_AVATAR_SCALE)
-	return int(st["pick"])
+	return pick
 
 
 func _hand_label_blitz() -> String:
