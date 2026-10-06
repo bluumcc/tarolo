@@ -57,7 +57,7 @@ var title_label: Label
 var round_dots: RoundDots
 var prog_card: StatCard         # fez / palpite, no lugar do antigo botão de ajuda
 var modifier_strip: ModifierStrip
-var discard_title: Label        # título grande da etapa de descarte, no topo do palco (fora do card)
+var discard_head: VBoxContainer  # título grande + instrução da etapa de descarte, no topo do palco (fora do card)
 var chrome_discard := false      # etapa sem mesa (descarte/palpite): sem modificador na faixa
 var shown_totals: Array = []
 var modal_open := false      # modal de poder/aposta aberto — o relógio da jogada pausa
@@ -241,16 +241,23 @@ func _build_ui() -> void:
 	stage.custom_minimum_size = Vector2(0, 300)
 	root.add_child(stage)
 	main_area = stage
-	discard_title = UIKit.serif_label("ESCOLHA DUAS CARTAS PARA DESCARTAR", 46, UIKit.TR_GOLD.lightened(0.25), HORIZONTAL_ALIGNMENT_CENTER)
-	discard_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	discard_title.anchor_right = 1.0
-	discard_title.offset_top = 56.0   # respiro do header
-	discard_title.offset_left = 8.0
-	discard_title.offset_right = -8.0
-	discard_title.add_theme_constant_override("outline_size", 4)
-	discard_title.add_theme_constant_override("line_spacing", 6)
-	discard_title.visible = false
-	stage.add_child(discard_title)
+	discard_head = VBoxContainer.new()
+	discard_head.anchor_right = 1.0
+	discard_head.offset_top = 96.0   # respiro do header
+	discard_head.offset_left = 8.0
+	discard_head.offset_right = -8.0
+	discard_head.add_theme_constant_override("separation", 14)
+	discard_head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	discard_head.visible = false
+	var dt := UIKit.serif_label("ESCOLHA DUAS CARTAS PARA DESCARTAR", 46, UIKit.TR_GOLD.lightened(0.25), HORIZONTAL_ALIGNMENT_CENTER)
+	dt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	dt.add_theme_constant_override("outline_size", 4)
+	dt.add_theme_constant_override("line_spacing", 6)
+	discard_head.add_child(dt)
+	var ds := UIKit.serif_label("Deslize a carta para cima ou toque nela duas vezes para descartar", 26, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
+	ds.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	discard_head.add_child(ds)
+	stage.add_child(discard_head)
 	table_center = TableEllipse.new()
 	table_center.name = "TableCenter"
 	table_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -2308,13 +2315,13 @@ func _human_discard_play() -> void:
 	phase = "discard"
 	discard_picks = []
 	_rebuild_hand()
-	discard_title.visible = true
-	_banner("", "Toque na carta pra focar, toque de novo pra descartar.", UIKit.BRAND)
+	discard_head.visible = true
+	_banner_clear()
 	status_label.text = "0/%d descartadas" % ChaosEngine.BLITZ_DISCARD_SIZE
 	_clock_start(DISCARD_SECONDS, _on_discard_timeout)
 	await item_chosen
 	_clock_stop()
-	discard_title.visible = false
+	discard_head.visible = false
 	phase = "idle"   # cartas deixam de ser clicáveis/arrastáveis fora da vez
 	status_label.text = ""
 	discard_picks = []
