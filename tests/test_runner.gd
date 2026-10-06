@@ -465,6 +465,7 @@ func _test_chaos() -> void:
 	sp._settle_side_pots(3)   # 3 é o melhor de todos
 	# principal: 40 de cada um dos 4 = 160 → 3; lateral: 1 e 2 e 0 (até 300): (60+260+260)=580 → melhor dos que cobriram (1, pela ordem)
 	check(is_equal_approx(sp.trick_pot, 160.0), "pote principal vai pro all-in curto")
+	check(sp.last_pots.size() == 2 and int(sp.last_pots[0]["winner"]) == 3 and not bool(sp.last_pots[1]["uncalled"]), "camadas do pote registradas pra UI (principal → all-in curto, lateral → quem cobriu)")
 	check(is_equal_approx(float(sp.stacks[1]) + float(sp.stacks[2]), 580.0), "pote lateral vai pro melhor dos que cobriram")
 	# All-in maior que o dos rivais: o excedente que ninguém cobriu volta pra quem pôs.
 	var up := ChaosEngine.new()
@@ -476,6 +477,7 @@ func _test_chaos() -> void:
 	up.plays = []
 	up._settle_side_pots(1)   # o curto (1) vence
 	check(is_equal_approx(up.trick_pot, 200.0) and is_equal_approx(float(up.stacks[0]), 300.0), "excedente não coberto volta pra quem apostou além")
+	check(up.last_pots.size() == 2 and bool(up.last_pots[1]["uncalled"]) and int(up.last_pots[1]["winner"]) == 0, "excedente aparece como 'sem cobertura' pra UI")
 
 	# Bot sem fichas pro blind é trocado.
 	p3 = ChaosEngine.new()

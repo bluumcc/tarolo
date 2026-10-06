@@ -32,6 +32,8 @@ func _init() -> void:
 		_extremes()
 	if only == "" or only == "torneio":
 		_tournament()
+	if only == "" or only == "roi":
+		_tournament_roi()
 	print("\nSIM: %s (%d falhas)" % ["OK" if failures == 0 else "FALHOU", failures])
 	quit(1 if failures > 0 else 0)
 
@@ -319,3 +321,60 @@ func _tournament() -> void:
 	check(never_ends == 0, "torneio: %d torneios de 16 terminam (%d sem fim em 80 níveis)" % [runs, never_ends])
 	check(bad_tables == 0, "torneio: mesas sempre equilibradas, ≤ %d e ≥ %d (%d desvios)" % [Tournament.MAX_TABLE, Tournament.MIN_TABLE, bad_tables])
 	check(bad_end == 0, "torneio: termina com um campeão")
+
+
+## Joga um torneio de 16 e devolve a colocação (1 = campeão) do entrante 0, igual a
+## `GameState.report_tournament_table` (eliminados no mesmo nível dividem a pior posição).
+func _placement(rng: RandomNumberGenerator, my_difficulty: int) -> int:
+	var field := Tournament.make_field("Você", ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O"], rng)
+	(field[0] as Dictionary)["difficulty"] = my_difficulty
+	var me: Dictionary = field[0]
+	var tables := Tournament.split_into_tables(field)
+	for level in range(80):
+		var blind := Tournament.blind_for(level)
+		for t in tables:
+			Tournament.simulate_level(t, blind, rng)
+		var survivors: Array = []
+		for t in tables:
+			for e in t:
+				if float(e["stack"]) > 0.0:
+					survivors.append(e)
+		if not survivors.has(me):
+			return survivors.size() + 1
+		if survivors.size() <= 1:
+			return 1
+		var kept: Array = []
+		for t in tables:
+			var k: Array = []
+			for e in t:
+				if survivors.has(e):
+					k.append(e)
+			if not k.is_empty():
+				kept.append(k)
+		tables = Tournament.rebalance(kept)
+	return 16
+
+
+# 4) Retorno do torneio por habilidade: a premiação deve pagar mais a quem joga melhor, e o campo
+# médio perde só a taxa da casa (soma dos prêmios = bolão).
+func _tournament_roi() -> void:
+	var runs := maxi(N, 100)
+	var roi := {}
+	for diff in [BotAI.Difficulty.EASY, BotAI.Difficulty.NORMAL, BotAI.Difficulty.HARD]:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 31337 + diff
+		var paid := 0.0
+		var itm := 0
+		var champs := 0
+		for r in range(runs):
+			var place := _placement(rng, diff)
+			var pay := Tournament.payout_for(place - 1)
+			paid += float(pay)
+			if pay > 0:
+				itm += 1
+			if place == 1:
+				champs += 1
+		roi[diff] = paid / (float(runs) * float(Tournament.BUY_IN)) - 1.0
+		print("  torneio %s: ROI %+.0f%%, no dinheiro %d%%, campeão %d%% (%d torneios)" % [["Fácil", "Normal", "Difícil"][diff], roi[diff] * 100.0, 100 * itm / runs, 100 * champs / runs, runs])
+	check(float(roi[BotAI.Difficulty.HARD]) > float(roi[BotAI.Difficulty.NORMAL]) and float(roi[BotAI.Difficulty.NORMAL]) > float(roi[BotAI.Difficulty.EASY]), "torneio: o retorno cresce com a habilidade (Fácil < Normal < Difícil)")
+	check(float(roi[BotAI.Difficulty.EASY]) > -1.0 and float(roi[BotAI.Difficulty.HARD]) < 3.0, "torneio: nenhum perfil quebra a premiação (ROI entre −100% e +300%)")

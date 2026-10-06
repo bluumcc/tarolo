@@ -7,6 +7,7 @@ extends SceneTree
 var N := 4
 var SESSIONS := 60
 const LEVELS := 12
+var only_mirror := false
 
 
 func _diff(k: String) -> int:
@@ -22,16 +23,19 @@ func session(kinds: Array, seed_i: int) -> Dictionary:
 	e.setup_match({"players": N, "seed": seed_i * 31 + 5, "levels": 0, "mode": "blitz", "blind": 10, "stacks": stacks})
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_i + 777
+	var nets: Array = []
+	for p in range(N):
+		nets.append(0.0)
 	var net := 0.0
 	var played := 0
 	for lv in range(LEVELS):
 		if lv > 0:
 			e.advance_round()
-		if e.stacks[0] < e.blind * 8:
-			break   # o jogador testado quebrou: a sessão acaba (sem reposição que mascararia perda)
-		for p in range(1, N):
+		var before_all: Array = []
+		for p in range(N):
 			if e.stacks[p] < e.blind * 8:
-				e.stacks[p] = 400.0   # bots quebrados são repostos
+				e.stacks[p] = 400.0   # quem quebrou é reposto (todos, inclusive o testado): só o ganho DENTRO do nível conta
+			before_all.append(float(e.stacks[p]))
 		var before: float = e.stacks[0]
 		for p in range(N):
 			if e.can_discard(p):
@@ -64,14 +68,19 @@ func session(kinds: Array, seed_i: int) -> Dictionary:
 					break
 				done = bool(res.get("trick_complete", false))
 		net += e.stacks[0] - before
+		for p in range(N):
+			nets[p] += float(e.stacks[p]) - float(before_all[p])
 		played += 1
-	return {"net": net / 10.0, "levels": played, "rake": e.house_rake / 10.0}
+	return {"net": net / 10.0, "levels": played, "rake": e.house_rake / 10.0, "nets": nets}
 
 
 func avg(tested: String, others: String) -> Array:
 	var net := 0.0
 	var lv := 0
 	var rake := 0.0
+	var seat_net: Array = []
+	for p in range(N):
+		seat_net.append(0.0)
 	for i in range(SESSIONS):
 		var kinds: Array = []
 		for p in range(N):
@@ -81,7 +90,10 @@ func avg(tested: String, others: String) -> Array:
 		net += float(r["net"])
 		lv += int(r["levels"])
 		rake += float(r["rake"])
-	return [net / maxf(lv, 1), rake / maxf(lv, 1)]
+		for p in range(N):
+			seat_net[p] += float(r["nets"][p]) / 10.0
+	var per_seat: Array = seat_net.map(func(x): return snappedf(float(x) / maxf(lv, 1), 0.01))
+	return [net / maxf(lv, 1), rake / maxf(lv, 1), per_seat]
 
 
 func _init() -> void:
@@ -91,8 +103,12 @@ func _init() -> void:
 			N = int(kv[1])
 		elif kv[0] == "sessions":
 			SESSIONS = int(kv[1])
+		elif kv[0] == "mirror":
+			only_mirror = true
 	var rows := [["H", "H"], ["O", "H"], ["H", "N"], ["N", "H"], ["E", "H"], ["N", "N"]]
+	if only_mirror:
+		rows = [["H", "H"]]
 	for r in rows:
 		var res := avg(r[0], r[1])
-		print("N=%d  %s contra %s: %+.2f blinds/nível   (taxa da casa %.2f blinds/nível na mesa)" % [N, r[0], r[1], res[0], res[1]])
+		print("N=%d  %s contra %s: %+.2f blinds/nível   (taxa da casa %.2f/nível na mesa; por assento %s)" % [N, r[0], r[1], res[0], res[1], str(res[2])])
 	quit()

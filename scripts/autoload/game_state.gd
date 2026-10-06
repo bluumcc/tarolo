@@ -308,8 +308,8 @@ func start_tournament(buy_in: int = Tournament.BUY_IN) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	var names: Array = BOT_NAMES.duplicate()
-	for n in BOT_NAMES:   # precisa de 15 bots e só há 12 nomes: os extras ganham um "II" pra nunca haver dois iguais na mesa
-		names.append("%s II" % n)
+	for n in BOT_NAMES:   # precisa de 15 bots e só há 12 nomes: os extras ganham um "2" pra nunca haver dois iguais na mesa
+		names.append("%s 2" % n)
 	var field := Tournament.make_field(player_name(), names, rng)
 	tournament = {"tables": Tournament.split_into_tables(field), "total_entrants": field.size(), "level": 0, "buy_in": buy_in}
 	return tournament

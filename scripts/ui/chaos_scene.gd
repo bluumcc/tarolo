@@ -2713,6 +2713,21 @@ func _refresh_pot_blitz() -> void:
 
 ## Fim de uma jogada no Blitz: a carta vencedora pulsa, o palpite de quem venceu sobe um e a
 ## faixa avisa se chegou no alvo ou estourou.
+## Pote dividido por all-in: quem levou cada lateral e o que ninguém cobriu (volta pra quem pôs). Vazio sem divisão.
+func _side_pot_note(result: Dictionary) -> String:
+	var pots: Array = result.get("pots", [])
+	if pots.size() < 2:
+		return ""
+	var parts: Array = []
+	for i in range(1, pots.size()):
+		var pot_i: Dictionary = pots[i]
+		if bool(pot_i["uncalled"]):
+			parts.append("◎%s voltam pra %s" % [UIKit.fmt_short(float(pot_i["amount"])), _pname(int(pot_i["winner"]))])
+		else:
+			parts.append("%s leva o lateral ◎%s" % [_pname(int(pot_i["winner"])), UIKit.fmt_short(float(pot_i["amount"]))])
+	return " · " + " · ".join(parts)
+
+
 func _resolve_trick_blitz(result: Dictionary) -> void:
 	var winner: int = result["winner"]
 	var win_view: CardView
@@ -2745,6 +2760,7 @@ func _resolve_trick_blitz(result: Dictionary) -> void:
 	elif curse_amt > 0.0:
 		title = "%s pagou aos rivais" % _pname(winner)
 	var modified := saque_amt > 0.0 or assalto_amt > 0.0 or curse_amt > 0.0
+	title += _side_pot_note(result)
 	_banner(title, "", UIKit.COMBO if modified else (UIKit.OK if winner == 0 else UIKit.INK))
 	Sfx.play("chip")
 	FX.burst(popup_layer, _seat_center(winner) - popup_layer.global_position, UIKit.ME if winner == 0 else UIKit.CHIPS, 10)

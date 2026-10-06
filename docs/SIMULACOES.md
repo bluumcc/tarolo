@@ -22,3 +22,8 @@ Rodam sem UI, com sementes fixas (reproduzíveis). Qualquer falha sai com códig
 Validação do próprio teste (mutação): quebrar o pagamento de potes laterais faz a conservação falhar.
 
 Bugs que a suíte/estas verificações acharam: fichas do acumulado sumiam ao fim de mesa de 1 nível (torneio, todos zerando); `clone_for_sim` não copiava `busted` (quebrava Oráculo/simulações).
+
+## Resultados de referência (mesa de 4/6, blind 10)
+- Equilíbrio por tamanho (`blitz_size_sim`, vantagem Difícil × Normal): 2 jogadores −0,6 (não equilibrado, por isso o torneio evita heads-up), 3: +3,0, 4: +2,1, 5: +5,7, 6: +6,7.
+- Economia completa (`tests/sim/economy_sim.gd`, 300 sessões, espelho): por assento −0,2 a −0,8 blinds/nível em mesa de 4 e −0,7 a +0,3 em mesa de 6; sem viés de posição relevante. A taxa da casa fica ≈ 1 blind/nível na mesa. Ordem de habilidade: Oráculo > Difícil > Normal > Fácil.
+- Retorno de torneio de 16 (`sim_suite --only=roi`): Fácil ROI −52 %, Normal ≈ 0 %, Difícil +15 % (no dinheiro 11 / 22 / 25 %).

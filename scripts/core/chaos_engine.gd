@@ -56,6 +56,7 @@ var folded: Array = []        # desistiu dessa rodada (não joga carta)
 var busted: Array = []        # stack zerou: fora do jogo até o fim da mesa
 var bet_level := 0.0          # valor que todos precisam igualar
 var raises := 0
+var last_pots: Array = []     # camadas do último pote da jogada: [{amount, winner, uncalled}] (a UI mostra quando há mais de uma)
 var to_act: Array = []        # fila de quem ainda precisa falar
 var bet_log: Array = []       # [{player, action, to, amount}]
 var betting := false
@@ -427,12 +428,14 @@ func bet_act(player: int, action: String, to := 0.0) -> Dictionary:
 func _settle_side_pots(winner: int) -> void:
 	var order := _trick_order(winner)
 	var won := 0.0
+	last_pots = []
 	for layer in pot_layers():
 		var taker := winner
 		for q in order:
 			if (layer["eligible"] as Array).has(q):
 				taker = q
 				break
+		last_pots.append({"amount": float(layer["amount"]), "winner": taker, "uncalled": (layer["eligible"] as Array).size() == 1 and last_pots.size() > 0})
 		if taker == winner:
 			won += float(layer["amount"])
 		else:
@@ -576,7 +579,7 @@ func resolve_walkover() -> Dictionary:
 			"bonus": 0.0, "saque_amount": 0.0, "assalto_amount": 0.0, "curse_amount": 0.0,
 			"walkover": true, "trick_number": trick_number, "modifier": ev,
 			"value": value, "wins": wins.duplicate(), "rake": 0.0, "trick_pot": trick_pot_total, "trick_gain": trick_gain,
-			"gain": trick_gain,
+			"gain": trick_gain, "pots": last_pots.duplicate(true),
 		}
 		return _finish_trick_blitz(result, winner)
 	var result := {
@@ -1039,7 +1042,7 @@ func _resolve_trick_blitz(idx: int, winner: int, ev: int) -> Dictionary:
 		"streak_mult": 1.0, "bonus": 0.0, "saque_amount": saque_amount, "assalto_amount": assalto_amount, "assalto_from": assalto_from,
 		"curse_amount": curse_amount, "walkover": false, "trick_number": trick_number, "modifier": ev,
 		"value": value, "wins": wins.duplicate(), "rake": 0.0, "trick_pot": trick_pot_total, "trick_gain": trick_gain,
-		"gain": prize + saque_amount + assalto_amount - curse_amount + trick_gain,
+		"gain": prize + saque_amount + assalto_amount - curse_amount + trick_gain, "pots": last_pots.duplicate(true),
 	}
 	return _finish_trick_blitz(result, winner)
 

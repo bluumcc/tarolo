@@ -26,6 +26,9 @@ func _ready() -> void:
 		SaveManager.section("settings")["hand_layout"] = str(args["hand_layout"])
 	if scene == "tutorial":
 		GameState.start_tutorial()
+	if args.has("tournament"):
+		SaveManager.section("profile")["fichas"] = 5000
+		GameState.start_tournament()   # a mesa do torneio (3 a 6 jogadores) vem de GameState.tournament
 	var inst: Node = load(path).instantiate()
 	# Direto na raiz, como o jogo real (o tema global não atravessa um Node comum).
 	get_tree().root.add_child.call_deferred(inst)
