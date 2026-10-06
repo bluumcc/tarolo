@@ -1053,6 +1053,7 @@ func _process(delta: float) -> void:
 		var cb := clock_timeout
 		_clock_stop()
 		me.set_timer(-1.0)
+		me.set_active(false)   # acabou o tempo: volta pro repouso (não fica preso na cor da vez)
 		if cb.is_valid():
 			cb.call()
 
@@ -2038,6 +2039,9 @@ func _run_ring(avatar: HexAvatar, active: bool) -> void:
 		return
 	var tw := create_tween()
 	tw.tween_method(avatar.set_timer, 1.0, 0.0, TURN_SECONDS)
+	tw.tween_callback(func():   # esgotou: apaga o anel e a vez (não fica vermelho até a próxima mão)
+		avatar.set_timer(-1.0)
+		avatar.set_active(false))
 	avatar.set_meta("ring_tween", tw)
 
 
@@ -2061,6 +2065,7 @@ func _update_turn_highlight(turn_player: int) -> void:
 func _betting_phase() -> void:
 	human_turn = false
 	phase = "bet"
+	_update_turn_highlight(-1)
 	bets_gathered = false
 	pot_locked = false
 	shown_pot = 0.0
@@ -2248,6 +2253,7 @@ func _resolve_walkover(result: Dictionary) -> void:
 func _set_discard_chrome(active: bool) -> void:
 	chrome_discard = active
 	if active:
+		_update_turn_highlight(-1)   # ninguém "na vez" fora das jogadas: todos em repouso
 		_set_pot_cards(false)   # sem pote nem prêmio no descarte e no palpite; voltam juntos
 	table_center.visible = not active
 	for p in range(engine.num_players):

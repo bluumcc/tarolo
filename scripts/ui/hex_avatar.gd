@@ -8,8 +8,8 @@ const RADIUS := 47.0                       ## do centro até a ponta de cima/bai
 const SIZE_PX := Vector2(81.0, 94.0)       ## largura = √3·R, altura = 2·R
 const PORTRAIT_PX := 70.0
 const BADGE_PX := 38.0
-const WARN_FRAC := 0.5                     ## abaixo disso o anel fica dourado
-const URGENT_FRAC := 0.25                  ## abaixo disso, vermelho
+const WARN_FRAC := 0.6                     ## abaixo disso o ciano começa a virar dourado
+const URGENT_FRAC := 0.3                   ## daqui até 0 o dourado vai virando vermelho
 
 var active := false                        ## é a vez dele: moldura ciano e mais grossa
 var portrait: Portrait
@@ -74,16 +74,17 @@ func _draw() -> void:
 		draw_polyline(ring, col, w, true)
 
 
-## Uma cor só em repouso (lilás); na vez, ciano; com o relógio, esquenta: dourado abaixo de 50% e
-## vermelho abaixo de 25%.
+## Uma cor só em repouso (lilás); com o relógio rodando (ou na vez), ciano que vai esquentando aos
+## poucos: ciano → dourado → vermelho conforme o tempo acaba. Sem vez e sem relógio, sempre repouso.
 func _ring_color() -> Color:
-	if not active and timer_frac < 0.0:
-		return UIKit.TR_PURPLE_LIGHT.lightened(0.35)
-	if timer_frac >= 0.0 and timer_frac < URGENT_FRAC:
-		return UIKit.TR_RED
-	if timer_frac >= 0.0 and timer_frac < WARN_FRAC:
-		return UIKit.TR_GOLD
-	return UIKit.TR_CYAN.lightened(0.1)
+	var turn := UIKit.TR_CYAN.lightened(0.1)
+	if timer_frac < 0.0:
+		return turn if active else UIKit.TR_PURPLE_LIGHT.lightened(0.35)
+	if timer_frac > WARN_FRAC:
+		return turn
+	if timer_frac > URGENT_FRAC:
+		return turn.lerp(UIKit.TR_GOLD, (WARN_FRAC - timer_frac) / (WARN_FRAC - URGENT_FRAC))
+	return UIKit.TR_GOLD.lerp(UIKit.TR_RED, clampf((URGENT_FRAC - timer_frac) / URGENT_FRAC, 0.0, 1.0))
 
 
 ## Pontos do contorno do hexágono que RESTAM (fração `f`, 0..1): o trecho que vai do ponto já
