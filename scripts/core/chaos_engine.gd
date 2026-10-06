@@ -252,9 +252,9 @@ func active_players() -> Array:
 
 ## Marca como busted todo jogador com stack ≤ 0. Retorna os índices recém-bustados.
 ## Persiste entre níveis — não é resetado por _setup_round().
-func bust_broke() -> Array:
+func bust_broke(include_human := true) -> Array:
 	var newly: Array = []
-	for p in range(num_players):
+	for p in range(0 if include_human else 1, num_players):
 		if not busted[p] and stacks[p] <= 0.0:
 			busted[p] = true
 			newly.append(p)

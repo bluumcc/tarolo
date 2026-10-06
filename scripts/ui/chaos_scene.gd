@@ -602,6 +602,8 @@ func _rebuild_hand() -> void:
 		cv.setup(card, true)
 		hand_container.add_child(cv)
 		cv.set_playable(discarding or (human_turn and legal.has(card)))
+		if phase == "predict":
+			cv.modulate = Color.WHITE   # olhando a mão pra escolher o palpite: sem apagar
 		cv.tapped.connect(_on_card_tapped)
 		cv.zoom_enabled = false
 	_layout_hand.call_deferred()
@@ -1276,27 +1278,17 @@ func _run_round() -> void:
 	while not engine.is_round_over():
 		if not is_inside_tree() or finished:
 			return
-		# Quebrou? No Blitz o check só acontece no início da rodada (_blitz_open_level);
-		# mid-rodada o jogador fica "sentado fora" (sem apostas, mas ainda joga cartas).
+		# Zerou as fichas = fora na hora (você e os bots), sem seguir "sentado fora" jogando cartas.
+		# Torneio: você é eliminado com a colocação. Ranqueado: você escolhe repor/recomprar ou sair.
 		if engine.blitz:
-			# Torneio: zerou as fichas (ex.: a entrada do palpite levou tudo) = eliminado na hora, com a
-			# colocação — nada de seguir "sentado fora" jogando cartas sem poder apostar.
-			if bool(config.get("tournament", false)) and engine.stacks[0] <= 0.0:
-				if await _bust_broke():
-					return
-			if engine.stacks[0] == 0.0 and not blitz_sitting_out:
-				blitz_sitting_out = true
-				_refresh_hud()
-				_banner("Sem fichas", "", UIKit.MUTED)
-				await _wait(2.0)
-				if not is_inside_tree() or finished:
+			if await _bust_broke():
+				return
+			if engine.stacks[0] <= 0.0 and not bool(config.get("tournament", false)):
+				if not await _ensure_solvent(true):
 					return
 		else:
 			if not await _ensure_solvent():
 				return
-		if not bool(config.get("tournament", false)):
-			for q in engine.refill_bots():
-				await _new_player_sits(q)
 		if await _fast_forward_if_alone():
 			break
 		await _trick_start()
@@ -1390,7 +1382,7 @@ func _new_player_sits(q: int) -> void:
 
 
 ## Você ficou sem fichas pro blind: recompra ou sai da mesa.
-func _ensure_solvent() -> bool:
+func _ensure_solvent(mid_level := false) -> bool:
 	if bool(config.get("tournament", false)):
 		# Torneio: qualquer stack > 0 ainda joga (all-in pelo que tiver — a ante já é limitada
 		# ao que sobrou em begin_trick()); só stack zerada é eliminação de verdade. Sem isso,
@@ -1399,7 +1391,7 @@ func _ensure_solvent() -> bool:
 			return true
 		_finish_match()
 		return false
-	if engine.stacks[0] >= float(engine.blind):
+	if engine.stacks[0] >= (1.0 if mid_level else float(engine.blind)):
 		return true
 	if GameState.autoplay:
 		_finish_match()
@@ -1457,18 +1449,20 @@ func _fast_forward_if_alone() -> bool:
 ## Torneio: quem ficou com 0 fichas está fora — bots saem da mesa com um aviso; se for você, a mesa
 ## acaba na hora (colocação e prêmio vêm do resultado do torneio). Devolve true se a mesa acabou.
 func _bust_broke() -> bool:
-	if not bool(config.get("tournament", false)) or not is_inside_tree() or finished:
+	if not engine.blitz or not is_inside_tree() or finished:
 		return false
-	var out: Array = engine.bust_broke()
+	var is_tour := bool(config.get("tournament", false))
+	var out: Array = engine.bust_broke(is_tour)
 	for p in out:
 		if p == 0:
 			continue
-		_banner("%s eliminado" % _pname(p), "", UIKit.DANGER)
+		if not GameState.autoplay:
+			_banner("%s eliminado" % _pname(p), "", UIKit.DANGER)
 		_refresh_hud()
 		await _wait(0.9)
 		if not is_inside_tree() or finished:
 			return true
-	if out.has(0):
+	if is_tour and out.has(0):
 		_banner("Você foi eliminado", "", UIKit.DANGER)
 		_refresh_hud()
 		await _wait(1.2)
@@ -2370,6 +2364,7 @@ func _blitz_open_level() -> bool:
 		else:
 			engine.apply_discard(p, ChaosBot.wants_discard(engine, p, int(config["difficulty"][p]), bot_rng))
 	phase = "predict"
+	_rebuild_hand()   # o leque fica brilhante (como no descarte), não apagado
 	bets_gathered = true
 	pot_locked = true
 	shown_pot = engine.carry
