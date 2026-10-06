@@ -253,6 +253,10 @@ func _build_ui() -> void:
 	hand_scroller.ghost_layer = popup_layer
 	hand_scroller.throw_allowed = func() -> bool: return phase == "discard" or human_turn
 	hand_scroller.throw_requested.connect(_on_card_thrown)
+	hand_scroller.deselect_on_cancel = true
+	hand_scroller.drag_cancelled.connect(func(v: CardView):
+		if selected_view == v:
+			selected_view = null)
 
 	overlay_layer = Control.new()
 	overlay_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -1182,6 +1186,27 @@ func _process(delta: float) -> void:
 		human_turn = false
 		_banner("TEMPO ESGOTADO", "Jogamos sua carta mais fraca.", UIKit.LOSS)
 		human_card_chosen.emit(weakest)
+
+
+## Tocar fora das cartas cancela a seleção (a carta volta pra mão).
+func _input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton) or hand_container == null:
+		return
+	var mb := event as InputEventMouseButton
+	if mb.button_index != MOUSE_BUTTON_LEFT or not mb.pressed:
+		return
+	var any_selected := false
+	for c in hand_container.get_children():
+		var cv := c as CardView
+		if cv.selected:
+			any_selected = true
+		if Rect2(Vector2.ZERO, cv.body.size).has_point(cv.body.get_global_transform().affine_inverse() * mb.global_position):
+			return   # o toque é numa carta: quem trata é _on_card_tapped
+	if not any_selected:
+		return
+	for c in hand_container.get_children():
+		(c as CardView).set_selected(false)
+	selected_view = null
 
 
 func _on_card_tapped(view: CardView) -> void:

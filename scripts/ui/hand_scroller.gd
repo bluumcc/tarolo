@@ -8,6 +8,7 @@ extends Control
 ## cima = arrasto da carta. Toque parado continua selecionando a carta (ver CardView).
 
 signal throw_requested(view: CardView, drop_global: Vector2)
+signal drag_cancelled(view: CardView)   # soltou antes do limite: a carta voltou pra mão
 
 const DEADZONE := 14.0
 const THROW_DISTANCE := 130.0
@@ -25,6 +26,7 @@ var _card: CardView
 var _ghost: CardView
 var _ghost_origin := Vector2.ZERO
 var _base_scale := Vector2.ONE
+var deselect_on_cancel := false  # puxar de volta antes do limite também tira a seleção da carta
 var ghost_scale_mult := 1.0     # a carta arrastada aparece maior que a da mão (tamanho "destacado")
 var _armed := false
 
@@ -179,6 +181,9 @@ func _finish_card_drag() -> void:
 	tw.chain().tween_callback(func():
 		if is_instance_valid(c):
 			c.visible = true
+			if deselect_on_cancel:
+				c.set_selected(false)
+			drag_cancelled.emit(c)
 		g.queue_free())
 
 
