@@ -241,7 +241,7 @@ prêmio principal.
   `resolve_walkover`). Os dois existem ao mesmo tempo o nível inteiro; misturá-los faria a conta do
   palpite vazar pra aposta da rodada (ou vice-versa).
 
-**Ante por rodada:** `BLITZ_TRICK_ANTE_FACTOR` (0,25× blind) — mais baixa que a ante do Caos
+**Ante + blind por rodada:** todo mundo paga a ante (`BLITZ_TRICK_ANTE_FACTOR`, 0,2× blind) E o blind inteiro antes das ações, em torneio e rankeada — o blind é a aposta mínima da jogada.
 (1× blind), porque a rodada de Blitz já carrega o custo da entrada do palpite por cima; cobrar o
 blind inteiro de novo por rodada ficaria caro demais depressa.
 

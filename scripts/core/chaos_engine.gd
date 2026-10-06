@@ -292,7 +292,9 @@ func begin_trick() -> void:
 	bet_log = []
 	hand_no += 1
 	button = leader  # aposta começa do jogador após o líder da vaza
-	var ante_size := float(blind) * (BLITZ_TRICK_ANTE_FACTOR if blitz else 1.0)
+	# Todo mundo paga a ante E o blind inteiro antes das ações (torneio e rankeada): o blind é a
+	# aposta mínima da jogada. No Blitz a ante é só uma fração do blind e vem somada a ele.
+	var ante_size := float(blind) * ((BLITZ_TRICK_ANTE_FACTOR + 1.0) if blitz else 1.0)
 	for p in range(num_players):
 		folded[p] = busted[p]   # eliminado (torneio) fica fora da jogada: sem ante, sem fala e sem carta
 		var ante := minf(ante_size, stacks[p])
