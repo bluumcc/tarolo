@@ -301,7 +301,7 @@ func _populate_tab(wide: bool) -> void:
 		"AJUSTES":  _build_menu(wide)
 
 
-func _build_ranked(_wide: bool) -> void:
+func _build_ranked(wide: bool) -> void:
 	var rk   := GameState.ranked()
 	var t    := Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))
 	var tc   := Color(Ranked.TIER_COLORS[int(t["tier"])])
@@ -317,7 +317,36 @@ func _build_ranked(_wide: bool) -> void:
 	title.add_theme_constant_override("outline_size", 8)
 	_content_col.add_child(title)
 
-	# Badge do rank (sem card), 25% maior que antes (200 → 250)
+	# Conteúdo principal: 2 colunas no PC, coluna única no mobile
+	var fichas := int(SaveManager.section("profile")["fichas"])
+	if wide:
+		var cols := HBoxContainer.new()
+		cols.add_theme_constant_override("separation", Widgets.MARGIN)
+		cols.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_content_col.add_child(cols)
+
+		# Coluna esquerda (60%): badge + tier + métricas
+		var left := VBoxContainer.new()
+		left.add_theme_constant_override("separation", 16)
+		left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		left.size_flags_stretch_ratio = 0.6
+		cols.add_child(left)
+		_ranked_badge_block(left, t, tc, 72, UIKit.TR_WHITE)
+		_ranked_stats_block(left, rk, wins, loss)
+
+		# Coluna direita (40%): torneios ocupa a coluna inteira
+		var right := VBoxContainer.new()
+		right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		right.size_flags_stretch_ratio = 0.4
+		cols.add_child(right)
+		_ranked_tournament_block(right, fichas, true)
+	else:
+		_ranked_badge_block(_content_col, t, tc, 48, UIKit.BROWN)
+		_ranked_stats_block(_content_col, rk, wins, loss)
+		_ranked_tournament_block(_content_col, fichas, false)
+
+
+func _ranked_badge_block(col: VBoxContainer, t: Dictionary, tc: Color, tier_size: int, tier_color: Color) -> void:
 	var circle := Panel.new()
 	circle.custom_minimum_size   = Vector2(250, 250)
 	circle.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -331,24 +360,22 @@ func _build_ranked(_wide: bool) -> void:
 	div_lbl.add_theme_color_override("font_outline_color", tc.darkened(0.6))
 	div_lbl.add_theme_constant_override("outline_size", 8)
 	circle.add_child(div_lbl)
-	_content_col.add_child(circle)
-
-	# Nome do rank (sem card)
-	var tier_lbl := UIKit.label(str(t["label"]).to_upper(), 48, UIKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
+	col.add_child(circle)
+	var tier_lbl := UIKit.label(str(t["label"]).to_upper(), tier_size, tier_color, HORIZONTAL_ALIGNMENT_CENTER)
 	tier_lbl.add_theme_color_override("font_outline_color", UIKit.OUTLINE)
 	tier_lbl.add_theme_constant_override("outline_size", 6)
-	_content_col.add_child(tier_lbl)
+	col.add_child(tier_lbl)
 
-	# Card de métricas: 75% da largura, centralizado (MMR, pontos e razão V/D)
+
+func _ranked_stats_block(col: VBoxContainer, rk: Dictionary, wins: int, loss: int) -> void:
 	var ratio := float(wins) / float(maxi(loss, 1))
 	var stat_rows: Array[Array] = [
 		["MMR",  UIKit.fmt_int(int(rk["mmr"]))],
-		["LP",   "%d / 100" % int(t["lp"])],
+		["LP",   "%d / 100" % int(Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))["lp"])],
 		["V / D", UIKit.fmt_dec(ratio, 2)],
 	]
 	var mp := UIKit.panel(UIKit.TR_PURPLE, UIKit.TR_PURPLE.lightened(0.12), 10)
-	mp.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	mp.custom_minimum_size   = Vector2(get_viewport_rect().size.x * 0.75, 0)
+	mp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var mv := VBoxContainer.new()
 	mv.add_theme_constant_override("separation", 12)
 	mp.add_child(mv)
@@ -359,19 +386,23 @@ func _build_ranked(_wide: bool) -> void:
 		mrow.add_child(mk)
 		mrow.add_child(UIKit.label(str(sr[1]), 26, UIKit.BROWN))
 		mv.add_child(mrow)
-	_content_col.add_child(mp)
+	col.add_child(mp)
 
-	# Card de torneios: título centralizado e lista com rolagem (altura limitada)
-	var fichas := int(SaveManager.section("profile")["fichas"])
+
+func _ranked_tournament_block(col: VBoxContainer, fichas: int, fill_height: bool) -> void:
 	var tp := UIKit.panel(UIKit.TR_PURPLE, UIKit.TR_PURPLE.lightened(0.12), 10)
 	tp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if fill_height:
+		tp.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var tv := VBoxContainer.new()
 	tv.add_theme_constant_override("separation", 16)
 	tp.add_child(tv)
 	tv.add_child(UIKit.label("TORNEIOS", 32, UIKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER))
 	var tscroll := ScrollContainer.new()
 	tscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	tscroll.custom_minimum_size = Vector2(0, clampf(get_viewport_rect().size.y * 0.38, 260.0, 480.0))
+	tscroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	if not fill_height:
+		tscroll.custom_minimum_size = Vector2(0, clampf(get_viewport_rect().size.y * 0.38, 260.0, 480.0))
 	UIKit.suppress_click_on_scroll(tscroll)
 	tv.add_child(tscroll)
 	var tlist := VBoxContainer.new()
@@ -412,7 +443,7 @@ func _build_ranked(_wide: bool) -> void:
 		eb.pressed.connect(_open_tournament.bind(buy, str(ev["name"])))
 		ir.add_child(eb)
 		tlist.add_child(item)
-	_content_col.add_child(tp)
+	col.add_child(tp)
 
 	# Botão fixo no rodapé, largura total (com a margem global)
 	var ab_mg := MarginContainer.new()
