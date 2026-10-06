@@ -1279,6 +1279,11 @@ func _run_round() -> void:
 		# Quebrou? No Blitz o check só acontece no início da rodada (_blitz_open_level);
 		# mid-rodada o jogador fica "sentado fora" (sem apostas, mas ainda joga cartas).
 		if engine.blitz:
+			# Torneio: zerou as fichas (ex.: a entrada do palpite levou tudo) = eliminado na hora, com a
+			# colocação — nada de seguir "sentado fora" jogando cartas sem poder apostar.
+			if bool(config.get("tournament", false)) and engine.stacks[0] <= 0.0:
+				if await _bust_broke():
+					return
 			if engine.stacks[0] == 0.0 and not blitz_sitting_out:
 				blitz_sitting_out = true
 				_refresh_hud()
