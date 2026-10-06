@@ -129,12 +129,17 @@ func _pressed_card() -> CardView:
 	return null
 
 
+func is_dragging() -> bool:
+	return _card != null and _ghost != null
+
+
 func _begin_card_drag(c: CardView) -> void:
 	_card = c
 	_ghost = CARD_SCENE.instantiate()
 	_ghost.setup(c.data, true)
 	_ghost.interactive = false
 	_ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ghost.z_index = 200   # a carta arrastada fica por cima de tudo
 	ghost_layer.add_child(_ghost)
 	_ghost.pivot_offset = c.pivot_offset
 	_ghost.rotation = c.rotation

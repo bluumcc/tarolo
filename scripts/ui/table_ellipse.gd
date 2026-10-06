@@ -154,7 +154,10 @@ func card_point(p: int, n: int, card: Vector2) -> Vector2:
 				x = card.x * 0.62   # rival de cima na sua frente: a sua carta desvia pro lado
 		return Vector2(_center.x + x, y)
 	if seat.y < _center.y - _r * 0.5:   # em cima: logo abaixo do nome/stack do dono
-		return Vector2(seat.x, seat.y + below + 6.0 + card.y / 2.0)
+		var cx := seat.x
+		if absf(seat.x - _center.x) > card.x * 1.5:
+			cx = lerpf(seat.x, _center.x, 0.3)   # os das pontas, em cima: mais pro centro
+		return Vector2(cx, seat.y + below + 6.0 + card.y / 2.0)
 	var side := -1.0 if seat.x > _center.x else 1.0   # pontas: pra dentro da mesa
 	return Vector2(seat.x + side * (seat_half_extent() * seat_scale + card.x * 0.6), seat.y)
 

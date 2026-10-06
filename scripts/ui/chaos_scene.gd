@@ -178,6 +178,7 @@ var log_last := ""
 var mod_name_label: Label
 var mod_desc_label: Label
 var docked_wide := false
+var side_dim: ColorRect
 
 
 func _build_ui() -> void:
@@ -306,6 +307,9 @@ func _build_ui() -> void:
 	overlay_layer.z_index = 100   # por cima de tudo, inclusive do seu avatar (z 50)
 	add_child(overlay_layer)
 
+	overlay_layer.child_entered_tree.connect(func(_n): _sync_side_dim.call_deferred())
+	overlay_layer.child_exiting_tree.connect(func(_n): _sync_side_dim.call_deferred())
+	phase_screen.visibility_changed.connect(_sync_side_dim)
 	_apply_orientation()
 	_layout_table.call_deferred()
 
@@ -425,7 +429,7 @@ func _build_side_column() -> void:
 	side_col.offset_bottom = -20.0
 	side_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(side_col)
-	var panel_box := UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 12, 10)
+	var panel_box := UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 12, UIKit.card_pad())
 	var reg := PanelContainer.new()
 	reg.add_theme_stylebox_override("panel", panel_box)
 	var rv := VBoxContainer.new()
@@ -463,9 +467,29 @@ func _build_side_column() -> void:
 	mod_desc_label.max_lines_visible = 3
 	mv.add_child(mod_desc_label)
 	side_col.add_child(mod)
+	# Quando há cena/modal (que ficam só na área da esquerda), a coluna também escurece.
+	side_dim = ColorRect.new()
+	side_dim.color = Color(0.02, 0.02, 0.05, 0.82)
+	side_dim.anchor_left = 1.0
+	side_dim.anchor_right = 1.0
+	side_dim.anchor_top = 0.0
+	side_dim.anchor_bottom = 1.0
+	side_dim.offset_left = -(SIDE_COL_W + SIDE_MARGIN * 2.0)
+	side_dim.offset_right = 0.0
+	side_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	side_dim.visible = false
+	side_dim.z_index = 90
+	add_child(side_dim)
 
 
 ## Leva pote, prêmio e ações pra coluna da direita (tela larga) ou de volta pra barra de baixo.
+func _sync_side_dim() -> void:
+	if side_dim == null:
+		return
+	var busy := docked_wide and (overlay_layer.get_child_count() > 0 or (phase_screen != null and phase_screen.visible))
+	side_dim.visible = busy
+
+
 func _dock_bottom(wide: bool) -> void:
 	if side_col == null or bottom_bar == null or wide == docked_wide:
 		return
@@ -625,7 +649,7 @@ func _apply_orientation() -> void:
 	_dock_bottom(wide)
 	# Desktop: etapas sem mesa (descarte/palpite) e modais ficam centralizados na área da esquerda;
 	# a coluna da direita é só dos cards (registro, modificador, prêmio, pote, ações).
-	var right_off := -(SIDE_COL_W + SIDE_MARGIN) if wide else 0.0
+	var right_off := -(SIDE_COL_W + SIDE_MARGIN * 2.0) if wide else 0.0   # deixa a mesma folga dos dois lados da coluna
 	for layer in [phase_layer, overlay_layer]:
 		if layer != null:
 			(layer as Control).offset_right = right_off
@@ -714,6 +738,17 @@ func _slot_pos(player: int) -> Vector2:
 func _slot_rank(player: int) -> int:
 	var n := table_players if table_players > 0 else engine.num_players
 	var order: Array = []
+	if _is_wide():
+		# Desktop: mais embaixo sempre por cima; na mesma altura, a da direita por cima da da esquerda.
+		var csz := CardView.SIZE * _table_scale()
+		for p in range(n):
+			var pt := table_center.card_point(p, n, csz)
+			order.append([int(round(pt.y / (csz.y * 0.5))), pt.x, p])
+		order.sort_custom(func(a, b): return a[0] < b[0] or (a[0] == b[0] and a[1] < b[1]))
+		for i in range(order.size()):
+			if int(order[i][2]) == player:
+				return i + 1
+		return 1
 	for p in range(n):
 		var dir := table_center.seat_dir(p, n)
 		order.append([int(round(dir.y * 100.0 / 35.0)), dir.x, p])   # linha (y agrupado), x, assento
@@ -747,7 +782,71 @@ func _layout_hand() -> void:
 	(parent as HandScroller).set_content_size(Vector2(content_w, zone_h))
 
 
+## Desktop: o mouse sobre uma carta da mão mostra uma cópia ampliada (reta) por cima de tudo. A cópia
+## ignora o mouse e a carta real não muda, então toque, swipe e duplo toque funcionam como sempre.
+var hover_ghost: CardView
+
+func _make_card_ghost(view: CardView) -> CardView:
+	var g: CardView = CARD_SCENE.instantiate()
+	g.setup(view.data, true)
+	g.interactive = false
+	g.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	popup_layer.add_child(g)
+	for c in g.find_children("*", "Control", true, false):
+		(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	g.pivot_offset = CardView.SIZE / 2.0
+	var k := CardView.focus_scale(true, get_viewport_rect().size.y)
+	g.scale = Vector2(k, k)
+	var center := view.get_global_transform() * (CardView.SIZE / 2.0)
+	var vp := get_viewport_rect().size
+	var half := CardView.SIZE * k / 2.0
+	center.y = minf(center.y, vp.y - half.y - 8.0)   # não sai da tela embaixo
+	center.y = maxf(center.y - CardView.SIZE.y * 0.25, half.y + 8.0)
+	g.global_position = center - CardView.SIZE / 2.0
+	g.z_index = 200   # por cima de tudo (assentos, colunas, camadas de cena)
+	return g
+
+
+func _on_card_hover(view: CardView, on: bool) -> void:
+	_clear_hover_ghost()
+	if not on or not is_instance_valid(view) or not view.visible or popup_layer == null or view.selected:
+		return
+	if not _is_wide() or hand_scroller.is_dragging():
+		return
+	hover_ghost = _make_card_ghost(view)
+
+
+## Desktop: a carta focada (1º toque) fica ampliada por cima de tudo até jogar ou desfocar.
+var focus_ghost: CardView
+var focus_ghost_for: CardView
+
+func _sync_focus_ghost() -> void:
+	var want: CardView = null
+	if _is_wide() and hand_scroller != null and selected_view != null and is_instance_valid(selected_view) \
+			and selected_view.selected and selected_view.visible and not hand_scroller.is_dragging() and phase != "discard":
+		want = selected_view
+	if want == focus_ghost_for:
+		return
+	if focus_ghost != null and is_instance_valid(focus_ghost):
+		focus_ghost.queue_free()
+	focus_ghost = null
+	focus_ghost_for = want
+	if want != null:
+		focus_ghost = _make_card_ghost(want)
+
+
+func _clear_hover_ghost() -> void:
+	if hover_ghost != null and is_instance_valid(hover_ghost):
+		hover_ghost.queue_free()
+	hover_ghost = null
+
+
 func _rebuild_hand() -> void:
+	_clear_hover_ghost()
+	focus_ghost_for = null   # a próxima passada do _process refaz (ou apaga) a cópia focada
+	if focus_ghost != null and is_instance_valid(focus_ghost):
+		focus_ghost.queue_free()
+	focus_ghost = null
 	for c in hand_container.get_children():
 		hand_container.remove_child(c)
 		c.queue_free()
@@ -764,6 +863,7 @@ func _rebuild_hand() -> void:
 		cv.tapped.connect(_on_card_tapped)
 		cv.zoom_enabled = false
 		cv.hover_zoom = _is_wide()
+		cv.hover_changed.connect(_on_card_hover)
 	_layout_hand.call_deferred()
 
 
@@ -1171,6 +1271,7 @@ func _clock_stop() -> void:
 
 
 func _process(delta: float) -> void:
+	_sync_focus_ghost()
 	var me := seat_avatars[0] as HexAvatar if not seat_avatars.is_empty() else null
 	if me == null:
 		return
@@ -1196,6 +1297,7 @@ func _input(event: InputEvent) -> void:
 	var mb := event as InputEventMouseButton
 	if mb.button_index != MOUSE_BUTTON_LEFT or not mb.pressed:
 		return
+	_clear_hover_ghost()   # clicou/arrastou: a ampliação do hover some e não atrapalha o gesto
 	var any_selected := false
 	for c in hand_container.get_children():
 		var cv := c as CardView
@@ -1669,7 +1771,17 @@ func _human_bet() -> Dictionary:
 			(st["picker"] as Node).queue_free()
 			st.erase("picker")
 		for c in bet_row.get_children():
+			bet_row.remove_child(c)
 			c.queue_free()
+		if docked_wide and bool(st["raising"]):
+			# Desktop: as opções de aposta ocupam o lugar dos botões, na coluna da direita
+			# (confirmar APOSTAR/AUMENTAR e CANCELAR dentro do próprio bloco).
+			var pbody := VBoxContainer.new()
+			pbody.add_theme_constant_override("separation", 8)
+			pbody.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			bet_row.add_child(pbody)
+			_build_raise_picker(pbody, opt, st, done)
+			return
 		if not can_check:
 			bet_row.add_child(mk.call("DESISTIR", UIKit.ActionKind.DANGER, func(): done.call({"action": "fold"})))
 		var main_txt := "PASSAR" if can_check else ("PAGAR\n◎%d%s" % [call_amt, "\nALL-IN" if all_in_call else ""])
@@ -1744,7 +1856,7 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 	]
 	for pr in presets:
 		var val := clampi(int(pr[1]), lo, hi)
-		var b := UIKit.button(str(pr[0]), UIKit.PURPLE if int(st["to"]) != val else UIKit.OK, 26)
+		var b := UIKit.button(str(pr[0]), UIKit.PURPLE if int(st["to"]) != val else UIKit.OK, 20 if docked_wide else 26)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.custom_minimum_size = Vector2(0, 64)
 		b.pressed.connect(func():
@@ -1753,10 +1865,10 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 		shortcuts.add_child(b)
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 14)
+	row.add_theme_constant_override("separation", 10 if docked_wide else 14)
 	body.add_child(row)
 	var minus := UIKit.button("−", UIKit.MUTED, 40)
-	minus.custom_minimum_size = Vector2(96, 72)
+	minus.custom_minimum_size = Vector2(80 if docked_wide else 96, 72)
 	minus.disabled = int(st["to"]) <= lo
 	minus.pressed.connect(func():
 		st["to"] = maxi(int(st["to"]) - blind, lo)
@@ -1764,10 +1876,12 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 	row.add_child(minus)
 	var mine_in := int(engine.contrib[0])   # o que você já pôs nesta jogada (ante e apostas anteriores)
 	var num := UIKit.label("◎ %d" % (int(st["to"]) - mine_in), 52, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
-	num.custom_minimum_size = Vector2(190, 0)
+	num.custom_minimum_size = Vector2(150 if docked_wide else 190, 0)
+	if docked_wide:
+		num.add_theme_font_size_override("font_size", 44)
 	row.add_child(num)
 	var plus := UIKit.button("+", UIKit.MUTED, 40)
-	plus.custom_minimum_size = Vector2(96, 72)
+	plus.custom_minimum_size = Vector2(80 if docked_wide else 96, 72)
 	plus.disabled = int(st["to"]) >= hi
 	plus.pressed.connect(func():
 		st["to"] = mini(int(st["to"]) + blind, hi)
@@ -1776,10 +1890,13 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 	var total_l := UIKit.label("Você coloca ◎%d agora · total seu na jogada ◎%d (já pôs ◎%d)" % [int(st["to"]) - mine_in, int(st["to"]), mine_in], 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	total_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_child(total_l)
-	var ok := UIKit.button("COLOCAR ◎%d" % (int(st["to"]) - mine_in) + (" (ALL-IN)" if int(st["to"]) >= hi and hi >= int(engine.stacks[0]) + mine_in else ""), UIKit.MONEY, 30)
+	var verb := "COLOCAR"
+	if docked_wide:
+		verb = "APOSTAR" if bool(opt["can_check"]) else "AUMENTAR"   # o mesmo nome do botão que abriu o seletor
+	var ok := UIKit.button("%s ◎%d" % [verb, int(st["to"]) - mine_in] + (" (ALL-IN)" if int(st["to"]) >= hi and hi >= int(engine.stacks[0]) + mine_in else ""), UIKit.MONEY, 30)
 	ok.pressed.connect(func(): done.call({"action": "raise", "to": float(st["to"])}))
 	body.add_child(ok)
-	var back := UIKit.button("VOLTAR", UIKit.MUTED, 26)
+	var back := UIKit.button("CANCELAR" if docked_wide else "VOLTAR", UIKit.MUTED, 26)
 	back.custom_minimum_size = Vector2(0, 64)
 	back.pressed.connect(func():
 		st["raising"] = false

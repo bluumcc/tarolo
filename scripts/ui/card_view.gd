@@ -11,7 +11,7 @@ const ART_ASPECT := 540.0 / 900.0
 ## Tamanho base da carta (escala 1.0): largura 188, altura pela proporção da arte (188x313).
 const SIZE := Vector2(188.0, 188.0 / ART_ASPECT)
 const TABLE_H_MOBILE := 218.5   ## altura da carta jogada na mesa (celular)
-const TABLE_H_WIDE := 156.0     ## idem em tela larga (PC)
+const TABLE_H_WIDE := 190.0     ## idem em tela larga (PC)
 const HAND_SCALE_MOBILE := 1.1   ## carta da mão no celular (+10% sobre o tamanho base)
 const HAND_H_WIDE := 320.0      ## altura máxima da carta na mão em tela larga
 const FOCUS_H_WIDE := 410.0     ## altura da carta destacada (arrastada no swipe) em tela larga
@@ -39,13 +39,14 @@ static func focus_scale(wide: bool, vp_h: float) -> float:
 static func table_scale(wide: bool) -> float:
 	return (TABLE_H_WIDE if wide else TABLE_H_MOBILE) / SIZE.y
 
+signal hover_changed(view: CardView, on: bool)
+
 var data: CardData
 var face_up := true
 var playable := false
 var selected := false
 var interactive := true
-var hover_zoom := false   ## desktop (mão): o mouse em cima amplia a carta
-const HOVER_SCALE := 1.22
+var hover_zoom := false   ## desktop (mão): o mouse em cima mostra a carta ampliada (a cena desenha)
 var _hovered := false
 ## Tela larga: a arte (540×900) encolhe pouco, e a mistura de dois níveis de mipmap deixa a carta
 ## borrada. Um viés de -0.5 na leitura da textura escolhe o nível mais nítido (medido: +23% de nitidez).
@@ -119,15 +120,7 @@ func _on_hover(on: bool) -> void:
 	if not hover_zoom or not interactive or _hovered == on:
 		return
 	_hovered = on
-	var tw := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT).set_parallel(true)
-	var s := HOVER_SCALE if on else 1.0
-	tw.tween_property(body, "scale", Vector2(s, s), GameState.anim(0.12))
-	if not selected:   # a carta selecionada já está levantada; as outras sobem junto com a ampliação
-		tw.tween_property(body, "position", Vector2(0, -SIZE.y * 0.14 if on else 0.0), GameState.anim(0.12))
-	if on:
-		body.z_index = 40
-	elif not selected:
-		body.z_index = 0
+	hover_changed.emit(self, on)   # quem desenha a ampliação é a cena (camada acima de tudo, sem mexer nesta carta)
 
 
 func set_selected(value: bool) -> void:

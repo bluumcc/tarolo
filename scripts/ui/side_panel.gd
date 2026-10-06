@@ -60,7 +60,7 @@ func _build(title: String, from_right: bool) -> void:
 	head.add_child(t)
 	var x := Widgets.icon_button("✕")
 	x.custom_minimum_size = Vector2(64, 64)
-	var sb := UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 14, 8)
+	var sb := UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 14, UIKit.card_pad())
 	for sn in ["normal", "hover", "pressed", "focus"]:
 		x.add_theme_stylebox_override(sn, sb)
 	x.add_theme_color_override("font_color", UIKit.TR_WHITE)

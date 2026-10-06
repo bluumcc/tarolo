@@ -295,6 +295,20 @@ static func text_on(face: Color) -> Color:
 ## cada atualização de HUD.
 static var _box_cache := {}
 
+## Padding interno global dos cards (StatCard, painéis, cards laterais): maior no desktop.
+const CARD_PAD := 12
+const CARD_PAD_WIDE := 22
+
+
+static func card_pad() -> int:
+	var loop := Engine.get_main_loop()
+	if loop is SceneTree:
+		var vp := (loop as SceneTree).root.get_visible_rect().size
+		if vp.x > vp.y:
+			return CARD_PAD_WIDE
+	return CARD_PAD
+
+
 static func box_cached(bg: Color, border: Color = BLACK, border_w: int = 3, radius: int = 4, pad: int = 12) -> StyleBoxFlat:
 	var key := "%s|%s|%d|%d|%d" % [bg.to_html(), border.to_html(), border_w, radius, pad]
 	if not _box_cache.has(key):
@@ -471,8 +485,8 @@ static func panel(bg: Color = PURPLE_DEEP, border: Color = BLACK, pad: int = 32)
 ## nó — PanelContainer se auto-dimensiona certinho ao redor do conteúdo (Button não faz
 ## isso com filhos arbitrários, então nunca use Button só pra "ser clicável").
 ## Conecte o retorno de `on_tap` pra tratar o toque (recebe o próprio painel).
-static func tap_panel(bg: Color = PURPLE_DEEP, border: Color = MUTED, pad: int = 10, on_tap: Callable = Callable()) -> PanelContainer:
-	var p := panel(bg, border, pad)
+static func tap_panel(bg: Color = PURPLE_DEEP, border: Color = MUTED, pad: int = -1, on_tap: Callable = Callable()) -> PanelContainer:
+	var p := panel(bg, border, pad if pad >= 0 else card_pad())
 	p.mouse_filter = Control.MOUSE_FILTER_PASS  # não engole o arrasto de quem quer rolar a lista
 	if on_tap.is_valid():
 		p.gui_input.connect(func(event: InputEvent):
