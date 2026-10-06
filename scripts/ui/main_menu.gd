@@ -152,14 +152,16 @@ func _topbar_nav_btn(tab: String, active: bool) -> Button:
 	if active:
 		bg = bg.lightened(0.12)
 	var is_ranked := tab == "RANKEADA"
-	var glow_col  := UIKit.TR_RED_GLOW if is_ranked else UIKit.TR_PURPLE.lightened(0.30)
-	var glow_size := 10 if is_ranked else 5
-	var border_w  := 3  if is_ranked else 2
+	var glow_col   := UIKit.TR_RED_GLOW if is_ranked else UIKit.TR_PURPLE.lightened(0.30)
+	var border_col := UIKit.TR_RED_NEON if is_ranked else Color.TRANSPARENT
+	var glow_size  := 14 if is_ranked else 5
+	var border_w   := 4  if is_ranked else 2
+	var shad_a     := 0.70 if is_ranked else 0.55
 	var b := UIKit.button(tab, bg, 26)
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2.ZERO
 	var mk := func(c: Color) -> StyleBoxFlat:
-		var sb := UIKit.glow_box(c, glow_col, glow_size, border_w, 10, 10)
+		var sb := UIKit.glow_box(c, glow_col, glow_size, border_w, 10, 10, border_col, shad_a)
 		sb.content_margin_top    = 0
 		sb.content_margin_bottom = 0
 		return sb
@@ -459,7 +461,7 @@ func _make_ranked_play_btn() -> Button:
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(0, 112)
 	var mk := func(bg: Color) -> StyleBoxFlat:
-		return UIKit.glow_box(bg, UIKit.TR_RED_GLOW, 10, 3, 10, 20)
+		return UIKit.glow_box(bg, UIKit.TR_RED_GLOW, 28, 5, 10, 20, UIKit.TR_RED_NEON, 0.85)
 	b.add_theme_stylebox_override("normal",   mk.call(UIKit.TR_RED))
 	b.add_theme_stylebox_override("hover",    mk.call(UIKit.TR_RED.lightened(0.10)))
 	b.add_theme_stylebox_override("pressed",  mk.call(UIKit.TR_RED.darkened(0.08)))
