@@ -35,9 +35,9 @@ func _build() -> void:
 	for c in get_children():
 		c.queue_free()
 
-	# Fundo com shader roxo profundo
+	# Fundo roxo escuro unificado (sem divisão header/conteúdo)
 	var bg := ColorRect.new()
-	bg.color = UIKit.NIGHT
+	bg.color = Color("#0D0A2E")
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var mat := ShaderMaterial.new()
@@ -90,15 +90,13 @@ func _build() -> void:
 
 # ── Barra superior ────────────────────────────────────────────────────────────
 
-func _build_topbar(wide: bool) -> PanelContainer:
-	var head := PanelContainer.new()
-	var hsb := UIKit.box(UIKit.TR_BLACK, UIKit.TR_PURPLE.lightened(0.22), 0, 0, 32)
-	hsb.set_border_width_all(0)
-	hsb.border_width_bottom = 2
-	hsb.set_corner_radius_all(0)
-	hsb.content_margin_top    = 32
-	hsb.content_margin_bottom = 32
-	head.add_theme_stylebox_override("panel", hsb)
+func _build_topbar(wide: bool) -> MarginContainer:
+	# Header transparente — fundo único para a página toda, sem divisão visual.
+	var head := MarginContainer.new()
+	head.add_theme_constant_override("margin_top",    28)
+	head.add_theme_constant_override("margin_bottom", 20)
+	head.add_theme_constant_override("margin_left",   Widgets.MARGIN)
+	head.add_theme_constant_override("margin_right",  Widgets.MARGIN)
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 0)
@@ -343,6 +341,11 @@ func _build_ranked(wide: bool) -> void:
 	var wins := int(rk["wins"])
 	var loss := int(rk["losses"])
 
+	# Espaçamento 3× entre header e emblema
+	var top_gap := Control.new()
+	top_gap.custom_minimum_size = Vector2(0, Widgets.MARGIN * 2)   # +48 → total ~72 do topo
+	_content_col.add_child(top_gap)
+
 	# Conteúdo principal: 2 colunas no PC, coluna única no mobile
 	var fichas := int(SaveManager.section("profile")["fichas"])
 	if wide:
@@ -351,7 +354,7 @@ func _build_ranked(wide: bool) -> void:
 		cols.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_content_col.add_child(cols)
 
-		# Coluna esquerda (60%): badge + tier + métricas (50% larg.) + botão jogar
+		# Coluna esquerda (60%): badge + tier + métricas
 		var left := VBoxContainer.new()
 		left.add_theme_constant_override("separation", 16)
 		left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -359,13 +362,6 @@ func _build_ranked(wide: bool) -> void:
 		cols.add_child(left)
 		_ranked_badge_block(left, t, tc, 72, UIKit.TR_WHITE)
 		_ranked_stats_block(left, rk, wins, loss, true)
-		var spacer_fill := Control.new()
-		spacer_fill.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		left.add_child(spacer_fill)
-		var pb := _make_ranked_play_btn()
-		pb.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		pb.custom_minimum_size.x = get_viewport_rect().size.x * 0.42
-		left.add_child(pb)
 
 		# Coluna direita (40%): torneios ocupa a coluna inteira
 		var right := VBoxContainer.new()
@@ -377,14 +373,19 @@ func _build_ranked(wide: bool) -> void:
 		_ranked_badge_block(_content_col, t, tc, 48, UIKit.BROWN)
 		_ranked_stats_block(_content_col, rk, wins, loss, false)
 		_ranked_tournament_block(_content_col, fichas, false)
-		# Botão na barra de rodapé (portrait)
-		var ab_mg := MarginContainer.new()
-		ab_mg.add_theme_constant_override("margin_left",   32)
-		ab_mg.add_theme_constant_override("margin_right",  32)
-		ab_mg.add_theme_constant_override("margin_top",    12)
-		ab_mg.add_theme_constant_override("margin_bottom", 32)
-		_action_bar.add_child(ab_mg)
-		ab_mg.add_child(_make_ranked_play_btn())
+
+	# Botão JOGAR RANKEADA fixo no bottom — igual nos dois modos
+	var ab_mg := MarginContainer.new()
+	ab_mg.add_theme_constant_override("margin_left",   32)
+	ab_mg.add_theme_constant_override("margin_right",  32)
+	ab_mg.add_theme_constant_override("margin_top",    12)
+	ab_mg.add_theme_constant_override("margin_bottom", 32)
+	_action_bar.add_child(ab_mg)
+	var pb := _make_ranked_play_btn()
+	if wide:
+		pb.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		pb.custom_minimum_size.x = get_viewport_rect().size.x * 0.38
+	ab_mg.add_child(pb)
 
 
 func _ranked_badge_block(col: VBoxContainer, t: Dictionary, tc: Color, tier_size: int, tier_color: Color) -> void:
@@ -393,6 +394,10 @@ func _ranked_badge_block(col: VBoxContainer, t: Dictionary, tc: Color, tier_size
 	circle.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var csb := UIKit.box(tc.darkened(0.1), tc.lightened(0.15), 6, 125, 0)
 	csb.set_border_width_all(6)
+	# Glow azul grande atrás do emblema (shadow feathered do StyleBoxFlat)
+	csb.shadow_color  = Color(0.10, 0.36, 0.96, 0.80)
+	csb.shadow_size   = 90
+	csb.shadow_offset = Vector2.ZERO
 	circle.add_theme_stylebox_override("panel", csb)
 	var div_txt := str(t["division"]) if str(t["division"]) != "" else "★"
 	var div_lbl := UIKit.label(div_txt, 100, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
