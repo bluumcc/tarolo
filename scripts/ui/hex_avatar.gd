@@ -62,8 +62,8 @@ func _draw() -> void:
 	var col := UIKit.TR_CYAN.lightened(0.1) if active else accent
 	var w := 6.0 if active else 4.0
 	draw_colored_polygon(_pts, UIKit.TR_PURPLE_DARK.darkened(0.35))
-	# Com o relógio rodando, a borda vai SUMINDO: só o trecho que resta é desenhado (a partir do
-	# vértice de cima, esgotando no sentido anti-horário).
+	# Com o relógio rodando, a borda vai SUMINDO: só o trecho que resta é desenhado (o consumo começa
+	# no topo e avança no sentido horário).
 	var ring := _perimeter(timer_frac) if timer_frac >= 0.0 else _perimeter(1.0)
 	if timer_frac < 0.0:
 		ring = _pts.duplicate()
@@ -74,7 +74,9 @@ func _draw() -> void:
 		draw_polyline(ring, col, w, true)
 
 
-## Pontos do contorno do hexágono cobrindo a fração `f` (0..1) do perímetro, a partir do vértice de cima.
+## Pontos do contorno do hexágono que RESTAM (fração `f`, 0..1): o trecho que vai do ponto já
+## consumido até o vértice de cima, no sentido horário. O consumo começa no topo (meio-dia) e avança
+## no sentido horário, então a borda vai desaparecendo nesse sentido.
 func _perimeter(f: float) -> PackedVector2Array:
 	var total := 0.0
 	var seg: Array = []
@@ -82,20 +84,20 @@ func _perimeter(f: float) -> PackedVector2Array:
 		var l := _pts[i].distance_to(_pts[(i + 1) % 6])
 		seg.append(l)
 		total += l
-	var left := total * clampf(f, 0.0, 1.0)
-	var pts := PackedVector2Array([_pts[0]])
+	var start := total * (1.0 - clampf(f, 0.0, 1.0))   # distância (horária, do topo) já consumida
+	var pts := PackedVector2Array()
+	var run := 0.0
 	for i in range(6):
-		if left <= 0.0:
-			break
+		var l: float = seg[i]
 		var a := _pts[i]
 		var b := _pts[(i + 1) % 6]
-		var l: float = seg[i]
-		if left >= l:
-			pts.append(b)
-			left -= l
-		else:
-			pts.append(a.lerp(b, left / l))
-			left = 0.0
+		if run + l <= start:
+			run += l
+			continue
+		if pts.is_empty():
+			pts.append(a.lerp(b, (start - run) / l))
+		pts.append(b)
+		run += l
 	return pts
 
 
