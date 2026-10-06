@@ -17,6 +17,7 @@ const CARD_SCENE := preload("res://scenes/Card.tscn")
 const TURN_SECONDS := 10.0      # jogar a carta; estourou, joga a mais fraca
 const DISCARD_SECONDS := 18.0   # descarte inicial; estourou, descarta as 2 mais fracas
 const DISCARD_HEAD_TOP := 84.0        # topo do bloco título+avatar das etapas de descarte e palpite
+const PREDICT_CARD_H := 298.0       # card do seletor de palpite (antes ~248, +20%)
 const DISCARD_AVATAR_SCALE := 1.95  # avatar grande do descarte (antes 2,16: colava no subtítulo)
 const PREDICT_SECONDS := 15.0   # lance de vitórias; estourou, confirma o palpite que estiver na tela
 const BET_SECONDS := 12.0       # apostar/passar/pagar/aumentar/desistir; estourou, passa (ou desiste se tiver que pagar)
@@ -353,6 +354,7 @@ func _build_hand_zone(root: VBoxContainer) -> void:
 	var zone := Control.new()
 	hand_zone = zone
 	zone.custom_minimum_size = Vector2(0, BANNER_H + hand_h + _pot_h())
+	zone.mouse_filter = Control.MOUSE_FILTER_IGNORE   # só as cartas recebem toque: a zona vazia em cima delas não pode engolir botões (ex.: CONFIRMAR do palpite)
 	root.add_child(zone)
 
 	# Card do modificador (nome; tocar abre a regra) na base da zona, em cima da barra de baixo.
@@ -2454,7 +2456,6 @@ func _human_predict() -> int:
 	discard_title.text = "QUANTAS JOGADAS VOCÊ VAI GANHAR?"
 	discard_title.add_theme_font_size_override("font_size", 36)
 	discard_sub.text = "Entrada ◎%s  ·  Pote ◎%s" % [UIKit.fmt_short(engine.blitz_entry()), UIKit.fmt_short(engine.carry)]
-	discard_head.offset_top = DISCARD_HEAD_TOP + get_viewport_rect().size.y * 0.10   # palpite: tudo 10% da tela mais baixo
 	discard_holder.custom_minimum_size = Vector2(0, 130)
 	discard_avatar.scale = Vector2(1.5, 1.5)
 	discard_name.visible = false   # aqui o espaço é do seletor
@@ -2462,10 +2463,11 @@ func _human_predict() -> int:
 	var box := PanelContainer.new()
 	box.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT.lightened(0.2), UIKit.TR_PURPLE, "small", 18, 20, 16))
 	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 48.0, 640.0), 0)
+	box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 48.0, 640.0), PREDICT_CARD_H)
 	discard_head.add_child(box)
 	var body := VBoxContainer.new()
-	body.add_theme_constant_override("separation", 10)
+	body.alignment = BoxContainer.ALIGNMENT_CENTER
+	body.add_theme_constant_override("separation", 14)
 	box.add_child(body)
 	var hint := ChaosBot.suggested_predict(engine, 0)
 	var st := {"pick": hint}
@@ -2510,7 +2512,6 @@ func _human_predict() -> int:
 	modal_open = false
 	if is_inside_tree():
 		discard_head.visible = false
-		discard_head.offset_top = DISCARD_HEAD_TOP
 		box.queue_free()
 		round_dots.visible = true
 		_banner_clear()
