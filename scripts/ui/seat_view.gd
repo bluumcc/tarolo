@@ -89,7 +89,10 @@ func layout() -> void:
 
 func _on_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		show_stack()
+		if _stack_row.visible:
+			show_name()   # tocar de novo volta pro nome
+		else:
+			show_stack()
 		accept_event()
 
 
@@ -106,3 +109,11 @@ func show_stack() -> void:
 			name_label.visible = true
 			_stack_row.visible = false
 			layout())
+
+
+func show_name() -> void:
+	Sfx.play("tick")
+	_token += 1   # cancela a volta automática pendente
+	name_label.visible = true
+	_stack_row.visible = false
+	layout()

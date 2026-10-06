@@ -153,8 +153,8 @@ func _show_insufficient_fichas() -> void:
 # ------------------------------------------------------------------ UI
 
 const HAND_RAISE := 28.0   ## o leque sobe um pouco da base da faixa da mão
-const BAR_H := 96.0       ## barra de baixo (cards laterais: palpite e tempo)
-const ACT_H := BAR_H * 0.75   ## botões de ação e card de pote/prêmio: 75% dos cards laterais
+const BAR_H := 76.0       ## altura da barra de baixo: cards laterais (palpite, tempo), botões de ação e card do prêmio — todos iguais
+const ACT_H := BAR_H
 const HEADER_H := 82.5       ## altura dos três cards do header (menu, dots, ajuda): +10%
 const POT_CARD_W := 300.0   ## largura fixa do card do pote (cabe "POTE ◎ 99999")
 const BANNER_SLOT_H := 46.0   ## faixa dos avisos de ação, logo abaixo do topo
@@ -230,6 +230,7 @@ func _build_ui() -> void:
 	info_v.add_theme_constant_override("separation", 0)
 	info_v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	info_box.add_child(info_v)
+	info_v.add_theme_constant_override("separation", 12)   # gap entre os dots e a mensagem
 	info_v.add_child(round_dots)
 	_build_banner(info_v)
 	topbar.add_child(info_box)
@@ -356,7 +357,7 @@ func _build_pot_card(slot: Control) -> void:
 func _build_banner(parent: Control) -> void:
 	banner_title = UIKit.serif_label("", 22, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	banner_title.autowrap_mode = TextServer.AUTOWRAP_OFF
-	banner_title.custom_minimum_size = Vector2(0, 30)   # altura reservada: nada se mexe quando o aviso aparece
+	banner_title.custom_minimum_size = Vector2(0, 28)   # altura reservada: nada se mexe quando o aviso aparece
 	banner_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	parent.add_child(banner_title)
 
@@ -405,7 +406,7 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	bottom_bar.add_theme_constant_override("separation", 10)
 	root.add_child(bottom_bar)
 
-	prog_card = StatCard.new().setup("PALPITE", "–", UIKit.TR_WHITE, 34)
+	prog_card = StatCard.new().setup("PALPITE", "–", UIKit.TR_WHITE, 28, 17)
 	prog_card.custom_minimum_size = Vector2(LEFT_W, 0)
 	bottom_bar.add_child(prog_card)
 
@@ -436,7 +437,7 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	double_btn.pressed.connect(_on_double_pressed)
 	mid.add_child(double_btn)
 
-	var tempo := StatCard.new().setup("TEMPO", "0:10", UIKit.TR_WHITE, 34)
+	var tempo := StatCard.new().setup("TEMPO", "0:10", UIKit.TR_WHITE, 28, 17)
 	tempo.custom_minimum_size = Vector2(LEFT_W, 0)   # mesma largura do card PALPITE
 	timer_label = tempo.value
 	timer_label.autowrap_mode = TextServer.AUTOWRAP_OFF
@@ -2338,7 +2339,7 @@ func _gather_bets() -> void:
 		for p in range(engine.num_players):
 			if engine.contrib[p] > 0.0:
 				any = true
-				FX.fly_chips(popup_layer, _pill_center(p), _global_center(bottom_mid), _chips_for(float(engine.contrib[p])), UIKit.LOSS if engine.folded[p] else UIKit.MONEY)
+				FX.fly_chips(popup_layer, _pill_center(p), _global_center(pot_box), _chips_for(float(engine.contrib[p])), UIKit.LOSS if engine.folded[p] else UIKit.MONEY)
 		if any:
 			Sfx.play("combo")
 	await _wait(0.6)
@@ -2355,7 +2356,7 @@ func _gather_bets() -> void:
 ## Fichas do pote voam pro vencedor; o pote zera.
 func _collect_pot(winner: int, total: float, gain: float) -> void:
 	var seat_at := _seat_center(winner)
-	FX.fly_chips(popup_layer, _global_center(bottom_mid), seat_at, _chips_for(total), UIKit.OK if winner == 0 else UIKit.MONEY)
+	FX.fly_chips(popup_layer, _global_center(pot_box), seat_at, _chips_for(total), UIKit.OK if winner == 0 else UIKit.MONEY)
 	Sfx.play("win" if winner == 0 else "chip")
 	await _wait(0.55)
 	if not is_inside_tree():
@@ -2473,7 +2474,7 @@ func _blitz_reveal() -> void:
 		running += stake
 		if not GameState.autoplay:
 			Sfx.play("chip")
-			FX.fly_chips(popup_layer, _seat_center(p), _global_center(bottom_mid), _chips_for(stake))
+			FX.fly_chips(popup_layer, _seat_center(p), _global_center(pot_box), _chips_for(stake))
 			FX.count(pot_label, shown_pot, running, _pot_text, 0.3)
 			FX.pop(pot_box, 1.1)
 			FX.pop(bet_pills[p], 1.3)
@@ -2659,7 +2660,7 @@ func _apply_double(p: int, is_cover := false) -> void:
 	if not GameState.autoplay:
 		_banner("%s %s" % [_pname(p), verb.to_lower()], "", UIKit.MONEY)
 		Sfx.play("combo")
-		FX.fly_chips(popup_layer, _seat_center(p), _global_center(bottom_mid), 3)
+		FX.fly_chips(popup_layer, _seat_center(p), _global_center(pot_box), 3)
 		FX.burst(popup_layer, _seat_center(p) - popup_layer.global_position, UIKit.MONEY, 14)
 		FX.shake(main_area, 0.3)
 		_pot_to(engine.pot)
@@ -2858,7 +2859,7 @@ func _resolve_trick_blitz(result: Dictionary) -> void:
 	Sfx.play("chip")
 	FX.burst(popup_layer, _seat_center(winner) - popup_layer.global_position, UIKit.ME if winner == 0 else UIKit.CHIPS, 10)
 	if float(result.get("trick_pot", 0.0)) > 0.0:
-		FX.fly_chips(popup_layer, _global_center(bottom_mid), _seat_center(winner), _chips_for(float(result["trick_pot"])), UIKit.OK if winner == 0 else UIKit.MONEY)
+		FX.fly_chips(popup_layer, _global_center(pot_box), _seat_center(winner), _chips_for(float(result["trick_pot"])), UIKit.OK if winner == 0 else UIKit.MONEY)
 	if prize_amt + saque_amt + assalto_amt + trick_gain > 0.0:
 		FX.float_text(popup_layer, _seat_center(winner), "+◎ %d" % int(prize_amt + saque_amt + assalto_amt + maxf(trick_gain, 0.0)), UIKit.MONEY)
 	elif curse_amt > 0.0:
@@ -2923,7 +2924,7 @@ func _blitz_settlement() -> void:
 		col = UIKit.OK if hits.has(0) else UIKit.INK
 	_banner(title, "", col)
 	Sfx.play("win" if hits.has(0) else ("lose" if hits.is_empty() else "chip"))
-	var pot_at := _global_center(bottom_mid)
+	var pot_at := _global_center(pot_box)
 	for p in range(engine.num_players):
 		var payout := float(br["payouts"][p])
 		var net := float(br["net"][p])
