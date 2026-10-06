@@ -44,6 +44,7 @@ var face_up := true
 var playable := false
 var selected := false
 var interactive := true
+var zoom_enabled := true   ## segurar / botão direito abre o zoom (a mesa Blitz desliga)
 
 var _pressing := false
 var _press_pos := Vector2.ZERO
@@ -236,7 +237,8 @@ func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
-			zoom_requested.emit(self)
+			if zoom_enabled:
+				zoom_requested.emit(self)
 			accept_event()
 		elif mb.button_index == MOUSE_BUTTON_LEFT:
 			if mb.pressed:
@@ -274,7 +276,7 @@ func _release() -> void:
 
 
 func _process(delta: float) -> void:
-	if _pressing and not _moved and not _long_fired:
+	if zoom_enabled and _pressing and not _moved and not _long_fired:
 		_press_time += delta
 		if _press_time >= LONG_PRESS:
 			_long_fired = true

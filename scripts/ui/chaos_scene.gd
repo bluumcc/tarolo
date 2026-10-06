@@ -624,7 +624,7 @@ func _rebuild_hand() -> void:
 		hand_container.add_child(cv)
 		cv.set_playable(discarding or (human_turn and legal.has(card)))
 		cv.tapped.connect(_on_card_tapped)
-		cv.zoom_requested.connect(_show_zoom)
+		cv.zoom_enabled = false
 	_layout_hand.call_deferred()
 
 
@@ -997,7 +997,7 @@ func _mmss(seconds: float) -> String:
 
 
 ## Relógio único da vez: liga com `_clock_start`, desliga com `_clock_stop`. O card TEMPO mostra os
-## segundos (vermelho nos últimos 3). Pausa no menu; só os modais "de tela" (tips, zoom) também
+## segundos (vermelho nos últimos 3). Pausa no menu; só os modais "de tela" (tips) também
 ## pausam, a menos que a etapa rode dentro de um modal (palpite, aposta: `in_modal`).
 func _clock_start(seconds: float, on_timeout: Callable, in_modal: bool = false) -> void:
 	clock_total = seconds
@@ -1111,7 +1111,6 @@ func _animate_play(player: int, card: CardData, from: Vector2) -> void:
 	cv.interactive = false
 	table_center.add_child(cv)
 	cv.set_playable(true)
-	cv.zoom_requested.connect(_show_zoom)
 	cv.global_position = from
 	cv.scale = Vector2(0.9, 0.9)
 	cv.rotation = randf_range(-0.25, 0.25)
@@ -1128,37 +1127,7 @@ func _animate_play(player: int, card: CardData, from: Vector2) -> void:
 
 # ------------------------------------------------------------------ resumo de nível / fim
 
-# ------------------------------------------------------------------ zoom / ajuda / pausa
-
-func _show_zoom(view: CardView) -> void:
-	if view == null or view.data == null:
-		return
-	var ov := UIKit.overlay()
-	overlay_layer.add_child(ov)
-	var v := VBoxContainer.new()
-	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_theme_constant_override("separation", 18)
-	var zoom_scale := minf(2.2, get_viewport_rect().size.y * 0.5 / CardView.SIZE.y)
-	var holder := Control.new()
-	holder.custom_minimum_size = CardView.SIZE * zoom_scale
-	var big: CardView = CARD_SCENE.instantiate()
-	big.setup(view.data, true)
-	big.interactive = false
-	holder.add_child(big)
-	big.scale = Vector2(zoom_scale, zoom_scale)
-	big.pivot_offset = Vector2.ZERO
-	v.add_child(holder)
-	var desc := UIKit.label(view.describe(), 32, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc.custom_minimum_size = Vector2(620, 0)
-	v.add_child(desc)
-	v.add_child(UIKit.label("toque para fechar", 28, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
-	ov.add_child(UIKit.centered(v))
-	UIKit.pop_in(holder, GameState.anim(0.18))
-	ov.gui_input.connect(func(e: InputEvent):
-		if e is InputEventMouseButton and e.pressed:
-			ov.queue_free())
-
+# ------------------------------------------------------------------ ajuda / pausa
 
 ## Dica de uso único (salva no perfil): aparece na primeira vez que a situação acontece.
 func _tip(key: String, title: String, text: String) -> void:
@@ -1196,7 +1165,7 @@ func _open_pause() -> void:
 	v.custom_minimum_size = Vector2(620, 0)
 	box.add_child(v)
 	v.add_child(UIKit.label("PAUSA", 40, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
-	var ph := UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar, ou arraste-a pra cima e solte na mesa. Segure / botão direito = zoom. Sair da mesa devolve suas fichas da stack pra carteira.", 28, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	var ph := UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar, ou arraste-a pra cima e solte na mesa. Sair da mesa devolve suas fichas da stack pra carteira.", 28, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	ph.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(ph)
 	paused = true
@@ -2393,7 +2362,7 @@ func _commit_discard(view: CardView, drop_global := Vector2.ZERO) -> void:
 
 ## Card do palpite: claro, sem fundo escurecido — vira o próprio conteúdo do card da mesa
 ## (table_center), que está vazio nessa etapa (nem pote nem cartas ainda). A mão continua à
-## vista e interagível embaixo (segurar ou botão direito numa carta ainda dá zoom). Seletor de
+## vista e interagível embaixo. Seletor de
 ## quantidade em −/+ com o palpite sugerido em destaque, em vez de uma fileira de botões de 0 a 8.
 func _human_predict() -> int:
 	modal_open = true
