@@ -92,13 +92,17 @@ func _build() -> void:
 
 func _build_topbar(wide: bool) -> PanelContainer:
 	var head := PanelContainer.new()
-	var hsb := UIKit.box(UIKit.TR_BLACK, UIKit.TR_BLACK, 0, 0, 0)
-	hsb.content_margin_left  = Widgets.MARGIN
-	hsb.content_margin_right = Widgets.MARGIN
-	hsb.content_margin_top    = 0
-	hsb.content_margin_bottom = 0
+	var hsb := StyleBoxFlat.new()
+	hsb.bg_color = UIKit.TR_BLACK
+	hsb.border_color = UIKit.TR_PURPLE.lightened(0.22)
+	hsb.set_border_width_all(0)
+	hsb.border_width_bottom = 2
+	hsb.set_corner_radius_all(0)
+	hsb.content_margin_left   = 32
+	hsb.content_margin_right  = 32
+	hsb.content_margin_top    = 32
+	hsb.content_margin_bottom = 32
 	head.add_theme_stylebox_override("panel", hsb)
-	head.custom_minimum_size = Vector2(0, Widgets.TOPBAR_H)
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 0)
@@ -114,16 +118,15 @@ func _build_topbar(wide: bool) -> PanelContainer:
 
 	if wide:
 		var gap1 := Control.new()
-		gap1.custom_minimum_size = Vector2(28, 0)
+		gap1.custom_minimum_size = Vector2(56, 0)
 		row.add_child(gap1)
 
-		# Botões de nav esticam pra preencher o espaço central
 		var btn_row := _make_topbar_nav()
 		btn_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(btn_row)
 
 		var gap2 := Control.new()
-		gap2.custom_minimum_size = Vector2(28, 0)
+		gap2.custom_minimum_size = Vector2(56, 0)
 		row.add_child(gap2)
 	else:
 		var spacer := Control.new()
@@ -325,14 +328,18 @@ func _build_ranked(wide: bool) -> void:
 		cols.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_content_col.add_child(cols)
 
-		# Coluna esquerda (60%): badge + tier + métricas
+		# Coluna esquerda (60%): badge + tier + métricas (50% larg.) + botão jogar
 		var left := VBoxContainer.new()
 		left.add_theme_constant_override("separation", 16)
 		left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		left.size_flags_stretch_ratio = 0.6
 		cols.add_child(left)
 		_ranked_badge_block(left, t, tc, 72, UIKit.TR_WHITE)
-		_ranked_stats_block(left, rk, wins, loss)
+		_ranked_stats_block(left, rk, wins, loss, true)
+		var spacer_fill := Control.new()
+		spacer_fill.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		left.add_child(spacer_fill)
+		left.add_child(_make_ranked_play_btn())
 
 		# Coluna direita (40%): torneios ocupa a coluna inteira
 		var right := VBoxContainer.new()
@@ -342,8 +349,16 @@ func _build_ranked(wide: bool) -> void:
 		_ranked_tournament_block(right, fichas, true)
 	else:
 		_ranked_badge_block(_content_col, t, tc, 48, UIKit.BROWN)
-		_ranked_stats_block(_content_col, rk, wins, loss)
+		_ranked_stats_block(_content_col, rk, wins, loss, false)
 		_ranked_tournament_block(_content_col, fichas, false)
+		# Botão na barra de rodapé (portrait)
+		var ab_mg := MarginContainer.new()
+		ab_mg.add_theme_constant_override("margin_left",   32)
+		ab_mg.add_theme_constant_override("margin_right",  32)
+		ab_mg.add_theme_constant_override("margin_top",    12)
+		ab_mg.add_theme_constant_override("margin_bottom", 32)
+		_action_bar.add_child(ab_mg)
+		ab_mg.add_child(_make_ranked_play_btn())
 
 
 func _ranked_badge_block(col: VBoxContainer, t: Dictionary, tc: Color, tier_size: int, tier_color: Color) -> void:
@@ -367,7 +382,7 @@ func _ranked_badge_block(col: VBoxContainer, t: Dictionary, tc: Color, tier_size
 	col.add_child(tier_lbl)
 
 
-func _ranked_stats_block(col: VBoxContainer, rk: Dictionary, wins: int, loss: int) -> void:
+func _ranked_stats_block(col: VBoxContainer, rk: Dictionary, wins: int, loss: int, wide: bool) -> void:
 	var ratio := float(wins) / float(maxi(loss, 1))
 	var stat_rows: Array[Array] = [
 		["MMR",  UIKit.fmt_int(int(rk["mmr"]))],
@@ -375,7 +390,12 @@ func _ranked_stats_block(col: VBoxContainer, rk: Dictionary, wins: int, loss: in
 		["V / D", UIKit.fmt_dec(ratio, 2)],
 	]
 	var mp := UIKit.panel(UIKit.TR_PURPLE, UIKit.TR_PURPLE.lightened(0.12), 10)
-	mp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if wide:
+		# 50% da largura da coluna, centralizado
+		mp.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		mp.custom_minimum_size = Vector2(get_viewport_rect().size.x * 0.28, 0)
+	else:
+		mp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var mv := VBoxContainer.new()
 	mv.add_theme_constant_override("separation", 12)
 	mp.add_child(mv)
@@ -445,20 +465,14 @@ func _ranked_tournament_block(col: VBoxContainer, fichas: int, fill_height: bool
 		tlist.add_child(item)
 	col.add_child(tp)
 
-	# Botão fixo no rodapé, largura total (com a margem global)
-	var ab_mg := MarginContainer.new()
-	ab_mg.add_theme_constant_override("margin_left",   Widgets.MARGIN)
-	ab_mg.add_theme_constant_override("margin_right",  Widgets.MARGIN)
-	ab_mg.add_theme_constant_override("margin_top",    12)
-	ab_mg.add_theme_constant_override("margin_bottom", 32)
-	_action_bar.add_child(ab_mg)
-	var find_btn := Button.new()
-	find_btn.text = "JOGAR RANKEADA"
-	find_btn.focus_mode = Control.FOCUS_NONE
-	find_btn.custom_minimum_size = Vector2(0, 112)
-	find_btn.add_theme_font_size_override("font_size", 44)
-	var glow_red := Color("#d63060")   ## vermelho mais claro pro glow
-	var mk_ranked := func(bg: Color) -> StyleBoxFlat:
+func _make_ranked_play_btn() -> Button:
+	var b := Button.new()
+	b.text = "JOGAR RANKEADA"
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(0, 112)
+	b.add_theme_font_size_override("font_size", 44)
+	var glow_red := Color("#d63060")
+	var mk := func(bg: Color) -> StyleBoxFlat:
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = bg
 		sb.border_color = glow_red
@@ -470,15 +484,15 @@ func _ranked_tournament_block(col: VBoxContainer, fichas: int, fill_height: bool
 		sb.content_margin_left  = 20
 		sb.content_margin_right = 20
 		return sb
-	find_btn.add_theme_stylebox_override("normal",   mk_ranked.call(UIKit.TR_RED))
-	find_btn.add_theme_stylebox_override("hover",    mk_ranked.call(UIKit.TR_RED.lightened(0.10)))
-	find_btn.add_theme_stylebox_override("pressed",  mk_ranked.call(UIKit.TR_RED.darkened(0.08)))
-	find_btn.add_theme_stylebox_override("focus",    mk_ranked.call(UIKit.TR_RED))
+	b.add_theme_stylebox_override("normal",   mk.call(UIKit.TR_RED))
+	b.add_theme_stylebox_override("hover",    mk.call(UIKit.TR_RED.lightened(0.10)))
+	b.add_theme_stylebox_override("pressed",  mk.call(UIKit.TR_RED.darkened(0.08)))
+	b.add_theme_stylebox_override("focus",    mk.call(UIKit.TR_RED))
 	for cn in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		find_btn.add_theme_color_override(cn, UIKit.TR_GOLD)
-	find_btn.add_theme_constant_override("outline_size", 0)
-	find_btn.pressed.connect(_start_ranked_matchmaking)
-	ab_mg.add_child(find_btn)
+		b.add_theme_color_override(cn, UIKit.TR_GOLD)
+	b.add_theme_constant_override("outline_size", 0)
+	b.pressed.connect(_start_ranked_matchmaking)
+	return b
 
 
 func _build_classic(wide: bool) -> void:
