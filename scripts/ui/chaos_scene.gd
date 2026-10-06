@@ -224,7 +224,7 @@ func _build_ui() -> void:
 	my_bet_pill.anchor_bottom = 1.0
 	my_bet_pill.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	my_bet_pill.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	my_bet_pill.offset_bottom = -30.0
+	my_bet_pill.offset_bottom = -76.0
 	my_bet_pill.z_index = 5
 	my_bet_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	my_bet_pill.add_theme_stylebox_override("panel", UIKit.box(UIKit.CLEAR, UIKit.CLEAR, 0, 0, 0))   # sem borda: só ficha + valor, como nos rivais
