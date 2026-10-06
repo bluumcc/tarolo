@@ -29,20 +29,20 @@ Aplicação das cores: vermelho → `rim_box(TR_RED_DARK, TR_RED_LIGHT, TR_RED)`
 ## Tamanho das cartas (regra para não repetir o erro)
 - Arte das cartas: PNG 540×900 (proporção `CardView.ART_ASPECT` = 0,6). `CardView.SIZE` **sempre deriva dela**: 188×313 (único tamanho; o seletor Compacta/Grande foi removido).
 - `TextureRect` da arte: **nunca `EXPAND_KEEP_SIZE`** (o PNG inflaria a carta 3×). Usar `EXPAND_IGNORE_SIZE`.
-- **Nunca compensar tamanho com escala "no olho".** Tamanhos por plataforma vêm de `CardView.hand_scale()` (celular 1,0; carta arrastada ×1,15), `focus_scale()` e `table_scale()`; a zona da mão vem de `HandLayout.fan_height()`.
+- **Nunca compensar tamanho com escala "no olho".** Tamanhos por plataforma vêm de `CardView.hand_scale()` (celular 1,1; carta arrastada ×1,15), `focus_scale()` e `table_scale()`; a zona da mão vem de `HandLayout.fan_height()`.
 - Escala de Control: pivô = `size/2` e posição = `centro - size/2` (tamanho sem escala). Ver `HandLayout._place`.
 - Gate: `godot --headless --path . res://tests/card_layout_gate.tscn` (corpo = SIZE, leque inteiro e centralizado, em celular e PC).
 
 ## Componentes da mesa Blitz (reutilizáveis, atômicos)
 Em `scripts/ui/`, todos desenhados em código (sem textura/shader) e só com tokens `UIKit.TR_*`:
 - `HexAvatar` — avatar hexagonal com moldura neon (`set_active` = vez), selo de vitórias (vértice de baixo à esquerda) e D do dealer (à direita). `make_badge()` cria o selo.
-- `SeatView` — assento: `HexAvatar` + plaquinha com o nome. Rival: tocar no avatar **ou** no nome abre o card do stack (3 s). `always_stack` = você (nome + stack sempre visíveis). Tamanho fixo `W×H`.
+- `SeatView` — assento: `HexAvatar` + plaquinha com o nome. Rival: tocar no avatar **ou** no nome troca o nome pelo stack por 7 s. `always_stack` = você (nome + stack sempre visíveis). Tamanho fixo `W×H`.
 - `StatCard` — card legenda + número (POTE, TEMPO, FEZ/PALPITE, APOSTA). `value` é o Label a atualizar.
 - `ModifierStrip` — faixa fixa de largura total com o modificador da rodada; `show_modifier()` só mexe nos nós se mudou; sinal `tapped` abre a explicação.
 - `RoundDots` — losangos de progresso (`set_progress(total, atual)`), um único `_draw`.
 - `UIKit.action_button(texto, UIKit.ActionKind.DANGER|OK|GOLD)` — botões de ação (padrão `rim_box`, serifada).
 - `UIKit.serif()` / `UIKit.serif_label()` — serifada de títulos/legendas (DejaVu Serif Bold subset, ~28 KB, `assets/fonts/DejaVuSerif-Bold-Subset.ttf`). Legendas ≥ 20 px.
-- `TableEllipse` — mesa de runas (anéis neon + glifos), desenhada uma vez por resize.
+- `TableEllipse` — mesa de runas (anéis neon + glifos). `fit()` ajusta a elipse: avatares na borda, mesa cresce até um avatar tocar a lateral/topo ou o de baixo chegar perto do card roxo.
 - Layout da mesa (`chaos_scene.gd`): topo = menu · título + `RoundDots` · `StatCard` fez/palpite; abaixo a `ModifierStrip`; seu avatar cruza o topo do card roxo, avisos ("fulano pagou") na faixa logo abaixo dele; mão em leque; prêmio no pé do card; barra de baixo = POTE · ações · TEMPO. A ajuda (antigo "?") mora na pausa.
 
 ## Princípios do produto

@@ -19,6 +19,8 @@ func _ready() -> void:
 	var path: String = lookup[scene]
 	GameState.chaos_mode = str(args.get("mode", "blitz"))
 	GameState.autoplay = scene == "game" or args.has("auto")
+	if args.has("players"):
+		GameState.ranked_table = {"blind": 10, "stack_blinds": 40, "players": int(args["players"])}   # mesa rankeada de N lugares
 	if args.has("hand_layout"):
 		SaveManager.section("settings")["hand_layout"] = str(args["hand_layout"])
 	if scene == "tutorial":

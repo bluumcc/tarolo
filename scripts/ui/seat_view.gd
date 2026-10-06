@@ -1,20 +1,23 @@
 class_name SeatView
 extends Control
 ## Assento de um jogador na mesa: avatar hexagonal + plaquinha com o nome embaixo.
-## Rival: tocar no avatar OU no nome abre o card com o stack (fecha sozinho em 3 s).
+## Rival: tocar no avatar OU no nome troca o nome pelo stack; o nome volta sozinho em 7 s.
 ## Você (`always_stack`): a plaquinha mostra nome e stack o tempo todo.
 ## O tamanho do assento é fixo (W×H), então a mesa pode posicioná-lo sem medir texto.
 
 const W := 130.0
 const H := 127.0
 const PLATE_MIN_W := 112.0
+const AVATAR_TOP := 2.0
+const AVATAR_CENTER_Y := AVATAR_TOP + HexAvatar.SIZE_PX.y / 2.0   ## centro do avatar, medido do topo do assento
+const STACK_SECONDS := 7.0
 
 var avatar: HexAvatar
 var name_label: Label
-var stack_label: Label      ## no card (rival) ou na própria plaquinha (você)
+var stack_label: Label      ## troca com o nome (rival) ou fica ao lado dele (você)
 var bet_label: Label        ## aposta da rodada, logo abaixo do nome (rival)
 var _plate: PanelContainer
-var _card: PanelContainer
+var _stack_row: HBoxContainer
 var _always := false
 var _token := 0
 
@@ -25,7 +28,7 @@ func setup(p: int, accent: Color, always_stack: bool = false) -> SeatView:
 	size = Vector2(W, H)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	avatar = HexAvatar.new().setup(p, accent)
-	avatar.position = Vector2((W - avatar.size.x) / 2.0, 2.0)
+	avatar.position = Vector2((W - avatar.size.x) / 2.0, AVATAR_TOP)
 	add_child(avatar)
 
 	_plate = PanelContainer.new()
@@ -38,7 +41,7 @@ func setup(p: int, accent: Color, always_stack: bool = false) -> SeatView:
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_plate.add_child(row)
-	name_label = UIKit.serif_label("", 22, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	name_label = UIKit.serif_label("", 19, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
 	name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	row.add_child(name_label)
 
@@ -52,15 +55,9 @@ func setup(p: int, accent: Color, always_stack: bool = false) -> SeatView:
 	stack_label.add_theme_font_size_override("font_size", 22)
 	stack_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	stack_row.add_child(stack_label)
-	_card = PanelContainer.new()
-	_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_card.add_theme_stylebox_override("panel", UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.2), UIKit.TR_GOLD.darkened(0.4), 2, 10, 6))
-	_card.visible = false
-	if _always:
-		row.add_child(stack_row)
-	else:
-		_card.add_child(stack_row)
-	add_child(_card)
+	_stack_row = stack_row
+	stack_row.visible = _always
+	row.add_child(stack_row)
 
 	bet_label = UIKit.label("", 22, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	bet_label.add_theme_font_size_override("font_size", 22)
@@ -75,31 +72,33 @@ func setup(p: int, accent: Color, always_stack: bool = false) -> SeatView:
 	return self
 
 
-## Posiciona plaquinha, aposta e card (chamar depois de mudar texto/fonte).
+## Posiciona plaquinha e aposta (chamar depois de mudar texto/fonte). A aposta dos rivais fica
+## embaixo da plaquinha; a sua (`always_stack`), no mesmo estilo, em cima do avatar.
 func layout() -> void:
 	var ps := _plate.get_combined_minimum_size()
 	_plate.size = Vector2(maxf(ps.x, PLATE_MIN_W), ps.y)
-	_plate.position = Vector2((W - _plate.size.x) / 2.0, avatar.position.y + avatar.size.y - 10.0)
-	var y := _plate.position.y + _plate.size.y
+	_plate.position = Vector2((W - _plate.size.x) / 2.0, avatar.position.y + avatar.size.y + 4.0)
 	var bh := bet_label.get_combined_minimum_size().y
-	bet_label.position = Vector2(0.0, y)
 	bet_label.size = Vector2(W, bh)
-	_card.size = _card.get_combined_minimum_size()
-	_card.position = Vector2((W - _card.size.x) / 2.0, y + bh + 2.0)
+	bet_label.position = Vector2(0.0, -bh - 2.0) if _always else Vector2(0.0, _plate.position.y + _plate.size.y)
 
 
 func _on_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		toggle_card()
+		show_stack()
 		accept_event()
 
 
-func toggle_card() -> void:
+## Troca o nome pelo stack por `STACK_SECONDS`; tocar de novo reinicia a contagem.
+func show_stack() -> void:
 	Sfx.play("tick")
-	_card.visible = not _card.visible
+	name_label.visible = false
+	_stack_row.visible = true
+	layout()
 	_token += 1
-	if _card.visible:
-		var mine := _token
-		get_tree().create_timer(3.0).timeout.connect(func():
-			if mine == _token and is_instance_valid(_card):
-				_card.visible = false)
+	var mine := _token
+	get_tree().create_timer(STACK_SECONDS).timeout.connect(func():
+		if mine == _token and is_instance_valid(self):
+			name_label.visible = true
+			_stack_row.visible = false
+			layout())

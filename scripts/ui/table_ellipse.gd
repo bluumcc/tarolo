@@ -6,32 +6,59 @@ extends Control
 const POINTS := 80
 
 
-## Meio-tamanho do assento (avatar + nome). Os avatares ficam com o centro NA borda da mesa
-## (metade dentro, metade fora), todos sobre a mesma elipse.
-const SEAT_HALF := Vector2(65.0, 52.0)
-## Quanto a mesa desce além da área do palco: o pedaço de baixo fica atrás do card roxo.
+## Folga entre o topo da área da mesa e o topo do avatar de cima (somada ao respiro de 8 px do
+## layout, dá o triplo da folga que havia entre a faixa do modificador e o avatar).
+const TOP_GAP := 16.0
+const SIDE_GAP := 4.0
+## Do centro do avatar pra baixo: parte de baixo do avatar + plaquinha de nome.
+const SEAT_BELOW := 78.0
+## Quanto a mesa pode descer além da área do palco: o pedaço de baixo fica atrás do card roxo.
 const TABLE_DROP := 70.0
 
+var seat_count := 4
+var seat_floor := 0.0          ## y (da área da mesa) abaixo do qual nenhum rival pode chegar: o card roxo
+var _center := Vector2.ZERO
+var _radii := Vector2(10, 10)
 
-func _top_y() -> float:
-	return SEAT_HALF.y + 2.0   # centro do avatar do topo
+
+## Encaixa a mesa na área: os avatares ficam todos NA borda da elipse (cada um na direção do
+## seu assento) e a mesa cresce com eles até um avatar tocar na lateral ou no topo, ou o de
+## baixo chegar perto do card roxo (`seat_floor`).
+func fit() -> void:
+	var r_av := HexAvatar.RADIUS
+	var half_w := SeatView.W / 2.0
+	var topc := TOP_GAP + r_av
+	var max_cos := 0.0
+	var min_sin := 0.0
+	var max_sin := 0.0
+	for p in range(1, seat_count):
+		var a := seat_angle(p, seat_count)
+		max_cos = maxf(max_cos, absf(cos(a)))
+		min_sin = minf(min_sin, sin(a))
+		max_sin = maxf(max_sin, sin(a))
+	var rx := size.x / 2.0 - SIDE_GAP
+	if max_cos > 0.01:
+		rx = minf(rx, (size.x / 2.0 - half_w - SIDE_GAP) / max_cos)
+	var ry := (size.y + TABLE_DROP - topc) / 2.0
+	if max_sin - min_sin > 0.01 and seat_floor > 0.0:
+		ry = minf(ry, (seat_floor - SEAT_BELOW - topc) / (max_sin - min_sin))
+	_radii = Vector2(maxf(rx, 10.0), maxf(ry, 10.0))
+	_center = Vector2(size.x / 2.0, topc - min_sin * _radii.y)
+	queue_redraw()
 
 
-## Centro da elipse: a mesa começa no avatar do topo e se estende pra baixo.
 func center_point() -> Vector2:
-	return Vector2(size.x / 2.0, _top_y() + radii().y)
+	return _center
 
 
 ## Raio visual da elipse (a mesa).
 func radii() -> Vector2:
-	return Vector2(
-		maxf(size.x / 2.0 - SEAT_HALF.x - 4.0, 10.0),
-		maxf((size.y + TABLE_DROP - _top_y()) / 2.0, 10.0))
+	return _radii
 
 
 ## Órbita dos centros dos avatares: a própria borda da elipse.
 func seat_edge_radii() -> Vector2:
-	return radii()
+	return _radii
 
 
 ## Ângulo do assento: o jogador 0 fica embaixo e os demais se distribuem com ângulos iguais.

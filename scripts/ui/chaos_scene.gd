@@ -150,7 +150,7 @@ func _show_insufficient_fichas() -> void:
 const HAND_RAISE := 28.0   ## o leque sobe um pouco da base da faixa da mão
 const BAR_H := 96.0       ## barra de ações embaixo
 const BANNER_H := 100.0    ## do topo da zona até a mão: faixa de avisos, abaixo do seu avatar
-const POT_H := 30.0        ## prêmio, no pé do card roxo
+const POT_H := 52.0        ## prêmio (card azul), no pé do card roxo
 const LANE_TOP := 56.0     ## topo da faixa de avisos, medido do topo do card roxo
 const LANE_H := 76.0
 const MY_SEAT_RISE := 21.0 ## quanto o centro do seu avatar fica acima do topo do card roxo
@@ -166,7 +166,7 @@ var timer_label: Label
 var center_card: Panel
 var hand_scroller: HandScroller
 var hand_zone: Control
-var my_bet_pill: PanelContainer
+var my_bet_pill: Control        # aposta da rodada: o Label do seu assento, em cima do avatar
 var my_bet_label: Label
 
 
@@ -266,12 +266,12 @@ func _build_ui() -> void:
 	table_center.resized.connect(_layout_table)
 	for p in range(engine.num_players):
 		stage.add_child(_build_seat(p))
-	# Sua aposta da rodada: card ao lado do seu avatar (posição em `_layout_seats`).
-	my_bet_pill = StatCard.new().setup("APOSTA", "", UIKit.TR_GOLD, 28)
-	my_bet_pill.z_index = 7
-	my_bet_pill.modulate.a = 0.0
-	my_bet_label = (my_bet_pill as StatCard).value
-	stage.add_child(my_bet_pill)
+	# Sua aposta da rodada: o mesmo texto de fichas dos rivais, em cima do seu avatar.
+	var me_seat := seat_nodes[0] as SeatView
+	my_bet_label = me_seat.bet_label
+	my_bet_pill = my_bet_label
+	my_bet_label.visible = true
+	my_bet_label.modulate.a = 0.0
 	bet_pills[0] = my_bet_pill
 	bet_tags[0] = my_bet_label
 
@@ -347,15 +347,25 @@ func _build_hand_zone(root: VBoxContainer) -> void:
 	bv.add_child(banner_sub)
 	center_card.add_child(banner_box)
 
-	pot_prize_label = UIKit.serif_label("", 20, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	pot_prize_label.anchor_left = 0.0
-	pot_prize_label.anchor_right = 1.0
-	pot_prize_label.anchor_top = 1.0
-	pot_prize_label.anchor_bottom = 1.0
-	pot_prize_label.offset_top = -POT_H - 4.0
-	pot_prize_label.offset_bottom = -4.0
+	# Prêmio: card com borda e texto azuis, acima do pé do card roxo (some junto com o texto).
+	var blue := UIKit.prize_blue()
+	var prize_card := PanelContainer.new()
+	prize_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	prize_card.anchor_left = 0.5
+	prize_card.anchor_right = 0.5
+	prize_card.anchor_top = 1.0
+	prize_card.anchor_bottom = 1.0
+	prize_card.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	prize_card.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	prize_card.offset_bottom = -18.0
+	prize_card.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), blue, blue.darkened(0.4), "small", 12, 18, 4))
+	pot_prize_label = UIKit.serif_label("", 22, blue, HORIZONTAL_ALIGNMENT_CENTER)
+	pot_prize_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	pot_prize_label.visible = false
-	center_card.add_child(pot_prize_label)
+	prize_card.visible = false
+	pot_prize_label.visibility_changed.connect(func(): prize_card.visible = pot_prize_label.visible)
+	prize_card.add_child(pot_prize_label)
+	center_card.add_child(prize_card)
 
 	# Mão em arco leve, sempre no tamanho real; rola de lado só se não couber.
 	hand_scroller = HandScroller.new()
@@ -512,9 +522,15 @@ func _build_seat(p: int) -> SeatView:
 func _layout_seats() -> void:
 	if table_center == null or stage == null:
 		return
+	var n := engine.num_players
+	var card_top := stage.size.y - 28.0   # fallback: topo do card roxo no sistema do palco
+	if center_card != null and center_card.is_inside_tree() and center_card.size.y > 0.0:
+		card_top = center_card.global_position.y - stage.global_position.y
+	table_center.seat_count = n
+	table_center.seat_floor = card_top - 20.0
+	table_center.fit()
 	var c := table_center.center_point()
 	var r := table_center.seat_edge_radii()
-	var n := engine.num_players
 	for p in range(n):
 		var seat := seat_nodes[p] as SeatView
 		if seat == null:
@@ -524,20 +540,11 @@ func _layout_seats() -> void:
 			continue
 		var theta := TableEllipse.seat_angle(p, n)
 		var pt := c + Vector2(cos(theta) * r.x, sin(theta) * r.y)
-		seat.position = Vector2(
-			clampf(pt.x - SeatView.W / 2.0, 0.0, maxf(stage.size.x - SeatView.W, 0.0)),
-			clampf(pt.y - SeatView.H / 2.0, 0.0, maxf(stage.size.y - SeatView.H, 0.0)))
+		seat.position = Vector2(pt.x - SeatView.W / 2.0, pt.y - SeatView.AVATAR_CENTER_Y)   # centro do avatar NA borda
 	var me := seat_nodes[0] as SeatView
 	if me == null:
 		return
-	var card_top := stage.size.y - 28.0   # fallback: topo do card roxo no sistema do palco
-	if center_card != null and center_card.is_inside_tree() and center_card.size.y > 0.0:
-		card_top = center_card.global_position.y - stage.global_position.y
-	var av_center_y := card_top - MY_SEAT_RISE
-	me.position = Vector2((stage.size.x - SeatView.W) / 2.0, av_center_y - me.avatar.position.y - me.avatar.size.y / 2.0)
-	var pill := my_bet_pill
-	pill.size = pill.get_combined_minimum_size()
-	pill.position = Vector2((stage.size.x + SeatView.W) / 2.0 + 4.0, av_center_y - pill.size.y / 2.0)
+	me.position = Vector2((stage.size.x - SeatView.W) / 2.0, card_top - MY_SEAT_RISE - SeatView.AVATAR_CENTER_Y)
 
 
 ## Pote: card de número no canto de baixo à esquerda (o prêmio fica no pé do card roxo).
@@ -1922,7 +1929,7 @@ func _refresh_bet_tags(p: int, idx: int) -> void:
 	if streak >= 2:
 		flames = "%s×%s" % ["♨".repeat(ChaosCombos.flame_level(streak)), UIKit.fmt_dec(ChaosCombos.streak_mult(streak), 2)]
 	var pile := float(engine.contrib[p]) if not bets_gathered and phase != "idle" else 0.0
-	var pill := bet_pills[p] as PanelContainer
+	var pill := bet_pills[p] as Control
 	(bet_tags[p] as Label).text = "◎ %d" % int(pile)
 	(bet_tags[p] as Label).add_theme_color_override("font_color", UIKit.LOSS if engine.folded[p] else UIKit.BRAND)
 	pill.modulate.a = 1.0 if pile > 0.0 else 0.0
@@ -2216,7 +2223,7 @@ func _set_discard_chrome(active: bool) -> void:
 		(seat_nodes[p] as Control).visible = not active
 	for p in range(engine.num_players):
 		if p == 0:
-			(bet_pills[p] as PanelContainer).visible = not active
+			(bet_pills[p] as Control).visible = not active
 		(order_badges[p] as PanelContainer).visible = not active
 		(dealer_badges[p] as PanelContainer).visible = not active
 
@@ -2589,7 +2596,7 @@ func _refresh_blitz_tag(p: int, _idx: int) -> void:
 	var pile := float(engine.contrib[0]) if (phase == "bet" or phase == "play") else 0.0
 	my_bet_pill.modulate.a = 1.0 if pile > 0.0 else 0.0
 	my_bet_label.text = "◎ %d" % int(pile)
-	my_bet_label.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[0] else UIKit.TR_GOLD)
+	my_bet_label.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[0] else UIKit.MONEY)
 	var val := prog_card.value
 	if not bool(blitz_revealed[0]):
 		val.text = "–"

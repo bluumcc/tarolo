@@ -189,6 +189,11 @@ static func serif() -> Font:
 	return _serif
 
 
+## Azul médio (nem escuro, nem bebê): o azul da paleta com o brilho no alto. Prêmio do palpite.
+static func prize_blue() -> Color:
+	return Color.from_hsv(TR_BLUE.h, TR_BLUE.s, 0.88)
+
+
 ## Lilás apagado pra legendas sobre painel escuro (derivado da paleta, sem hex novo).
 static func muted_lilac() -> Color:
 	return TR_PURPLE_LIGHT.lightened(0.6)
