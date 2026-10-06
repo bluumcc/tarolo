@@ -53,12 +53,10 @@ var dealer_badges: Array = []
 var phase := "idle"            # "bet" | "play" | "idle"
 var bets_gathered := false     # apostas já juntadas no pote
 var first_round_done := false
-var title_label: Label
 var round_dots: RoundDots
 var prog_card: StatCard         # PALPITE (fez/palpite), no canto de baixo à esquerda
 var bottom_mid: Control          # meio da barra de baixo: ações OU o card de pote/prêmio
-var idle_card: PanelContainer    # POTE | PRÊMIO — ocupa o lugar dos botões enquanto não há ação
-var prize_col: Control
+var idle_card: PanelContainer    # PRÊMIO — ocupa o lugar dos botões enquanto não há ação
 var modifier_strip: ModifierStrip
 var discard_head: VBoxContainer  # título grande + instrução da etapa de descarte, no topo do palco (fora do card)
 var chrome_discard := false      # etapa sem mesa (descarte/palpite): sem modificador na faixa
@@ -222,13 +220,25 @@ func _build_ui() -> void:
 	info_v.add_theme_constant_override("separation", 4)
 	info_v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	info_box.add_child(info_v)
-	title_label = UIKit.serif_label("", 24, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	title_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	title_label.clip_text = true
-	info_v.add_child(title_label)
 	round_dots = RoundDots.new()
 	round_dots.set_progress(ChaosEngine.HAND_SIZE, 0)
 	info_v.add_child(round_dots)
+	# Pote: uma linha só, logo abaixo dos losangos.
+	pot_box = HBoxContainer.new()
+	(pot_box as HBoxContainer).alignment = BoxContainer.ALIGNMENT_CENTER
+	(pot_box as HBoxContainer).add_theme_constant_override("separation", 10)
+	pot_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var pot_cap := UIKit.serif_label("POTE", 20, UIKit.TR_GOLD.lerp(UIKit.TR_WHITE, 0.25), HORIZONTAL_ALIGNMENT_CENTER)
+	pot_cap.autowrap_mode = TextServer.AUTOWRAP_OFF
+	pot_box.add_child(pot_cap)
+	pot_label = UIKit.label("◎ 0", 28, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	pot_label.add_theme_font_size_override("font_size", 28)
+	pot_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	pot_box.add_child(pot_label)
+	pot_sub = UIKit.label("", 18, UIKit.MUTED)   # sem lugar na tela
+	pot_sub.visible = false
+	pot_box.add_child(pot_sub)
+	info_v.add_child(pot_box)
 	topbar.add_child(info_box)
 	var help_btn := Widgets.icon_button("?")
 	for sn in ["normal", "hover", "pressed", "focus"]:
@@ -420,45 +430,28 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	bottom_bar.add_child(tempo)
 
 
-## Card do meio, de largura total: POTE e PRÊMIO lado a lado (o prêmio só aparece quando existe).
+## Card do meio, de largura total: PRÊMIO numa linha só, centralizado (só quando existe).
 ## Fica no lugar dos botões e some quando uma ação é pedida (ver `_refresh_idle_card`).
 func _build_idle_card() -> void:
 	var blue := UIKit.prize_blue()
 	idle_card = PanelContainer.new()
 	idle_card.custom_minimum_size = Vector2(0, ACT_H)
 	idle_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	idle_card.add_theme_stylebox_override("panel", UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 12, 6))
+	idle_card.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), blue, blue.darkened(0.4), "small", 12, 12, 6))
 	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 12)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	idle_card.add_child(row)
-	var cols := []
-	for spec in [["POTE", UIKit.TR_GOLD], ["PRÊMIO", blue]]:
-		var col := VBoxContainer.new()
-		col.alignment = BoxContainer.ALIGNMENT_CENTER
-		col.add_theme_constant_override("separation", 0)
-		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var cap := UIKit.serif_label(spec[0], 18, (spec[1] as Color).lerp(UIKit.TR_WHITE, 0.25), HORIZONTAL_ALIGNMENT_CENTER)
-		cap.autowrap_mode = TextServer.AUTOWRAP_OFF
-		cap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		col.add_child(cap)
-		var val := UIKit.label("◎ 0", 30, spec[1], HORIZONTAL_ALIGNMENT_CENTER)
-		val.add_theme_font_size_override("font_size", 30)
-		val.autowrap_mode = TextServer.AUTOWRAP_OFF
-		val.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		col.add_child(val)
-		row.add_child(col)
-		cols.append([col, val])
-	pot_box = cols[0][0]
-	pot_label = cols[0][1]
-	prize_col = cols[1][0]
-	pot_prize_label = cols[1][1]
-	prize_col.visible = false
-	pot_prize_label.visibility_changed.connect(func(): prize_col.visible = pot_prize_label.visible)
-	pot_sub = UIKit.label("", 18, UIKit.MUTED)   # sem lugar na tela: o card só mostra os valores
-	pot_sub.visible = false
-	idle_card.add_child(pot_sub)
+	var cap := UIKit.serif_label("PRÊMIO", 22, blue.lerp(UIKit.TR_WHITE, 0.25), HORIZONTAL_ALIGNMENT_CENTER)
+	cap.autowrap_mode = TextServer.AUTOWRAP_OFF
+	row.add_child(cap)
+	pot_prize_label = UIKit.label("◎ 0", 32, blue, HORIZONTAL_ALIGNMENT_CENTER)
+	pot_prize_label.add_theme_font_size_override("font_size", 32)
+	pot_prize_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	row.add_child(pot_prize_label)
+	pot_prize_label.visible = false
+	pot_prize_label.visibility_changed.connect(func(): cap.visible = pot_prize_label.visible; _refresh_idle_card())
 
 
 ## Card de pote/prêmio só quando ninguém está pedindo ação (botões, dobrar) nem rolando
@@ -467,7 +460,7 @@ func _refresh_idle_card() -> void:
 	if idle_card == null:
 		return
 	var asking := (bet_row != null and bet_row.visible) or (double_btn != null and double_btn.visible)
-	idle_card.visible = not asking and phase != "discard" and phase != "predict" and not chrome_discard
+	idle_card.visible = not asking and phase != "discard" and phase != "predict" and not chrome_discard and pot_prize_label.visible
 
 
 func _is_wide() -> bool:
@@ -1916,7 +1909,6 @@ func _refresh_hud() -> void:
 			pile_l.text = "◎ %d" % int(pile)
 			pile_l.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[p] else UIKit.MONEY)
 		_refresh_bet_tags(p, idx)
-	title_label.text = "RODADA %d%s · %s ◎%d" % [engine.round_index + 1, ("/%d" % engine.levels) if engine.levels > 0 else "", "ENTRADA" if engine.blitz else "BLIND", int(engine.blitz_entry()) if engine.blitz else engine.blind]
 	round_dots.set_progress(ChaosEngine.HAND_SIZE, engine.trick_number)
 	_refresh_modifier_strip()
 	_refresh_pot()
