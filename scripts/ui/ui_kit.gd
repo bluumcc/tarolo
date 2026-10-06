@@ -73,7 +73,8 @@ const TR_BLACK  := Color("#080413")   ## fundo principal
 const TR_WHITE  := Color("#e7e7e3")   ## texto principal / face de carta
 const TR_GOLD   := Color("#bead84")   ## dourado âmbar (recompensas, destaque)
 const TR_CYAN   := Color("#6cbfc5")   ## ciano (info, seleção, ação secundária)
-const TR_RED    := Color("#a61b44")   ## vermelho (perigo, naipes vermelhos)
+const TR_RED      := Color("#a61b44")   ## vermelho (perigo, naipes vermelhos)
+const TR_RED_GLOW := Color("#d63060")   ## vermelho brilhante (glow de botão primário)
 const TR_BLUE   := Color("#236592")   ## azul (defesa, elementos de fundo)
 const TR_PURPLE := Color("#0c0a1a")   ## roxo escuro (superfícies profundas, modais)
 
@@ -112,6 +113,23 @@ static func box(bg: Color, border: Color = BLACK, border_w: int = 3, radius: int
 	sb.content_margin_right = pad
 	sb.content_margin_top = pad
 	sb.content_margin_bottom = pad + (3 if border == BLACK else 0)
+	sb.anti_aliasing = true
+	return sb
+
+
+## StyleBox com sombra/glow colorida — para botões primários e de destaque.
+## `glow_col` é a cor do contorno e da sombra; `glow_size` é o raio da sombra.
+static func glow_box(bg: Color, glow_col: Color, glow_size: int = 10, border_w: int = 3, radius: int = 10, pad_h: int = 12) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.border_color = glow_col
+	sb.set_border_width_all(border_w)
+	sb.set_corner_radius_all(radius)
+	sb.shadow_color = Color(glow_col.r, glow_col.g, glow_col.b, 0.55)
+	sb.shadow_size   = glow_size
+	sb.shadow_offset = Vector2.ZERO
+	sb.content_margin_left  = pad_h
+	sb.content_margin_right = pad_h
 	sb.anti_aliasing = true
 	return sb
 

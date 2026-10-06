@@ -92,14 +92,10 @@ func _build() -> void:
 
 func _build_topbar(wide: bool) -> PanelContainer:
 	var head := PanelContainer.new()
-	var hsb := StyleBoxFlat.new()
-	hsb.bg_color = UIKit.TR_BLACK
-	hsb.border_color = UIKit.TR_PURPLE.lightened(0.22)
+	var hsb := UIKit.box(UIKit.TR_BLACK, UIKit.TR_PURPLE.lightened(0.22), 0, 0, 32)
 	hsb.set_border_width_all(0)
 	hsb.border_width_bottom = 2
 	hsb.set_corner_radius_all(0)
-	hsb.content_margin_left   = 32
-	hsb.content_margin_right  = 32
 	hsb.content_margin_top    = 32
 	hsb.content_margin_bottom = 32
 	head.add_theme_stylebox_override("panel", hsb)
@@ -156,24 +152,14 @@ func _topbar_nav_btn(tab: String, active: bool) -> Button:
 	if active:
 		bg = bg.lightened(0.12)
 	var is_ranked := tab == "RANKEADA"
-	var glow_col  := Color("#d63060") if is_ranked else UIKit.TR_PURPLE.lightened(0.30)
+	var glow_col  := UIKit.TR_RED_GLOW if is_ranked else UIKit.TR_PURPLE.lightened(0.30)
 	var glow_size := 10 if is_ranked else 5
 	var border_w  := 3  if is_ranked else 2
-	var b := Button.new()
-	b.text = tab
+	var b := UIKit.button(tab, bg, 26)
 	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override("font_size", 26)
+	b.custom_minimum_size = Vector2.ZERO
 	var mk := func(c: Color) -> StyleBoxFlat:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = c
-		sb.border_color = glow_col
-		sb.set_border_width_all(border_w)
-		sb.set_corner_radius_all(10)
-		sb.shadow_color  = Color(glow_col.r, glow_col.g, glow_col.b, 0.55)
-		sb.shadow_size   = glow_size
-		sb.shadow_offset = Vector2.ZERO
-		sb.content_margin_left   = 10
-		sb.content_margin_right  = 10
+		var sb := UIKit.glow_box(c, glow_col, glow_size, border_w, 10, 10)
 		sb.content_margin_top    = 0
 		sb.content_margin_bottom = 0
 		return sb
@@ -469,24 +455,11 @@ func _ranked_tournament_block(col: VBoxContainer, fichas: int, fill_height: bool
 	col.add_child(tp)
 
 func _make_ranked_play_btn() -> Button:
-	var b := Button.new()
-	b.text = "JOGAR RANKEADA"
+	var b := UIKit.button("JOGAR RANKEADA", UIKit.TR_RED, 44)
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(0, 112)
-	b.add_theme_font_size_override("font_size", 44)
-	var glow_red := Color("#d63060")
 	var mk := func(bg: Color) -> StyleBoxFlat:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = bg
-		sb.border_color = glow_red
-		sb.set_border_width_all(3)
-		sb.set_corner_radius_all(10)
-		sb.shadow_color = Color(glow_red.r, glow_red.g, glow_red.b, 0.55)
-		sb.shadow_size   = 10
-		sb.shadow_offset = Vector2.ZERO
-		sb.content_margin_left  = 20
-		sb.content_margin_right = 20
-		return sb
+		return UIKit.glow_box(bg, UIKit.TR_RED_GLOW, 10, 3, 10, 20)
 	b.add_theme_stylebox_override("normal",   mk.call(UIKit.TR_RED))
 	b.add_theme_stylebox_override("hover",    mk.call(UIKit.TR_RED.lightened(0.10)))
 	b.add_theme_stylebox_override("pressed",  mk.call(UIKit.TR_RED.darkened(0.08)))

@@ -9,7 +9,7 @@ extends RefCounted
 const ROW_MAX_OVERLAP := 0.5    # fileira: no máximo 50% de uma carta escondida atrás da outra
 const FAN_STEP_RAD := 0.036     # leque: abertura angular entre cartas vizinhas
 const FAN_MAX_HALF_ANGLE := 0.40 # leque: metade da abertura máxima (rad)
-const FAN_MAX_GAP := 0.62        # leque: distância máxima entre centros, em larguras de carta
+const FAN_MAX_GAP := 1.3         # leque: distância máxima entre centros, em larguras de carta
 
 
 ## Posiciona/rotaciona cada CardView em `cards` (já filhos de `hand_container`) dentro da
@@ -61,7 +61,7 @@ static func _apply_fan(cards: Array, avail_w: float, avail_h: float, card_size: 
 	var c := cos(alpha)
 	var half_w := card_size.x / 2.0 * c + card_size.y / 2.0 * s   # meia largura da carta da ponta, já girada
 	var half_h := card_size.y / 2.0 * c + card_size.x / 2.0 * s
-	var span := maxf(avail_w - 2.0 * half_w, card_size.x * 0.5)
+	var span := maxf(avail_w * 0.75 - 2.0 * half_w, card_size.x * 0.5)
 	var radius := span / (2.0 * s)
 	var max_gap := card_size.x * FAN_MAX_GAP   # poucas cartas: não abre demais
 	var gap := radius * 2.0 * alpha / float(n - 1)

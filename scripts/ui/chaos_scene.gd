@@ -245,7 +245,8 @@ func _build_ui() -> void:
 ## Card central (60% da largura): título e descrição do modificador em cima, a mão em arco no
 ## meio (por cima do card, as cartas passam das bordas) e o pote embaixo.
 func _build_hand_zone(root: VBoxContainer) -> void:
-	var hand_h := CardView.SIZE.y + CardView.MAX_LIFT + 72.0
+	var hs := _hand_scale()
+	var hand_h := CardView.SIZE.y * hs + CardView.MAX_LIFT * hs + 72.0
 	var zone := Control.new()
 	zone.custom_minimum_size = Vector2(0, BANNER_H + hand_h + POT_H)
 	root.add_child(zone)
@@ -304,7 +305,7 @@ func _build_hand_zone(root: VBoxContainer) -> void:
 	hand_scroller.anchor_top = 0.0
 	hand_scroller.anchor_bottom = 0.0
 	hand_scroller.offset_top = BANNER_H
-	hand_scroller.offset_bottom = BANNER_H + hand_h
+	hand_scroller.offset_bottom = BANNER_H + hand_h  # also kept in sync by _update_hand_scroller_margins
 	_update_hand_scroller_margins()
 	zone.add_child(hand_scroller)
 	hand_scroller.resized.connect(_layout_hand)
@@ -409,18 +410,33 @@ func _is_wide() -> bool:
 	return sz.x > sz.y
 
 
-## Mão usa a largura total da viewport (quebra a limitação de MAX_UI_W).
+## 75% da viewport em tela larga; largura total no mobile.
+func _max_ui_w() -> float:
+	return get_viewport_rect().size.x * (0.75 if _is_wide() else 1.0)
+
+
+## Cartas a 50% em PC (mais espaço na tela), tamanho cheio no mobile.
+func _hand_scale() -> float:
+	return 0.5 if _is_wide() else 1.0
+
+
+## Mão usa a largura total da viewport (quebra a limitação de _max_ui_w).
 func _update_hand_scroller_margins() -> void:
 	if hand_scroller == null:
 		return
-	var side := maxf(float(Widgets.MARGIN), (get_viewport_rect().size.x - MAX_UI_W) / 2.0)
+	var vp_w := get_viewport_rect().size.x
+	var side := maxf(float(Widgets.MARGIN), (vp_w - _max_ui_w()) / 2.0)
 	hand_scroller.offset_left = -side
 	hand_scroller.offset_right = side
+	var hs := _hand_scale()
+	var hand_h := CardView.SIZE.y * hs + CardView.MAX_LIFT * hs + 72.0
+	hand_scroller.offset_bottom = BANNER_H + hand_h
 
 
 ## Em tela larga o jogo fica numa coluna centralizada (não estica).
 func _apply_orientation() -> void:
-	var side := maxf(float(Widgets.MARGIN), (get_viewport_rect().size.x - MAX_UI_W) / 2.0)
+	var max_w := _max_ui_w()
+	var side := maxf(float(Widgets.MARGIN), (get_viewport_rect().size.x - max_w) / 2.0)
 	margin_box.add_theme_constant_override("margin_left", int(side))
 	margin_box.add_theme_constant_override("margin_right", int(side))
 	_update_hand_scroller_margins()
@@ -683,14 +699,18 @@ func _layout_hand() -> void:
 	if cards.is_empty():
 		return
 	var parent := hand_container.get_parent() as Control
+	var hs := _hand_scale()
+	var card_sz := CardView.SIZE * hs
+	for c in cards:
+		(c as CardView).scale = Vector2(hs, hs)
 	var avail_w := get_viewport_rect().size.x - 8.0
 	# Nunca usar parent.size.y aqui: com rolagem vertical desligada, o ScrollContainer
 	# cresce pra caber o conteúdo — usar o próprio tamanho dele como altura disponível
 	# vira um loop (aumenta a altura, o que aumenta o parent, que aumenta a altura de
 	# novo…) até estourar um limite interno do Godot (~800000px) e empurrar a mão e o
 	# rodapé pra bem fora da tela. A altura útil é sempre a da carta + a folga do lift.
-	var avail_h := CardView.SIZE.y + CardView.MAX_LIFT + 72.0
-	var content_w := HandLayout.apply(cards, avail_w, avail_h, "fan", CardView.SIZE)
+	var avail_h := card_sz.y + CardView.MAX_LIFT * hs + 72.0
+	var content_w := HandLayout.apply(cards, avail_w, avail_h, "fan", card_sz)
 	(parent as HandScroller).set_content_size(Vector2(content_w, avail_h))
 
 
