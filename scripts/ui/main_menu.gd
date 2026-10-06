@@ -52,8 +52,6 @@ func _build() -> void:
 
 	var wide := _is_wide()
 	page.add_child(_build_topbar(wide))
-	if wide:
-		page.add_child(_build_tabbar_portrait())  # landscape: abas abaixo do topbar
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -94,36 +92,39 @@ func _build() -> void:
 
 func _build_topbar(wide: bool) -> PanelContainer:
 	var head := PanelContainer.new()
-	var hsb := UIKit.box(UIKit.SURFACE, UIKit.BLACK, 3, 0, 12)
-	hsb.set_corner_radius_all(0)
-	if not wide:
-		hsb.corner_radius_bottom_left  = 20
-		hsb.corner_radius_bottom_right = 20
+	var hsb := UIKit.box(UIKit.TR_BLACK, UIKit.TR_BLACK, 0, 0, 0)
 	hsb.content_margin_left  = Widgets.MARGIN
 	hsb.content_margin_right = Widgets.MARGIN
+	hsb.content_margin_top    = 0
+	hsb.content_margin_bottom = 0
 	head.add_theme_stylebox_override("panel", hsb)
 	head.custom_minimum_size = Vector2(0, Widgets.TOPBAR_H)
 
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 16)
+	row.add_theme_constant_override("separation", 0)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	head.add_child(row)
 
-	# Logo
-	var logo := UIKit.label("TAROLO", 38, UIKit.BRAND)
+	# Logo esquerda
+	var logo := UIKit.label("TAROLO", 36, UIKit.TR_GOLD)
 	logo.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	logo.add_theme_color_override("font_outline_color", UIKit.TITLE_OUTLINE)
-	logo.add_theme_constant_override("outline_size", 7)
+	logo.add_theme_color_override("font_outline_color", UIKit.TR_PURPLE)
+	logo.add_theme_constant_override("outline_size", 5)
 	row.add_child(logo)
 
 	if wide:
-		# Abas no centro da barra superior
-		var spacer := Control.new()
-		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(spacer)
-		row.add_child(_make_tab_buttons(false))
-		var spacer2 := Control.new()
-		spacer2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(spacer2)
+		var gap1 := Control.new()
+		gap1.custom_minimum_size = Vector2(28, 0)
+		row.add_child(gap1)
+
+		# Botões de nav esticam pra preencher o espaço central
+		var btn_row := _make_topbar_nav()
+		btn_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(btn_row)
+
+		var gap2 := Control.new()
+		gap2.custom_minimum_size = Vector2(28, 0)
+		row.add_child(gap2)
 	else:
 		var spacer := Control.new()
 		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -133,6 +134,44 @@ func _build_topbar(wide: bool) -> PanelContainer:
 	row.add_child(_wallet)
 
 	return head
+
+
+## Botões de navegação embutidos na topbar (só no wide/PC).
+func _make_topbar_nav() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	for tab in ["RANKEADA", "CLÁSSICO", "LOJA", "AJUSTES"]:
+		var btn := _topbar_nav_btn(tab, tab == _active_tab)
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(btn)
+	return row
+
+
+func _topbar_nav_btn(tab: String, active: bool) -> Button:
+	var bg   := UIKit.TR_RED   if tab == "RANKEADA" else UIKit.TR_PURPLE
+	var text := UIKit.TR_GOLD  if tab == "RANKEADA" else UIKit.TR_WHITE
+	if active:
+		bg = bg.lightened(0.12)
+	var b := Button.new()
+	b.text = tab
+	b.focus_mode = Control.FOCUS_NONE
+	b.add_theme_font_size_override("font_size", 22)
+	var mk := func(c: Color) -> StyleBoxFlat:
+		var sb := UIKit.box(c, UIKit.TR_GOLD if active else UIKit.CLEAR, 0, 0, 0)
+		sb.border_width_bottom = 4 if active else 0
+		sb.content_margin_left  = 10
+		sb.content_margin_right = 10
+		sb.content_margin_top    = 0
+		sb.content_margin_bottom = 0
+		return sb
+	b.add_theme_stylebox_override("normal",  mk.call(bg))
+	b.add_theme_stylebox_override("hover",   mk.call(bg.lightened(0.10)))
+	b.add_theme_stylebox_override("pressed", mk.call(bg.darkened(0.08)))
+	b.add_theme_stylebox_override("focus",   mk.call(bg))
+	for cn in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		b.add_theme_color_override(cn, text)
+	b.pressed.connect(func(): _switch_tab(tab))
+	return b
 
 
 func _build_tabbar_portrait() -> Control:
@@ -149,7 +188,7 @@ func _build_tabbar_portrait() -> Control:
 func _make_tab_buttons(expand: bool) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 0)
-	for name in ["RANKEADA", "CLÁSSICO", "LOJA", "MENU"]:
+	for name in ["RANKEADA", "CLÁSSICO", "LOJA", "AJUSTES"]:
 		var btn := _tab_btn(name, name == _active_tab, expand)
 		if expand:
 			btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -188,10 +227,10 @@ func _tab_btn(tab: String, active: bool, tall: bool = false) -> Button:
 
 func _tab_accent(tab: String) -> Color:
 	match tab:
-		"RANKEADA": return UIKit.DANGER
-		"CLÁSSICO": return UIKit.ACTION
-		"LOJA":     return UIKit.MONEY
-		_:          return UIKit.MUTED
+		"RANKEADA": return UIKit.TR_RED
+		"CLÁSSICO": return UIKit.TR_WHITE
+		"LOJA":     return UIKit.TR_WHITE
+		_:          return UIKit.TR_WHITE
 
 
 func _switch_tab(tab: String) -> void:
@@ -210,7 +249,7 @@ func _build_wallet() -> HBoxContainer:
 
 	var prof := SaveManager.section("profile")
 
-	var chip_p := _pill("◎ " + UIKit.fmt_int(int(prof["fichas"])), UIKit.CHIPS, "ChipsLabel")
+	var chip_p := _pill("◎ " + UIKit.fmt_int(int(prof["fichas"])), UIKit.TR_CYAN, "ChipsLabel")
 	chip_p.mouse_filter = Control.MOUSE_FILTER_STOP
 	chip_p.gui_input.connect(func(e: InputEvent):
 		if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT and e.pressed:
@@ -218,20 +257,21 @@ func _build_wallet() -> HBoxContainer:
 			_open_fichas())
 	row.add_child(chip_p)
 
-	row.add_child(_pill("◆ " + UIKit.fmt_int(int(prof["gems"])), UIKit.MODIFIER, "GemsLabel"))
+	row.add_child(_pill("◆ " + UIKit.fmt_int(int(prof["gems"])), UIKit.TR_GOLD, "GemsLabel"))
 
 	return row
 
 
 func _pill(text: String, color: Color, label_name: String) -> PanelContainer:
-	var p   := UIKit.panel(UIKit.SURFACE_DEEP, color.darkened(0.3), 8)
+	var bg  := UIKit.TR_PURPLE.lightened(0.08)
+	var p   := UIKit.panel(bg, color.darkened(0.1), 2)
 	var sb  := p.get_theme_stylebox("panel") as StyleBoxFlat
-	sb.set_corner_radius_all(28)
+	sb.set_corner_radius_all(24)
 	sb.content_margin_left  = 16
 	sb.content_margin_right = 20
-	sb.content_margin_top   = 8
-	sb.content_margin_bottom = 8
-	p.custom_minimum_size = Vector2(0, 52)
+	sb.content_margin_top   = 6
+	sb.content_margin_bottom = 6
+	p.custom_minimum_size = Vector2(0, 48)
 	var lbl := UIKit.label(text, 22, color)
 	lbl.name = label_name
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -258,7 +298,7 @@ func _populate_tab(wide: bool) -> void:
 		"RANKEADA": _build_ranked(wide)
 		"CLÁSSICO": _build_classic(wide)
 		"LOJA":     _build_shop(wide)
-		"MENU":     _build_menu(wide)
+		"AJUSTES":  _build_menu(wide)
 
 
 func _build_ranked(_wide: bool) -> void:
