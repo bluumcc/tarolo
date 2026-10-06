@@ -17,6 +17,15 @@ Arquivo de referência: `docs/PALETA.md`. Tokens em `scripts/ui/ui_kit.gd` (`UIK
 
 **Regra:** nunca hex inline nas telas — sempre `UIKit.TR_*`. Variações via `.lightened()` / `.darkened()`.
 
+## Padrão de borda com glow (`rim_box`)
+
+Helper: `UIKit.rim_box(bg, rim_col, glow_col, size)` — borda na cor **clara** + shadow feathered na cor **normal**.
+
+- `size = "large"`: botões de destaque (glow_size 30, alpha 0.42)
+- `size = "small"`: cards/botões secundários (glow_size 14, alpha 0.35)
+
+Aplicação das cores: vermelho → `rim_box(TR_RED_DARK, TR_RED_LIGHT, TR_RED)`. Roxo → `box(bg, TR_PURPLE_LIGHT)` (sem glow). Godot não suporta blur em borda — o efeito vem do contraste da cor clara + shadow esparsa na cor normal. Ver `docs/PALETA.md` para detalhes.
+
 ## Princípios do produto
 - **O Vanilla é sempre o modo mais fiel ao Jeu de Tarot lúdico (Tarot francês).** Regras oficiais (seguir naipe, cortar com Trunfo, obrigação de cobrir com Trunfo maior, Bouts, licitação, contratos) não devem ser alteradas pra "melhorar o jogo". Variações de regra pertencem ao Caos (ou a modos novos), nunca ao Vanilla.
 - O Caos é o modo dinâmico/experimental: poker de rodadas (blind, stack, apostas), modificadores e combos. Ver `docs/MESA_CAOS.md`.

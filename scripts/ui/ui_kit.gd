@@ -122,6 +122,15 @@ static func box(bg: Color, border: Color = BLACK, border_w: int = 3, radius: int
 	return sb
 
 
+## Padrão de borda com bloom: borda na cor clara (linha visual) + glow esparso na cor normal.
+## Encapsula o padrão visual do projeto: [cor]-claro na borda, [cor]-normal no glow.
+## size: "large" (botões de destaque, glow_size 30, alpha 0.42) ou "small" (cards/botões secundários, glow_size 14, alpha 0.35).
+static func rim_box(bg: Color, rim_col: Color, glow_col: Color, size: String = "large", radius: int = 10, pad_h: int = 12) -> StyleBoxFlat:
+	var glow_size := 30 if size == "large" else 14
+	var shad_a    := 0.42 if size == "large" else 0.35
+	return glow_box(bg, glow_col, glow_size, 2, radius, pad_h, rim_col, shad_a)
+
+
 ## StyleBox com sombra/glow colorida — para botões primários e de destaque.
 ## `glow_col` é a cor da sombra; `border_col` substitui a cor da borda (padrão = glow_col).
 ## `shadow_alpha` controla a opacidade do halo externo.

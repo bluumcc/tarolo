@@ -146,60 +146,36 @@ func _make_topbar_nav() -> HBoxContainer:
 
 func _topbar_nav_btn(tab: String, active: bool) -> Button:
 	var is_ranked := tab == "RANKEADA"
-	var text_col  := UIKit.TR_GOLD if is_ranked else UIKit.TR_WHITE
+	var text_col := UIKit.TR_GOLD if is_ranked else UIKit.TR_WHITE
+	var base_bg  := UIKit.TR_RED_DARK if is_ranked else (UIKit.TR_PURPLE_LIGHT if active else UIKit.TR_PURPLE)
 
-	# Cores e glow variam por tipo×estado:
-	var bg: Color
-	var glow_col: Color
-	var glow_size: int
-	var border_col: Color
-	var border_w: int
-	var shad_a: float
-
-	if is_ranked:
-		if active:
-			bg         = UIKit.TR_RED.lightened(0.22)   # fundo bem mais claro/vivo
-			glow_col   = UIKit.TR_RED_GLOW
-			glow_size  = 18
-			border_col = Color.TRANSPARENT              # shadow feathered faz o glow
-			border_w   = 2
-			shad_a     = 0.88
-		else:
-			bg         = UIKit.TR_RED.darkened(0.40)    # opaco/muted, sem destaque
-			glow_col   = UIKit.TR_RED_GLOW
-			glow_size  = 2
-			border_col = UIKit.TR_RED.darkened(0.10)    # só a borda dim, quase sem glow
-			border_w   = 2
-			shad_a     = 0.18
-	else:
-		var purple_rim := UIKit.TR_PURPLE_LIGHT.lightened(0.45)
-		if active:
-			bg         = UIKit.TR_PURPLE_LIGHT
-			glow_col   = purple_rim
-			glow_size  = 10
-			border_col = Color.TRANSPARENT
-			border_w   = 1
-			shad_a     = 0.72
-		else:
-			bg         = UIKit.TR_PURPLE                # #0c0a1a quase preto
-			glow_col   = purple_rim
-			glow_size  = 6
-			border_col = Color.TRANSPARENT              # shadow feathered como "borda blur"
-			border_w   = 1
-			shad_a     = 0.52
-
-	var b := UIKit.button(tab, bg, 28)
+	var b := UIKit.button(tab, base_bg, 32)
 	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(0, 64)
-	var mk := func(c: Color) -> StyleBoxFlat:
-		var sb := UIKit.glow_box(c, glow_col, glow_size, border_w, 10, 10, border_col, shad_a)
-		sb.content_margin_top    = 16
-		sb.content_margin_bottom = 16
-		return sb
-	b.add_theme_stylebox_override("normal",  mk.call(bg))
-	b.add_theme_stylebox_override("hover",   mk.call(bg.lightened(0.10)))
-	b.add_theme_stylebox_override("pressed", mk.call(bg.darkened(0.08)))
-	b.add_theme_stylebox_override("focus",   mk.call(bg))
+	b.custom_minimum_size = Vector2(0, 96)
+
+	var mk: Callable
+	if is_ranked:
+		# Padrão borda grande: vermelho-claro + glow vermelho-normal esparso
+		mk = func(c: Color) -> StyleBoxFlat:
+			var sb := UIKit.rim_box(c, UIKit.TR_RED_LIGHT, UIKit.TR_RED, "large", 10, 16)
+			if not active:
+				sb.shadow_size = 6
+				sb.shadow_color = Color(UIKit.TR_RED.r, UIKit.TR_RED.g, UIKit.TR_RED.b, 0.18)
+			sb.content_margin_top    = 24
+			sb.content_margin_bottom = 24
+			return sb
+	else:
+		# Flat: roxo-normal, borda roxo-claro, sem glow
+		mk = func(c: Color) -> StyleBoxFlat:
+			var sb := UIKit.box(c, UIKit.TR_PURPLE_LIGHT, 2, 10, 16)
+			sb.content_margin_top    = 24
+			sb.content_margin_bottom = 24
+			return sb
+
+	b.add_theme_stylebox_override("normal",  mk.call(base_bg))
+	b.add_theme_stylebox_override("hover",   mk.call(base_bg.lightened(0.10)))
+	b.add_theme_stylebox_override("pressed", mk.call(base_bg.darkened(0.08)))
+	b.add_theme_stylebox_override("focus",   mk.call(base_bg))
 	for cn in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		b.add_theme_color_override(cn, text_col)
 	b.pressed.connect(func(): _switch_tab(tab))
@@ -361,6 +337,13 @@ func _build_ranked(wide: bool) -> void:
 		cols.add_child(left)
 		_ranked_badge_block(left, t, tc, 72, UIKit.TR_WHITE)
 		_ranked_stats_block(left, rk, wins, loss, true)
+		# Botão na coluna esquerda, empurrado para o bottom pelo spacer
+		var spacer_fill := Control.new()
+		spacer_fill.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		left.add_child(spacer_fill)
+		var pb_wide := _make_ranked_play_btn()
+		pb_wide.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		left.add_child(pb_wide)
 
 		# Coluna direita (40%): torneios ocupa a coluna inteira
 		var right := VBoxContainer.new()
@@ -372,19 +355,14 @@ func _build_ranked(wide: bool) -> void:
 		_ranked_badge_block(_content_col, t, tc, 48, UIKit.BROWN)
 		_ranked_stats_block(_content_col, rk, wins, loss, false)
 		_ranked_tournament_block(_content_col, fichas, false)
-
-	# Botão JOGAR RANKEADA fixo no bottom — igual nos dois modos
-	var ab_mg := MarginContainer.new()
-	ab_mg.add_theme_constant_override("margin_left",   32)
-	ab_mg.add_theme_constant_override("margin_right",  32)
-	ab_mg.add_theme_constant_override("margin_top",    12)
-	ab_mg.add_theme_constant_override("margin_bottom", 32)
-	_action_bar.add_child(ab_mg)
-	var pb := _make_ranked_play_btn()
-	if wide:
-		pb.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		pb.custom_minimum_size.x = get_viewport_rect().size.x * 0.38
-	ab_mg.add_child(pb)
+		# Portrait: botão fixo no bottom
+		var ab_mg := MarginContainer.new()
+		ab_mg.add_theme_constant_override("margin_left",   32)
+		ab_mg.add_theme_constant_override("margin_right",  32)
+		ab_mg.add_theme_constant_override("margin_top",    12)
+		ab_mg.add_theme_constant_override("margin_bottom", 32)
+		_action_bar.add_child(ab_mg)
+		ab_mg.add_child(_make_ranked_play_btn())
 
 
 func _ranked_badge_block(col: VBoxContainer, t: Dictionary, tc: Color, tier_size: int, tier_color: Color) -> void:
@@ -393,8 +371,8 @@ func _ranked_badge_block(col: VBoxContainer, t: Dictionary, tc: Color, tier_size
 	circle.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var csb := UIKit.box(tc.darkened(0.1), tc.lightened(0.15), 6, 125, 0)
 	csb.set_border_width_all(6)
-	# Glow azul grande atrás do emblema (shadow feathered do StyleBoxFlat)
-	csb.shadow_color  = Color(0.10, 0.36, 0.96, 0.80)
+	# Glow roxo-claro grande e suave atrás do emblema
+	csb.shadow_color  = Color(UIKit.TR_PURPLE_LIGHT.r, UIKit.TR_PURPLE_LIGHT.g, UIKit.TR_PURPLE_LIGHT.b, 0.75)
 	csb.shadow_size   = 90
 	csb.shadow_offset = Vector2.ZERO
 	circle.add_theme_stylebox_override("panel", csb)
@@ -419,7 +397,7 @@ func _ranked_stats_block(col: VBoxContainer, rk: Dictionary, wins: int, loss: in
 		["LP",   "%d / 100" % int(Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))["lp"])],
 		["V/D", UIKit.fmt_dec(ratio, 2)],
 	]
-	var mp := UIKit.panel(UIKit.TR_PURPLE, UIKit.TR_PURPLE.lightened(0.12), 24)
+	var mp := UIKit.panel(UIKit.TR_PURPLE, UIKit.TR_PURPLE_LIGHT, 24)
 	if wide:
 		mp.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		mp.custom_minimum_size = Vector2(get_viewport_rect().size.x * 0.28, 0)
@@ -439,7 +417,7 @@ func _ranked_stats_block(col: VBoxContainer, rk: Dictionary, wins: int, loss: in
 
 
 func _ranked_tournament_block(col: VBoxContainer, fichas: int, fill_height: bool) -> void:
-	var tp := UIKit.panel(UIKit.TR_PURPLE, UIKit.TR_PURPLE.lightened(0.12), 24)
+	var tp := UIKit.panel(UIKit.TR_PURPLE, UIKit.TR_PURPLE_LIGHT, 24)
 	tp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	if fill_height:
 		tp.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -495,16 +473,19 @@ func _ranked_tournament_block(col: VBoxContainer, fichas: int, fill_height: bool
 	col.add_child(tp)
 
 func _make_ranked_play_btn() -> Button:
-	var b := UIKit.button("JOGAR RANKEADA", UIKit.TR_RED, 44)
+	# Padrão borda grande: fundo vermelho-escuro, borda vermelho-claro, glow vermelho-normal esparso
+	var b := UIKit.button("JOGAR RANKEADA", UIKit.TR_RED_DARK, 44)
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(0, 112)
 	var mk := func(bg: Color) -> StyleBoxFlat:
-		# Sem border_col sólido — shadow feathered faz o glow sem linha dura.
-		return UIKit.glow_box(bg, UIKit.TR_RED_GLOW, 34, 3, 10, 20, Color.TRANSPARENT, 0.92)
-	b.add_theme_stylebox_override("normal",   mk.call(UIKit.TR_RED))
-	b.add_theme_stylebox_override("hover",    mk.call(UIKit.TR_RED.lightened(0.10)))
-	b.add_theme_stylebox_override("pressed",  mk.call(UIKit.TR_RED.darkened(0.08)))
-	b.add_theme_stylebox_override("focus",    mk.call(UIKit.TR_RED))
+		var sb := UIKit.rim_box(bg, UIKit.TR_RED_LIGHT, UIKit.TR_RED, "large", 10, 20)
+		sb.content_margin_top    = 0
+		sb.content_margin_bottom = 0
+		return sb
+	b.add_theme_stylebox_override("normal",   mk.call(UIKit.TR_RED_DARK))
+	b.add_theme_stylebox_override("hover",    mk.call(UIKit.TR_RED_DARK.lightened(0.10)))
+	b.add_theme_stylebox_override("pressed",  mk.call(UIKit.TR_RED_DARK.darkened(0.08)))
+	b.add_theme_stylebox_override("focus",    mk.call(UIKit.TR_RED_DARK))
 	for cn in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		b.add_theme_color_override(cn, UIKit.TR_GOLD)
 	b.add_theme_constant_override("outline_size", 0)

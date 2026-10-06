@@ -31,5 +31,26 @@ Tokens definidos pelo dono do projeto. Nunca usar hex solto nas telas — sempre
 - **Sem hex inline nas telas** — toda cor via `UIKit.TR_*` ou derivada programaticamente.
 - **Texto sobre fundo escuro:** `TR_WHITE` ou `TR_GOLD`.
 - **Texto sobre vermelho:** `TR_RED_LIGHT` ou `TR_WHITE` com contraste verificado.
-- **Botão vermelho:** face `TR_RED`, fundo/sombra `TR_RED_DARK`, glow `TR_RED_GLOW`.
+- **Botão vermelho:** fundo `TR_RED_DARK`, borda `TR_RED_LIGHT`, glow `TR_RED`.
 - **Superfícies:** `TR_PURPLE_DARK` (fundo de tela) → `TR_PURPLE` (painéis) → `TR_PURPLE_LIGHT` (cards elevados).
+
+## Padrão de borda com glow (`rim_box`)
+
+Todo elemento com borda usa o helper `UIKit.rim_box(bg, rim_col, glow_col, size)`:
+
+- **`rim_col`** (borda visual): versão **clara** da cor (ex.: `TR_RED_LIGHT`, `TR_PURPLE_LIGHT`)
+- **`glow_col`** (shadow feathered): versão **normal** da cor (ex.: `TR_RED`, `TR_PURPLE`)
+- Godot não suporta blur nativo em bordas — o efeito de "borda com glow" vem de:
+  1. Linha de borda na cor clara (contraste visual = parece mais nítida)
+  2. Shadow feathered grande e esparsa na cor normal (dá o brilho difuso externo)
+
+### Dois tamanhos
+
+| Tamanho | `glow_size` | `shadow_alpha` | Uso |
+|---|---|---|---|
+| `"large"` | 30 | 0.42 | Botões de destaque (RANKEADA, JOGAR RANKEADA) |
+| `"small"` | 14 | 0.35 | Cards secundários, botões menores |
+
+### Cards sem glow
+
+Cards de estatísticas, painéis informativos e abas não-rankeada usam `UIKit.box(bg, TR_PURPLE_LIGHT)` — sem glow, só borda roxo-claro.
