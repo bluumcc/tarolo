@@ -205,6 +205,10 @@ func _build_ui() -> void:
 	topbar.add_child(help_btn)
 
 	# Palco: a mesa (elipse achatada) com os rivais sentados em volta, a distâncias iguais.
+	var stage_gap := Control.new()   # respiro entre o cabeçalho e o avatar do topo
+	stage_gap.custom_minimum_size = Vector2(0, 28)
+	stage_gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(stage_gap)
 	stage = Control.new()
 	stage.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	stage.custom_minimum_size = Vector2(0, 300)
