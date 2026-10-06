@@ -56,7 +56,7 @@ var bottom_mid: Control          # meio da barra de baixo: ações OU o card de 
 var prize_card: StatCard         # PRÊMIO, canto inferior direito
 var table_players := 0           # nº de jogadores com que a mesa foi dimensionada; só é refeito entre rodadas
 var discard_avatar: HexAvatar     # seu avatar grande na etapa de descarte (com o anel do relógio)
-var discard_stack: Label
+var discard_name: Label
 var discard_head: VBoxContainer  # título grande + instrução da etapa de descarte, no topo do palco (fora do card)
 var chrome_discard := false      # etapa sem mesa (descarte/palpite): sem modificador na faixa
 var shown_totals: Array = []
@@ -250,10 +250,10 @@ func _build_ui() -> void:
 	main_area = stage
 	discard_head = VBoxContainer.new()
 	discard_head.anchor_right = 1.0
-	discard_head.offset_top = 96.0   # respiro do header
+	discard_head.offset_top = 84.0   # respiro do header
 	discard_head.offset_left = 8.0
 	discard_head.offset_right = -8.0
-	discard_head.add_theme_constant_override("separation", 14)
+	discard_head.add_theme_constant_override("separation", 8)
 	discard_head.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	discard_head.visible = false
 	var dt := UIKit.serif_label("ESCOLHA DUAS CARTAS PARA DESCARTAR", 46, UIKit.TR_GOLD.lightened(0.25), HORIZONTAL_ALIGNMENT_CENTER)
@@ -265,13 +265,13 @@ func _build_ui() -> void:
 	ds.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	discard_head.add_child(ds)
 	var holder := Control.new()   # avatar grande (escala 2,4), com bastante espaço em volta
-	holder.custom_minimum_size = Vector2(0, 330)
+	holder.custom_minimum_size = Vector2(0, 212)
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	discard_head.add_child(holder)
 	discard_avatar = HexAvatar.new().setup(0, _seat_accent(0))
 	discard_avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	discard_avatar.set_active(true)
-	discard_avatar.scale = Vector2(2.4, 2.4)
+	discard_avatar.scale = Vector2(2.16, 2.16)
 	discard_avatar.anchor_left = 0.5
 	discard_avatar.anchor_right = 0.5
 	discard_avatar.anchor_top = 0.5
@@ -282,13 +282,9 @@ func _build_ui() -> void:
 	discard_avatar.offset_bottom = HexAvatar.SIZE_PX.y / 2.0
 	discard_avatar.wins_badge.visible = false
 	holder.add_child(discard_avatar)
-	var dn := UIKit.serif_label("VOCÊ", 34, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
-	dn.autowrap_mode = TextServer.AUTOWRAP_OFF
-	discard_head.add_child(dn)
-	discard_stack = UIKit.label("◎ 0", 40, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	discard_stack.add_theme_font_size_override("font_size", 40)
-	discard_stack.autowrap_mode = TextServer.AUTOWRAP_OFF
-	discard_head.add_child(discard_stack)
+	discard_name = UIKit.serif_label("", 34, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	discard_name.autowrap_mode = TextServer.AUTOWRAP_OFF
+	discard_head.add_child(discard_name)
 	stage.add_child(discard_head)
 	table_center = TableEllipse.new()
 	table_center.name = "TableCenter"
@@ -2361,13 +2357,18 @@ func _human_discard_play() -> void:
 	discard_picks = []
 	_rebuild_hand()
 	discard_head.visible = true
-	discard_stack.text = "◎ " + UIKit.fmt_short(engine.stacks[0])
+	discard_name.text = str(config["names"][0]).capitalize()
 	_banner_clear()
+	round_dots.visible = false   # no descarte o card do header mostra só o título da fase
+	banner_title.text = "FASE DE DESCARTE"
+	banner_title.add_theme_color_override("font_color", UIKit.TR_GOLD)
+	banner_title.modulate.a = 1.0
 	status_label.text = "0/%d descartadas" % ChaosEngine.BLITZ_DISCARD_SIZE
 	_clock_start(DISCARD_SECONDS, _on_discard_timeout)
 	await item_chosen
 	_clock_stop()
 	discard_head.visible = false
+	round_dots.visible = true
 	phase = "idle"   # cartas deixam de ser clicáveis/arrastáveis fora da vez
 	status_label.text = ""
 	discard_picks = []

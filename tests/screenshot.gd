@@ -9,6 +9,7 @@ func _ready() -> void:
 		var kv := a.trim_prefix("--").split("=")
 		args[kv[0]] = kv[1] if kv.size() > 1 else ""
 	SaveManager.persist = false
+	SaveManager.section("profile")["fichas"] = maxi(int(SaveManager.section("profile").get("fichas", 0)), 5000)   # sempre há fichas pra sentar na mesa
 	var scene: String = str(args.get("scene", "menu"))
 	if args.has("speed"):
 		Engine.time_scale = float(args["speed"])   # acelera timers/tweens (a jogada do humano estoura sozinha)
