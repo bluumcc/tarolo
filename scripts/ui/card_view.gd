@@ -38,10 +38,11 @@ static func hand_scale(wide: bool, vp_w: float, vp_h: float) -> float:
 	return target / SIZE.y
 
 
-## Escala da carta destacada (a que acompanha o dedo no swipe): maior que a da mão em tela larga.
-static func focus_scale(wide: bool, vp_h: float) -> float:
+## Escala da carta destacada (a que acompanha o dedo no swipe): celular = mão +75%;
+## PC = altura fixa de 410 (limitada a 34% da viewport).
+static func focus_scale(wide: bool, vp_w: float, vp_h: float) -> float:
 	if not wide:
-		return 1.0
+		return hand_scale(false, vp_w, vp_h) * 1.75
 	return minf(FOCUS_H_WIDE * SIZE.y / SIZE_COMPACT.y, vp_h * 0.34) / SIZE.y
 
 
