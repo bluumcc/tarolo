@@ -1242,6 +1242,8 @@ func _unhandled_input(event: InputEvent) -> void:
 # ------------------------------------------------------------------ HUD (stacks, pote, ações)
 
 # ------------------------------------------------------------------ loop de jogadas
+# Eliminação (torneio): só no fim da rodada, depois do rateio do palpite (que ainda pode devolver
+# fichas). No meio da rodada quem zerou só fica sem apostar, mas continua jogando as cartas.
 
 func _run_round() -> void:
 	if engine.blitz:
@@ -1277,12 +1279,8 @@ func _run_round() -> void:
 			return
 		if engine.walkover_player() != -1:
 			await _resolve_walkover(engine.resolve_walkover())
-			if bool(config.get("tournament", false)):
-				await _bust_broke_bots()
 			continue
 		await _play_cards()
-		if bool(config.get("tournament", false)):
-			await _bust_broke_bots()
 	if not is_inside_tree() or finished:
 		return
 	if engine.blitz:
@@ -1319,7 +1317,7 @@ func _play_cards() -> void:
 			if not is_inside_tree() or finished:
 				return
 		var card: CardData
-		if p == 0 and not GameState.autoplay and not blitz_sitting_out:
+		if p == 0 and not GameState.autoplay:   # sem fichas só tira você das apostas: as cartas (e o palpite) continuam sendo suas
 			card = await _wait_human()
 		else:
 			await _wait(0.9 if p == 0 else (bot_rng.randf_range(0.55, 0.95) if engine.blitz else bot_rng.randf_range(0.9, 1.5)))
