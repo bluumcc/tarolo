@@ -8,12 +8,12 @@ extends RefCounted
 ## nível (as outras tocam headless, no mesmo nível, em paralelo "no escuro").
 
 const FIELD_SIZE := 16
-## Teto em 4: o tamanho balanceado/testado do Blitz (bots, dificuldade, modificadores como
-## "Assalto ao Líder" foram todos calibrados pra 3 rivais). Dava pra ir até 7 pelo limite do
-## baralho (78 cartas ÷ 10 da mão inicial), mas sem balancear e testar fora de 4 primeiro.
-const MAX_TABLE := 4
-## Mesa nunca fica menor que isso sem ser desfeita e redistribuída (heads-up ainda é jogável).
-const MIN_TABLE := 2
+## Mesas de até 6 (o máximo suportado e testado; o baralho dá até 7 de mão de 10). O Blitz 1x1 não
+## é equilibrado (a dificuldade não decide o resultado, ver `tests/blitz_size_sim.gd`), então
+## o torneio evita heads-up: mesas só ficam abaixo de MIN_TABLE quando o campo inteiro já é menor
+## que isso (a final com 2 sobreviventes).
+const MAX_TABLE := 6
+const MIN_TABLE := 3
 const BUY_IN := 300             ## fichas, cobradas uma vez na inscrição (não por mesa/nível)
 const RAKE_PCT := 0.10          ## taxa da casa sobre o bolão total
 const PAYOUTS := [0.60, 0.28, 0.12]   ## fração do bolão pros 3 primeiros colocados
@@ -132,12 +132,17 @@ static func simulate_level(entrants: Array, blind: int, rng: RandomNumberGenerat
 			eng.apply_discard(p, ChaosBot.wants_discard(eng, p, int(entrants[p]["difficulty"]), rng))
 	for p in range(n):
 		eng.blitz_place(p, ChaosBot.blitz_pick(eng, p, int(entrants[p]["difficulty"]), rng))
+	var outer_guard := 0
 	while not eng.is_round_over():
+		outer_guard += 1
+		if outer_guard > 40:   # jogada que não avança: nunca trava o torneio inteiro por causa de uma mesa headless
+			push_error("simulate_level preso: blind %d, stacks iniciais %s, agora %s, jogada %d, folded %s, mãos %s, vez %d, jogadas %d, apostando %s" % [blind, str(stacks), str(eng.stacks), eng.trick_number, str(eng.folded), str(eng.hands.map(func(h): return h.size())), eng.current, eng.plays.size(), str(eng.betting)])
+			break
 		eng.draw_trick_modifier()
 		eng.begin_trick()
 		# Fase de apostas por rodada (ante + aumentar/desistir)
 		var bet_guard := 0
-		while eng.betting and bet_guard < 40:
+		while eng.betting and bet_guard < 300:
 			bet_guard += 1
 			var ba := eng.bet_actor()
 			if ba == -1:

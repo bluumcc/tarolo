@@ -307,7 +307,7 @@ func _tournament() -> void:
 				sizes.append((t as Array).size())
 				seen += (t as Array).size()
 			sizes.sort()
-			if seen != survivors.size() or sizes[sizes.size() - 1] - sizes[0] > 1 or sizes[sizes.size() - 1] > Tournament.MAX_TABLE or (sizes[0] < Tournament.MIN_TABLE and survivors.size() > 1):
+			if seen != survivors.size() or sizes[sizes.size() - 1] - sizes[0] > 1 or sizes[sizes.size() - 1] > Tournament.MAX_TABLE or (sizes[0] < Tournament.MIN_TABLE and survivors.size() >= Tournament.MIN_TABLE):
 				bad_tables += 1
 			level += 1
 		if level >= 80:

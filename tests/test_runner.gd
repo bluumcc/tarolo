@@ -331,12 +331,12 @@ func _test_chaos() -> void:
 	check(cl_diff.is_empty(), "clone_for_sim copia todos os campos do motor %s" % str(cl_diff))
 
 	# ---- Torneio: realocação equilibrada entre mesas
-	for rb in [[16, [4, 4, 4, 4]], [11, [4, 4, 3]], [9, [3, 3, 3]], [5, [3, 2]], [4, [4]], [2, [2]]]:
+	for rb in [[16, [6, 5, 5]], [13, [5, 4, 4]], [11, [6, 5]], [7, [4, 3]], [6, [6]], [4, [4]], [2, [2]]]:
 		var rb_tables: Array = []
 		var rb_left := int(rb[0])
 		var rb_id := 0
-		while rb_left > 0:   # começa desbalanceado: mesas de 4 e uma ou duas sobras
-			var rb_n := mini(4, rb_left)
+		while rb_left > 0:   # começa desbalanceado: mesas cheias e uma ou duas sobras
+			var rb_n := mini(Tournament.MAX_TABLE, rb_left)
 			var rb_t: Array = []
 			for _i in range(rb_n):
 				rb_t.append({"id": rb_id, "human": rb_id == 0})
@@ -357,8 +357,9 @@ func _test_chaos() -> void:
 		rb_sizes.sort()
 		rb_sizes.reverse()
 		var rb_ok: bool = rb_sum == rb_count and rb_sizes[0] - rb_sizes[rb_sizes.size() - 1] <= 1 and rb_sizes[0] <= Tournament.MAX_TABLE
+		check(rb_count < Tournament.MIN_TABLE or rb_sizes[rb_sizes.size() - 1] >= mini(Tournament.MIN_TABLE, rb_count), "Torneio: %d jogadores nunca viram mesa de heads-up fora da final" % rb_count)
 		check(rb_ok, "Torneio: %d jogadores realocados em mesas parelhas (%s)" % [rb_count, str(rb_sizes)])
-		check(rb_sizes.size() == ceili(float(rb_count) / 4.0), "Torneio: %d jogadores usam o mínimo de mesas" % rb_count)
+		check(rb_sizes.size() == ceili(float(rb_count) / float(Tournament.MAX_TABLE)), "Torneio: %d jogadores usam o mínimo de mesas" % rb_count)
 
 	# ---- Eliminado (torneio) sai da jogada: não ante, não fala, não ocupa vaga de carta
 	var bu := ChaosEngine.new()

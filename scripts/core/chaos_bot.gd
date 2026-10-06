@@ -261,11 +261,18 @@ static func bet_decision(engine: ChaosEngine, player: int, difficulty: int, rng:
 		bluff_rate = 0.14
 		raise_rate = 0.7
 		call_margin = 1.2
-	var strong := pwin >= 0.5
+	# Re-aumento (a mesa é no-limit, sem teto): cada aumento já feito na rodada deixa o bot mais
+	# seletivo — a chance cai pela metade e a mão precisa ser mais forte —, e a partir de 6 aumentos ele só
+	# paga ou desiste. Sem isso, bots fortes aumentariam um por cima do outro quase sem fim.
+	var raised := engine.raises
+	var can_raise_bot: bool = bool(opt["can_raise"]) and raised < BOT_MAX_RERAISES
+	raise_rate *= pow(0.5, raised)
+	bluff_rate *= pow(0.5, raised)
+	var strong := pwin >= (0.5 if raised == 0 else 0.62)
 	var bluffing := not strong and rng.randf() < bluff_rate
-	if bluffing and not opt["can_raise"]:
+	if bluffing and not can_raise_bot:
 		bluffing = false
-	var want_raise: bool = bool(opt["can_raise"]) and (bluffing or (strong and rng.randf() < raise_rate))
+	var want_raise: bool = can_raise_bot and (bluffing or (strong and rng.randf() < raise_rate))
 	if want_raise:
 		var blind := float(engine.blind)
 		var steps := 1
@@ -292,6 +299,7 @@ static func bet_decision(engine: ChaosEngine, player: int, difficulty: int, rng:
 
 # ------------------------------------------------------------------ Blitz
 
+const BOT_MAX_RERAISES := 6   # a partir daqui o bot só paga ou desiste (o humano segue livre)
 const EXPECT_SCALE := 1.48   # calibrado por simulação (tests/blitz_sim.gd)
 
 
