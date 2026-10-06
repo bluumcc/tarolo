@@ -27,11 +27,13 @@ static func apply_size_mode(mode: String) -> void:
 	SIZE = SIZE_LARGE if mode == "large" else SIZE_COMPACT
 
 
-## Escala da carta na mão: 1.0 no celular; em tela larga, altura-alvo limitada a 25% da viewport
-## (a zona da mão tem que caber junto com a barra de baixo).
-static func hand_scale(wide: bool, vp_h: float) -> float:
+## Escala da carta na mão. Celular: largura = fração da tela (compact 28%, large 31%), as cartas
+## se sobrepõem mais pra caber o leque. PC: altura-alvo limitada a 25% da viewport (a zona da
+## mão tem que caber junto com a barra de baixo).
+static func hand_scale(wide: bool, vp_w: float, vp_h: float) -> float:
 	if not wide:
-		return 1.0
+		var frac := 0.31 if SIZE.y > 300.0 else 0.28
+		return frac * vp_w / SIZE.x
 	var target := minf(HAND_H_WIDE * SIZE.y / SIZE_COMPACT.y, vp_h * 0.25)
 	return target / SIZE.y
 

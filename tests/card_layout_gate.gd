@@ -27,7 +27,7 @@ func _ready() -> void:
 
 func _case(mode: String, vp: Vector2, n: int) -> void:
 	var wide := vp.x > vp.y
-	var hs := CardView.hand_scale(wide, vp.y)
+	var hs := CardView.hand_scale(wide, vp.x, vp.y)
 	var cs := CardView.SIZE * hs
 	var avail_w := vp.x
 	var zone_h := 0.0

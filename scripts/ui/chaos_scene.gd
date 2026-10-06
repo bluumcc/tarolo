@@ -417,7 +417,7 @@ func _max_ui_w() -> float:
 
 ## Escala da carta na mão (ver CardView.hand_scale): cheia no celular, ~410 de altura no PC.
 func _hand_scale() -> float:
-	return CardView.hand_scale(_is_wide(), get_viewport_rect().size.y)
+	return CardView.hand_scale(_is_wide(), get_viewport_rect().size.x, get_viewport_rect().size.y)
 
 
 ## Escala da carta jogada na mesa (altura fixa por plataforma).
