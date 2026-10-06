@@ -14,7 +14,7 @@ const TABLE_H_MOBILE := 135.0   ## altura da carta jogada na mesa (celular)
 const TABLE_H_WIDE := 180.0     ## idem em tela larga (PC)
 const HAND_H_WIDE := 320.0      ## altura máxima da carta na mão em tela larga
 const FOCUS_H_WIDE := 410.0     ## altura da carta destacada (arrastada no swipe) em tela larga
-const FOCUS_MOBILE := 1.75      ## carta arrastada no celular = mão +75%
+const FOCUS_MOBILE := 1.15      ## carta arrastada no celular = mão +15%
 const MAX_LIFT := 44.0  ## até onde a carta sobe visualmente ao selecionar/passar o mouse
 const LONG_PRESS := 0.45
 

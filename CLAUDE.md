@@ -29,7 +29,7 @@ Aplicação das cores: vermelho → `rim_box(TR_RED_DARK, TR_RED_LIGHT, TR_RED)`
 ## Tamanho das cartas (regra para não repetir o erro)
 - Arte das cartas: PNG 540×900 (proporção `CardView.ART_ASPECT` = 0,6). `CardView.SIZE` **sempre deriva dela**: 188×313 (único tamanho; o seletor Compacta/Grande foi removido).
 - `TextureRect` da arte: **nunca `EXPAND_KEEP_SIZE`** (o PNG inflaria a carta 3×). Usar `EXPAND_IGNORE_SIZE`.
-- **Nunca compensar tamanho com escala "no olho".** Tamanhos por plataforma vêm de `CardView.hand_scale()` (celular 1,0; carta arrastada ×1,75), `focus_scale()` e `table_scale()`; a zona da mão vem de `HandLayout.fan_height()`.
+- **Nunca compensar tamanho com escala "no olho".** Tamanhos por plataforma vêm de `CardView.hand_scale()` (celular 1,0; carta arrastada ×1,15), `focus_scale()` e `table_scale()`; a zona da mão vem de `HandLayout.fan_height()`.
 - Escala de Control: pivô = `size/2` e posição = `centro - size/2` (tamanho sem escala). Ver `HandLayout._place`.
 - Gate: `godot --headless --path . res://tests/card_layout_gate.tscn` (corpo = SIZE, leque inteiro e centralizado, em celular e PC).
 
