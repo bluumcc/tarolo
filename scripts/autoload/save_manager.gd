@@ -67,6 +67,8 @@ func reset() -> void:
 
 
 func section(name: String) -> Dictionary:
+	if not data.has(name):
+		data[name] = defaults().get(name, {})
 	return data[name]
 
 
