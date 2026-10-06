@@ -671,6 +671,17 @@ func _plural(n: int, one: String, many: String) -> String:
 ## jogada é anunciado à parte, na hora, por `_trick_start()`.
 ## Começo de rodada: é o único momento em que o tamanho da mesa se ajusta ao nº de jogadores
 ## (durante as 8 jogadas ela não muda, mesmo que alguém saia).
+## Ganchos pro multiplayer (hoje o nº de jogadores é fixo na partida): quem chega no meio de uma
+## rodada só é avisado e fica de fora até a próxima; quem sai deixa o assento onde está até a
+## rodada acabar. A mesa só se refaz em `_lock_table_size`, no começo da rodada seguinte.
+func notify_player_joining(player_name: String) -> void:
+	_banner("%s entra na próxima rodada" % player_name.capitalize(), "", UIKit.MUTED)
+
+
+func notify_player_left(player_name: String) -> void:
+	_banner("%s saiu" % player_name.capitalize(), "", UIKit.LOSS)
+
+
 func _lock_table_size() -> void:
 	table_players = engine.num_players
 	_layout_table()

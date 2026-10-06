@@ -345,3 +345,19 @@ quebra, mesas se fundindo, até sobrar 1 campeão.
   de torneio" dedicado nem consciência de ICM/all-in-or-fold perto da bolha), e o tamanho do
   campo (16) e a régua de blind são fixos, sem configuração. Primeira versão jogável do formato
   MTT, não o produto final.
+
+
+## Entrada e saída de jogadores no meio de uma partida (regra pro multiplayer)
+- **Mesa:** a mesa (largura e altura) é calculada pelo nº de jogadores e só se refaz no começo de
+  cada rodada (`ChaosScene._lock_table_size`). Durante as 8 jogadas ela não muda, mesmo que
+  alguém entre ou saia. `tests/table_gate.gd` confere a geometria pra 4, 5 e 6 jogadores.
+- **Quem chega no meio:** não aparece pra quem está jogando (os assentos não são universais: a
+  posição depende de quantos jogadores existem, então não dá pra "reservar" um lugar apagado).
+  Quem joga só vê o aviso "Fulano entra na próxima rodada" (`notify_player_joining`). Quem chegou
+  assiste à rodada sem mão e sem aposta; quando a rodada acaba ele é sentado junto com todos:
+  recebe as cartas, o dealer é sorteado de novo e a mesa se ajusta.
+- **Quem sai no meio:** o assento fica onde está, apagado, até a rodada acabar (`notify_player_left`);
+  as jogadas dele passam pra um bot ou ele desiste, pra a rodada fechar.
+- **Mais de 6 querendo entrar:** o limite da mesa é 6; quem sobra forma outra mesa.
+- **Estado:** só os avisos e o ajuste entre rodadas existem hoje; a fila de entrada, o estado de
+  espectador e o assento apagado dependem do motor multiplayer.
