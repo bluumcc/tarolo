@@ -59,6 +59,7 @@ var bottom_mid: Control          # meio da barra de baixo: ações OU o card de 
 var idle_card: PanelContainer    # PRÊMIO — ocupa o lugar dos botões enquanto não há ação
 var modifier_strip: ModifierStrip   # card do modificador, em cima da barra de baixo
 var banner_slot: Control
+var table_players := 0           # nº de jogadores com que a mesa foi dimensionada; só é refeito entre rodadas
 var discard_head: VBoxContainer  # título grande + instrução da etapa de descarte, no topo do palco (fora do card)
 var chrome_discard := false      # etapa sem mesa (descarte/palpite): sem modificador na faixa
 var shown_totals: Array = []
@@ -152,6 +153,7 @@ func _show_insufficient_fichas() -> void:
 const HAND_RAISE := 28.0   ## o leque sobe um pouco da base da faixa da mão
 const BAR_H := 96.0       ## barra de baixo (cards laterais: palpite e tempo)
 const ACT_H := BAR_H * 0.75   ## botões de ação e card de pote/prêmio: 75% dos cards laterais
+const HEADER_H := 75.0       ## altura dos três cards do header (menu, dots, ajuda): +10%
 const POT_CARD_W := 300.0   ## largura fixa do card do pote (cabe "POTE ◎ 99999")
 const BANNER_SLOT_H := 46.0   ## faixa dos avisos de ação, logo abaixo do topo
 const MOD_GAP := 10.0       ## folga entre o leque e o card do modificador
@@ -209,6 +211,7 @@ func _build_ui() -> void:
 	root.add_child(topbar)
 	var neutral := UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 14, 8)
 	var menu_btn := Widgets.icon_button("☰")
+	menu_btn.custom_minimum_size = Vector2(HEADER_H, HEADER_H)
 	for sn in ["normal", "hover", "pressed", "focus"]:
 		menu_btn.add_theme_stylebox_override(sn, neutral)
 	menu_btn.add_theme_color_override("font_color", UIKit.TR_WHITE)
@@ -216,6 +219,7 @@ func _build_ui() -> void:
 	topbar.add_child(menu_btn)
 	var info_box := PanelContainer.new()
 	info_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_box.custom_minimum_size = Vector2(0, HEADER_H)
 	info_box.add_theme_stylebox_override("panel", UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 14, 6))
 	round_dots = RoundDots.new()
 	round_dots.set_progress(ChaosEngine.HAND_SIZE, 0)
@@ -223,6 +227,7 @@ func _build_ui() -> void:
 	info_box.add_child(round_dots)
 	topbar.add_child(info_box)
 	var help_btn := Widgets.icon_button("?")
+	help_btn.custom_minimum_size = Vector2(HEADER_H, HEADER_H)
 	for sn in ["normal", "hover", "pressed", "focus"]:
 		help_btn.add_theme_stylebox_override(sn, neutral)
 	help_btn.add_theme_color_override("font_color", UIKit.TR_WHITE)
@@ -592,7 +597,9 @@ func _layout_seats() -> void:
 		return
 	var n := engine.num_players
 	var card_top := stage.size.y + 8.0 + _card_offset_top()   # referência vertical do seu avatar (sem card visível), no sistema do palco
-	table_center.seat_count = n
+	if table_players == 0:
+		table_players = n
+	table_center.seat_count = table_players   # só muda no começo de uma rodada (`_lock_table_size`)
 	table_center.seat_floor = card_top - 20.0
 	table_center.my_seat_y = card_top - MY_SEAT_RISE
 	table_center.fit()
@@ -676,7 +683,15 @@ func _plural(n: int, one: String, many: String) -> String:
 
 ## Tela de transição de início de rodada: só orienta (rodada, mesa) — o modificador de cada
 ## jogada é anunciado à parte, na hora, por `_trick_start()`.
+## Começo de rodada: é o único momento em que o tamanho da mesa se ajusta ao nº de jogadores
+## (durante as 8 jogadas ela não muda, mesmo que alguém saia).
+func _lock_table_size() -> void:
+	table_players = engine.num_players
+	_layout_table()
+
+
 func _announce_round() -> void:
+	_lock_table_size()
 	if engine.blitz:
 		_set_discard_chrome(true)
 	_refresh_hud()
