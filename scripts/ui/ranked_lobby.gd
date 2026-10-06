@@ -64,6 +64,7 @@ func _build() -> void:
 	var margin := MarginContainer.new()
 	for s in ["left", "right", "top", "bottom"]:
 		margin.add_theme_constant_override("margin_" + s, Widgets.MARGIN)
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL   # sem isso o conteúdo encolhe pra ~2/3 da tela
 	scroll.add_child(margin)
 
 	if _is_wide():
@@ -72,6 +73,13 @@ func _build() -> void:
 		_build_portrait(margin)
 
 	_search_btn.grab_focus.call_deferred()
+
+
+## Card do lobby: a superfície padrão do design system com a borda na cor do assunto.
+func _card(accent: Color) -> PanelContainer:
+	var pc := PanelContainer.new()
+	pc.add_theme_stylebox_override("panel", UIKit.rim_box(DS.surface(), accent.lightened(0.15), accent.darkened(0.3), "small", DS.R_CARD, UIKit.card_pad(), UIKit.card_pad()))
+	return pc
 
 
 func _build_portrait(parent: MarginContainer) -> void:
@@ -107,9 +115,7 @@ func _fill_columns(left: VBoxContainer, right: VBoxContainer) -> void:
 	var tier_color := Color(Ranked.TIER_COLORS[t["tier"]])
 
 	# ── Cartão de liga ─────────────────────────────────────────────────
-	var badge_panel := GlowPanel.new()
-	badge_panel.accent = tier_color
-	badge_panel.bg = UIKit.SURFACE_DEEP
+	var badge_panel := _card(tier_color)
 	var bv := VBoxContainer.new()
 	bv.add_theme_constant_override("separation", 12)
 	badge_panel.add_child(bv)
@@ -119,10 +125,8 @@ func _fill_columns(left: VBoxContainer, right: VBoxContainer) -> void:
 	var emblem := PanelContainer.new()
 	emblem.custom_minimum_size = Vector2(140, 140)
 	emblem.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	var esb := UIKit.chunky(tier_color)
-	esb.set_corner_radius_all(70)
-	esb.content_margin_left = 0
-	esb.content_margin_right = 0
+	var tn := DS.tone(tier_color)
+	var esb := UIKit.rim_box(tn["bg"], tn["rim"], tn["glow"], "small", 70, 0, 0)
 	emblem.add_theme_stylebox_override("panel", esb)
 	var div_txt := str(t["division"]) if str(t["division"]) != "" else "★"
 	var div := UIKit.label(div_txt, 60, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
@@ -153,9 +157,7 @@ func _fill_columns(left: VBoxContainer, right: VBoxContainer) -> void:
 		20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 
 	# ── Escada de ligas ────────────────────────────────────────────────
-	var ladder_panel := GlowPanel.new()
-	ladder_panel.accent = UIKit.VIOLET
-	ladder_panel.bg = UIKit.SURFACE_DEEP
+	var ladder_panel := _card(UIKit.VIOLET)
 	var lv := VBoxContainer.new()
 	lv.add_theme_constant_override("separation", 8)
 	ladder_panel.add_child(lv)
@@ -198,10 +200,7 @@ func _fill_columns(left: VBoxContainer, right: VBoxContainer) -> void:
 	for h in hist:
 		var lp := int(h["lp"])
 		var win := lp >= 0
-		var hp := GlowPanel.new()
-		hp.accent = UIKit.OK if win else UIKit.DANGER
-		hp.bg = UIKit.SURFACE_DEEP
-		hp.pulse_speed = 0.0
+		var hp := _card(UIKit.OK if win else UIKit.DANGER)
 		var hl := UIKit.label(
 			"%dº lugar  ·  %s pts  ·  %s%d LP  ·  %s" % [
 				int(h["placement"]),
