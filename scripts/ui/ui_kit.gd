@@ -341,7 +341,7 @@ static func sfx(name: String) -> void:
 		node.play(name)
 
 
-static func panel(bg: Color = PURPLE_DEEP, border: Color = BLACK, pad: int = 20) -> PanelContainer:
+static func panel(bg: Color = PURPLE_DEEP, border: Color = BLACK, pad: int = 32) -> PanelContainer:
 	var p := PanelContainer.new()
 	p.add_theme_stylebox_override("panel", box(bg, border, 3, 4, pad))
 	return p

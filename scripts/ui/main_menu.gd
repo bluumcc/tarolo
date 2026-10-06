@@ -142,7 +142,7 @@ func _build_topbar(wide: bool) -> PanelContainer:
 ## Botões de navegação embutidos na topbar (só no wide/PC).
 func _make_topbar_nav() -> HBoxContainer:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
+	row.add_theme_constant_override("separation", 14)
 	for tab in ["RANKEADA", "CLÁSSICO", "LOJA", "AJUSTES"]:
 		var btn := _topbar_nav_btn(tab, tab == _active_tab)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -151,19 +151,29 @@ func _make_topbar_nav() -> HBoxContainer:
 
 
 func _topbar_nav_btn(tab: String, active: bool) -> Button:
-	var bg   := UIKit.TR_RED   if tab == "RANKEADA" else UIKit.TR_PURPLE
-	var text := UIKit.TR_GOLD  if tab == "RANKEADA" else UIKit.TR_WHITE
+	var bg   := UIKit.TR_RED    if tab == "RANKEADA" else UIKit.TR_PURPLE
+	var text := UIKit.TR_GOLD   if tab == "RANKEADA" else UIKit.TR_WHITE
 	if active:
 		bg = bg.lightened(0.12)
+	var is_ranked := tab == "RANKEADA"
+	var glow_col  := Color("#d63060") if is_ranked else UIKit.TR_PURPLE.lightened(0.30)
+	var glow_size := 10 if is_ranked else 5
+	var border_w  := 3  if is_ranked else 2
 	var b := Button.new()
 	b.text = tab
 	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override("font_size", 22)
+	b.add_theme_font_size_override("font_size", 26)
 	var mk := func(c: Color) -> StyleBoxFlat:
-		var sb := UIKit.box(c, UIKit.TR_GOLD if active else UIKit.CLEAR, 0, 0, 0)
-		sb.border_width_bottom = 4 if active else 0
-		sb.content_margin_left  = 10
-		sb.content_margin_right = 10
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = c
+		sb.border_color = glow_col
+		sb.set_border_width_all(border_w)
+		sb.set_corner_radius_all(10)
+		sb.shadow_color  = Color(glow_col.r, glow_col.g, glow_col.b, 0.55)
+		sb.shadow_size   = glow_size
+		sb.shadow_offset = Vector2.ZERO
+		sb.content_margin_left   = 10
+		sb.content_margin_right  = 10
 		sb.content_margin_top    = 0
 		sb.content_margin_bottom = 0
 		return sb
@@ -311,15 +321,6 @@ func _build_ranked(wide: bool) -> void:
 	var wins := int(rk["wins"])
 	var loss := int(rk["losses"])
 
-	# Título da página
-	var top_gap := Control.new()
-	top_gap.custom_minimum_size = Vector2(0, Widgets.MARGIN)
-	_content_col.add_child(top_gap)
-	var title := UIKit.label("TAROLO", 48, UIKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
-	title.add_theme_color_override("font_outline_color", UIKit.TITLE_OUTLINE)
-	title.add_theme_constant_override("outline_size", 8)
-	_content_col.add_child(title)
-
 	# Conteúdo principal: 2 colunas no PC, coluna única no mobile
 	var fichas := int(SaveManager.section("profile")["fichas"])
 	if wide:
@@ -339,7 +340,10 @@ func _build_ranked(wide: bool) -> void:
 		var spacer_fill := Control.new()
 		spacer_fill.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		left.add_child(spacer_fill)
-		left.add_child(_make_ranked_play_btn())
+		var pb := _make_ranked_play_btn()
+		pb.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		pb.custom_minimum_size.x = get_viewport_rect().size.x * 0.42
+		left.add_child(pb)
 
 		# Coluna direita (40%): torneios ocupa a coluna inteira
 		var right := VBoxContainer.new()
@@ -387,11 +391,10 @@ func _ranked_stats_block(col: VBoxContainer, rk: Dictionary, wins: int, loss: in
 	var stat_rows: Array[Array] = [
 		["MMR",  UIKit.fmt_int(int(rk["mmr"]))],
 		["LP",   "%d / 100" % int(Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))["lp"])],
-		["V / D", UIKit.fmt_dec(ratio, 2)],
+		["V/D", UIKit.fmt_dec(ratio, 2)],
 	]
 	var mp := UIKit.panel(UIKit.TR_PURPLE, UIKit.TR_PURPLE.lightened(0.12), 10)
 	if wide:
-		# 50% da largura da coluna, centralizado
 		mp.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		mp.custom_minimum_size = Vector2(get_viewport_rect().size.x * 0.28, 0)
 	else:
@@ -401,10 +404,10 @@ func _ranked_stats_block(col: VBoxContainer, rk: Dictionary, wins: int, loss: in
 	mp.add_child(mv)
 	for sr in stat_rows:
 		var mrow := HBoxContainer.new()
-		var mk := UIKit.label(str(sr[0]), 26, UIKit.MUTED)
+		var mk := UIKit.label(str(sr[0]), 26, UIKit.TR_GOLD)
 		mk.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		mrow.add_child(mk)
-		mrow.add_child(UIKit.label(str(sr[1]), 26, UIKit.BROWN))
+		mrow.add_child(UIKit.label(str(sr[1]), 26, UIKit.TR_WHITE))
 		mv.add_child(mrow)
 	col.add_child(mp)
 
@@ -438,11 +441,11 @@ func _ranked_tournament_block(col: VBoxContainer, fichas: int, fill_height: bool
 		item.add_child(ir)
 		var info := VBoxContainer.new()
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		info.add_child(UIKit.label("%s (%d jogadores)" % [str(ev["name"]), Tournament.FIELD_SIZE], 24, UIKit.BROWN))
-		info.add_child(UIKit.label("Inscrição ◎%s" % UIKit.fmt_int(buy), 20, UIKit.MUTED))
+		info.add_child(UIKit.label("%s (%d jogadores)" % [str(ev["name"]), Tournament.FIELD_SIZE], 24, UIKit.TR_GOLD))
+		info.add_child(UIKit.label("Inscrição ◎%s" % UIKit.fmt_int(buy), 20, UIKit.TR_WHITE))
 		var prizes := UIKit.label("1º ◎%s · 2º ◎%s · 3º ◎%s" % [
 			UIKit.fmt_int(Tournament.payout_for(0, buy)), UIKit.fmt_int(Tournament.payout_for(1, buy)),
-			UIKit.fmt_int(Tournament.payout_for(2, buy))], 20, UIKit.MUTED)
+			UIKit.fmt_int(Tournament.payout_for(2, buy))], 20, UIKit.TR_WHITE)
 		prizes.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.add_child(prizes)
 		ir.add_child(info)
