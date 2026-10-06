@@ -12,6 +12,49 @@ const FAN_MAX_HALF_ANGLE := 0.40 # leque: metade da abertura máxima (rad)
 const FAN_MAX_GAP := 1.3         # leque: distância máxima entre centros, em larguras de carta
 
 
+## Maior escala (≤ 1.0) onde N cartas cabem em avail_w × avail_h com gap mínimo legível.
+## Chame antes de apply(); depois limite o resultado ao máximo da plataforma (0.5 wide, 1.0 mobile).
+static func fit_scale_fan(n: int, avail_w: float, avail_h: float, base_size: Vector2) -> float:
+	if n <= 1:
+		return 1.0
+	var lo := 0.08
+	var hi := 1.0
+	for _i in range(24):
+		var mid := (lo + hi) * 0.5
+		if _fan_fits(n, avail_w, avail_h, base_size * mid):
+			lo = mid
+		else:
+			hi = mid
+	return lo
+
+
+## Verifica se um leque de N cartas com card_size cabe em avail_w × avail_h
+## com altura e espaçamento suficientes.
+static func _fan_fits(n: int, avail_w: float, avail_h: float, card_size: Vector2) -> bool:
+	if n == 1:
+		return card_size.y + 6.0 <= avail_h
+	var alpha := clampf(FAN_STEP_RAD * float(n - 1), 0.12, FAN_MAX_HALF_ANGLE)
+	var c   := cos(alpha)
+	var sa  := sin(alpha)
+	var half_w := card_size.x * 0.5 * c + card_size.y * 0.5 * sa
+	var half_h := card_size.y * 0.5 * c + card_size.x * 0.5 * sa
+	var span := maxf(avail_w * 0.75 - 2.0 * half_w, card_size.x * 0.5)
+	var radius := span / (2.0 * sa)
+	var max_gap_dist := card_size.x * FAN_MAX_GAP
+	var gap := radius * 2.0 * alpha / float(n - 1)
+	if gap > max_gap_dist:
+		radius = max_gap_dist * float(n - 1) / (2.0 * alpha)
+		gap = max_gap_dist
+	var drop := radius * (1.0 - c)
+	# Restrição de altura: todas as cartas inteiramente visíveis.
+	if avail_h < drop + 2.0 * half_h + 4.0:
+		return false
+	# Restrição de espaçamento: cada carta mostra ao menos 25% da largura.
+	if gap < card_size.x * 0.25:
+		return false
+	return true
+
+
 ## Posiciona/rotaciona cada CardView em `cards` (já filhos de `hand_container`) dentro da
 ## área disponível (avail_w x avail_h). Devolve a largura total de conteúdo, pro chamador
 ## ajustar o `custom_minimum_size` do contêiner (e o ScrollContainer saber até onde rolar).

@@ -699,19 +699,20 @@ func _layout_hand() -> void:
 	if cards.is_empty():
 		return
 	var parent := hand_container.get_parent() as Control
-	var hs := _hand_scale()
+	var max_hs := _hand_scale()
+	# Altura fixa da zona (igual ao que _build_hand_zone alocou).
+	# NÃO usar parent.size.y — ScrollContainer com rolagem vertical desligada cresce pra
+	# caber o conteúdo, criando um loop que empurra tudo pra ~800000 px.
+	var zone_h := CardView.SIZE.y * max_hs + CardView.MAX_LIFT * max_hs + 72.0
+	var avail_w := get_viewport_rect().size.x - 8.0
+	# Escala que faz todas as N cartas caberem com espaçamento legível; limitada ao max da plataforma.
+	var hs := minf(HandLayout.fit_scale_fan(cards.size(), avail_w, zone_h, CardView.SIZE), max_hs)
 	var card_sz := CardView.SIZE * hs
 	for c in cards:
 		(c as CardView).scale = Vector2(hs, hs)
-	var avail_w := get_viewport_rect().size.x - 8.0
-	# Nunca usar parent.size.y aqui: com rolagem vertical desligada, o ScrollContainer
-	# cresce pra caber o conteúdo — usar o próprio tamanho dele como altura disponível
-	# vira um loop (aumenta a altura, o que aumenta o parent, que aumenta a altura de
-	# novo…) até estourar um limite interno do Godot (~800000px) e empurrar a mão e o
-	# rodapé pra bem fora da tela. A altura útil é sempre a da carta + a folga do lift.
-	var avail_h := card_sz.y + CardView.MAX_LIFT * hs + 72.0
-	var content_w := HandLayout.apply(cards, avail_w, avail_h, "fan", card_sz)
-	(parent as HandScroller).set_content_size(Vector2(content_w, avail_h))
+	# Passa zone_h pra aplicar as cartas na base da zona, independente de hs.
+	var content_w := HandLayout.apply(cards, avail_w, zone_h, "fan", card_sz)
+	(parent as HandScroller).set_content_size(Vector2(content_w, zone_h))
 
 
 func _rebuild_hand() -> void:
