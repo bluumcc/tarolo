@@ -156,8 +156,7 @@ const POT_H := 36.0        ## folga embaixo da mão (a aba de avisos mora aqui)
 const CARD_SHRINK := 0.28   ## o card roxo é 28% mais baixo (encurta por cima; o pé fica onde estava): 10% + mais 20%
 const CARD_RISE := 36.0    ## quanto o card roxo sobe acima da zona da mão (antes do encurtamento)
 const MY_SEAT_RISE := 21.0 ## quanto o centro do seu avatar fica acima do topo do card roxo
-const LEFT_W := 132.0
-const RIGHT_W := 108.0
+const LEFT_W := 132.0     ## largura dos dois cards laterais (palpite e tempo)
 const MAX_UI_W := 900.0    ## em tela larga o jogo não estica além disso
 
 var stage: Control
@@ -165,7 +164,6 @@ var margin_box: MarginContainer
 var bottom_bar: HBoxContainer
 var bet_row: HBoxContainer
 var timer_label: Label
-var center_card: Panel
 var hand_scroller: HandScroller
 var hand_zone: Control
 var my_bet_pill: Control        # aposta da jogada: o Label do seu assento, em cima do avatar
@@ -329,16 +327,6 @@ func _build_hand_zone(root: VBoxContainer) -> void:
 	zone.custom_minimum_size = Vector2(0, BANNER_H + hand_h + POT_H)
 	root.add_child(zone)
 
-	center_card = Panel.new()
-	center_card.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT.lightened(0.1), UIKit.TR_PURPLE, "small", 16, 0))
-	center_card.anchor_left = 0.1
-	center_card.anchor_right = 0.9
-	center_card.anchor_top = 0.0
-	center_card.anchor_bottom = 1.0
-	center_card.offset_top = -CARD_RISE
-	center_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	zone.add_child(center_card)
-
 	# Avisos do jogo: aba na base do card roxo, em cima da barra de baixo (some quando vazia).
 	banner_box = PanelContainer.new()
 	banner_box.custom_minimum_size = Vector2(0, 0)
@@ -399,7 +387,7 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	var mid := VBoxContainer.new()
 	bottom_mid = mid
 	mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	mid.alignment = BoxContainer.ALIGNMENT_CENTER
+	mid.alignment = BoxContainer.ALIGNMENT_END   # base alinhada com a dos cards laterais
 	mid.add_theme_constant_override("separation", 4)
 	bottom_bar.add_child(mid)
 	status_label = UIKit.label("", 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
@@ -424,7 +412,7 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	mid.add_child(double_btn)
 
 	var tempo := StatCard.new().setup("TEMPO", "0:10", UIKit.TR_WHITE, 34)
-	tempo.custom_minimum_size = Vector2(RIGHT_W, 0)
+	tempo.custom_minimum_size = Vector2(LEFT_W, 0)   # mesma largura do card PALPITE
 	timer_label = tempo.value
 	timer_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	bottom_bar.add_child(tempo)
@@ -495,6 +483,11 @@ func _hand_h() -> float:
 
 
 ## Mão usa a largura total da viewport (quebra a limitação de _max_ui_w).
+## Topo da área do seu avatar, relativo ao topo da zona da mão (a zona encolhe `CARD_SHRINK` por cima).
+func _card_offset_top() -> float:
+	return -CARD_RISE + CARD_SHRINK * (BANNER_H + _hand_h() + POT_H + CARD_RISE)
+
+
 ## O leque desce 10% da altura da carta (as pontas passam por trás da barra de baixo).
 func _deck_drop() -> float:
 	return 0.1 * CardView.SIZE.y * _hand_scale()
@@ -512,8 +505,6 @@ func _update_hand_scroller_margins() -> void:
 	hand_scroller.offset_bottom = BANNER_H + hand_h + _deck_drop()
 	if hand_zone != null:
 		hand_zone.custom_minimum_size = Vector2(0, BANNER_H + hand_h + POT_H)
-	if center_card != null:   # o card roxo é 10% mais baixo (encurta por cima; o pé fica onde estava)
-		center_card.offset_top = -CARD_RISE + CARD_SHRINK * (BANNER_H + hand_h + POT_H + CARD_RISE)
 
 
 ## Em tela larga o jogo fica numa coluna centralizada (não estica).
@@ -569,7 +560,7 @@ func _layout_seats() -> void:
 	if table_center == null or stage == null:
 		return
 	var n := engine.num_players
-	var card_top := stage.size.y + 8.0 + (center_card.offset_top if center_card != null else -CARD_RISE)   # topo do card roxo no sistema do palco
+	var card_top := stage.size.y + 8.0 + _card_offset_top()   # referência vertical do seu avatar (sem card visível), no sistema do palco
 	table_center.seat_count = n
 	table_center.seat_floor = card_top - 20.0
 	table_center.my_seat_y = card_top - MY_SEAT_RISE
@@ -779,13 +770,32 @@ func _count_down(go: Button, lbl: Label, hold: float) -> void:
 
 ## Mensagem na aba em cima da barra de baixo. `color` pinta o título.
 func _banner(title: String, sub: String, color: Color) -> void:
+	var tone := _tone(color)
 	banner_title.text = title
-	banner_title.add_theme_color_override("font_color", color)
+	banner_title.add_theme_color_override("font_color", tone)
 	banner_sub.text = sub
 	banner_sub.visible = sub != ""
+	banner_box.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), tone, tone.darkened(0.45), "small", 10, 14, 6))
 	banner_box.visible = title != "" or sub != ""
 	banner_box.modulate.a = 0.0
 	create_tween().tween_property(banner_box, "modulate:a", 1.0, GameState.anim(0.12))
+
+
+## Poucas cores, cada uma com um sentido (todas legíveis sobre o roxo escuro): ciano = sua vez,
+## branco = neutro (passou, pagou, venceu), dourado = fichas subindo (aumentou, dobrou), vermelho =
+## perda/erro (desistiu, tempo), laranja = efeito de modificador, verde = acerto.
+func _tone(c: Color) -> Color:
+	if c == UIKit.TURN:
+		return UIKit.TR_CYAN
+	if c == UIKit.LOSS or c == UIKit.DANGER:
+		return UIKit.TR_RED_NEON
+	if c == UIKit.MONEY or c == UIKit.ME:
+		return UIKit.TR_GOLD
+	if c == UIKit.COMBO:
+		return UIKit.COMBO
+	if c == UIKit.OK:
+		return UIKit.OK
+	return UIKit.TR_WHITE
 
 
 ## Nome pro aviso: "Você" ou o nome do rival (só a inicial maiúscula).
@@ -2666,7 +2676,8 @@ func _resolve_trick_blitz(result: Dictionary) -> void:
 		title = "%s roubou de %s" % [_pname(winner), _pname(int(result["assalto_from"]))]
 	elif curse_amt > 0.0:
 		title = "%s pagou aos rivais" % _pname(winner)
-	_banner(title, "", UIKit.ME if winner == 0 else UIKit.INK)
+	var modified := saque_amt > 0.0 or assalto_amt > 0.0 or curse_amt > 0.0
+	_banner(title, "", UIKit.COMBO if modified else (UIKit.OK if winner == 0 else UIKit.INK))
 	Sfx.play("chip")
 	FX.burst(popup_layer, _seat_center(winner) - popup_layer.global_position, UIKit.ME if winner == 0 else UIKit.CHIPS, 10)
 	if float(result.get("trick_pot", 0.0)) > 0.0:
