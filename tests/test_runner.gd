@@ -372,8 +372,8 @@ func _test_chaos() -> void:
 	check(not r3["ok"], "não dá pra passar com aposta aberta")
 	p1.bet_act(3, "fold")
 	check(p1.folded[3], "desistir tira da rodada")
-	p1.raises = ChaosEngine.MAX_RAISES
-	check(not p1.bet_act(0, "raise", 60.0)["ok"], "limite de aumentos por rodada")
+	p1.raises = 50
+	check(bool(p1.bet_options(0)["can_raise"]), "sem teto de re-aumentos: só o all-in limita")
 	p1.bet_act(0, "call")
 	p1.bet_act(1, "call")
 	check(not p1.betting and p1.active_count() == 3, "rodada de apostas fecha quando todo mundo igualou ou desistiu")
@@ -432,6 +432,29 @@ func _test_chaos() -> void:
 	total_after += p3.trick_pot
 	check(is_equal_approx(total_before, total_after), "potes paralelos devolvem o excedente sem criar nem perder fichas")
 	check(p3.trick_pot <= 4.0 * float(p3.contrib[2]) + 0.001, "all-in curto só leva de cada rival o que ele mesmo pôs")
+	# Potes laterais de verdade: A (curto, melhor mão) ganha só o principal; o lateral vai pro melhor dos que cobriram.
+	var sp := ChaosEngine.new()
+	sp.setup_match({"seed": 3, "levels": 1, "mode": "blitz", "blind": 10, "players": 4, "stacks": [500.0, 500.0, 500.0, 500.0]})
+	sp.contrib = [100.0, 300.0, 300.0, 40.0]   # 3 é all-in curto; 1 e 2 cobrem 300; 0 desistiu com 100
+	sp.folded = [true, false, false, false]
+	sp.stacks = [0.0, 0.0, 0.0, 0.0]
+	sp.trick_pot = 740.0
+	sp.plays = []
+	sp._settle_side_pots(3)   # 3 é o melhor de todos
+	# principal: 40 de cada um dos 4 = 160 → 3; lateral: 1 e 2 e 0 (até 300): (60+260+260)=580 → melhor dos que cobriram (1, pela ordem)
+	check(is_equal_approx(sp.trick_pot, 160.0), "pote principal vai pro all-in curto")
+	check(is_equal_approx(float(sp.stacks[1]) + float(sp.stacks[2]), 580.0), "pote lateral vai pro melhor dos que cobriram")
+	# All-in maior que o dos rivais: o excedente que ninguém cobriu volta pra quem pôs.
+	var up := ChaosEngine.new()
+	up.setup_match({"seed": 4, "levels": 1, "mode": "blitz", "blind": 10, "players": 4, "stacks": [500.0, 500.0, 500.0, 500.0]})
+	up.contrib = [400.0, 100.0, 0.0, 0.0]
+	up.folded = [false, false, true, true]
+	up.stacks = [0.0, 0.0, 0.0, 0.0]
+	up.trick_pot = 500.0
+	up.plays = []
+	up._settle_side_pots(1)   # o curto (1) vence
+	check(is_equal_approx(up.trick_pot, 200.0) and is_equal_approx(float(up.stacks[0]), 300.0), "excedente não coberto volta pra quem apostou além")
+
 	# Bot sem fichas pro blind é trocado.
 	p3 = ChaosEngine.new()
 	p3.setup_match({"seed": 5, "stacks": [200, 200, 60, 200]})

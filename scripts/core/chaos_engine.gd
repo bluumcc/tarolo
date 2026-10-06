@@ -15,7 +15,6 @@ const HAND_SIZE := 8
 const ROUNDS := 5            # níveis de uma partida com fim (config "levels"); 0 = mesa sem fim
 const BLIND := 10
 const BUY_IN_BLINDS := ChaosEconomy.BUY_IN_BLINDS    # stack de entrada = 20 blinds
-const MAX_RAISES := 10       # aumentos por rodada: na prática só o all-in limita (era 4 e travava o re-aumento)
 const PRIZE_PER_POINT := 0.25  # cada ponto das cartas vale 0,25 blind, pago pelos rivais
 const GOLD_MULT := 3.0       # Rodada Dourada
 const KING_CUT_BONUS := 3.0  # Corte de Rei (pontos)
@@ -319,14 +318,12 @@ func bet_actor() -> int:
 	return int(to_act[0]) if betting and not to_act.is_empty() else -1
 
 
-## Maior "total na rodada" que alguém ainda consegue pagar dentre os rivais de `player` que
-## não desistiram — aumentar acima disso seria dinheiro que ninguém pode cobrir.
-func _rival_reach(player: int) -> float:
-	var reach := 0.0
+## Aumentar só faz sentido se algum rival que não desistiu ainda tem fichas pra responder.
+func _rival_can_respond(player: int) -> bool:
 	for q in range(num_players):
-		if q != player and not folded[q]:
-			reach = maxf(reach, stacks[q] + contrib[q])
-	return reach
+		if q != player and not folded[q] and stacks[q] > 0.0:
+			return true
+	return false
 
 
 ## Verdadeiro se ninguém além do último que fala tem fichas pra igualar mais nada.
@@ -346,10 +343,12 @@ func to_call(player: int) -> float:
 ## O pagar é limitado à stack (pagar "tudo que tem" é all-in) e o aumento vai até o all-in
 ## pessoal, limitado só pelo que o rival mais forte ainda consegue cobrir.
 func bet_options(player: int) -> Dictionary:
+	# No-limit de verdade: dá pra aumentar até o próprio all-in, mesmo que passe do que qualquer rival
+	# tem. O que ninguém cobre volta pra quem pôs (ver `_settle_side_pots`).
 	var own_max: float = stacks[player] + contrib[player]
-	var max_to := minf(own_max, _rival_reach(player))
+	var max_to := own_max
 	var call_amt := to_call(player)
-	var can_raise: bool = raises < MAX_RAISES and max_to > bet_level and stacks[player] > call_amt
+	var can_raise: bool = max_to > bet_level and stacks[player] > call_amt and _rival_can_respond(player)
 	return {
 		"can_check": bet_level - contrib[player] <= 0.0,
 		"call": call_amt,
@@ -420,19 +419,73 @@ func bet_act(player: int, action: String, to := 0.0) -> Dictionary:
 	return {"ok": true, "action": action, "to": bet_level, "amount": amount, "done": done}
 
 
-## Potes paralelos (all-in): o vencedor só leva de cada rival o que ele mesmo pôs na rodada;
-## o que passar disso volta pra quem pôs. O que sobra em `trick_pot` é o que o vencedor leva.
+## Potes paralelos (all-in), como no poker: o que cada um pôs na rodada é fatiado em camadas pelos
+## valores de all-in dos que não desistiram. Cada camada (pote principal, depois os laterais) vai
+## pro MELHOR jogador entre os que a cobriram (`contrib` ≥ topo da camada). O que ninguém cobriu
+## volta pra quem pôs. A parte do `winner` (o melhor de todos) fica em `trick_pot`, que quem chama
+## soma à stack dele; as camadas dos outros vencedores já são pagas aqui.
 func _settle_side_pots(winner: int) -> void:
-	var won := 0.0
+	var order := _trick_order(winner)
+	var levels: Array = []
 	for q in range(num_players):
-		var c: float = contrib[q]
-		if q == winner or folded[q]:
-			won += c
-			continue
-		var take := minf(c, contrib[winner])
-		won += take
-		stacks[q] += c - take
+		if not folded[q] and contrib[q] > 0.0 and not levels.has(contrib[q]):
+			levels.append(contrib[q])
+	levels.sort()
+	var total := 0.0
+	for q in range(num_players):
+		total += contrib[q]
+	var paid := 0.0
+	var won := 0.0
+	var prev := 0.0
+	for lv in levels:
+		var slice := 0.0
+		for q in range(num_players):
+			slice += minf(contrib[q], lv) - minf(contrib[q], prev)
+		var taker := winner
+		for q in order:
+			if not folded[q] and contrib[q] >= lv:
+				taker = q
+				break
+		if taker == winner:
+			won += slice
+		else:
+			stacks[taker] += slice
+		paid += slice
+		prev = lv
+	won += maxf(total - paid, 0.0)   # sobra de quem desistiu acima de todos os níveis: fica no pote do vencedor
 	trick_pot = won
+
+
+## Jogadores do melhor pro pior na rodada de cartas, com `winner` sempre primeiro (os demais seguem
+## a mesma regra de quem vence, pelo naipe líder; quem não jogou carta — desistiu — fica de fora).
+func _trick_order(winner: int) -> Array:
+	var scored: Array = []
+	var ls := TrickRules.lead_suit(plays)
+	var inverted := active_modifier() == ChaosModifiers.Modifier.VAZA_INVERTIDA
+	for pl in plays:
+		var q: int = pl["player"]
+		if q == winner:
+			continue
+		var c: CardData = pl["card"]
+		var score := -1000.0
+		if c.is_louco():
+			score = -500.0 if louco_can_win() else -1000.0
+		elif inverted:
+			if c.suit == ls and not c.is_trunfo():
+				score = 100.0 - float(c.rank)
+		elif c.is_trunfo():
+			score = 200.0 + float(c.rank)
+		elif c.suit == ls:
+			score = float(c.rank)
+		scored.append([score, q])
+	scored.sort_custom(func(a, b): return a[0] > b[0])
+	var out: Array = [winner]
+	for e in scored:
+		out.append(int(e[1]))
+	for q in range(num_players):   # quem ainda não jogou carta (ordem desconhecida) vem por último
+		if not folded[q] and not out.has(q):
+			out.append(q)
+	return out
 
 
 ## Quem desiste descarta a carta mais fraca (virada): as mãos continuam do mesmo tamanho.

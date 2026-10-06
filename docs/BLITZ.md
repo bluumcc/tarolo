@@ -361,3 +361,8 @@ quebra, mesas se fundindo, até sobrar 1 campeão.
 - **Mais de 6 querendo entrar:** o limite da mesa é 6; quem sobra forma outra mesa.
 - **Estado:** só os avisos e o ajuste entre rodadas existem hoje; a fila de entrada, o estado de
   espectador e o assento apagado dependem do motor multiplayer.
+
+## Aposta por jogada: no-limit com potes laterais
+- Aumentar vai até o **all-in próprio**, mesmo acima do que qualquer rival tem; **sem teto de re-aumentos**.
+- O pote da jogada é fatiado em camadas pelos all-ins dos que não desistiram (principal + laterais). Cada camada vai pro **melhor jogador entre os que a cobriram**; o que ninguém cobriu volta pra quem apostou.
+- Só dá pra aumentar se algum rival que não desistiu ainda tem fichas pra responder.

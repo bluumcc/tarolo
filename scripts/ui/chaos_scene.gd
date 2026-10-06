@@ -1496,8 +1496,6 @@ func _human_bet() -> Dictionary:
 
 ## Por que o AUMENTAR não aparece — a pergunta que o jogador faria.
 func _no_raise_reason(opt: Dictionary) -> String:
-	if engine.raises >= ChaosEngine.MAX_RAISES:
-		return "Limite de %d aumentos atingido." % ChaosEngine.MAX_RAISES
 	if float(engine.stacks[0]) <= float(opt["call"]):
 		return "Pagar já é seu all-in."
 	return "Rivais não cobrem mais."
