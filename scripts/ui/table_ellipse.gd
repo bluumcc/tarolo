@@ -7,27 +7,32 @@ const LAYERS := 20
 const POINTS := 80
 
 
-func center_point() -> Vector2:
-	return size / 2.0
-
-
-## Meio-tamanho do assento (avatar + nome) e folga entre ele e a borda da mesa. A mesa é a elipse
-## que sobra DEPOIS de reservar esse anel em volta, então todos os avatares ficam à mesma
-## distância (SEAT_GAP) da borda dela.
+## Meio-tamanho do assento (avatar + nome). Os avatares ficam com o centro NA borda da mesa
+## (metade dentro, metade fora), todos sobre a mesma elipse.
 const SEAT_HALF := Vector2(65.0, 52.0)
-const SEAT_GAP := 26.0
+## Quanto a mesa desce além da área do palco: o pedaço de baixo fica atrás do card roxo.
+const TABLE_DROP := 70.0
 
 
-## Raio visual da elipse (a mesa), já descontado o anel dos avatares.
+func _top_y() -> float:
+	return SEAT_HALF.y + 2.0   # centro do avatar do topo
+
+
+## Centro da elipse: a mesa começa no avatar do topo e se estende pra baixo.
+func center_point() -> Vector2:
+	return Vector2(size.x / 2.0, _top_y() + radii().y)
+
+
+## Raio visual da elipse (a mesa).
 func radii() -> Vector2:
 	return Vector2(
-		maxf(size.x / 2.0 - SEAT_HALF.x - SEAT_GAP - 6.0, 10.0),
-		maxf(size.y / 2.0 - SEAT_HALF.y - SEAT_GAP - 6.0, 10.0))
+		maxf(size.x / 2.0 - SEAT_HALF.x - 4.0, 10.0),
+		maxf((size.y + TABLE_DROP - _top_y()) / 2.0, 10.0))
 
 
-## Órbita dos centros dos avatares: a elipse da mesa + meio-assento + folga, em cada eixo.
+## Órbita dos centros dos avatares: a própria borda da elipse.
 func seat_edge_radii() -> Vector2:
-	return radii() + SEAT_HALF + Vector2(SEAT_GAP, SEAT_GAP)
+	return radii()
 
 
 ## Ângulo do assento: o jogador 0 fica embaixo e os demais se distribuem com ângulos iguais.
