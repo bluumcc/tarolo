@@ -379,7 +379,7 @@ func _ranked_stats_block(col: VBoxContainer, rk: Dictionary, wins: int, loss: in
 		["LP",   "%d / 100" % int(Ranked.tier_info(int(rk["points"]), int(rk["mmr"]))["lp"])],
 		["V/D", UIKit.fmt_dec(ratio, 2)],
 	]
-	var mp := UIKit.panel(UIKit.TR_PURPLE, UIKit.TR_PURPLE.lightened(0.12), 10)
+	var mp := UIKit.panel(UIKit.TR_PURPLE, UIKit.TR_PURPLE.lightened(0.12), 24)
 	if wide:
 		mp.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		mp.custom_minimum_size = Vector2(get_viewport_rect().size.x * 0.28, 0)
@@ -399,7 +399,7 @@ func _ranked_stats_block(col: VBoxContainer, rk: Dictionary, wins: int, loss: in
 
 
 func _ranked_tournament_block(col: VBoxContainer, fichas: int, fill_height: bool) -> void:
-	var tp := UIKit.panel(UIKit.TR_PURPLE, UIKit.TR_PURPLE.lightened(0.12), 10)
+	var tp := UIKit.panel(UIKit.TR_PURPLE, UIKit.TR_PURPLE.lightened(0.12), 24)
 	tp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	if fill_height:
 		tp.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -420,7 +420,7 @@ func _ranked_tournament_block(col: VBoxContainer, fichas: int, fill_height: bool
 	tscroll.add_child(tlist)
 	for ev in Tournament.OPEN_EVENTS:
 		var buy: int = int(ev["buy_in"])
-		var item := UIKit.panel(UIKit.TR_PURPLE.lightened(0.06), UIKit.TR_PURPLE.lightened(0.18), 8)
+		var item := UIKit.panel(UIKit.TR_PURPLE.lightened(0.06), UIKit.TR_PURPLE.lightened(0.18), 20)
 		item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var ir := HBoxContainer.new()
 		ir.add_theme_constant_override("separation", 12)

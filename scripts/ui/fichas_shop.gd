@@ -7,7 +7,7 @@ extends RefCounted
 static func open(host: Control, on_change: Callable = Callable()) -> Control:
 	var ov := UIKit.overlay()
 	host.add_child(ov)
-	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 16)
+	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 24)
 	var vp := host.get_viewport_rect().size
 	box.custom_minimum_size = Vector2(minf(vp.x - 32.0, 660.0), 0)
 	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -60,7 +60,7 @@ static func _build(body: VBoxContainer, state: Dictionary, on_change: Callable) 
 	(state["bal"] as VBoxContainer).add_child(info)
 
 	# Recarga diária: 1 por dia, só quando as fichas não pagam nem a entrada mais barata.
-	var daily := UIKit.panel(UIKit.PURPLE, UIKit.OK, 12)
+	var daily := UIKit.panel(UIKit.PURPLE, UIKit.OK, 20)
 	var dv := VBoxContainer.new()
 	dv.add_theme_constant_override("separation", 6)
 	daily.add_child(dv)
@@ -96,7 +96,7 @@ static func _build(body: VBoxContainer, state: Dictionary, on_change: Callable) 
 
 
 static func _pack_row(pk: Dictionary, prof: Dictionary, state: Dictionary, on_change: Callable) -> PanelContainer:
-	var row := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MUTED, 8)
+	var row := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.MUTED, 20)
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 10)
 	row.add_child(h)
