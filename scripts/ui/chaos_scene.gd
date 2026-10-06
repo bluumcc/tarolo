@@ -57,6 +57,8 @@ var title_label: Label
 var round_dots: RoundDots
 var prog_card: StatCard         # fez / palpite, no lugar do antigo botão de ajuda
 var modifier_strip: ModifierStrip
+var discard_title: Label        # título grande da etapa de descarte, no topo do palco (fora do card)
+var chrome_discard := false      # etapa sem mesa (descarte/palpite): sem modificador na faixa
 var shown_totals: Array = []
 var modal_open := false      # modal de poder/aposta aberto — o relógio da jogada pausa
 var best_gain := 0.0         # maior pote que o jogador levou na sessão
@@ -239,6 +241,16 @@ func _build_ui() -> void:
 	stage.custom_minimum_size = Vector2(0, 300)
 	root.add_child(stage)
 	main_area = stage
+	discard_title = UIKit.serif_label("ESCOLHA DUAS CARTAS PARA DESCARTAR", 46, UIKit.TR_GOLD.lightened(0.25), HORIZONTAL_ALIGNMENT_CENTER)
+	discard_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	discard_title.anchor_right = 1.0
+	discard_title.offset_top = 56.0   # respiro do header
+	discard_title.offset_left = 8.0
+	discard_title.offset_right = -8.0
+	discard_title.add_theme_constant_override("outline_size", 4)
+	discard_title.add_theme_constant_override("line_spacing", 6)
+	discard_title.visible = false
+	stage.add_child(discard_title)
 	table_center = TableEllipse.new()
 	table_center.name = "TableCenter"
 	table_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -623,7 +635,7 @@ func _announce_round() -> void:
 ## Modificador da rodada na faixa fixa do topo (nome + efeito curto, cor pela função).
 func _refresh_modifier_strip() -> void:
 	var m := engine.modifier
-	if m == -1:
+	if m == -1 or chrome_discard:
 		modifier_strip.show_modifier("", "", UIKit.TR_RED)
 		return
 	modifier_strip.show_modifier(_modifier_label(m).to_upper(), ChaosModifiers.short_of(m, engine.blitz), _modifier_color(m))
@@ -2191,6 +2203,7 @@ func _resolve_walkover(result: Dictionary) -> void:
 ## Descarte inicial: etapa própria, sem mesa, sem modificador, sem indicador de vez — só os
 ## avatares com nome e stack, pra não confundir com informação de uma rodada que nem começou.
 func _set_discard_chrome(active: bool) -> void:
+	chrome_discard = active
 	table_center.visible = not active
 	for p in range(1, engine.num_players):
 		(seat_nodes[p] as Control).visible = not active
@@ -2295,11 +2308,13 @@ func _human_discard_play() -> void:
 	phase = "discard"
 	discard_picks = []
 	_rebuild_hand()
-	_banner("ESCOLHA 2 CARTAS PRA DESCARTAR", "Toque na carta pra focar, toque de novo pra descartar.", UIKit.BRAND)
+	discard_title.visible = true
+	_banner("", "Toque na carta pra focar, toque de novo pra descartar.", UIKit.BRAND)
 	status_label.text = "0/%d descartadas" % ChaosEngine.BLITZ_DISCARD_SIZE
 	_clock_start(DISCARD_SECONDS, _on_discard_timeout)
 	await item_chosen
 	_clock_stop()
+	discard_title.visible = false
 	phase = "idle"   # cartas deixam de ser clicáveis/arrastáveis fora da vez
 	status_label.text = ""
 	discard_picks = []
