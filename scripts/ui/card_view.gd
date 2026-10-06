@@ -10,7 +10,7 @@ signal zoom_requested(view: CardView)
 const ART_ASPECT := 540.0 / 900.0
 ## Tamanho base da carta (escala 1.0): largura 188, altura pela proporção da arte (188x313).
 const SIZE := Vector2(188.0, 188.0 / ART_ASPECT)
-const TABLE_H_MOBILE := 135.0   ## altura da carta jogada na mesa (celular)
+const TABLE_H_MOBILE := 190.0   ## altura da carta jogada na mesa (celular)
 const TABLE_H_WIDE := 180.0     ## idem em tela larga (PC)
 const HAND_H_WIDE := 320.0      ## altura máxima da carta na mão em tela larga
 const FOCUS_H_WIDE := 410.0     ## altura da carta destacada (arrastada no swipe) em tela larga

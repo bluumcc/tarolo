@@ -21,6 +21,12 @@ func seat_radii() -> Vector2:
 	return Vector2(maxf(size.x / 2.0 - 84.0, 10.0), maxf(size.y / 2.0 - 72.0, 10.0))
 
 
+## Raio dos avatares: encostados nas margens da área da mesa (fora da elipse). A carta jogada
+## de cada assento continua usando seat_radii (perto do centro).
+func seat_edge_radii() -> Vector2:
+	return Vector2(maxf(size.x / 2.0 - 65.0, 10.0), maxf(size.y / 2.0 - 50.0, 10.0))
+
+
 ## Ângulo do assento: o jogador 0 fica embaixo e os demais se distribuem com ângulos iguais.
 static func seat_angle(player: int, count: int) -> float:
 	return PI / 2.0 + TAU * float(player) / float(maxi(count, 1))

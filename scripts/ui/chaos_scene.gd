@@ -621,7 +621,7 @@ func _layout_seats() -> void:
 	if table_center == null or stage == null:
 		return
 	var c := table_center.center_point()
-	var r := table_center.seat_radii()
+	var r := table_center.seat_edge_radii()
 	var n := engine.num_players
 	for p in range(1, n):
 		var seat := seat_nodes[p] as Control
@@ -743,24 +743,7 @@ func _rebuild_hand() -> void:
 		cv.set_playable(discarding or (human_turn and legal.has(card)))
 		cv.tapped.connect(_on_card_tapped)
 		cv.zoom_requested.connect(_show_zoom)
-		_apply_modifier_badge(cv, card)
 	_layout_hand.call_deferred()
-
-
-## Mostra na própria carta o valor real dela sob o modificador + item ativos, pra decisão
-## de qual jogar ser visível e não só matemática escondida no placar. Mantém o texto do
-## mesmo tamanho do padrão ("X,Y pts") pra não esticar a carta — só o ícone e a cor mudam.
-func _apply_modifier_badge(cv: CardView, card: CardData, player: int = 0) -> void:
-	var base := card.points()
-	var eff := engine.card_value(card, player)
-	if is_equal_approx(eff, base):
-		return
-	var boosted := eff > base
-	cv.points_label.text = "%s %s pts" % ["▲" if boosted else "▼", UIKit.fmt_dec(eff, 1)]
-	var dark_face := card.is_trunfo() or card.is_louco()
-	var good := UIKit.OK if dark_face else UIKit.GOOD_ON_LIGHT
-	var bad := UIKit.LOSS if dark_face else UIKit.BAD_ON_LIGHT
-	cv.points_label.add_theme_color_override("font_color", good if boosted else bad)
 
 
 func _plural(n: int, one: String, many: String) -> String:
@@ -1200,7 +1183,6 @@ func _animate_play(player: int, card: CardData, from: Vector2) -> void:
 	table_center.add_child(cv)
 	cv.set_playable(true)
 	cv.zoom_requested.connect(_show_zoom)
-	_apply_modifier_badge(cv, card, -1)  # na mesa só mostra o efeito do modificador — o item só conta se essa carta vencer a rodada
 	cv.global_position = from
 	cv.scale = Vector2(0.9, 0.9)
 	cv.rotation = randf_range(-0.25, 0.25)
