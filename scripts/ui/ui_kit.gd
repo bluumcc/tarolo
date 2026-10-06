@@ -68,16 +68,20 @@ const HUD_DIM := Color(0.8, 0.78, 0.86, 1.0)
 const HINT_BG := Color(0.10, 0.08, 0.14, 0.9)
 const TOAST_BG := Color(0.03, 0.03, 0.07, 0.92)
 
-## Paleta Tarot Royale — nova identidade visual do jogo.
-const TR_BLACK  := Color("#080413")   ## fundo principal
-const TR_WHITE  := Color("#e7e7e3")   ## texto principal / face de carta
-const TR_GOLD   := Color("#bead84")   ## dourado âmbar (recompensas, destaque)
+## Paleta Tarot Royale — ver docs/PALETA.md para referência completa.
+const TR_BLACK  := Color("#080413")   ## sombra / contorno / fundo de carta
+const TR_WHITE  := Color("#e8e7e6")   ## branco — texto principal, face de carta
+const TR_GOLD   := Color("#d8c7aa")   ## dourado — recompensas, fichas, destaque
 const TR_CYAN   := Color("#6cbfc5")   ## ciano (info, seleção, ação secundária)
-const TR_RED      := Color("#a61b44")   ## vermelho (perigo, naipes vermelhos)
-const TR_RED_GLOW := Color("#d63060")   ## vermelho brilhante (glow de botão primário)
-const TR_RED_NEON := Color("#ff8099")   ## neon quente: borda da linha interna do botão big-glow
-const TR_BLUE   := Color("#236592")   ## azul (defesa, elementos de fundo)
-const TR_PURPLE := Color("#0c0a1a")   ## roxo escuro (superfícies profundas, modais)
+const TR_RED_LIGHT := Color("#ffd4e0")  ## vermelho-claro — quase branco, texto sobre vermelho
+const TR_RED       := Color("#f61b54")  ## vermelho-normal — perigo, naipes, RANKEADA
+const TR_RED_DARK  := Color("#5d1440")  ## vermelho-escuro — fundo/sombra de botão vermelho
+const TR_RED_GLOW  := Color("#d63060")  ## glow difuso do botão vermelho
+const TR_RED_NEON  := Color("#ff8099")  ## neon quente: borda interna do botão big-glow
+const TR_BLUE          := Color("#236592")  ## azul (defesa, elementos de fundo)
+const TR_PURPLE_LIGHT  := Color("#4f346a")  ## roxo-claro — superfícies elevadas, botões ativos
+const TR_PURPLE        := Color("#191430")  ## roxo-normal — painéis, modais
+const TR_PURPLE_DARK   := Color("#140c33")  ## roxo-escuro — fundo da tela, camada mais profunda
 
 ## Duelo do Vanilla: o Atacante é o "chefe" (vermelho), a Defesa é o time contra ele (azul).
 const BOSS := Color("#E2463B")

@@ -1,5 +1,22 @@
 # Tarolo — guia para Claude Code
 
+## Paleta de cores
+
+Arquivo de referência: `docs/PALETA.md`. Tokens em `scripts/ui/ui_kit.gd` (`UIKit.TR_*`).
+
+| Cor | Token | Hex |
+|---|---|---|
+| branco | `TR_WHITE` | `#e8e7e6` |
+| dourado | `TR_GOLD` | `#d8c7aa` |
+| vermelho-claro | `TR_RED_LIGHT` | `#ffd4e0` |
+| vermelho-normal | `TR_RED` | `#f61b54` |
+| vermelho-escuro | `TR_RED_DARK` | `#5d1440` |
+| roxo-claro | `TR_PURPLE_LIGHT` | `#4f346a` |
+| roxo-normal | `TR_PURPLE` | `#191430` |
+| roxo-escuro | `TR_PURPLE_DARK` | `#140c33` |
+
+**Regra:** nunca hex inline nas telas — sempre `UIKit.TR_*`. Variações via `.lightened()` / `.darkened()`.
+
 ## Princípios do produto
 - **O Vanilla é sempre o modo mais fiel ao Jeu de Tarot lúdico (Tarot francês).** Regras oficiais (seguir naipe, cortar com Trunfo, obrigação de cobrir com Trunfo maior, Bouts, licitação, contratos) não devem ser alteradas pra "melhorar o jogo". Variações de regra pertencem ao Caos (ou a modos novos), nunca ao Vanilla.
 - O Caos é o modo dinâmico/experimental: poker de rodadas (blind, stack, apostas), modificadores e combos. Ver `docs/MESA_CAOS.md`.

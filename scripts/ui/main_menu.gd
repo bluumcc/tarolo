@@ -37,7 +37,7 @@ func _build() -> void:
 
 	# Fundo roxo escuro unificado (sem divisão header/conteúdo)
 	var bg := ColorRect.new()
-	bg.color = Color("#0D0A2E")
+	bg.color = UIKit.TR_PURPLE_DARK
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var mat := ShaderMaterial.new()
@@ -172,10 +172,9 @@ func _topbar_nav_btn(tab: String, active: bool) -> Button:
 			border_w   = 2
 			shad_a     = 0.18
 	else:
-		# roxo bem clarinho para o glow/border dos outros botões
-		var purple_rim := Color("#9080e8")
+		var purple_rim := UIKit.TR_PURPLE_LIGHT.lightened(0.45)
 		if active:
-			bg         = Color("#2D1E8A")               # PURPLE vivo (não cinza)
+			bg         = UIKit.TR_PURPLE_LIGHT
 			glow_col   = purple_rim
 			glow_size  = 10
 			border_col = Color.TRANSPARENT
