@@ -33,6 +33,18 @@ Aplicação das cores: vermelho → `rim_box(TR_RED_DARK, TR_RED_LIGHT, TR_RED)`
 - Escala de Control: pivô = `size/2` e posição = `centro - size/2` (tamanho sem escala). Ver `HandLayout._place`.
 - Gate: `godot --headless --path . res://tests/card_layout_gate.tscn` (corpo = SIZE, leque inteiro e centralizado, em celular e PC).
 
+## Componentes da mesa Blitz (reutilizáveis, atômicos)
+Em `scripts/ui/`, todos desenhados em código (sem textura/shader) e só com tokens `UIKit.TR_*`:
+- `HexAvatar` — avatar hexagonal com moldura neon (`set_active` = vez), selo de vitórias (vértice de baixo à esquerda) e D do dealer (à direita). `make_badge()` cria o selo.
+- `SeatView` — assento: `HexAvatar` + plaquinha com o nome. Rival: tocar no avatar **ou** no nome abre o card do stack (3 s). `always_stack` = você (nome + stack sempre visíveis). Tamanho fixo `W×H`.
+- `StatCard` — card legenda + número (POTE, TEMPO, FEZ/PALPITE, APOSTA). `value` é o Label a atualizar.
+- `ModifierStrip` — faixa fixa de largura total com o modificador da rodada; `show_modifier()` só mexe nos nós se mudou; sinal `tapped` abre a explicação.
+- `RoundDots` — losangos de progresso (`set_progress(total, atual)`), um único `_draw`.
+- `UIKit.action_button(texto, UIKit.ActionKind.DANGER|OK|GOLD)` — botões de ação (padrão `rim_box`, serifada).
+- `UIKit.serif()` / `UIKit.serif_label()` — serifada de títulos/legendas (DejaVu Serif Bold subset, ~28 KB, `assets/fonts/DejaVuSerif-Bold-Subset.ttf`). Legendas ≥ 20 px.
+- `TableEllipse` — mesa de runas (anéis neon + glifos), desenhada uma vez por resize.
+- Layout da mesa (`chaos_scene.gd`): topo = menu · título + `RoundDots` · `StatCard` fez/palpite; abaixo a `ModifierStrip`; seu avatar cruza o topo do card roxo, avisos ("fulano pagou") na faixa logo abaixo dele; mão em leque; prêmio no pé do card; barra de baixo = POTE · ações · TEMPO. A ajuda (antigo "?") mora na pausa.
+
 ## Princípios do produto
 - **O Vanilla é sempre o modo mais fiel ao Jeu de Tarot lúdico (Tarot francês).** Regras oficiais (seguir naipe, cortar com Trunfo, obrigação de cobrir com Trunfo maior, Bouts, licitação, contratos) não devem ser alteradas pra "melhorar o jogo". Variações de regra pertencem ao Caos (ou a modos novos), nunca ao Vanilla.
 - O Caos é o modo dinâmico/experimental: poker de rodadas (blind, stack, apostas), modificadores e combos. Ver `docs/MESA_CAOS.md`.

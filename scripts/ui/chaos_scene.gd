@@ -47,8 +47,10 @@ var dealer_badges: Array = []
 var phase := "idle"            # "bet" | "play" | "idle"
 var bets_gathered := false     # apostas já juntadas no pote
 var first_round_done := false
-var info_label: Label
-var trick_dots: HBoxContainer
+var title_label: Label
+var round_dots: RoundDots
+var prog_card: StatCard         # fez / palpite, no lugar do antigo botão de ajuda
+var modifier_strip: ModifierStrip
 var shown_totals: Array = []
 var modal_open := false      # modal de poder/aposta aberto — o relógio da jogada pausa
 var best_gain := 0.0         # maior pote que o jogador levou na sessão
@@ -58,7 +60,8 @@ var action_color: Array = []
 var popup_layer: Control
 var overlay_layer: Control
 var table_views: Array = []
-var pot_box: PanelContainer
+var pot_box: StatCard           # POTE, no canto de baixo à esquerda
+var _turn_color := UIKit.TR_CYAN.lightened(0.15)   # moldura/nome de quem joga agora
 var pot_label: Label
 var pot_sub: Label
 var pot_prize_label: Label   # prêmio do palpite — visível quando o trick_pot está em destaque
@@ -140,8 +143,11 @@ func _show_insufficient_fichas() -> void:
 
 const HAND_RAISE := 28.0   ## o leque sobe um pouco da base da faixa da mão
 const BAR_H := 96.0       ## barra de ações embaixo
-const BANNER_H := 84.0     ## título + descrição do modificador, em cima da mão
-const POT_H := 48.0        ## pote, embaixo da mão
+const BANNER_H := 100.0    ## do topo da zona até a mão: faixa de avisos, abaixo do seu avatar
+const POT_H := 30.0        ## prêmio, no pé do card roxo
+const LANE_TOP := 56.0     ## topo da faixa de avisos, medido do topo do card roxo
+const LANE_H := 76.0
+const MY_SEAT_RISE := 21.0 ## quanto o centro do seu avatar fica acima do topo do card roxo
 const LEFT_W := 132.0
 const RIGHT_W := 108.0
 const MAX_UI_W := 900.0    ## em tela larga o jogo não estica além disso
@@ -151,7 +157,7 @@ var margin_box: MarginContainer
 var bottom_bar: HBoxContainer
 var bet_row: HBoxContainer
 var timer_label: Label
-var center_card: PanelContainer
+var center_card: Panel
 var hand_scroller: HandScroller
 var hand_zone: Control
 var my_bet_pill: PanelContainer
@@ -160,6 +166,11 @@ var my_bet_label: Label
 
 func _build_ui() -> void:
 	add_child(UIKit.background())
+	var dim := ColorRect.new()   # mesa de runas sobre quase-preto: escurece o fundo azulado
+	dim.color = Color(UIKit.TR_BLACK, 0.62)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(dim)
 
 	margin_box = MarginContainer.new()
 	margin_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -184,63 +195,62 @@ func _build_ui() -> void:
 	dealer_badges.resize(engine.num_players)
 	seat_nodes.resize(engine.num_players)
 
-	# Barra de topo — menu, nível/entrada + bolinhas das rodadas, ajuda.
+	# Topo: menu · título com os losangos das rodadas · fez/palpite (no lugar da ajuda, que
+	# agora fica dentro da pausa).
 	var topbar := HBoxContainer.new()
 	topbar.add_theme_constant_override("separation", 12)
 	root.add_child(topbar)
 	var menu_btn := Widgets.icon_button("☰")
+	for sn in ["normal", "hover", "pressed", "focus"]:
+		menu_btn.add_theme_stylebox_override(sn, UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_GOLD.darkened(0.2), UIKit.TR_GOLD.darkened(0.6), "small", 14, 8))
+	menu_btn.add_theme_color_override("font_color", UIKit.TR_GOLD)
 	menu_btn.pressed.connect(_open_pause)
 	topbar.add_child(menu_btn)
-	var info_box := UIKit.panel(UIKit.SURFACE, UIKit.BLACK, 8)
+	var info_box := PanelContainer.new()
 	info_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_box.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_GOLD.darkened(0.2), UIKit.TR_GOLD.darkened(0.6), "small", 14, 12, 6))
 	var info_v := VBoxContainer.new()
 	info_v.add_theme_constant_override("separation", 4)
+	info_v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	info_box.add_child(info_v)
-	info_label = UIKit.label("", 28, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	info_v.add_child(info_label)
-	trick_dots = HBoxContainer.new()
-	trick_dots.alignment = BoxContainer.ALIGNMENT_CENTER
-	trick_dots.add_theme_constant_override("separation", 8)
-	info_v.add_child(trick_dots)
+	title_label = UIKit.serif_label("", 24, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	title_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	title_label.clip_text = true
+	info_v.add_child(title_label)
+	round_dots = RoundDots.new()
+	round_dots.set_progress(ChaosEngine.HAND_SIZE, 0)
+	info_v.add_child(round_dots)
 	topbar.add_child(info_box)
-	var help_btn := Widgets.icon_button("?", UIKit.ACTION.darkened(0.1))
-	help_btn.pressed.connect(_open_help)
-	topbar.add_child(help_btn)
+	prog_card = StatCard.new().setup("FEZ/PALPITE", "–", UIKit.TR_WHITE, 34)
+	topbar.add_child(prog_card)
 
-	# Palco: a mesa (elipse achatada) com os rivais sentados em volta, a distâncias iguais.
-	var stage_gap := Control.new()   # respiro entre o cabeçalho e o avatar do topo
-	stage_gap.custom_minimum_size = Vector2(0, 28)
-	stage_gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(stage_gap)
+	# Modificador da rodada: faixa fixa, largura total — nenhum aviso passa por cima dela.
+	modifier_strip = ModifierStrip.new()
+	modifier_strip.tapped.connect(_show_modifier_info)
+	root.add_child(modifier_strip)
+
+	# Palco: a mesa de runas com os rivais sentados na borda, a distâncias iguais; você embaixo.
 	stage = Control.new()
 	stage.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	stage.custom_minimum_size = Vector2(0, 300)
 	root.add_child(stage)
 	main_area = stage
-	my_bet_pill = PanelContainer.new()   # sua aposta da rodada: na base da mesa, logo acima do card roxo
-	my_bet_pill.anchor_left = 0.5
-	my_bet_pill.anchor_right = 0.5
-	my_bet_pill.anchor_top = 1.0
-	my_bet_pill.anchor_bottom = 1.0
-	my_bet_pill.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	my_bet_pill.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	my_bet_pill.offset_bottom = -52.0
-	my_bet_pill.z_index = 5
-	my_bet_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	my_bet_pill.add_theme_stylebox_override("panel", UIKit.box(UIKit.CLEAR, UIKit.CLEAR, 0, 0, 0))   # sem borda: só ficha + valor, como nos rivais
-	my_bet_label = UIKit.label("", 22, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
-	my_bet_label.add_theme_font_size_override("font_size", 22)
-	my_bet_pill.add_child(my_bet_label)
-	my_bet_pill.modulate.a = 0.0
 	table_center = TableEllipse.new()
 	table_center.name = "TableCenter"
 	table_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	table_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stage.add_child(table_center)
-	stage.add_child(my_bet_pill)
 	table_center.resized.connect(_layout_table)
-	for p in range(1, engine.num_players):
-		stage.add_child(_build_rival_seat(p))
+	for p in range(engine.num_players):
+		stage.add_child(_build_seat(p))
+	# Sua aposta da rodada: card ao lado do seu avatar (posição em `_layout_seats`).
+	my_bet_pill = StatCard.new().setup("APOSTA", "", UIKit.TR_GOLD, 28)
+	my_bet_pill.z_index = 7
+	my_bet_pill.modulate.a = 0.0
+	my_bet_label = (my_bet_pill as StatCard).value
+	stage.add_child(my_bet_pill)
+	bet_pills[0] = my_bet_pill
+	bet_tags[0] = my_bet_label
 
 	_build_hand_zone(root)
 	_build_bottom_bar(root)
@@ -269,8 +279,8 @@ func _build_ui() -> void:
 	_layout_table.call_deferred()
 
 
-## Card central (60% da largura): título e descrição do modificador em cima, a mão em arco no
-## meio (por cima do card, as cartas passam das bordas) e o pote embaixo.
+## Card central: a faixa de avisos fica logo abaixo do seu avatar (que cruza o topo do card), a
+## mão em arco por cima do card (as cartas passam das bordas) e o prêmio no pé.
 func _build_hand_zone(root: VBoxContainer) -> void:
 	var hand_h := _hand_h()
 	var zone := Control.new()
@@ -278,52 +288,51 @@ func _build_hand_zone(root: VBoxContainer) -> void:
 	zone.custom_minimum_size = Vector2(0, BANNER_H + hand_h + POT_H)
 	root.add_child(zone)
 
-	center_card = UIKit.panel(UIKit.SURFACE_DEEP, UIKit.OUTLINE, 10)
+	center_card = Panel.new()
+	center_card.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT.lightened(0.1), UIKit.TR_PURPLE, "small", 16, 0))
 	center_card.anchor_left = 0.1
 	center_card.anchor_right = 0.9
 	center_card.anchor_top = 0.0
 	center_card.anchor_bottom = 1.0
-	center_card.offset_left = 0.0
-	center_card.offset_right = 0.0
 	center_card.offset_top = -36.0
-	center_card.offset_bottom = 0.0
 	center_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	zone.add_child(center_card)
-	var cv := VBoxContainer.new()
-	cv.add_theme_constant_override("separation", 0)
-	cv.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	center_card.add_child(cv)
 
-	# Faixa de avisos (altura fixa, nunca cresce com o texto): em repouso mostra o modificador.
+	# Faixa de avisos (altura fixa, nunca cresce com o texto): "fulano pagou", sua vez, resultado.
 	banner_box = Panel.new()
-	banner_box.custom_minimum_size = Vector2(0, BANNER_H - 20.0)
+	banner_box.anchor_right = 1.0
+	banner_box.offset_left = 10.0
+	banner_box.offset_right = -10.0
+	banner_box.offset_top = LANE_TOP
+	banner_box.offset_bottom = LANE_TOP + LANE_H
 	banner_box.clip_contents = true
 	banner_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	banner_box.add_theme_stylebox_override("panel", UIKit.box(UIKit.CLEAR, UIKit.CLEAR, 0, 0, 0))
 	var bv := VBoxContainer.new()
 	bv.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bv.alignment = BoxContainer.ALIGNMENT_CENTER
-	bv.add_theme_constant_override("separation", 2)
+	bv.add_theme_constant_override("separation", 0)
 	bv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	banner_box.add_child(bv)
-	banner_title = UIKit.label("", 26, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER)
+	banner_title = UIKit.serif_label("", 24, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	banner_title.autowrap_mode = TextServer.AUTOWRAP_OFF
 	banner_title.clip_text = true
 	bv.add_child(banner_title)
-	banner_sub = UIKit.label("", 17, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-	banner_sub.add_theme_font_size_override("font_size", 20)
+	banner_sub = UIKit.serif_label("", 18, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
 	banner_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	banner_sub.max_lines_visible = 2
 	bv.add_child(banner_sub)
-	cv.add_child(banner_box)
+	center_card.add_child(banner_box)
 
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	cv.add_child(spacer)
-
-	_build_pot()
-	cv.add_child(pot_box)
+	pot_prize_label = UIKit.serif_label("", 20, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	pot_prize_label.anchor_left = 0.0
+	pot_prize_label.anchor_right = 1.0
+	pot_prize_label.anchor_top = 1.0
+	pot_prize_label.anchor_bottom = 1.0
+	pot_prize_label.offset_top = -POT_H - 4.0
+	pot_prize_label.offset_bottom = -4.0
+	pot_prize_label.visible = false
+	center_card.add_child(pot_prize_label)
 
 	# Mão em arco leve, sempre no tamanho real; rola de lado só se não couber.
 	hand_scroller = HandScroller.new()
@@ -342,66 +351,15 @@ func _build_hand_zone(root: VBoxContainer) -> void:
 	hand_scroller.set_content(hand_container)
 
 
-## Barra de baixo: stack e vazas à esquerda, ações no centro, relógio da jogada à direita.
+## Barra de baixo: pote à esquerda, ações no centro, relógio da jogada à direita.
 func _build_bottom_bar(root: VBoxContainer) -> void:
 	bottom_bar = HBoxContainer.new()
 	bottom_bar.custom_minimum_size = Vector2(0, BAR_H)
 	bottom_bar.add_theme_constant_override("separation", 10)
 	root.add_child(bottom_bar)
 
-	var left := UIKit.panel(UIKit.SURFACE_DEEP, UIKit.OUTLINE, 8)
-	left.custom_minimum_size = Vector2(LEFT_W, 0)
-	left.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var lh := HBoxContainer.new()
-	lh.add_theme_constant_override("separation", 6)
-	lh.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	left.add_child(lh)
-	# Sem avatar: só o D (quando você é o dealer) e os dois números. O anel invisível serve de
-	# origem pras fichas voando e pro destaque de vez.
-	var ring0 := PanelContainer.new()
-	ring0.custom_minimum_size = Vector2(1, 1)
-	ring0.modulate.a = 0.0
-	ring0.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	lh.add_child(ring0)
-	seat_avatars[0] = ring0
-	var ord0 := _badge("", UIKit.PURPLE_DEEP, UIKit.MUTED)
-	ord0.visible = false
-	lh.add_child(ord0)
-	order_badges[0] = ord0
-	var dl0 := _badge("D", UIKit.MONEY, UIKit.BLACK)
-	dl0.custom_minimum_size = Vector2(40, 40)
-	dl0.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	dl0.visible = false
-	lh.add_child(dl0)
-	dealer_badges[0] = dl0
-	var info0 := _make_info(0, false)
-	info0.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info0.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	lh.add_child(info0)
-	# Card do stack: rótulo "STACK" em cima, ficha + valor embaixo. A aposta da rodada e o
-	# placar ficam na mesa (my_bet_pill), nunca aqui.
-	var cap0 := UIKit.label("STACK", 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-	cap0.add_theme_font_size_override("font_size", 20)
-	var stack0 := hud_totals[0] as Label
-	var stack_row := HBoxContainer.new()
-	stack_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	stack_row.add_theme_constant_override("separation", 6)
-	stack_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var chip0 := UIKit.label("◎", 34, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
-	chip0.add_theme_font_size_override("font_size", 34)
-	info0.remove_child(stack0)
-	stack_row.add_child(chip0)
-	stack_row.add_child(stack0)
-	info0.add_child(cap0)
-	info0.move_child(cap0, 0)
-	info0.add_child(stack_row)
-	info0.move_child(stack_row, 1)
-	(bet_pills[0] as Control).queue_free()   # a pílula de aposta/placar vive na mesa
-	bet_pills[0] = my_bet_pill
-	bet_tags[0] = my_bet_label
-	bottom_bar.add_child(left)
-	hud_badges[0] = left
-	seat_nodes[0] = left
+	_build_pot()
+	bottom_bar.add_child(pot_box)
 
 	var mid := VBoxContainer.new()
 	mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -414,34 +372,23 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	status_label.max_lines_visible = 2
 	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	status_label.visible = false   # a vez e as dicas aparecem no card central, acima das cartas
+	status_label.visible = false   # a vez e as dicas aparecem na faixa de avisos, acima das cartas
 	mid.add_child(status_label)
 	bet_row = HBoxContainer.new()
 	bet_row.add_theme_constant_override("separation", 6)
 	bet_row.custom_minimum_size = Vector2(0, BAR_H)
 	bet_row.visible = false
 	mid.add_child(bet_row)
-	double_btn = UIKit.button("DOBRAR", UIKit.MONEY, 24)
+	double_btn = UIKit.action_button("DOBRAR", UIKit.ActionKind.GOLD, 24)
 	double_btn.custom_minimum_size = Vector2(0, BAR_H)
 	double_btn.visible = false
 	double_btn.pressed.connect(_on_double_pressed)
 	mid.add_child(double_btn)
 
-	var right := UIKit.panel(UIKit.SURFACE_DEEP, UIKit.OUTLINE, 8)
-	right.custom_minimum_size = Vector2(RIGHT_W, 0)
-	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var rv := VBoxContainer.new()
-	rv.alignment = BoxContainer.ALIGNMENT_CENTER
-	rv.add_theme_constant_override("separation", 4)
-	rv.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	right.add_child(rv)
-	var cap := UIKit.label("TEMPO", 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-	cap.add_theme_font_size_override("font_size", 20)
-	rv.add_child(cap)
-	timer_label = UIKit.label("0:10", 34, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	timer_label.add_theme_font_size_override("font_size", 34)
+	var tempo := StatCard.new().setup("TEMPO", "0:10", UIKit.TR_WHITE, 34)
+	tempo.custom_minimum_size = Vector2(RIGHT_W, 0)
+	timer_label = tempo.value
 	timer_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	rv.add_child(timer_label)
 	turn_bar = ProgressBar.new()
 	turn_bar.show_percentage = false
 	turn_bar.min_value = 0.0
@@ -451,8 +398,8 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	turn_bar.add_theme_stylebox_override("background", UIKit.box(UIKit.PURPLE_DEEP, UIKit.PURPLE, 2, 7, 0))
 	turn_bar.add_theme_stylebox_override("fill", UIKit.box(UIKit.BRAND, UIKit.BRAND, 0, 7, 0))
 	turn_bar.visible = false   # o card do tempo mostra só os segundos
-	rv.add_child(turn_bar)
-	bottom_bar.add_child(right)
+	timer_label.get_parent().add_child(turn_bar)
+	bottom_bar.add_child(tempo)
 
 
 func _is_wide() -> bool:
@@ -517,224 +464,78 @@ func _on_resize() -> void:
 	_layout_hand()
 
 
-## Assento de rival: avatar e só o nome embaixo. Tocar no avatar abre o card com o stack. As
-## bolinhas do avatar: vazas ganhas (canto de baixo à esquerda) e o D do dealer (à direita).
-## A posição é calculada em `_layout_seats` (em volta da mesa, a distâncias iguais).
-func _build_rival_seat(p: int) -> Control:
-	var seat := Control.new()
-	seat.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var wrap := _make_avatar(p, 84.0)
-	wrap.mouse_filter = Control.MOUSE_FILTER_STOP
-	seat.add_child(wrap)
-	var name_l := UIKit.label("", 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	name_l.add_theme_font_size_override("font_size", 22)
-	name_l.autowrap_mode = TextServer.AUTOWRAP_OFF
-	name_l.clip_text = true
-	name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	seat.add_child(name_l)
-	var card := UIKit.panel(UIKit.SURFACE_DEEP, UIKit.OUTLINE, 8)
-	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(_make_rival_info(p))
-	card.visible = false
-	seat.add_child(card)
-	var bet_l := UIKit.label("", 22, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)   # aposta da rodada, embaixo do nome
-	bet_l.add_theme_font_size_override("font_size", 22)
-	bet_l.autowrap_mode = TextServer.AUTOWRAP_OFF
-	bet_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bet_l.visible = false
-	seat.add_child(bet_l)
-	hud_titles[p] = name_l
-	var token := {"n": 0}
-	wrap.gui_input.connect(func(event: InputEvent):
-		if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
-			return
-		Sfx.play("tick")
-		card.visible = not card.visible
-		token["n"] += 1
-		var mine: int = token["n"]
-		if card.visible:
-			get_tree().create_timer(3.0).timeout.connect(func():
-				if mine == token["n"] and is_instance_valid(card):
-					card.visible = false))
+## Cor da moldura do avatar em repouso, por assento (você em dourado).
+func _seat_accent(p: int) -> Color:
+	match p:
+		0:
+			return UIKit.TR_GOLD
+		1:
+			return UIKit.TR_RED
+		2:
+			return UIKit.TR_BLUE.lightened(0.45)
+		_:
+			return UIKit.TR_RED_GLOW
+
+
+## Assento = avatar hexagonal + plaquinha com o nome (ver SeatView). Rival: tocar no avatar ou no
+## nome abre o card do stack; você: nome e stack sempre à vista. Selo de vitórias no vértice de
+## baixo à esquerda do avatar e o D do dealer à direita. A posição vem de `_layout_seats`.
+func _build_seat(p: int) -> SeatView:
+	var seat := SeatView.new().setup(p, _seat_accent(p), p == 0)
+	hud_titles[p] = seat.name_label
+	hud_totals[p] = seat.stack_label
+	seat_avatars[p] = seat.avatar
+	order_badges[p] = seat.avatar.wins_badge
+	dealer_badges[p] = seat.avatar.dealer_badge
 	seat_nodes[p] = seat
 	hud_badges[p] = seat
+	if p == 0:
+		seat.z_index = 6   # cruza o topo do card roxo: precisa ficar por cima dele
 	return seat
 
 
-## Conteúdo do card que abre ao tocar no avatar: só o stack (número). Os outros nós existem
-## escondidos só pra manter os mesmos vetores de HUD.
-func _make_rival_info(p: int) -> VBoxContainer:
-	var v := VBoxContainer.new()
-	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var stack_l := UIKit.label("0", 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	stack_l.add_theme_font_size_override("font_size", 22)
-	stack_l.autowrap_mode = TextServer.AUTOWRAP_OFF
-	v.add_child(stack_l)
-	var pill := PanelContainer.new()
-	pill.visible = false
-	var pv := VBoxContainer.new()
-	pill.add_child(pv)
-	pv.add_child(UIKit.label("", 22))
-	var bet_l := UIKit.label("", 22)
-	pv.add_child(bet_l)
-	v.add_child(pill)
-	var status_l := UIKit.label("", 20)
-	status_l.visible = false
-	v.add_child(status_l)
-	hud_totals[p] = stack_l
-	bet_tags[p] = bet_l
-	bet_pills[p] = pill
-	prog_tags[p] = status_l
-	return v
-
-
-## Avatar redondo com a bolinha de ordem (canto de cima) e o D dourado do dealer.
-func _make_avatar(p: int, d: float) -> Control:
-	var wrap := Control.new()
-	wrap.custom_minimum_size = Vector2(d + 16.0, d + 12.0)
-	wrap.size = wrap.custom_minimum_size
-	wrap.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var ring := PanelContainer.new()
-	ring.custom_minimum_size = Vector2(d, d)
-	ring.size = Vector2(d, d)
-	ring.position = Vector2(8, 10)
-	ring.pivot_offset = Vector2(d / 2.0, d / 2.0)
-	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var face := Portrait.new().setup(p, UIKit.CLEAR, d - 16.0)
-	face.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	face.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	ring.add_child(face)
-	wrap.add_child(ring)
-	var ord := _badge("0", UIKit.PURPLE_DEEP, UIKit.MUTED)   # vazas ganhas
-	ord.custom_minimum_size = Vector2(40, 40)
-	ord.position = Vector2(0.0, wrap.size.y - 40.0)
-	wrap.add_child(ord)
-	var dl := _badge("D", UIKit.MONEY, UIKit.BLACK)
-	dl.custom_minimum_size = Vector2(40, 40)
-	dl.position = Vector2(wrap.size.x - 40.0, wrap.size.y - 40.0)
-	dl.visible = false
-	wrap.add_child(dl)
-	seat_avatars[p] = ring
-	order_badges[p] = ord
-	dealer_badges[p] = dl
-	return wrap
-
-
-## Nome (só rivais), stack e vazas x/y — só números, todos do mesmo tamanho e cor. A vez de
-## cada um aparece na borda grossa do avatar, não em texto.
-func _make_info(p: int, rival: bool) -> VBoxContainer:
-	var fs := 22 if rival else 34
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 0)
-	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var name_l := UIKit.label("", fs, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	name_l.add_theme_font_size_override("font_size", fs)
-	name_l.autowrap_mode = TextServer.AUTOWRAP_OFF
-	name_l.clip_text = true
-	name_l.visible = rival
-	v.add_child(name_l)
-	var stack_l := UIKit.label("0", fs, UIKit.INK if rival else UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
-	stack_l.add_theme_font_size_override("font_size", fs)
-	stack_l.autowrap_mode = TextServer.AUTOWRAP_OFF
-	v.add_child(stack_l)
-	var pill := PanelContainer.new()
-	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pill.add_theme_stylebox_override("panel", UIKit.box(UIKit.CLEAR, UIKit.CLEAR, 0, 0, 0))
-	var pv := VBoxContainer.new()
-	pv.add_theme_constant_override("separation", 0)
-	pv.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var cap_l := UIKit.label("", fs, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)   # sem legenda (fica escondida)
-	cap_l.visible = false
-	pv.add_child(cap_l)
-	var bet_l := UIKit.label("", fs, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	bet_l.add_theme_font_size_override("font_size", fs)
-	bet_l.autowrap_mode = TextServer.AUTOWRAP_OFF
-	pv.add_child(bet_l)
-	pill.add_child(pv)
-	pill.modulate.a = 0.0
-	v.add_child(pill)
-	var status_l := UIKit.label("", 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-	status_l.visible = false   # a vez é mostrada pela borda do avatar e pelo card central
-	v.add_child(status_l)
-	hud_titles[p] = name_l
-	hud_totals[p] = stack_l
-	bet_tags[p] = bet_l
-	bet_pills[p] = pill
-	prog_tags[p] = status_l
-	return v
-
-
-## Rivais em volta da mesa, com ângulos iguais entre si. Cada assento é o avatar com o nome
-## embaixo; o card do stack (ao tocar) abre por cima, sem mexer no tamanho do assento.
+## Rivais em volta da mesa, com ângulos iguais entre si (o centro do avatar fica a ~12 px acima
+## do ponto da borda); você no centro de baixo, com o avatar cruzando o topo do card roxo.
 func _layout_seats() -> void:
 	if table_center == null or stage == null:
 		return
 	var c := table_center.center_point()
 	var r := table_center.seat_edge_radii()
 	var n := engine.num_players
-	for p in range(1, n):
-		var seat := seat_nodes[p] as Control
+	for p in range(n):
+		var seat := seat_nodes[p] as SeatView
 		if seat == null:
 			continue
-		var wrap := seat.get_child(0) as Control
-		var name_l := seat.get_child(1) as Control
-		var card := seat.get_child(2) as Control
-		var w := 130.0
-		var name_h := name_l.get_combined_minimum_size().y
-		wrap.position = Vector2((w - wrap.size.x) / 2.0, 0.0)
-		name_l.position = Vector2(0.0, wrap.size.y)
-		name_l.size = Vector2(w, name_h)
-		var bet_l := seat.get_child(3) as Control
-		var bet_h := bet_l.get_combined_minimum_size().y
-		bet_l.position = Vector2(0.0, wrap.size.y + name_h)
-		bet_l.size = Vector2(w, bet_h)
-		card.size = card.get_combined_minimum_size()
-		card.position = Vector2((w - card.size.x) / 2.0, wrap.size.y + name_h + bet_h + 2.0)
-		var h := wrap.size.y + name_h
-		seat.size = Vector2(w, h)
+		seat.layout()
+		if p == 0:
+			continue
 		var theta := TableEllipse.seat_angle(p, n)
 		var pt := c + Vector2(cos(theta) * r.x, sin(theta) * r.y)
 		seat.position = Vector2(
-			clampf(pt.x - w / 2.0, 0.0, maxf(stage.size.x - w, 0.0)),
-			clampf(pt.y - h / 2.0, 0.0, maxf(stage.size.y - h, 0.0)))
+			clampf(pt.x - SeatView.W / 2.0, 0.0, maxf(stage.size.x - SeatView.W, 0.0)),
+			clampf(pt.y - SeatView.H / 2.0, 0.0, maxf(stage.size.y - SeatView.H, 0.0)))
+	var me := seat_nodes[0] as SeatView
+	if me == null:
+		return
+	var card_top := stage.size.y - 28.0   # fallback: topo do card roxo no sistema do palco
+	if center_card != null and center_card.is_inside_tree() and center_card.size.y > 0.0:
+		card_top = center_card.global_position.y - stage.global_position.y
+	var av_center_y := card_top - MY_SEAT_RISE
+	me.position = Vector2((stage.size.x - SeatView.W) / 2.0, av_center_y - me.avatar.position.y - me.avatar.size.y / 2.0)
+	var pill := my_bet_pill
+	pill.size = pill.get_combined_minimum_size()
+	pill.position = Vector2((stage.size.x + SeatView.W) / 2.0 + 4.0, av_center_y - pill.size.y / 2.0)
 
 
-## Bolinha com uma letra/número (ordem de fala, botão do dealer).
-func _badge(text: String, fill: Color, border: Color) -> PanelContainer:
-	var b := PanelContainer.new()
-	b.custom_minimum_size = Vector2(30, 30)
-	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sb := UIKit.box(fill, border, 3, 15, 0)
-	sb.set_corner_radius_all(15)
-	b.add_theme_stylebox_override("panel", sb)
-	var l := UIKit.label(text, 20, UIKit.TEXT_ON_LIGHT if (fill == UIKit.INK or fill == UIKit.MONEY) else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	l.autowrap_mode = TextServer.AUTOWRAP_OFF
-	b.add_child(l)
-	return b
-
-
-## Pote: só o valor em fichas, embaixo da mão, dentro do card central.
+## Pote: card de número no canto de baixo à esquerda (o prêmio fica no pé do card roxo).
 func _build_pot() -> void:
-	pot_box = PanelContainer.new()
-	pot_box.custom_minimum_size = Vector2(0, POT_H)
-	pot_box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	pot_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pot_box.add_theme_stylebox_override("panel", UIKit.box(UIKit.CLEAR, UIKit.CLEAR, 0, 0, 0))
-	var pot_vbox := VBoxContainer.new()
-	pot_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	pot_vbox.add_theme_constant_override("separation", 2)
-	pot_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pot_box.add_child(pot_vbox)
-	pot_label = UIKit.label("POTE ◎ 0", 34, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+	pot_box = StatCard.new().setup("POTE", "◎ 0", UIKit.TR_GOLD, 32)
+	pot_box.custom_minimum_size = Vector2(LEFT_W, 0)
+	pot_label = pot_box.value
 	pot_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	pot_vbox.add_child(pot_label)
-	pot_prize_label = UIKit.label("", 18, UIKit.ACTION, HORIZONTAL_ALIGNMENT_CENTER)
-	pot_prize_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	pot_prize_label.visible = false
-	pot_vbox.add_child(pot_prize_label)
 	pot_sub = UIKit.label("", 18, UIKit.MUTED)   # sem lugar na tela: o card só mostra o valor
 	pot_sub.visible = false
+	pot_box.add_child(pot_sub)
 
 
 ## Reposiciona assentos e cartas da mesa (ex.: ao virar o celular).
@@ -825,13 +626,30 @@ func _announce_round() -> void:
 	_banner_clear()
 
 
-## Texto da faixa em repouso (nenhuma mensagem ativa): o modificador dessa rodada — já sempre
-## conhecido, porque `_trick_start()` avisa em tela cheia antes de qualquer decisão.
-func _rest_banner() -> Array:
+## Modificador da rodada na faixa fixa do topo (nome + efeito curto, cor pela função).
+func _refresh_modifier_strip() -> void:
 	var m := engine.modifier
 	if m == -1:
-		return ["", "", UIKit.MUTED]
-	return ["%s %s" % [ChaosModifiers.ICONS[m], _modifier_label(m)], ChaosModifiers.short_of(m, engine.blitz), ChaosModifiers.color_of(m)]
+		modifier_strip.show_modifier("", "", UIKit.TR_RED)
+		return
+	modifier_strip.show_modifier(_modifier_label(m).to_upper(), ChaosModifiers.short_of(m, engine.blitz), _modifier_color(m))
+
+
+## Cor da faixa: perigo/perda em vermelho, o resto em dourado (tokens da paleta).
+func _modifier_color(m: int) -> Color:
+	return UIKit.TR_RED if ChaosModifiers.color_of(m) == UIKit.LOSS else UIKit.TR_GOLD
+
+
+## Toque na faixa: explicação completa do modificador.
+func _show_modifier_info() -> void:
+	var m := engine.modifier
+	if m == -1 or overlay_layer == null:
+		return
+	var v := UIKit.modal(overlay_layer, _modifier_label(m).to_upper(), 640.0)
+	var t := UIKit.label(ChaosModifiers.tip_of(m, engine.blitz), 28, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(t)
+	UIKit.close_button(overlay_layer, v)
 
 
 ## Nome do modificador, incluindo o naipe sorteado quando ele tiver um (e já traduzido pro
@@ -922,11 +740,9 @@ func _banner(title: String, sub: String, color: Color) -> void:
 
 
 func _banner_clear() -> void:
-	# Em repouso a faixa lembra o modificador do nível (informação útil no lugar de um vazio).
-	var rest := _rest_banner()
-	banner_title.text = str(rest[0])
-	banner_title.add_theme_color_override("font_color", rest[2])
-	banner_sub.text = str(rest[1])
+	# Em repouso a faixa fica livre: o modificador vive na faixa fixa do topo.
+	banner_title.text = ""
+	banner_sub.text = ""
 	banner_box.modulate.a = 1.0
 
 
@@ -950,7 +766,8 @@ func _trick_start() -> void:
 	var color := ChaosModifiers.color_of(m)
 	await _modifier_transition(m, color)
 	if is_inside_tree():
-		_banner("%s %s" % [ChaosModifiers.ICONS[m], _modifier_label(m)], ChaosModifiers.short_of(m, engine.blitz), color)
+		_refresh_modifier_strip()
+		_banner_clear()
 
 
 ## Sorteio do modificador da rodada: em vez de texto trocando sozinho, um item fechado carrega,
@@ -1348,6 +1165,9 @@ func _open_pause() -> void:
 	var resume := UIKit.button("CONTINUAR")
 	resume.pressed.connect(ov.queue_free)
 	v.add_child(resume)
+	var how := UIKit.button("COMO JOGAR", UIKit.BUTTON_MUTED)
+	how.pressed.connect(_open_help)
+	v.add_child(how)
 	var quit := UIKit.button("SAIR DA MESA  ◎%d" % int(engine.stacks[0]), UIKit.DANGER)
 	quit.pressed.connect(func():
 		paused = false
@@ -1569,16 +1389,10 @@ func _human_bet() -> Dictionary:
 	var done := func(result: Dictionary) -> void:
 		st["result"] = result
 		item_chosen.emit(1)
-	var mk := func(text: String, color: Color, cb: Callable) -> Button:
-		var b := UIKit.button(text, color, 20)
-		b.add_theme_font_size_override("font_size", 20)
+	var mk := func(text: String, kind: int, cb: Callable) -> Button:
+		var b := UIKit.action_button(text, kind, 20)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.custom_minimum_size = Vector2(0, BAR_H)
-		for sn in ["normal", "hover", "pressed", "focus", "disabled"]:
-			var sb := b.get_theme_stylebox(sn) as StyleBoxFlat
-			if sb:
-				sb.content_margin_left = 4
-				sb.content_margin_right = 4
 		b.pressed.connect(cb)
 		return b
 	st["render"] = func():
@@ -1588,11 +1402,11 @@ func _human_bet() -> Dictionary:
 		for c in bet_row.get_children():
 			c.queue_free()
 		if not can_check:
-			bet_row.add_child(mk.call("DESISTIR", UIKit.DANGER, func(): done.call({"action": "fold"})))
+			bet_row.add_child(mk.call("DESISTIR", UIKit.ActionKind.DANGER, func(): done.call({"action": "fold"})))
 		var main_txt := "PASSAR" if can_check else ("PAGAR\n◎%d%s" % [call_amt, "\nALL-IN" if all_in_call else ""])
-		bet_row.add_child(mk.call(main_txt, UIKit.OK, func(): done.call({"action": "check" if can_check else "call"})))
+		bet_row.add_child(mk.call(main_txt, UIKit.ActionKind.OK, func(): done.call({"action": "check" if can_check else "call"})))
 		if bool(opt["can_raise"]):
-			bet_row.add_child(mk.call("APOSTAR" if can_check else "AUMENTAR", UIKit.MONEY, func():
+			bet_row.add_child(mk.call("APOSTAR" if can_check else "AUMENTAR", UIKit.ActionKind.GOLD, func():
 				st["raising"] = not bool(st["raising"])
 				(st["render"] as Callable).call()))
 		if bool(st["raising"]):
@@ -2010,9 +1824,7 @@ func _fmt_chips(v: float) -> String:
 
 
 func _pot_text(v: float) -> String:
-	if engine.blitz:
-		return "POTE ◎ %d" % int(v)
-	return ("POTE ◎ %d" if bets_gathered else "EM JOGO ◎ %d") % int(v)
+	return "◎ %d" % int(v)
 
 
 func _refresh_hud() -> void:
@@ -2033,7 +1845,7 @@ func _refresh_hud() -> void:
 		var sitting: bool = p == 0 and blitz_sitting_out and phase != "idle"
 		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 0.3 if sitting else (0.45 if out else 1.0))
 		(hud_titles[p] as Label).text = "VOCÊ" if p == 0 else str(config["names"][p]).to_upper()
-		(hud_titles[p] as Label).add_theme_color_override("font_color", UIKit.TURN if p == turn_player else UIKit.INK)
+		(hud_titles[p] as Label).add_theme_color_override("font_color", _turn_color if p == turn_player else UIKit.TR_WHITE)
 		(dealer_badges[p] as Control).visible = engine.hand_no > 0 and engine.button == p
 		var idx := order.find(p)
 		var ob := order_badges[p] as PanelContainer
@@ -2052,15 +1864,15 @@ func _refresh_hud() -> void:
 			ob.add_theme_stylebox_override("panel", UIKit.box_cached(fill, edge, 3, 20, 0))
 			wl.add_theme_color_override("font_color", ink)
 			# Aposta da rodada embaixo do nome, enquanto as apostas rolam (depois voa pro pote).
-			var seat := seat_nodes[p] as Control
-			var pile_l := seat.get_child(3) as Label
+			var pile_l := (seat_nodes[p] as SeatView).bet_label
 			var pile := float(engine.contrib[p]) if phase == "bet" and not bets_gathered else 0.0
 			pile_l.visible = pile > 0.0
 			pile_l.text = "◎ %d" % int(pile)
 			pile_l.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[p] else UIKit.MONEY)
 		_refresh_bet_tags(p, idx)
-	info_label.text = "NÍVEL %d%s · %s ◎%d" % [engine.round_index + 1, ("/%d" % engine.levels) if engine.levels > 0 else "", "ENTRADA" if engine.blitz else "BLIND", int(engine.blitz_entry()) if engine.blitz else engine.blind]
-	Widgets.progress_dots(trick_dots, ChaosEngine.HAND_SIZE, engine.trick_number)
+	title_label.text = "NÍVEL %d%s · %s ◎%d" % [engine.round_index + 1, ("/%d" % engine.levels) if engine.levels > 0 else "", "ENTRADA" if engine.blitz else "BLIND", int(engine.blitz_entry()) if engine.blitz else engine.blind]
+	round_dots.set_progress(ChaosEngine.HAND_SIZE, engine.trick_number)
+	_refresh_modifier_strip()
 	_refresh_pot()
 	_update_turn_highlight(turn_player)
 	_refresh_double_button()
@@ -2078,6 +1890,8 @@ func _refresh_bet_tags(p: int, idx: int) -> void:
 	if engine.blitz:
 		_refresh_blitz_tag(p, idx)
 		return
+	if bet_pills[p] == null or prog_tags[p] == null:
+		return   # a mesa Blitz (única em uso) não tem essa linha de situação por assento
 	var streak: int = engine.streak[p] if p < engine.streak.size() else 0
 	var flames := ""
 	if streak >= 2:
@@ -2162,9 +1976,9 @@ func _update_turn_highlight(turn_player: int) -> void:
 	turn_pulse_token += 1
 	var my_token := turn_pulse_token
 	for p in range(seat_avatars.size()):
-		var avatar: PanelContainer = seat_avatars[p]
+		var avatar: HexAvatar = seat_avatars[p]
 		var active := p == turn_player
-		avatar.add_theme_stylebox_override("panel", UIKit.box_cached(UIKit.PURPLE_DEEP, UIKit.TURN if active else UIKit.MUTED, 8 if active else 3, 42, 0))
+		avatar.set_active(active)
 		if not active:
 			avatar.scale = Vector2.ONE
 	if turn_player >= 0:
@@ -2414,7 +2228,7 @@ func _blitz_open_level() -> bool:
 	pot_locked = true
 	shown_pot = engine.carry
 	pot_label.text = _pot_text(shown_pot)
-	pot_box.visible = false   # só aparece depois do palpite, quando as entradas de verdade entram
+	pot_box.modulate.a = 0.0   # só aparece depois do palpite, quando as entradas de verdade entram
 	var carry_txt := "  Pote acumulado: ◎%d." % int(engine.carry) if engine.carry > 0.0 else ""
 	_banner("PALPITES", "Quantas rodadas cada um vai ganhar?%s" % carry_txt, UIKit.MONEY)
 	_refresh_hud()
@@ -2443,7 +2257,7 @@ func _blitz_open_level() -> bool:
 
 ## Revela os palpites um a um: a entrada voa pro pote e o palpite aparece na frente do jogador.
 func _blitz_reveal() -> void:
-	pot_box.visible = true
+	pot_box.modulate.a = 1.0
 	var running := engine.carry
 	for p in range(engine.num_players):
 		blitz_revealed[p] = true
@@ -2733,40 +2547,31 @@ func _refresh_double_button() -> void:
 		double_btn.text = "%s ◎%d" % ["TRIPLICAR" if int(engine.doubles[0]) == 1 else "DOBRAR", int(engine.blitz_entry())]
 
 
-## Palpite na frente do jogador, com o progresso ao vivo: verde no alvo, vermelho estourou ou
-## sem tempo de chegar lá, neutro enquanto ainda dá.
-func _refresh_blitz_tag(p: int, idx: int) -> void:
-	var pill := bet_pills[p] as PanelContainer
-	var lbl := bet_tags[p] as Label
-	# Para o jogador (p=0): durante a aposta, a pill mostra a contribuição atual (◎10)
-	# igual ao que o label nos assentos rivais já mostra para p≠0.
-	if p == 0 and phase == "bet" and not bets_gathered:
-		var pile := float(engine.contrib[0])
-		pill.modulate.a = 1.0 if pile > 0.0 else 0.0
-		lbl.text = "◎ %d" % int(pile)
-		lbl.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[0] else UIKit.MONEY)
+## Seu placar ao vivo e sua aposta. Fez/palpite fica no card do topo (verde no alvo, vermelho
+## estourou ou sem tempo de chegar lá, neutro enquanto ainda dá). A aposta da rodada, no card
+## ao lado do seu avatar, enquanto a rodada vale. Rivais: só o selo de vitórias do avatar — o
+## alvo deles é segredo até o fim do nível.
+func _refresh_blitz_tag(p: int, _idx: int) -> void:
+	if p != 0:
 		return
-	var shown := bool(blitz_revealed[p])
-	pill.modulate.a = 1.0 if shown else 0.0
-	if not shown:
+	var pile := float(engine.contrib[0]) if (phase == "bet" or phase == "play") else 0.0
+	my_bet_pill.modulate.a = 1.0 if pile > 0.0 else 0.0
+	my_bet_label.text = "◎ %d" % int(pile)
+	my_bet_label.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[0] else UIKit.TR_GOLD)
+	var val := prog_card.value
+	if not bool(blitz_revealed[0]):
+		val.text = "–"
+		val.add_theme_color_override("font_color", UIKit.TR_WHITE)
 		return
-	var open_book := p == 0 or blitz_showdown
-	var tag := " ×%d" % (1 + int(engine.doubles[p])) if int(engine.doubles[p]) > 0 else ""
-	if open_book:
-		# Você (e todo mundo no fim do nível): vitórias / palpite. Só o seu muda de cor conforme o alvo.
-		lbl.text = "%d/%d%s" % [int(engine.wins[p]), int(engine.predicts[p]), tag]
-		var col := UIKit.INK
-		if p == 0:
-			var need := engine.blitz_need(p)
-			if need == 0:
-				col = UIKit.OK
-			elif need < 0 or need > engine.tricks_left():
-				col = UIKit.LOSS
-		lbl.add_theme_color_override("font_color", col)
-	else:
-		# Rival: só as vitórias já feitas (de 8) — o alvo dele é segredo até o fim do nível.
-		lbl.text = "%d/%d%s" % [int(engine.wins[p]), ChaosEngine.HAND_SIZE, tag]
-		lbl.add_theme_color_override("font_color", UIKit.INK)
+	var tag := " ×%d" % (1 + int(engine.doubles[0])) if int(engine.doubles[0]) > 0 else ""
+	val.text = "%d/%d%s" % [int(engine.wins[0]), int(engine.predicts[0]), tag]
+	var col := UIKit.TR_WHITE
+	var need := engine.blitz_need(0)
+	if need == 0:
+		col = UIKit.OK
+	elif need < 0 or need > engine.tricks_left():
+		col = UIKit.LOSS
+	val.add_theme_color_override("font_color", col)
 
 
 func _refresh_pot_blitz() -> void:

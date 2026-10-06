@@ -1,9 +1,8 @@
 class_name TableEllipse
 extends Control
-## Mesa de jogo: elipse achatada desenhada por código (sem imagem), centro roxo claro que
-## escurece até o vermelho na borda. Também dá a geometria pros assentos e cartas da mesa.
+## Mesa de jogo: elipse desenhada por código (sem imagem) — círculo de runas neon sobre roxo
+## escuro. Também dá a geometria pros assentos e cartas da mesa.
 
-const LAYERS := 20
 const POINTS := 80
 
 
@@ -49,15 +48,43 @@ func _points(r: Vector2) -> PackedVector2Array:
 	return pts
 
 
+## Zodíaco e planetas que rodam no anel de runas (todos na DejaVu Sans, que vai junto do jogo).
+const GLYPHS := ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓", "☉", "☽", "☿", "♀", "♂", "♃", "♄", "✦"]
+static var _glyph_font: Font
+
+
+func _ring(scale: float) -> PackedVector2Array:
+	var pts := _points(radii() * scale)
+	pts.append(pts[0])
+	return pts
+
+
+## Mesa-círculo de runas: miolo roxo escuro que esquenta pra borda, anéis neon e um anel de
+## glifos astrológicos. Desenhada uma vez (só redesenha ao mudar de tamanho): custo zero por frame.
 func _draw() -> void:
 	var r := radii()
-	var edge := UIKit.DANGER.darkened(0.45)
-	var core := UIKit.VIOLET.lightened(0.05).darkened(0.35)
-	for i in range(LAYERS):
-		var t := float(i) / float(LAYERS - 1)
-		var col := edge.lerp(core, smoothstep(0.0, 1.0, t))
-		draw_colored_polygon(_points(r * (1.0 - t * 0.9)), col)
-	var ring := _points(r)
-	ring.append(ring[0])
-	draw_polyline(ring, Color(UIKit.DANGER, 0.9), 4.0, true)
-	draw_polyline(ring, Color(UIKit.DANGER, 0.25), 12.0, true)
+	var core := UIKit.TR_PURPLE_DARK
+	var edge := UIKit.TR_RED_DARK.darkened(0.2)
+	for i in range(8):
+		var t := float(i) / 7.0
+		draw_colored_polygon(_points(r * (1.0 - t * 0.92)), edge.lerp(core, smoothstep(0.0, 1.0, t)))
+	var neon := UIKit.TR_RED_GLOW.lightened(0.15)
+	draw_polyline(_ring(1.0), Color(neon, 0.18), 16.0, true)
+	draw_polyline(_ring(1.0), Color(neon, 0.40), 7.0, true)
+	draw_polyline(_ring(1.0), neon, 3.0, true)
+	var soft := UIKit.TR_PURPLE_LIGHT.lightened(0.3)
+	draw_polyline(_ring(0.93), Color(soft, 0.9), 1.5, true)
+	draw_polyline(_ring(0.77), Color(soft, 0.9), 1.5, true)
+	draw_polyline(_ring(0.46), Color(soft, 0.35), 1.2, true)
+	if _glyph_font == null:
+		_glyph_font = load("res://assets/fonts/DejaVuSans.ttf") as Font
+	var c := center_point()
+	var rg := r * 0.85
+	var fs := 22
+	for i in range(GLYPHS.size()):
+		var a := TAU * float(i) / float(GLYPHS.size())
+		var pos := c + Vector2(cos(a) * rg.x, sin(a) * rg.y)
+		var tangent := atan2(cos(a) * rg.y, -sin(a) * rg.x)
+		draw_set_transform(pos, tangent, Vector2.ONE)
+		draw_string(_glyph_font, Vector2(-fs * 0.5, fs * 0.35), GLYPHS[i], HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(neon, 0.9))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

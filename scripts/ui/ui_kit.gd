@@ -125,19 +125,19 @@ static func box(bg: Color, border: Color = BLACK, border_w: int = 3, radius: int
 ## Padrão de borda com bloom: borda na cor clara (linha visual) + glow esparso na cor normal.
 ## Encapsula o padrão visual do projeto: [cor]-claro na borda, [cor]-normal no glow.
 ## size: "large" (botões de destaque, glow_size 30, alpha 0.42) ou "small" (cards/botões secundários, glow_size 14, alpha 0.35).
-static func rim_box(bg: Color, rim_col: Color, glow_col: Color, size: String = "large", radius: int = 10, pad_h: int = 12) -> StyleBoxFlat:
+static func rim_box(bg: Color, rim_col: Color, glow_col: Color, size: String = "large", radius: int = 10, pad_h: int = 12, pad_v: int = -1) -> StyleBoxFlat:
 	var glow_size := 30 if size == "large" else 14
 	var shad_a    := 0.42 if size == "large" else 0.35
 	# Borda semitransparente: linha visível mas suave (não dura). Godot não tem blur nativo
 	# em borda; reduzir o alpha da cor clara é a melhor aproximação de "blur".
 	var rim_soft  := Color(rim_col.r, rim_col.g, rim_col.b, 0.48)
-	return glow_box(bg, glow_col, glow_size, 2, radius, pad_h, rim_soft, shad_a)
+	return glow_box(bg, glow_col, glow_size, 2, radius, pad_h, rim_soft, shad_a, pad_v)
 
 
 ## StyleBox com sombra/glow colorida — para botões primários e de destaque.
 ## `glow_col` é a cor da sombra; `border_col` substitui a cor da borda (padrão = glow_col).
 ## `shadow_alpha` controla a opacidade do halo externo.
-static func glow_box(bg: Color, glow_col: Color, glow_size: int = 10, border_w: int = 3, radius: int = 10, pad_h: int = 12, border_col: Color = Color.TRANSPARENT, shadow_alpha: float = 0.55) -> StyleBoxFlat:
+static func glow_box(bg: Color, glow_col: Color, glow_size: int = 10, border_w: int = 3, radius: int = 10, pad_h: int = 12, border_col: Color = Color.TRANSPARENT, shadow_alpha: float = 0.55, pad_v: int = -1) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
 	sb.border_color = border_col if border_col.a > 0.0 else glow_col
@@ -148,6 +148,9 @@ static func glow_box(bg: Color, glow_col: Color, glow_size: int = 10, border_w: 
 	sb.shadow_offset = Vector2.ZERO
 	sb.content_margin_left  = pad_h
 	sb.content_margin_right = pad_h
+	if pad_v >= 0:
+		sb.content_margin_top = pad_v
+		sb.content_margin_bottom = pad_v
 	sb.anti_aliasing = true
 	return sb
 
@@ -168,6 +171,82 @@ static func label(text: String, size: int = 22, color: Color = INK, align: int =
 		l.add_theme_color_override("font_outline_color", OUTLINE)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
+
+
+static var _serif: Font
+
+
+## Serifada de título (DejaVu Serif Bold, só Latin ≈ 28 KB): nomes, legendas, cabeçalho e botões
+## da mesa. Símbolos (◎ ★ ♛) vêm da DejaVu Sans, de reserva.
+static func serif() -> Font:
+	if _serif == null:
+		var f := load("res://assets/fonts/DejaVuSerif-Bold-Subset.ttf") as FontFile
+		var sym := load("res://assets/fonts/DejaVuSans.ttf") as Font
+		if f != null and sym != null:
+			var fb: Array[Font] = [sym]
+			f.fallbacks = fb
+		_serif = f
+	return _serif
+
+
+## Lilás apagado pra legendas sobre painel escuro (derivado da paleta, sem hex novo).
+static func muted_lilac() -> Color:
+	return TR_PURPLE_LIGHT.lightened(0.6)
+
+
+## Rótulo em serifada com o tamanho exato pedido (nada de bônus +4 do `label`): legendas
+## (≥ 20), nomes e títulos. Contorno fino pra ler em cima da mesa.
+static func serif_label(text: String, size: int = 22, color: Color = TR_WHITE, align: int = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
+	var l := label(text, size, color, align)
+	l.add_theme_font_override("font", serif())
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_constant_override("outline_size", 2)
+	l.add_theme_color_override("font_outline_color", TR_BLACK)
+	return l
+
+
+## Botão de ação da mesa (DESISTIR / PAGAR / AUMENTAR / DOBRAR): fundo escuro, borda clara na
+## cor da função e glow suave (padrão `rim_box`), texto em serifada.
+enum ActionKind { DANGER, OK, GOLD }
+
+
+static func action_button(text: String, kind: int, size: int = 22) -> Button:
+	var bg: Color
+	var rim: Color
+	var glow: Color
+	var ink: Color
+	match kind:
+		ActionKind.DANGER:
+			bg = TR_RED_DARK
+			rim = TR_RED_LIGHT
+			glow = TR_RED
+			ink = TR_RED_LIGHT
+		ActionKind.OK:
+			bg = TR_BLUE.darkened(0.45)
+			rim = TR_CYAN
+			glow = TR_BLUE
+			ink = TR_WHITE
+		_:
+			bg = TR_GOLD.darkened(0.75)
+			rim = TR_GOLD
+			glow = TR_GOLD.darkened(0.25)
+			ink = TR_GOLD.lightened(0.3)
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.mouse_filter = Control.MOUSE_FILTER_PASS
+	b.add_theme_font_override("font", serif())
+	b.add_theme_font_size_override("font_size", size)
+	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		b.add_theme_color_override(c, ink)
+	b.add_theme_color_override("font_disabled_color", TR_PURPLE_LIGHT)
+	b.add_theme_stylebox_override("normal", rim_box(bg, rim, glow, "small", 12, 4))
+	b.add_theme_stylebox_override("hover", rim_box(bg.lightened(0.08), rim, glow, "small", 12, 4))
+	b.add_theme_stylebox_override("pressed", rim_box(bg.lightened(0.18), rim, glow, "small", 12, 4))
+	b.add_theme_stylebox_override("focus", rim_box(bg, rim, glow, "small", 12, 4))
+	b.add_theme_stylebox_override("disabled", rim_box(TR_PURPLE_DARK, TR_PURPLE_LIGHT, TR_PURPLE, "small", 12, 4))
+	b.pressed.connect(func(): sfx("tick"))
+	return b
 
 
 ## Face de botão 3D: cor viva, contorno escuro e base grossa; ao apertar, "afunda".
