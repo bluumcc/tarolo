@@ -272,7 +272,7 @@ func _build_ui() -> void:
 	holder.custom_minimum_size = Vector2(0, 212)
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	discard_head.add_child(holder)
-	discard_avatar = HexAvatar.new().setup(0, _seat_accent(0))
+	discard_avatar = HexAvatar.new().setup(0)
 	discard_avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	discard_avatar.set_active(true)
 	discard_avatar.scale = Vector2(2.16, 2.16)
@@ -519,23 +519,11 @@ func _on_resize() -> void:
 
 
 ## Cor da moldura do avatar em repouso, por assento (você em dourado).
-func _seat_accent(p: int) -> Color:
-	match p:
-		0:
-			return UIKit.TR_GOLD
-		1:
-			return UIKit.TR_RED
-		2:
-			return UIKit.TR_BLUE.lightened(0.45)
-		_:
-			return UIKit.TR_RED_GLOW
-
-
 ## Assento = avatar hexagonal + plaquinha com o nome (ver SeatView). Rival: tocar no avatar ou no
 ## nome abre o card do stack; você: nome e stack sempre à vista. Selo de vitórias no vértice de
 ## baixo à esquerda do avatar e o D do dealer à direita. A posição vem de `_layout_seats`.
 func _build_seat(p: int) -> SeatView:
-	var seat := SeatView.new().setup(p, _seat_accent(p), p == 0)
+	var seat := SeatView.new().setup(p, p == 0)
 	hud_titles[p] = seat.name_label
 	hud_totals[p] = seat.stack_label
 	seat_avatars[p] = seat.avatar

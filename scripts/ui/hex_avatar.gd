@@ -8,8 +8,9 @@ const RADIUS := 47.0                       ## do centro até a ponta de cima/bai
 const SIZE_PX := Vector2(81.0, 94.0)       ## largura = √3·R, altura = 2·R
 const PORTRAIT_PX := 70.0
 const BADGE_PX := 38.0
+const WARN_FRAC := 0.5                     ## abaixo disso o anel fica dourado
+const URGENT_FRAC := 0.25                  ## abaixo disso, vermelho
 
-var accent := UIKit.TR_RED                 ## cor da moldura em repouso (muda por assento)
 var active := false                        ## é a vez dele: moldura ciano e mais grossa
 var portrait: Portrait
 var wins_badge: PanelContainer
@@ -18,8 +19,7 @@ var timer_frac := -1.0                     ## 1 → 0: anel de tempo da vez (−
 var _pts := PackedVector2Array()
 
 
-func setup(seat: int, p_accent: Color) -> HexAvatar:
-	accent = p_accent
+func setup(seat: int) -> HexAvatar:
 	custom_minimum_size = SIZE_PX
 	size = SIZE_PX
 	pivot_offset = SIZE_PX / 2.0
@@ -59,7 +59,7 @@ func set_timer(f: float) -> void:
 
 
 func _draw() -> void:
-	var col := UIKit.TR_CYAN.lightened(0.1) if active else accent
+	var col := _ring_color()
 	var w := 6.0 if active else 4.0
 	draw_colored_polygon(_pts, UIKit.TR_PURPLE_DARK.darkened(0.35))
 	# Com o relógio rodando, a borda vai SUMINDO: só o trecho que resta é desenhado (o consumo começa
@@ -72,6 +72,18 @@ func _draw() -> void:
 		draw_polyline(ring, Color(col, 0.14), w + 16.0, true)   # halo largo e fraco
 		draw_polyline(ring, Color(col, 0.30), w + 7.0, true)    # halo curto
 		draw_polyline(ring, col, w, true)
+
+
+## Uma cor só em repouso (lilás); na vez, ciano; com o relógio, esquenta: dourado abaixo de 50% e
+## vermelho abaixo de 25%.
+func _ring_color() -> Color:
+	if not active and timer_frac < 0.0:
+		return UIKit.TR_PURPLE_LIGHT.lightened(0.35)
+	if timer_frac >= 0.0 and timer_frac < URGENT_FRAC:
+		return UIKit.TR_RED
+	if timer_frac >= 0.0 and timer_frac < WARN_FRAC:
+		return UIKit.TR_GOLD
+	return UIKit.TR_CYAN.lightened(0.1)
 
 
 ## Pontos do contorno do hexágono que RESTAM (fração `f`, 0..1): o trecho que vai do ponto já

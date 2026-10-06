@@ -23,12 +23,12 @@ var _always := false
 var _token := 0
 
 
-func setup(p: int, accent: Color, always_stack: bool = false) -> SeatView:
+func setup(p: int, always_stack: bool = false) -> SeatView:
 	_always = always_stack
 	custom_minimum_size = Vector2(W, H)
 	size = Vector2(W, H)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	avatar = HexAvatar.new().setup(p, accent)
+	avatar = HexAvatar.new().setup(p)
 	avatar.position = Vector2((W - avatar.size.x) / 2.0, AVATAR_TOP)
 	add_child(avatar)
 
