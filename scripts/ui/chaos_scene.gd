@@ -153,6 +153,7 @@ const BAR_H := 96.0       ## barra de baixo (cards laterais: palpite e tempo)
 const ACT_H := BAR_H * 0.75   ## botões de ação e card de pote/prêmio: 75% dos cards laterais
 const BANNER_H := 100.0    ## do topo da zona até a mão: faixa de avisos, abaixo do seu avatar
 const POT_H := 36.0        ## folga embaixo da mão (a aba de avisos mora aqui)
+const CARD_SHRINK := 0.28   ## o card roxo é 28% mais baixo (encurta por cima; o pé fica onde estava): 10% + mais 20%
 const CARD_RISE := 36.0    ## quanto o card roxo sobe acima da zona da mão (antes do encurtamento)
 const MY_SEAT_RISE := 21.0 ## quanto o centro do seu avatar fica acima do topo do card roxo
 const LEFT_W := 132.0
@@ -358,7 +359,6 @@ func _build_hand_zone(root: VBoxContainer) -> void:
 	banner_box.add_child(bv)
 	banner_title = UIKit.serif_label("", 22, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	banner_title.autowrap_mode = TextServer.AUTOWRAP_OFF
-	banner_title.clip_text = true
 	bv.add_child(banner_title)
 	banner_sub = UIKit.serif_label("", 18, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
 	banner_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -495,9 +495,9 @@ func _hand_h() -> float:
 
 
 ## Mão usa a largura total da viewport (quebra a limitação de _max_ui_w).
-## O leque desce 20% da altura da carta (as pontas passam por trás da barra de baixo).
+## O leque desce 10% da altura da carta (as pontas passam por trás da barra de baixo).
 func _deck_drop() -> float:
-	return 0.2 * CardView.SIZE.y * _hand_scale()
+	return 0.1 * CardView.SIZE.y * _hand_scale()
 
 
 func _update_hand_scroller_margins() -> void:
@@ -513,7 +513,7 @@ func _update_hand_scroller_margins() -> void:
 	if hand_zone != null:
 		hand_zone.custom_minimum_size = Vector2(0, BANNER_H + hand_h + POT_H)
 	if center_card != null:   # o card roxo é 10% mais baixo (encurta por cima; o pé fica onde estava)
-		center_card.offset_top = -CARD_RISE + 0.1 * (BANNER_H + hand_h + POT_H + CARD_RISE)
+		center_card.offset_top = -CARD_RISE + CARD_SHRINK * (BANNER_H + hand_h + POT_H + CARD_RISE)
 
 
 ## Em tela larga o jogo fica numa coluna centralizada (não estica).
@@ -559,7 +559,7 @@ func _build_seat(p: int) -> SeatView:
 	seat_nodes[p] = seat
 	hud_badges[p] = seat
 	if p == 0:
-		seat.z_index = 6   # cruza o topo do card roxo: precisa ficar por cima dele
+		seat.z_index = 50   # cruza o topo do card roxo e fica por cima do leque
 	return seat
 
 
@@ -573,8 +573,6 @@ func _layout_seats() -> void:
 	table_center.seat_count = n
 	table_center.seat_floor = card_top - 20.0
 	table_center.fit()
-	var c := table_center.center_point()
-	var r := table_center.seat_edge_radii()
 	for p in range(n):
 		var seat := seat_nodes[p] as SeatView
 		if seat == null:
@@ -583,7 +581,7 @@ func _layout_seats() -> void:
 		if p == 0:
 			continue
 		var theta := TableEllipse.seat_angle(p, n)
-		var pt := c + Vector2(cos(theta) * r.x, sin(theta) * r.y)
+		var pt := table_center.border_point(theta)
 		seat.position = Vector2(pt.x - SeatView.W / 2.0, pt.y - SeatView.AVATAR_CENTER_Y)   # centro do avatar NA borda
 	var me := seat_nodes[0] as SeatView
 	if me == null:
