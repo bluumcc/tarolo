@@ -52,7 +52,6 @@ var phase := "idle"            # "bet" | "play" | "idle"
 var bets_gathered := false     # apostas já juntadas no pote
 var first_round_done := false
 var round_dots: RoundDots
-var prog_card: StatCard         # PALPITE (fez/palpite), no canto de baixo à esquerda
 var bottom_mid: Control          # meio da barra de baixo: ações OU o card de pote/prêmio
 var idle_card: PanelContainer    # PRÊMIO — ocupa o lugar dos botões enquanto não há ação
 var modifier_strip: ModifierStrip   # card do modificador, em cima da barra de baixo
@@ -220,7 +219,7 @@ func _build_ui() -> void:
 	info_box.custom_minimum_size = Vector2(0, HEADER_H)
 	info_box.add_theme_stylebox_override("panel", UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 14, 6))
 	round_dots = RoundDots.new()
-	round_dots.set_progress(ChaosEngine.HAND_SIZE, 0)
+	round_dots.set_state(ChaosEngine.HAND_SIZE, [], 0)
 	var info_v := VBoxContainer.new()
 	info_v.alignment = BoxContainer.ALIGNMENT_CENTER
 	info_v.add_theme_constant_override("separation", 0)
@@ -401,10 +400,6 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	bottom_bar.custom_minimum_size = Vector2(0, BAR_H)
 	bottom_bar.add_theme_constant_override("separation", 10)
 	root.add_child(bottom_bar)
-
-	prog_card = StatCard.new().setup("PALPITE", "–", UIKit.TR_WHITE, 28, 17)
-	prog_card.custom_minimum_size = Vector2(LEFT_W, 0)
-	bottom_bar.add_child(prog_card)
 
 	var mid := VBoxContainer.new()
 	bottom_mid = mid
@@ -1973,8 +1968,8 @@ func _refresh_hud() -> void:
 		(dealer_badges[p] as Control).visible = engine.hand_no > 0 and engine.button == p
 		var idx := order.find(p)
 		var ob := order_badges[p] as PanelContainer
-		ob.visible = p != 0
-		if p != 0:
+		ob.visible = p != 0 or (engine.blitz and bool(blitz_revealed[0]))   # você também mostra suas vitórias
+		if true:
 			var wl := ob.get_child(0) as Label
 			wl.text = str(int(engine.wins[p]))
 			var fill := UIKit.PURPLE_DEEP
@@ -1994,7 +1989,7 @@ func _refresh_hud() -> void:
 			pile_l.text = "◎ %d" % int(pile)
 			pile_l.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[p] else UIKit.MONEY)
 		_refresh_bet_tags(p, idx)
-	round_dots.set_progress(ChaosEngine.HAND_SIZE, engine.trick_number)
+	_refresh_round_dots()
 	_refresh_modifier_strip()
 	_refresh_pot()
 	_update_turn_highlight(turn_player)
@@ -2677,20 +2672,18 @@ func _refresh_blitz_tag(p: int, _idx: int) -> void:
 	my_bet_pill.modulate.a = 1.0 if pile > 0.0 else 0.0
 	my_bet_label.text = "◎ %d" % int(pile)
 	my_bet_label.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[0] else UIKit.MONEY)
-	var val := prog_card.value
-	if not bool(blitz_revealed[0]):
-		val.text = "–"
-		val.add_theme_color_override("font_color", UIKit.TR_WHITE)
-		return
-	var tag := " ×%d" % (1 + int(engine.doubles[0])) if int(engine.doubles[0]) > 0 else ""
-	val.text = "%d/%d%s" % [int(engine.wins[0]), int(engine.predicts[0]), tag]
-	var col := UIKit.TR_WHITE
-	var need := engine.blitz_need(0)
-	if need == 0:
-		col = UIKit.OK
-	elif need < 0 or need > engine.tricks_left():
-		col = UIKit.LOSS
-	val.add_theme_color_override("font_color", col)
+
+
+## Losangos: concluídos preenchidos (verde = venceu, vermelho = perdeu); os próximos `falta` com
+## borda forte (o palpite que ainda falta); o resto com borda normal. Sem palpite revelado, sem meta.
+func _refresh_round_dots() -> void:
+	var results: Array = []
+	for h in engine.history:
+		results.append(int(h["winner"]) == 0)
+	var need := 0
+	if engine.blitz and bool(blitz_revealed[0]):
+		need = clampi(engine.blitz_need(0), 0, engine.tricks_left())
+	round_dots.set_state(ChaosEngine.HAND_SIZE, results, need)
 
 
 func _refresh_pot_blitz() -> void:
