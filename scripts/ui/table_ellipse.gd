@@ -139,6 +139,26 @@ func seat_point(p: int, n: int) -> Vector2:
 	return _center + Vector2(x, -_r)
 
 
+## Tela larga: onde cai o centro da carta jogada de `p` — cada carta fica perto do dono, sem encostar
+## no assento nem nas vizinhas (a sua, embaixo, sai um pouco do eixo pra não cobrir a do rival de
+## cima). `card` é o tamanho da carta já na escala da mesa.
+func card_point(p: int, n: int, card: Vector2) -> Vector2:
+	var seat := seat_point(p, n)
+	var below := (HexAvatar.RADIUS + 82.0) * seat_scale   # do centro do avatar de cima até o fim do nome/stack
+	if p == 0:
+		var y := _center.y + _r - HexAvatar.RADIUS * seat_scale - 6.0 - card.y / 2.0
+		var x := 0.0
+		for q in range(1, n):
+			var sp := seat_point(q, n)
+			if sp.y < _center.y - _r * 0.5 and absf(sp.x - _center.x) < card.x * 1.2:
+				x = card.x * 0.62   # rival de cima na sua frente: a sua carta desvia pro lado
+		return Vector2(_center.x + x, y)
+	if seat.y < _center.y - _r * 0.5:   # em cima: logo abaixo do nome/stack do dono
+		return Vector2(seat.x, seat.y + below + 6.0 + card.y / 2.0)
+	var side := -1.0 if seat.x > _center.x else 1.0   # pontas: pra dentro da mesa
+	return Vector2(seat.x + side * (seat_half_extent() * seat_scale + card.x * 0.6), seat.y)
+
+
 ## Direção (unitária) do centro da mesa até o assento.
 func seat_dir(p: int, n: int) -> Vector2:
 	var d := seat_point(p, n) - _center

@@ -11,7 +11,7 @@ const ART_ASPECT := 540.0 / 900.0
 ## Tamanho base da carta (escala 1.0): largura 188, altura pela proporção da arte (188x313).
 const SIZE := Vector2(188.0, 188.0 / ART_ASPECT)
 const TABLE_H_MOBILE := 218.5   ## altura da carta jogada na mesa (celular)
-const TABLE_H_WIDE := 180.0     ## idem em tela larga (PC)
+const TABLE_H_WIDE := 156.0     ## idem em tela larga (PC)
 const HAND_SCALE_MOBILE := 1.1   ## carta da mão no celular (+10% sobre o tamanho base)
 const HAND_H_WIDE := 320.0      ## altura máxima da carta na mão em tela larga
 const FOCUS_H_WIDE := 410.0     ## altura da carta destacada (arrastada no swipe) em tela larga

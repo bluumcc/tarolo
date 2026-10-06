@@ -622,6 +622,12 @@ func _apply_orientation() -> void:
 	margin_box.add_theme_constant_override("margin_right", int(SIDE_COL_W + SIDE_MARGIN * 2.0) if wide else int(side))
 	round_dots.set_big(wide)
 	_dock_bottom(wide)
+	# Desktop: etapas sem mesa (descarte/palpite) e modais ficam centralizados na área da esquerda;
+	# a coluna da direita é só dos cards (registro, modificador, prêmio, pote, ações).
+	var right_off := -(SIDE_COL_W + SIDE_MARGIN) if wide else 0.0
+	for layer in [phase_layer, overlay_layer]:
+		if layer != null:
+			(layer as Control).offset_right = right_off
 	_update_hand_scroller_margins()
 	_refresh_hud()
 	_layout_table()
@@ -695,6 +701,8 @@ func _slot_pos(player: int) -> Vector2:
 	var n := table_players if table_players > 0 else engine.num_players
 	var dir := table_center.seat_dir(player, n)
 	var ts := _table_scale()
+	if _is_wide():
+		return table_center.card_point(player, n, CardView.SIZE * ts) - CardView.SIZE / 2.0
 	var off := Vector2(dir.x * CardView.SIZE.x * ts * 0.75, dir.y * CardView.SIZE.y * ts * 0.22)
 	return table_center.center_point() + off - CardView.SIZE / 2.0
 
