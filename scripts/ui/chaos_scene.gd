@@ -394,7 +394,6 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	prize_card = StatCard.new().setup("PRÊMIO", "◎ 0", blue, 26, 17)
 	prize_card.custom_minimum_size = Vector2(SIDE_W, 0)
 	prize_card.caption.add_theme_color_override("font_color", blue.lerp(UIKit.TR_WHITE, 0.25))
-	prize_card.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), blue, blue.darkened(0.4), "small", 12, 8, 8))
 	pot_prize_label = prize_card.value
 	pot_prize_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	prize_card.modulate.a = 0.0
