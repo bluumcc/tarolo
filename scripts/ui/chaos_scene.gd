@@ -224,7 +224,7 @@ func _build_ui() -> void:
 	my_bet_pill.anchor_bottom = 1.0
 	my_bet_pill.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	my_bet_pill.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	my_bet_pill.offset_bottom = -76.0
+	my_bet_pill.offset_bottom = -52.0
 	my_bet_pill.z_index = 5
 	my_bet_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	my_bet_pill.add_theme_stylebox_override("panel", UIKit.box(UIKit.CLEAR, UIKit.CLEAR, 0, 0, 0))   # sem borda: só ficha + valor, como nos rivais
@@ -748,29 +748,14 @@ func _layout_table() -> void:
 
 
 ## A carta de cada jogador fica do lado do avatar dele (esquerda, topo, direita, você embaixo),
-## agrupadas no centro e sobrepostas: a ordem de empilhar (_table_z) é pela posição na mesa, da
-## esquerda pra direita, então o canto superior esquerdo de cada carta nunca fica coberto.
+## agrupadas no centro e sobrepostas. A ordem de empilhar é a da jogada (sentido horário): a carta
+## que vem depois cobre a anterior. Os lados ficam bem afastados e topo/base deslocados na
+## vertical pra deixar o canto superior esquerdo de cada carta aparecendo.
 func _slot_pos(player: int) -> Vector2:
 	var theta := TableEllipse.seat_angle(player, engine.num_players)
 	var ts := _table_scale()
-	var off := Vector2(cos(theta) * CardView.SIZE.x * ts * 0.55, sin(theta) * CardView.SIZE.y * ts * 0.18)
+	var off := Vector2(cos(theta) * CardView.SIZE.x * ts * 0.75, sin(theta) * CardView.SIZE.y * ts * 0.22)
 	return table_center.center_point() + off - CardView.SIZE / 2.0
-
-
-## Ordem de empilhar: esquerda embaixo, direita em cima (empate: o de cima da tela fica atrás).
-func _table_z(player: int) -> int:
-	var n := engine.num_players
-	var mine := _table_key(player, n)
-	var z := 0
-	for q in range(n):
-		if q != player and _table_key(q, n) < mine:
-			z += 1
-	return z
-
-
-func _table_key(player: int, n: int) -> float:
-	var th := TableEllipse.seat_angle(player, n)
-	return cos(th) * 1000.0 + sin(th)
 
 
 ## As cartas nunca encolhem: fileira reta ou leque, escolhido em Configurações — nos dois
@@ -1274,7 +1259,7 @@ func _animate_play(player: int, card: CardData, from: Vector2) -> void:
 	cv.global_position = from
 	cv.scale = Vector2(0.9, 0.9)
 	cv.rotation = randf_range(-0.25, 0.25)
-	cv.z_index = _table_z(player)
+	cv.z_index = table_views.size()   # a carta que vem depois (sentido horário) cobre a anterior
 	table_views.append({"player": player, "view": cv})
 	Sfx.play("card", randf_range(0.9, 1.15))
 	var tw := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
