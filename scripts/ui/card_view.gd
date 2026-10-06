@@ -75,6 +75,7 @@ func _ready() -> void:
 	_card_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE  ## NUNCA KEEP_SIZE: o PNG (540x900) inflaria a carta
 	_card_tex.stretch_mode = TextureRect.STRETCH_SCALE
 	_card_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_card_tex.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS   # a arte (540×900) encolhe até 5×: sem mipmap fica chiada
 	_card_tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_card_tex.clip_contents = true
 	_card_tex.visible = false

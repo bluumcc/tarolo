@@ -515,14 +515,14 @@ func _layout_seats() -> void:
 	table_center.seat_count = table_players   # só muda no começo de uma rodada (`_lock_table_size`)
 	table_center.seat_floor = card_top - 20.0
 	table_center.my_seat_y = card_top - MY_SEAT_RISE
+	table_center.wide = _is_wide()
 	table_center.fit()
 	for p in range(n):
 		var seat := seat_nodes[p] as SeatView
 		if seat == null:
 			continue
 		seat.layout()
-		var theta := TableEllipse.seat_angle(p, n)
-		var pt := table_center.border_point(theta)
+		var pt := table_center.seat_point(p, n)
 		seat.position = Vector2(pt.x - SeatView.W / 2.0, pt.y - SeatView.AVATAR_CENTER_Y)   # centro do avatar NA borda
 
 
@@ -541,9 +541,9 @@ func _layout_table() -> void:
 ## disso), agrupadas no centro e sobrepostas.
 func _slot_pos(player: int) -> Vector2:
 	var n := table_players if table_players > 0 else engine.num_players
-	var theta := TableEllipse.seat_angle(player, n)
+	var dir := table_center.seat_dir(player, n)
 	var ts := _table_scale()
-	var off := Vector2(cos(theta) * CardView.SIZE.x * ts * 0.75, sin(theta) * CardView.SIZE.y * ts * 0.22)
+	var off := Vector2(dir.x * CardView.SIZE.x * ts * 0.75, dir.y * CardView.SIZE.y * ts * 0.22)
 	return table_center.center_point() + off - CardView.SIZE / 2.0
 
 
@@ -554,8 +554,8 @@ func _slot_rank(player: int) -> int:
 	var n := table_players if table_players > 0 else engine.num_players
 	var order: Array = []
 	for p in range(n):
-		var th := TableEllipse.seat_angle(p, n)
-		order.append([int(round(sin(th) * 100.0 / 35.0)), cos(th), p])   # linha (y agrupado), x, assento
+		var dir := table_center.seat_dir(p, n)
+		order.append([int(round(dir.y * 100.0 / 35.0)), dir.x, p])   # linha (y agrupado), x, assento
 	order.sort_custom(func(a, b): return a[0] < b[0] or (a[0] == b[0] and a[1] < b[1]))
 	for i in range(order.size()):
 		if int(order[i][2]) == player:
