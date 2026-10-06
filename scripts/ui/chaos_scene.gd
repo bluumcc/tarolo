@@ -572,21 +572,17 @@ func _layout_seats() -> void:
 	var card_top := stage.size.y + 8.0 + (center_card.offset_top if center_card != null else -CARD_RISE)   # topo do card roxo no sistema do palco
 	table_center.seat_count = n
 	table_center.seat_floor = card_top - 20.0
+	table_center.my_seat_y = card_top - MY_SEAT_RISE
 	table_center.fit()
 	for p in range(n):
 		var seat := seat_nodes[p] as SeatView
 		if seat == null:
 			continue
 		seat.layout()
-		if p == 0:
-			continue
 		var theta := TableEllipse.seat_angle(p, n)
 		var pt := table_center.border_point(theta)
 		seat.position = Vector2(pt.x - SeatView.W / 2.0, pt.y - SeatView.AVATAR_CENTER_Y)   # centro do avatar NA borda
-	var me := seat_nodes[0] as SeatView
-	if me == null:
-		return
-	me.position = Vector2((stage.size.x - SeatView.W) / 2.0, card_top - MY_SEAT_RISE - SeatView.AVATAR_CENTER_Y)
+
 
 
 ## Reposiciona assentos e cartas da mesa (ex.: ao virar o celular).

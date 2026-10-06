@@ -16,6 +16,7 @@ const SEAT_BELOW := 78.0
 const TABLE_DROP := 70.0
 
 var seat_count := 4
+var my_seat_y := 0.0           ## y máximo do centro do SEU avatar (embaixo, perto do card roxo); a mesa não passa disso
 var seat_floor := 0.0          ## y (da área da mesa) abaixo do qual nenhum rival pode chegar: o card roxo
 var _center := Vector2.ZERO
 var _r := 10.0                 ## raio horizontal (e das duas pontas arredondadas)
@@ -46,6 +47,8 @@ func fit() -> void:
 	var topc := TOP_GAP + HexAvatar.RADIUS
 	var r_avail := maxf(size.x / 2.0 - half_w - SIDE_GAP, 10.0)
 	var ry_cap := maxf((size.y + TABLE_DROP - topc) / 2.0, 20.0)
+	if my_seat_y > 0.0:
+		ry_cap = maxf(ry_cap, (my_seat_y - topc) / 2.0)   # a mesa desce até o seu avatar, onde ele estiver
 	var lo := 20.0
 	var hi := ry_cap
 	if _fits(r_avail, hi, topc):
@@ -70,14 +73,17 @@ func _fits(r_avail: float, ry: float, topc: float) -> bool:
 	_half = maxf(ry - _r, 0.0)
 	_center = Vector2.ZERO
 	var span := _seat_dy_range()
-	return seat_floor <= 0.0 or topc + (span.y - span.x) + SEAT_BELOW <= seat_floor
+	if my_seat_y > 0.0 and topc + (span.y - span.x) > my_seat_y:
+		return false   # o avatar de baixo (você) passaria do limite
+	var rivals_hi := _seat_dy_range(1).y
+	return seat_floor <= 0.0 or topc + (rivals_hi - span.x) + SEAT_BELOW <= seat_floor
 
 
-## (menor dy, maior dy) dos centros dos rivais em relação ao centro da mesa.
-func _seat_dy_range() -> Vector2:
+## (menor dy, maior dy) dos centros dos avatares (a partir de `first`; 0 = você) em relação ao centro da mesa.
+func _seat_dy_range(first: int = 0) -> Vector2:
 	var lo := 0.0
 	var hi := 0.0
-	for p in range(1, seat_count):
+	for p in range(first, seat_count):
 		var dy := border_point(seat_angle(p, seat_count)).y - _center.y
 		lo = minf(lo, dy)
 		hi = maxf(hi, dy)
