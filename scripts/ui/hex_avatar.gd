@@ -14,6 +14,7 @@ var active := false                        ## é a vez dele: moldura ciano e mai
 var portrait: Portrait
 var wins_badge: PanelContainer
 var dealer_badge: PanelContainer
+var timer_frac := -1.0                     ## 1 → 0: anel de tempo da vez (−1 = sem anel)
 var _pts := PackedVector2Array()
 
 
@@ -50,6 +51,13 @@ func set_active(on: bool) -> void:
 	queue_redraw()
 
 
+func set_timer(f: float) -> void:
+	if is_equal_approx(f, timer_frac):
+		return
+	timer_frac = f
+	queue_redraw()
+
+
 func _draw() -> void:
 	var col := UIKit.TR_CYAN.lightened(0.1) if active else accent
 	var w := 6.0 if active else 4.0
@@ -59,6 +67,38 @@ func _draw() -> void:
 	draw_polyline(ring, Color(col, 0.14), w + 16.0, true)   # halo largo e fraco
 	draw_polyline(ring, Color(col, 0.30), w + 7.0, true)    # halo curto
 	draw_polyline(ring, col, w, true)
+
+
+	if timer_frac >= 0.0:
+		_draw_timer_ring()
+
+
+## Anel de tempo: contorna o hexágono a partir do vértice de cima, esgotando no sentido anti-horário.
+func _draw_timer_ring() -> void:
+	var total := 0.0
+	var seg: Array = []
+	for i in range(6):
+		var l := _pts[i].distance_to(_pts[(i + 1) % 6])
+		seg.append(l)
+		total += l
+	var left := total * clampf(timer_frac, 0.0, 1.0)
+	var col := UIKit.TR_RED_NEON if timer_frac <= 0.3 else UIKit.TR_CYAN.lightened(0.2)
+	var pts := PackedVector2Array([_pts[0]])
+	for i in range(6):
+		if left <= 0.0:
+			break
+		var a := _pts[i]
+		var b := _pts[(i + 1) % 6]
+		var l: float = seg[i]
+		if left >= l:
+			pts.append(b)
+			left -= l
+		else:
+			pts.append(a.lerp(b, left / l))
+			left = 0.0
+	if pts.size() > 1:
+		draw_polyline(pts, Color(col, 0.35), 12.0, true)
+		draw_polyline(pts, col, 7.0, true)
 
 
 ## Selo redondo com texto (vitórias, dealer). O texto é o primeiro filho (os HUDs recolorem).

@@ -44,6 +44,7 @@ Em `scripts/ui/`, todos desenhados em código (sem textura/shader) e só com tok
 - `UIKit.serif()` / `UIKit.serif_label()` — serifada de títulos/legendas (DejaVu Serif Bold subset, ~28 KB, `assets/fonts/DejaVuSerif-Bold-Subset.ttf`). Legendas ≥ 20 px.
 - `TableEllipse` — mesa de runas em pílula (cápsula). `fit()` ajusta ao nº de jogadores (`seat_count`): largura = a maior em que o que estiver mais perto da margem (plaquinha fixa de 150% do avatar, avatar ou selo) encosta; altura = a maior que serve. A cena só refaz o ajuste no começo de cada rodada (`_lock_table_size`): durante as 8 jogadas a mesa não muda. `border_point(theta)` dá onde cada avatar senta. Gate: `godot --headless --path . -s res://tests/table_gate.gd`.
 - Layout da mesa (`chaos_scene.gd`): topo = menu · título + `RoundDots` · `StatCard` fez/palpite; abaixo a `ModifierStrip`; seu avatar cruza o topo do card roxo, avisos ("fulano pagou") na faixa logo abaixo dele; mão em leque; prêmio no pé do card; barra de baixo = POTE · ações · TEMPO. A ajuda (antigo "?") mora na pausa.
+- **Barra de baixo:** POTE à esquerda, ações no meio (vazio quando não há ação), PRÊMIO à direita; o relógio da vez é um anel que se esgota na borda do avatar (`HexAvatar.set_timer`).
 - **Avisos de ação** (`_banner`): só título curto, na cor do tipo de ação, numa linha dentro do card do header (embaixo dos losangos); o pote fica num card fixo logo abaixo e nunca some.
 
 ## Princípios do produto

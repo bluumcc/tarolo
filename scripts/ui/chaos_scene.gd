@@ -53,9 +53,9 @@ var bets_gathered := false     # apostas já juntadas no pote
 var first_round_done := false
 var round_dots: RoundDots
 var bottom_mid: Control          # meio da barra de baixo: ações OU o card de pote/prêmio
-var idle_card: PanelContainer    # PRÊMIO — ocupa o lugar dos botões enquanto não há ação
+var prize_card: StatCard         # PRÊMIO, canto inferior direito
+var prize_shown := false         # existe prêmio em jogo (o card só aparece então)
 var modifier_strip: ModifierStrip   # card do modificador, em cima da barra de baixo
-var banner_slot: Control
 var table_players := 0           # nº de jogadores com que a mesa foi dimensionada; só é refeito entre rodadas
 var discard_head: VBoxContainer  # título grande + instrução da etapa de descarte, no topo do palco (fora do card)
 var chrome_discard := false      # etapa sem mesa (descarte/palpite): sem modificador na faixa
@@ -157,6 +157,7 @@ const MOD_GAP := 10.0       ## folga entre o leque e o card do modificador
 const BANNER_H := 100.0    ## do topo da zona até a mão: faixa de avisos, abaixo do seu avatar
 const AVATAR_TO_FAN := 38.0   ## do topo do leque (na zona) até a referência do seu avatar; dá folga entre o stack e as cartas
 const MY_SEAT_RISE := 21.0 ## quanto o centro do seu avatar fica acima do topo do card roxo
+const SIDE_W := 150.0     ## largura dos dois cards laterais (pote e prêmio)
 const LEFT_W := 132.0     ## largura dos dois cards laterais (palpite e tempo)
 const MAX_UI_W := 900.0    ## em tela larga o jogo não estica além disso
 
@@ -164,7 +165,6 @@ var stage: Control
 var margin_box: MarginContainer
 var bottom_bar: HBoxContainer
 var bet_row: HBoxContainer
-var timer_label: Label
 var hand_scroller: HandScroller
 var hand_zone: Control
 var my_bet_pill: Control        # aposta da jogada: o Label do seu assento, em cima do avatar
@@ -242,14 +242,6 @@ func _build_ui() -> void:
 			if not is_equal_approx(b.custom_minimum_size.x, topbar.size.y):
 				b.custom_minimum_size = Vector2(topbar.size.y, HEADER_H))
 
-	# Faixa logo abaixo: o POTE (largura fixa) fica aqui e dá lugar aos avisos de ação enquanto
-	# há um aviso. Altura fixa: nada se mexe quando troca.
-	banner_slot = Control.new()
-	banner_slot.custom_minimum_size = Vector2(0, BANNER_SLOT_H)
-	banner_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(banner_slot)
-	_build_pot_card(banner_slot)
-
 	# Palco: a mesa de runas com os rivais sentados na borda, a distâncias iguais; você embaixo.
 	stage = Control.new()
 	stage.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -317,37 +309,6 @@ func _build_ui() -> void:
 	_layout_table.call_deferred()
 
 
-## Pote: card de largura fixa (cabe valores altos), uma linha só — "POTE ◎ 12000" — centrado na
-## faixa do topo. Dá lugar aos avisos de ação enquanto houver um.
-func _build_pot_card(slot: Control) -> void:
-	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(POT_CARD_W, 0)
-	card.anchor_left = 0.5
-	card.anchor_right = 0.5
-	card.anchor_top = 0.0
-	card.anchor_bottom = 1.0
-	card.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_theme_stylebox_override("panel", UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 12, 6))
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 12)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(row)
-	var cap := UIKit.serif_label("POTE", 22, UIKit.TR_GOLD.lerp(UIKit.TR_WHITE, 0.25), HORIZONTAL_ALIGNMENT_CENTER)
-	cap.autowrap_mode = TextServer.AUTOWRAP_OFF
-	row.add_child(cap)
-	pot_label = UIKit.label("◎ 0", 30, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	pot_label.add_theme_font_size_override("font_size", 30)
-	pot_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	row.add_child(pot_label)
-	pot_sub = UIKit.label("", 18, UIKit.MUTED)   # sem lugar na tela
-	pot_sub.visible = false
-	row.add_child(pot_sub)
-	pot_box = card
-	slot.add_child(card)
-
-
 ## Aviso de ação: título curto, na cor do tipo de ação, numa linha dentro do card do header (embaixo dos losangos).
 func _build_banner(parent: Control) -> void:
 	banner_title = UIKit.serif_label("", 22, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
@@ -401,6 +362,17 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	bottom_bar.add_theme_constant_override("separation", 10)
 	root.add_child(bottom_bar)
 
+	# Esquerda: POTE. Meio: ações. Direita: PRÊMIO. (O relógio da vez é o anel do avatar.)
+	var pot := StatCard.new().setup("POTE", "◎ 0", UIKit.TR_GOLD, 26, 17)
+	pot.custom_minimum_size = Vector2(SIDE_W, 0)
+	pot_box = pot
+	pot_label = pot.value
+	pot_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	pot_sub = UIKit.label("", 18, UIKit.MUTED)   # sem lugar na tela
+	pot_sub.visible = false
+	pot.add_child(pot_sub)
+	bottom_bar.add_child(pot)
+
 	var mid := VBoxContainer.new()
 	bottom_mid = mid
 	mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -413,13 +385,12 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	status_label.max_lines_visible = 2
 	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	status_label.visible = false   # a vez e as dicas aparecem na aba de avisos, em cima desta barra
+	status_label.visible = false
 	mid.add_child(status_label)
-	_build_idle_card()
-	mid.add_child(idle_card)
 	bet_row = HBoxContainer.new()
 	bet_row.add_theme_constant_override("separation", 6)
 	bet_row.custom_minimum_size = Vector2(0, ACT_H)
+	bet_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bet_row.visible = false
 	mid.add_child(bet_row)
 	double_btn = UIKit.action_button("DOBRAR", UIKit.ActionKind.GOLD, 24)
@@ -428,44 +399,22 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	double_btn.pressed.connect(_on_double_pressed)
 	mid.add_child(double_btn)
 
-	var tempo := StatCard.new().setup("TEMPO", "0:10", UIKit.TR_WHITE, 28, 17)
-	tempo.custom_minimum_size = Vector2(LEFT_W, 0)   # mesma largura do card PALPITE
-	timer_label = tempo.value
-	timer_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	bottom_bar.add_child(tempo)
-
-
-## Card do meio, de largura total: PRÊMIO numa linha só, centralizado (só quando existe).
-## Fica no lugar dos botões e some quando uma ação é pedida (ver `_refresh_idle_card`).
-func _build_idle_card() -> void:
 	var blue := UIKit.prize_blue()
-	idle_card = PanelContainer.new()
-	idle_card.custom_minimum_size = Vector2(0, ACT_H)
-	idle_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	idle_card.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), blue, blue.darkened(0.4), "small", 12, 12, 6))
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 12)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	idle_card.add_child(row)
-	var cap := UIKit.serif_label("PRÊMIO", 22, blue.lerp(UIKit.TR_WHITE, 0.25), HORIZONTAL_ALIGNMENT_CENTER)
-	cap.autowrap_mode = TextServer.AUTOWRAP_OFF
-	row.add_child(cap)
-	pot_prize_label = UIKit.label("◎ 0", 32, blue, HORIZONTAL_ALIGNMENT_CENTER)
-	pot_prize_label.add_theme_font_size_override("font_size", 32)
+	prize_card = StatCard.new().setup("PRÊMIO", "◎ 0", blue, 26, 17)
+	prize_card.custom_minimum_size = Vector2(SIDE_W, 0)
+	prize_card.caption.add_theme_color_override("font_color", blue.lerp(UIKit.TR_WHITE, 0.25))
+	prize_card.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), blue, blue.darkened(0.4), "small", 12, 8, 8))
+	pot_prize_label = prize_card.value
 	pot_prize_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	row.add_child(pot_prize_label)
-	pot_prize_label.visible = false
-	pot_prize_label.visibility_changed.connect(func(): cap.visible = pot_prize_label.visible; _refresh_idle_card())
+	prize_card.modulate.a = 0.0
+	bottom_bar.add_child(prize_card)
 
 
-## Card de pote/prêmio só quando ninguém está pedindo ação (botões, dobrar) nem rolando
-## descarte/palpite.
+## Prêmio só aparece quando existe e fora do descarte/palpite; o espaço fica reservado (alpha).
 func _refresh_idle_card() -> void:
-	if idle_card == null:
+	if prize_card == null:
 		return
-	var asking := (bet_row != null and bet_row.visible) or (double_btn != null and double_btn.visible)
-	idle_card.visible = not asking and phase != "discard" and phase != "predict" and not chrome_discard and pot_prize_label.visible
+	prize_card.modulate.a = 1.0 if (prize_shown and phase != "discard" and phase != "predict" and not chrome_discard) else 0.0
 
 
 func _is_wide() -> bool:
@@ -1124,19 +1073,17 @@ func _clock_stop() -> void:
 
 
 func _process(delta: float) -> void:
-	if timer_label == null:
+	var me := seat_avatars[0] as HexAvatar if not seat_avatars.is_empty() else null
+	if me == null:
 		return
-	timer_label.modulate.a = 1.0 if clock_on else 0.35
-	timer_label.text = _mmss(clock_left if clock_on else TURN_SECONDS)
+	me.set_timer(clock_left / clock_total if clock_on else -1.0)
 	if not clock_on or paused or finished or (modal_open and not clock_in_modal):
 		return
 	clock_left -= delta
-	var urgent := clock_left <= 3.0
-	timer_label.add_theme_color_override("font_color", UIKit.LOSS if urgent else UIKit.TR_WHITE)
 	if clock_left <= 0.0:
 		var cb := clock_timeout
 		_clock_stop()
-		timer_label.add_theme_color_override("font_color", UIKit.TR_WHITE)
+		me.set_timer(-1.0)
 		if cb.is_valid():
 			cb.call()
 
@@ -2090,6 +2037,21 @@ func _chips_for(amount: float) -> int:
 	return clampi(int(ceil(amount / float(engine.blind))), 1, 7)
 
 
+## Anel de tempo dos rivais: esgota enquanto é a vez deles (visual; os bots jogam logo).
+func _run_ring(avatar: HexAvatar, active: bool) -> void:
+	if avatar.has_meta("ring_tween"):
+		var old = avatar.get_meta("ring_tween")
+		if old is Tween and (old as Tween).is_valid():
+			(old as Tween).kill()
+		avatar.remove_meta("ring_tween")
+	if not active:
+		avatar.set_timer(-1.0)
+		return
+	var tw := create_tween()
+	tw.tween_method(avatar.set_timer, 1.0, 0.0, TURN_SECONDS)
+	avatar.set_meta("ring_tween", tw)
+
+
 func _update_turn_highlight(turn_player: int) -> void:
 	turn_pulse_token += 1
 	var my_token := turn_pulse_token
@@ -2097,6 +2059,8 @@ func _update_turn_highlight(turn_player: int) -> void:
 		var avatar: HexAvatar = seat_avatars[p]
 		var active := p == turn_player
 		avatar.set_active(active)
+		if p != 0:
+			_run_ring(avatar, active)
 		if not active:
 			avatar.scale = Vector2.ONE
 	if turn_player >= 0:
@@ -2699,9 +2663,9 @@ func _refresh_pot_blitz() -> void:
 	# Quando o trick_pot está em destaque, mostra o prêmio do palpite abaixo como secundário.
 	if in_trick and engine.pot > 0.0:
 		pot_prize_label.text = "◎ %d" % int(engine.pot)
-		pot_prize_label.visible = true
+		prize_shown = true
 	else:
-		pot_prize_label.visible = false
+		prize_shown = false
 	var sub := ""
 	if phase == "bet":
 		sub = "aposta da jogada"
