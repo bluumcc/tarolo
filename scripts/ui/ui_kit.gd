@@ -77,10 +77,10 @@ const BOSS_TEXT := Color("#FF7A6E")   ## versão legível (texto) do vermelho do
 const SUIT_COLORS := [Color("#E8C170"), Color("#7FD1AE"), Color("#FF5C7A"), Color("#9AA7FF"), Color("#C792EA"), Color("#F2F0F8")]
 
 const CARD_BACKS := {
-	"noite":      {"name": "Noite",      "color": "#1C2350", "cover": "cover_a", "price": 0},
-	"ametista":   {"name": "Ametista",   "color": "#5B2A86", "cover": "cover_b", "price": 30},
-	"brasa":      {"name": "Brasa",      "color": "#7A2335", "cover": "cover_c", "price": 60},
-	"abismo":     {"name": "Abismo",     "color": "#0F3B3A", "cover": "cover_d", "price": 100},
+	"noite":      {"name": "Noite",      "color": "#1C2350", "cover": "cover_b", "price": 0},
+	"ametista":   {"name": "Ametista",   "color": "#5B2A86", "cover": "cover_d", "price": 30},
+	"brasa":      {"name": "Brasa",      "color": "#7A2335", "cover": "cover_a", "price": 60},
+	"abismo":     {"name": "Abismo",     "color": "#0F3B3A", "cover": "cover_c", "price": 100},
 	"ouro_velho": {"name": "Ouro Velho", "color": "#6B5321", "price": 160},
 	"desafiante": {"name": "Desafiante", "color": "#9E1F4A", "price": 0, "requires_tier": 4},
 }

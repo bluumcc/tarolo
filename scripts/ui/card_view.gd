@@ -41,8 +41,8 @@ func _ready() -> void:
 	for n in [rank_label, suit_small, center_label, name_label, points_label, bout_label]:
 		(n as Label).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_card_tex = TextureRect.new()
-	_card_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-	_card_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_card_tex.expand_mode = TextureRect.EXPAND_KEEP_SIZE
+	_card_tex.stretch_mode = TextureRect.STRETCH_SCALE
 	_card_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_card_tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_card_tex.clip_contents = true
@@ -115,10 +115,8 @@ func _refresh() -> void:
 	center_label.visible = not has_art
 	name_label.visible = not has_art
 	if has_art:
-		points_label.text = "%s pts" % UIKit.fmt_dec(data.points(), 1)
-		points_label.add_theme_color_override("font_color", UIKit.MUTED)
-		bout_label.text = "BOUT" if data.is_bout() else ""
-		bout_label.add_theme_color_override("font_color", UIKit.BRAND)
+		points_label.text = ""
+		bout_label.text = ""
 		return
 	var color := _ink_color()
 	rank_label.text = data.rank_label()
@@ -179,7 +177,7 @@ func _refresh_border() -> void:
 		border = UIKit.SUIT_COLORS[CardData.Suit.LOUCO]
 		bg = Color("#241a33")
 	elif data.is_trunfo():
-		border = UIKit.SUIT_COLORS[CardData.Suit.TRUNFO]
+		border = Color("#2A1E50")  ## neutro escuro — borda roxa sumiria com a arte
 		bg = Color("#221436")
 	if data.is_bout():
 		border = UIKit.BRAND if _dark_face() else Color("#D9A21B")
