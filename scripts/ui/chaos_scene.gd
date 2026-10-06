@@ -138,11 +138,11 @@ func _show_insufficient_fichas() -> void:
 
 # ------------------------------------------------------------------ UI
 
-const BAR_H := 132.0       ## barra de ações embaixo
+const BAR_H := 96.0       ## barra de ações embaixo
 const BANNER_H := 84.0     ## título + descrição do modificador, em cima da mão
 const POT_H := 48.0        ## pote, embaixo da mão
-const LEFT_W := 150.0
-const RIGHT_W := 112.0
+const LEFT_W := 132.0
+const RIGHT_W := 108.0
 const MAX_UI_W := 900.0    ## em tela larga o jogo não estica além disso
 
 var stage: Control
@@ -373,6 +373,27 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	info0.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info0.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	lh.add_child(info0)
+	# Card do stack: rótulo "STACK" em cima, ficha + valor embaixo. A aposta da rodada e o
+	# placar ficam na mesa (my_bet_pill), nunca aqui.
+	var cap0 := UIKit.label("STACK", 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	cap0.add_theme_font_size_override("font_size", 20)
+	var stack0 := hud_totals[0] as Label
+	var stack_row := HBoxContainer.new()
+	stack_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	stack_row.add_theme_constant_override("separation", 6)
+	stack_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var chip0 := UIKit.label("◎", 34, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+	chip0.add_theme_font_size_override("font_size", 34)
+	info0.remove_child(stack0)
+	stack_row.add_child(chip0)
+	stack_row.add_child(stack0)
+	info0.add_child(cap0)
+	info0.move_child(cap0, 0)
+	info0.add_child(stack_row)
+	info0.move_child(stack_row, 1)
+	(bet_pills[0] as Control).queue_free()   # a pílula de aposta/placar vive na mesa
+	bet_pills[0] = my_bet_pill
+	bet_tags[0] = my_bet_label
 	bottom_bar.add_child(left)
 	hud_badges[0] = left
 	seat_nodes[0] = left
@@ -392,11 +413,11 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	mid.add_child(status_label)
 	bet_row = HBoxContainer.new()
 	bet_row.add_theme_constant_override("separation", 6)
-	bet_row.custom_minimum_size = Vector2(0, 72)
+	bet_row.custom_minimum_size = Vector2(0, BAR_H)
 	bet_row.visible = false
 	mid.add_child(bet_row)
 	double_btn = UIKit.button("DOBRAR", UIKit.MONEY, 24)
-	double_btn.custom_minimum_size = Vector2(0, 64)
+	double_btn.custom_minimum_size = Vector2(0, BAR_H)
 	double_btn.visible = false
 	double_btn.pressed.connect(_on_double_pressed)
 	mid.add_child(double_btn)
@@ -412,7 +433,8 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	var cap := UIKit.label("TEMPO", 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	cap.add_theme_font_size_override("font_size", 20)
 	rv.add_child(cap)
-	timer_label = UIKit.label("0:10", 36, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	timer_label = UIKit.label("0:10", 34, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	timer_label.add_theme_font_size_override("font_size", 34)
 	timer_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	rv.add_child(timer_label)
 	turn_bar = ProgressBar.new()
@@ -423,6 +445,7 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	turn_bar.modulate.a = 0.0
 	turn_bar.add_theme_stylebox_override("background", UIKit.box(UIKit.PURPLE_DEEP, UIKit.PURPLE, 2, 7, 0))
 	turn_bar.add_theme_stylebox_override("fill", UIKit.box(UIKit.BRAND, UIKit.BRAND, 0, 7, 0))
+	turn_bar.visible = false   # o card do tempo mostra só os segundos
 	rv.add_child(turn_bar)
 	bottom_bar.add_child(right)
 
@@ -1539,7 +1562,7 @@ func _human_bet() -> Dictionary:
 		var b := UIKit.button(text, color, 20)
 		b.add_theme_font_size_override("font_size", 20)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.custom_minimum_size = Vector2(0, 72)
+		b.custom_minimum_size = Vector2(0, BAR_H)
 		for sn in ["normal", "hover", "pressed", "focus", "disabled"]:
 			var sb := b.get_theme_stylebox(sn) as StyleBoxFlat
 			if sb:
@@ -2708,13 +2731,10 @@ func _refresh_blitz_tag(p: int, idx: int) -> void:
 	# igual ao que o label nos assentos rivais já mostra para p≠0.
 	if p == 0 and phase == "bet" and not bets_gathered:
 		var pile := float(engine.contrib[0])
-		my_bet_pill.modulate.a = 1.0 if pile > 0.0 else 0.0
-		my_bet_label.text = "◎ %d" % int(pile)
-		my_bet_label.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[0] else UIKit.MONEY)
-		pill.modulate.a = 0.0
+		pill.modulate.a = 1.0 if pile > 0.0 else 0.0
+		lbl.text = "◎ %d" % int(pile)
+		lbl.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[0] else UIKit.MONEY)
 		return
-	if p == 0:
-		my_bet_pill.modulate.a = 0.0
 	var shown := bool(blitz_revealed[p])
 	pill.modulate.a = 1.0 if shown else 0.0
 	if not shown:
