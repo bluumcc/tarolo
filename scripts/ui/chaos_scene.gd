@@ -153,7 +153,7 @@ const BAR_H := 96.0       ## barra de baixo (cards laterais: palpite e tempo)
 const ACT_H := BAR_H * 0.75   ## botões de ação e card de pote/prêmio: 75% dos cards laterais
 const BANNER_H := 100.0    ## do topo da zona até a mão: faixa de avisos, abaixo do seu avatar
 const POT_H := 36.0        ## folga embaixo da mão (a aba de avisos mora aqui)
-const CARD_SHRINK := 0.28   ## o card roxo é 28% mais baixo (encurta por cima; o pé fica onde estava): 10% + mais 20%
+const CARD_SHRINK := 0.20   ## quanto a área do seu avatar encolhe por cima da zona da mão; dá folga mínima entre o stack e o topo do leque
 const CARD_RISE := 36.0    ## quanto o card roxo sobe acima da zona da mão (antes do encurtamento)
 const MY_SEAT_RISE := 21.0 ## quanto o centro do seu avatar fica acima do topo do card roxo
 const LEFT_W := 132.0     ## largura dos dois cards laterais (palpite e tempo)
@@ -2219,8 +2219,8 @@ func _resolve_walkover(result: Dictionary) -> void:
 func _set_discard_chrome(active: bool) -> void:
 	chrome_discard = active
 	table_center.visible = not active
-	for p in range(1, engine.num_players):
-		(seat_nodes[p] as Control).visible = not active
+	for p in range(engine.num_players):
+		(seat_nodes[p] as Control).visible = not active   # você também: todos entram juntos, depois do descarte
 	for p in range(engine.num_players):
 		if p == 0:
 			(bet_pills[p] as Control).visible = not active
