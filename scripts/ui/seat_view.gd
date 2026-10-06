@@ -12,6 +12,7 @@ const PLATE_MIN_W := HexAvatar.SIZE_PX.x * PLATE_RATIO
 const AVATAR_TOP := 2.0
 const AVATAR_CENTER_Y := AVATAR_TOP + HexAvatar.SIZE_PX.y / 2.0   ## centro do avatar, medido do topo do assento
 const STACK_SECONDS := 7.0
+const WIDE_SCALE := 1.3       ## tela larga (PC): o assento inteiro cresce em volta do centro do avatar
 
 var avatar: HexAvatar
 var name_label: Label

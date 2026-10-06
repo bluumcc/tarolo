@@ -22,6 +22,7 @@ var _center := Vector2.ZERO
 var _r := 10.0                 ## raio horizontal (e das duas pontas arredondadas)
 var _half := 0.0               ## metade do trecho reto: a mesa é uma pílula (cápsula) em pé (celular)...
 var wide := false              ## ...ou deitada (PC/tela larga): `_r` vira o raio vertical e `_half` o trecho reto horizontal
+var seat_scale := 1.0           ## só na pílula (wide): os assentos crescem e a mesa abre espaço pra eles
 
 
 ## Ponto da borda da mesa (pílula) na direção `theta` a partir do centro; `s` encolhe a pílula
@@ -63,11 +64,11 @@ static func seat_half_extent() -> float:
 ## os rivais de baixo acima de `seat_floor`). Quem chama só refaz isto entre rodadas: durante as 8
 ## jogadas o tamanho não muda.
 func fit() -> void:
-	var topc := TOP_GAP + HexAvatar.RADIUS
+	var topc := TOP_GAP + HexAvatar.RADIUS * (seat_scale if wide else 1.0)
 	if wide:
 		# Pílula deitada: estica até o elemento do assento mais perto da lateral encostar na margem;
 		# a altura vai do avatar de cima (a `TOP_GAP`) ao seu avatar, embaixo (`my_seat_y`).
-		var half_w := maxf(size.x / 2.0 - seat_half_extent() - SIDE_GAP, 10.0)
+		var half_w := maxf(size.x / 2.0 - seat_half_extent() * seat_scale - SIDE_GAP, 10.0)
 		var ry := maxf(((my_seat_y if my_seat_y > 0.0 else size.y) - topc) / 2.0, 20.0)
 		_r = minf(ry, half_w)
 		_half = maxf(half_w - _r, 0.0)

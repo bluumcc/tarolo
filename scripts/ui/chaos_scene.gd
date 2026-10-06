@@ -520,12 +520,16 @@ func _layout_seats() -> void:
 	table_center.seat_floor = card_top - 20.0
 	table_center.my_seat_y = card_top - MY_SEAT_RISE
 	table_center.wide = _is_wide()
+	var seat_k := SeatView.WIDE_SCALE if _is_wide() else 1.0   # tela larga: avatares maiores (mobile em pé não muda)
+	table_center.seat_scale = seat_k
 	table_center.fit()
 	for p in range(n):
 		var seat := seat_nodes[p] as SeatView
 		if seat == null:
 			continue
 		seat.layout()
+		seat.pivot_offset = Vector2(SeatView.W / 2.0, SeatView.AVATAR_CENTER_Y)
+		seat.scale = Vector2(seat_k, seat_k)
 		var pt := table_center.seat_point(p, n)
 		seat.position = Vector2(pt.x - SeatView.W / 2.0, pt.y - SeatView.AVATAR_CENTER_Y)   # centro do avatar NA borda
 
