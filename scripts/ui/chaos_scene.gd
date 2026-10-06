@@ -153,6 +153,8 @@ var timer_label: Label
 var center_card: PanelContainer
 var hand_scroller: HandScroller
 var hand_zone: Control
+var my_bet_pill: PanelContainer
+var my_bet_label: Label
 
 
 func _build_ui() -> void:
@@ -214,11 +216,27 @@ func _build_ui() -> void:
 	stage.custom_minimum_size = Vector2(0, 300)
 	root.add_child(stage)
 	main_area = stage
+	my_bet_pill = PanelContainer.new()   # sua aposta da rodada: na base da mesa, logo acima do card roxo
+	my_bet_pill.anchor_left = 0.5
+	my_bet_pill.anchor_right = 0.5
+	my_bet_pill.anchor_top = 1.0
+	my_bet_pill.anchor_bottom = 1.0
+	my_bet_pill.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	my_bet_pill.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	my_bet_pill.offset_bottom = -6.0
+	my_bet_pill.z_index = 5
+	my_bet_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	my_bet_pill.add_theme_stylebox_override("panel", UIKit.box(UIKit.SURFACE_DEEP, UIKit.MONEY, 2, 20, 16))
+	my_bet_label = UIKit.label("", 34, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+	my_bet_label.add_theme_font_size_override("font_size", 34)
+	my_bet_pill.add_child(my_bet_label)
+	my_bet_pill.modulate.a = 0.0
 	table_center = TableEllipse.new()
 	table_center.name = "TableCenter"
 	table_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	table_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stage.add_child(table_center)
+	stage.add_child(my_bet_pill)
 	table_center.resized.connect(_layout_table)
 	for p in range(1, engine.num_players):
 		stage.add_child(_build_rival_seat(p))
@@ -701,18 +719,30 @@ func _layout_table() -> void:
 		cv.position = _slot_pos(int(v["player"]))
 
 
-## Cartas da mesa em cascata, na ordem em que foram jogadas: cada carta é deslocada pra direita
-## (e um pouco pra baixo) da anterior, então o canto superior esquerdo de todas fica visível.
+## A carta de cada jogador fica do lado do avatar dele (esquerda, topo, direita, você embaixo),
+## agrupadas no centro e sobrepostas: a ordem de empilhar (_table_z) é pela posição na mesa, da
+## esquerda pra direita, então o canto superior esquerdo de cada carta nunca fica coberto.
 func _slot_pos(player: int) -> Vector2:
-	var idx := 0
-	for i in range(table_views.size()):
-		if int(table_views[i]["player"]) == player:
-			idx = i
-			break
+	var theta := TableEllipse.seat_angle(player, engine.num_players)
 	var ts := _table_scale()
-	var step := float(idx) - (float(maxi(engine.num_players, 1)) - 1.0) / 2.0
-	var off := Vector2(step * CardView.SIZE.x * ts * 0.42, step * CardView.SIZE.y * ts * 0.10)
+	var off := Vector2(cos(theta) * CardView.SIZE.x * ts * 0.55, sin(theta) * CardView.SIZE.y * ts * 0.18)
 	return table_center.center_point() + off - CardView.SIZE / 2.0
+
+
+## Ordem de empilhar: esquerda embaixo, direita em cima (empate: o de cima da tela fica atrás).
+func _table_z(player: int) -> int:
+	var n := engine.num_players
+	var mine := _table_key(player, n)
+	var z := 0
+	for q in range(n):
+		if q != player and _table_key(q, n) < mine:
+			z += 1
+	return z
+
+
+func _table_key(player: int, n: int) -> float:
+	var th := TableEllipse.seat_angle(player, n)
+	return cos(th) * 1000.0 + sin(th)
 
 
 ## As cartas nunca encolhem: fileira reta ou leque, escolhido em Configurações — nos dois
@@ -1195,6 +1225,7 @@ func _animate_play(player: int, card: CardData, from: Vector2) -> void:
 	cv.global_position = from
 	cv.scale = Vector2(0.9, 0.9)
 	cv.rotation = randf_range(-0.25, 0.25)
+	cv.z_index = _table_z(player)
 	table_views.append({"player": player, "view": cv})
 	Sfx.play("card", randf_range(0.9, 1.15))
 	var tw := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
@@ -2677,10 +2708,13 @@ func _refresh_blitz_tag(p: int, idx: int) -> void:
 	# igual ao que o label nos assentos rivais já mostra para p≠0.
 	if p == 0 and phase == "bet" and not bets_gathered:
 		var pile := float(engine.contrib[0])
-		pill.modulate.a = 1.0 if pile > 0.0 else 0.0
-		lbl.text = "◎ %d" % int(pile)
-		lbl.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[0] else UIKit.MONEY)
+		my_bet_pill.modulate.a = 1.0 if pile > 0.0 else 0.0
+		my_bet_label.text = "◎ %d" % int(pile)
+		my_bet_label.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[0] else UIKit.MONEY)
+		pill.modulate.a = 0.0
 		return
+	if p == 0:
+		my_bet_pill.modulate.a = 0.0
 	var shown := bool(blitz_revealed[p])
 	pill.modulate.a = 1.0 if shown else 0.0
 	if not shown:
