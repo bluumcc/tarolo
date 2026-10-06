@@ -2590,7 +2590,7 @@ func _refresh_double_button() -> void:
 func _refresh_blitz_tag(p: int, _idx: int) -> void:
 	if p != 0:
 		return
-	var pile := float(engine.contrib[0]) if (phase == "bet" or phase == "play") else 0.0
+	var pile := float(engine.contrib[0]) if (phase == "bet" and not bets_gathered) else 0.0   # some quando as apostas vão pro pote, igual aos rivais
 	my_bet_pill.modulate.a = 1.0 if pile > 0.0 else 0.0
 	my_bet_label.text = "◎ %d" % int(pile)
 	my_bet_label.add_theme_color_override("font_color", UIKit.LOSS if engine.folded[0] else UIKit.MONEY)
