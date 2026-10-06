@@ -351,7 +351,7 @@ static func button(text: String, accent: Color = ACTION, size: int = 26) -> Butt
 	b.add_theme_font_size_override("font_size", size)
 	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		b.add_theme_color_override(c, tn["ink"])
-	b.add_theme_color_override("font_disabled_color", TR_PURPLE_LIGHT)
+	b.add_theme_color_override("font_disabled_color", muted_lilac())
 	b.add_theme_constant_override("outline_size", 3)
 	b.add_theme_color_override("font_outline_color", TR_BLACK)
 	var bg: Color = tn["bg"]
@@ -361,7 +361,7 @@ static func button(text: String, accent: Color = ACTION, size: int = 26) -> Butt
 	b.add_theme_stylebox_override("hover", rim_box(bg.lightened(0.1), rim, glow, "small", DS.R_BUTTON, DS.SP_L, DS.SP_S))
 	b.add_theme_stylebox_override("pressed", rim_box(bg.lightened(0.2), rim, glow, "small", DS.R_BUTTON, DS.SP_L, DS.SP_S))
 	b.add_theme_stylebox_override("focus", rim_box(bg, rim.lightened(0.3), glow, "small", DS.R_BUTTON, DS.SP_L, DS.SP_S))
-	b.add_theme_stylebox_override("disabled", rim_box(TR_PURPLE_DARK, TR_PURPLE_LIGHT, TR_PURPLE, "small", DS.R_BUTTON, DS.SP_L, DS.SP_S))
+	b.add_theme_stylebox_override("disabled", rim_box(TR_PURPLE_DARK, TR_PURPLE_LIGHT.lightened(0.2), TR_PURPLE, "small", DS.R_BUTTON, DS.SP_L, DS.SP_S))
 	b.pressed.connect(func(): sfx("tick"))
 	# Feedback de toque: o botão "afunda" um pouco ao apertar.
 	b.resized.connect(func(): b.pivot_offset = b.size / 2.0)
@@ -375,6 +375,7 @@ static func button(text: String, accent: Color = ACTION, size: int = 26) -> Butt
 
 ## Botão de ícone quadrado (68 px, acima do mínimo de toque de 56).
 static func icon_button(text: String, color: Color = BUTTON_MUTED) -> Button:
+	var tn := DS.tone(color)
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
@@ -382,25 +383,10 @@ static func icon_button(text: String, color: Color = BUTTON_MUTED) -> Button:
 	b.custom_minimum_size = Vector2(68, 68)
 	b.add_theme_font_size_override("font_size", 32)
 	for cn in ["font_color", "font_hover_color", "font_pressed_color"]:
-		b.add_theme_color_override(cn, text_on(color))
-	var n := chunky(color)
-	n.set_corner_radius_all(22)
-	n.set_border_width_all(3)
-	n.border_width_bottom = 8
-	n.content_margin_left = 6
-	n.content_margin_right = 6
-	n.content_margin_top = 6
-	n.content_margin_bottom = 12
-	var h := n.duplicate() as StyleBoxFlat
-	h.bg_color = color.lightened(0.12)
-	var pr := chunky(color, true)
-	pr.set_corner_radius_all(22)
-	pr.border_width_bottom = 3
-	pr.content_margin_left = 6
-	pr.content_margin_right = 6
-	b.add_theme_stylebox_override("normal", n)
-	b.add_theme_stylebox_override("hover", h)
-	b.add_theme_stylebox_override("pressed", pr)
+		b.add_theme_color_override(cn, tn["ink"])
+	b.add_theme_stylebox_override("normal", rim_box(tn["bg"], tn["rim"], tn["glow"], "small", DS.R_BUTTON, DS.SP_S, DS.SP_S))
+	b.add_theme_stylebox_override("hover", rim_box((tn["bg"] as Color).lightened(0.1), tn["rim"], tn["glow"], "small", DS.R_BUTTON, DS.SP_S, DS.SP_S))
+	b.add_theme_stylebox_override("pressed", rim_box((tn["bg"] as Color).lightened(0.2), tn["rim"], tn["glow"], "small", DS.R_BUTTON, DS.SP_S, DS.SP_S))
 	b.pressed.connect(func(): sfx("tick"))
 	return b
 

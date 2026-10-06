@@ -206,7 +206,7 @@ func _make_tab_buttons(expand: bool) -> HBoxContainer:
 
 func _tab_btn(tab: String, active: bool, tall: bool = false) -> Button:
 	var accent := _tab_accent(tab)
-	var face   := accent.darkened(0.18) if active else UIKit.SURFACE_DEEP
+	var face   := accent.darkened(0.78) if active else UIKit.SURFACE_DEEP
 	var b      := UIKit.button(tab, face, 22)
 	b.focus_mode      = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(0, 120 if tall else 60)
@@ -226,7 +226,7 @@ func _tab_btn(tab: String, active: bool, tall: bool = false) -> Button:
 		sb.content_margin_right = 12
 		return sb
 	b.add_theme_stylebox_override("normal",  mk.call(face))
-	b.add_theme_stylebox_override("hover",   mk.call(accent.darkened(0.08) if active else UIKit.SURFACE))
+	b.add_theme_stylebox_override("hover",   mk.call(accent.darkened(0.7) if active else UIKit.SURFACE))
 	b.add_theme_stylebox_override("pressed", mk.call(face))
 	b.add_theme_stylebox_override("focus",   mk.call(face))
 	b.pressed.connect(func(): _switch_tab(tab))
@@ -236,9 +236,7 @@ func _tab_btn(tab: String, active: bool, tall: bool = false) -> Button:
 func _tab_accent(tab: String) -> Color:
 	match tab:
 		"RANKEADA": return UIKit.TR_RED
-		"CLÁSSICO": return UIKit.TR_WHITE
-		"LOJA":     return UIKit.TR_WHITE
-		_:          return UIKit.TR_WHITE
+		_:          return UIKit.TR_CYAN
 
 
 func _switch_tab(tab: String) -> void:

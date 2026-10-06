@@ -67,42 +67,41 @@ static func top_bar(name_text: String, level_text: String, chips: String, gems: 
 
 ## Cartão de modo: bloco grande e colorido tocável (título, legenda, ícone).
 static func mode_card(title: String, caption: String, color: Color, height: int, icon: String, on_press: Callable, title_size: int = 40) -> PanelContainer:
+	var tn := DS.tone(color)
+	var style := func(lift: float) -> StyleBoxFlat:
+		return UIKit.rim_box((tn["bg"] as Color).lightened(lift), tn["rim"], tn["glow"], "small", DS.R_CARD, DS.SP_L, DS.SP_M)
 	var p := PanelContainer.new()
 	p.custom_minimum_size = Vector2(0, height)
 	p.mouse_filter = Control.MOUSE_FILTER_PASS  # não engole o arrasto de quem quer rolar a lista
 	p.focus_mode = Control.FOCUS_ALL
-	p.add_theme_stylebox_override("panel", UIKit.chunky(color))
+	p.add_theme_stylebox_override("panel", style.call(0.0))
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_theme_constant_override("separation", 12)
+	row.add_theme_constant_override("separation", DS.SP_M)
 	p.add_child(row)
 	var col := VBoxContainer.new()
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.add_theme_constant_override("separation", 2)
+	col.add_theme_constant_override("separation", DS.SP_XS)
 	row.add_child(col)
-	var fg := UIKit.text_on(color)   # escuro sobre cards claros (dourado, verde)
-	var t := UIKit.label(title, title_size, fg)
-	t.add_theme_color_override("font_outline_color", color.darkened(0.6))
-	if fg != UIKit.INK:
-		t.remove_theme_constant_override("outline_size")
-	col.add_child(t)
-	var c := UIKit.label(caption, 20, Color(fg.r, fg.g, fg.b, 0.92))
+	var ink: Color = tn["ink"]
+	col.add_child(UIKit.label(title, title_size, ink))
+	var c := UIKit.label(caption, DS.FS_LABEL, ink)
 	c.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(c)
-	var ic := UIKit.label(icon, int(height * 0.5), Color(fg.r, fg.g, fg.b, 0.95))
+	var ic := UIKit.label(icon, int(height * 0.5), Color(ink.r, ink.g, ink.b, 0.95))
 	ic.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(ic)
 	p.gui_input.connect(func(e: InputEvent):
 		if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
 			if e.pressed:
-				p.add_theme_stylebox_override("panel", UIKit.chunky(color, true))
+				p.add_theme_stylebox_override("panel", style.call(0.12))
 			else:
-				p.add_theme_stylebox_override("panel", UIKit.chunky(color))
+				p.add_theme_stylebox_override("panel", style.call(0.0))
 				UIKit.sfx("tick")
 				on_press.call())
-	p.mouse_exited.connect(func(): p.add_theme_stylebox_override("panel", UIKit.chunky(color)))
+	p.mouse_exited.connect(func(): p.add_theme_stylebox_override("panel", style.call(0.0)))
 	return p
 
 
