@@ -16,6 +16,7 @@ const CARD_SCENE := preload("res://scenes/Card.tscn")
 ## Relógios da mesa (um só, `_clock_start`): estourou, jogamos por você.
 const TURN_SECONDS := 10.0      # jogar a carta; estourou, joga a mais fraca
 const DISCARD_SECONDS := 18.0   # descarte inicial; estourou, descarta as 2 mais fracas
+const PHASE_TITLE_H := 177.0         # faixa do título (3 linhas a 46 px) das etapas sem mesa: descarte e palpite
 const DISCARD_HEAD_TOP := 84.0        # topo do bloco título+avatar das etapas de descarte e palpite
 const PREDICT_CARD_H := 298.0       # card do seletor de palpite (antes ~248, +20%)
 const DISCARD_AVATAR_SCALE := 1.95  # avatar grande do descarte (antes 2,16: colava no subtítulo)
@@ -267,6 +268,8 @@ func _build_ui() -> void:
 	discard_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	discard_title.add_theme_constant_override("outline_size", 4)
 	discard_title.add_theme_constant_override("line_spacing", 6)
+	discard_title.custom_minimum_size.y = PHASE_TITLE_H   # mesma faixa de título em todas as fases sem mesa: o que vem depois começa na mesma altura
+	discard_title.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	discard_head.add_child(discard_title)
 	discard_sub = UIKit.serif_label("Deslize a carta para cima ou toque nela duas vezes para descartar", 26, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
 	discard_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -2447,6 +2450,20 @@ func _commit_discard(view: CardView, drop_global := Vector2.ZERO) -> void:
 ## Etapa do palpite: mesma tela do descarte (header com o título da fase, pergunta e dados da mão
 ## fora do card, seu avatar com o anel do relógio) e, embaixo, o card do seletor −/+ com o
 ## palpite sugerido em destaque. Mesa, pote e rivais só aparecem depois do lance.
+## Liga/desliga o toque na mão (cartas, contêiner e rolagem). Usado quando um card passa por cima
+## dela: nenhuma carta pode capturar o toque que é de um botão.
+func _hand_inert(on: bool) -> void:
+	for n in hand_scroller.find_children("*", "Control", true, false) + [hand_scroller]:
+		var c := n as Control
+		if on:
+			if not c.has_meta("mf"):
+				c.set_meta("mf", c.mouse_filter)
+			c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		elif c.has_meta("mf"):
+			c.mouse_filter = c.get_meta("mf")
+			c.remove_meta("mf")
+
+
 func _human_predict() -> int:
 	modal_open = true
 	round_dots.visible = false
@@ -2454,12 +2471,12 @@ func _human_predict() -> int:
 	banner_title.add_theme_color_override("font_color", UIKit.TR_GOLD)
 	banner_title.modulate.a = 1.0
 	discard_title.text = "QUANTAS JOGADAS VOCÊ VAI GANHAR?"
-	discard_title.add_theme_font_size_override("font_size", 36)
 	discard_sub.text = "Entrada ◎%s  ·  Pote ◎%s" % [UIKit.fmt_short(engine.blitz_entry()), UIKit.fmt_short(engine.carry)]
 	discard_holder.custom_minimum_size = Vector2(0, 130)
 	discard_avatar.scale = Vector2(1.5, 1.5)
 	discard_name.visible = false   # aqui o espaço é do seletor
 	discard_head.visible = true
+	_hand_inert(true)   # em telas baixas a mão fica sob o card do palpite e engolia o toque do CONFIRMAR
 	var box := PanelContainer.new()
 	box.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT.lightened(0.2), UIKit.TR_PURPLE, "small", 18, 20, 16))
 	box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -2511,12 +2528,12 @@ func _human_predict() -> int:
 	_clock_stop()
 	modal_open = false
 	if is_inside_tree():
+		_hand_inert(false)
 		discard_head.visible = false
 		box.queue_free()
 		round_dots.visible = true
 		_banner_clear()
 		discard_title.text = "ESCOLHA DUAS CARTAS PARA DESCARTAR"
-		discard_title.add_theme_font_size_override("font_size", 46)
 		discard_sub.text = "Deslize a carta para cima ou toque nela duas vezes para descartar"
 		discard_name.visible = true
 		discard_holder.custom_minimum_size = Vector2(0, 212)
