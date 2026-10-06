@@ -16,6 +16,8 @@ const CARD_SCENE := preload("res://scenes/Card.tscn")
 ## Relógios da mesa (um só, `_clock_start`): estourou, jogamos por você.
 const TURN_SECONDS := 10.0      # jogar a carta; estourou, joga a mais fraca
 const DISCARD_SECONDS := 18.0   # descarte inicial; estourou, descarta as 2 mais fracas
+const DISCARD_HEAD_TOP := 84.0        # topo do bloco título+avatar das etapas de descarte e palpite
+const DISCARD_AVATAR_SCALE := 1.95  # avatar grande do descarte (antes 2,16: colava no subtítulo)
 const PREDICT_SECONDS := 15.0   # lance de vitórias; estourou, confirma o palpite que estiver na tela
 const BET_SECONDS := 12.0       # apostar/passar/pagar/aumentar/desistir; estourou, passa (ou desiste se tiver que pagar)
 
@@ -253,7 +255,7 @@ func _build_ui() -> void:
 	main_area = stage
 	discard_head = VBoxContainer.new()
 	discard_head.anchor_right = 1.0
-	discard_head.offset_top = 84.0   # respiro do header
+	discard_head.offset_top = DISCARD_HEAD_TOP   # respiro do header
 	discard_head.offset_left = 8.0
 	discard_head.offset_right = -8.0
 	discard_head.add_theme_constant_override("separation", 8)
@@ -275,7 +277,7 @@ func _build_ui() -> void:
 	discard_avatar = HexAvatar.new().setup(0)
 	discard_avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	discard_avatar.set_active(true)
-	discard_avatar.scale = Vector2(2.16, 2.16)
+	discard_avatar.scale = Vector2(DISCARD_AVATAR_SCALE, DISCARD_AVATAR_SCALE)
 	discard_avatar.anchor_left = 0.5
 	discard_avatar.anchor_right = 0.5
 	discard_avatar.anchor_top = 0.5
@@ -2426,6 +2428,7 @@ func _human_predict() -> int:
 	discard_title.text = "QUANTAS JOGADAS VOCÊ VAI GANHAR?"
 	discard_title.add_theme_font_size_override("font_size", 36)
 	discard_sub.text = "Entrada ◎%s  ·  Pote ◎%s" % [UIKit.fmt_short(engine.blitz_entry()), UIKit.fmt_short(engine.carry)]
+	discard_head.offset_top = DISCARD_HEAD_TOP + get_viewport_rect().size.y * 0.10   # palpite: tudo 10% da tela mais baixo
 	discard_holder.custom_minimum_size = Vector2(0, 130)
 	discard_avatar.scale = Vector2(1.5, 1.5)
 	discard_name.visible = false   # aqui o espaço é do seletor
@@ -2481,6 +2484,7 @@ func _human_predict() -> int:
 	modal_open = false
 	if is_inside_tree():
 		discard_head.visible = false
+		discard_head.offset_top = DISCARD_HEAD_TOP
 		box.queue_free()
 		round_dots.visible = true
 		_banner_clear()
@@ -2489,7 +2493,7 @@ func _human_predict() -> int:
 		discard_sub.text = "Deslize a carta para cima ou toque nela duas vezes para descartar"
 		discard_name.visible = true
 		discard_holder.custom_minimum_size = Vector2(0, 212)
-		discard_avatar.scale = Vector2(2.16, 2.16)
+		discard_avatar.scale = Vector2(DISCARD_AVATAR_SCALE, DISCARD_AVATAR_SCALE)
 	return int(st["pick"])
 
 
