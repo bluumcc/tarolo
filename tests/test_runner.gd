@@ -309,6 +309,27 @@ func _test_chaos() -> void:
 	lg.plays.append({"player": 2, "card": c(CardData.Suit.TRUNFO, 15)})
 	check(lg.legal_for(0).size() == 2, "Caos: sem naipe, corta com qualquer Trunfo (mesmo menor que o cortado)")
 
+	# ---- clone_for_sim copia todo o estado do motor (um campo esquecido quebra bots/Oráculo)
+	var cl_e := ChaosEngine.new()
+	cl_e.setup_match({"seed": 5, "mode": "blitz", "blind": 10, "players": 4, "levels": 2})
+	for cl_p in range(4):
+		cl_e.apply_discard(cl_p, ChaosBot.wants_discard(cl_e, cl_p, 1, cl_e.rng))
+		cl_e.blitz_place(cl_p, 2)
+	cl_e.draw_trick_modifier()
+	cl_e.begin_trick()
+	var cl_c := cl_e.clone_for_sim()
+	var cl_diff: Array = []
+	for pr in cl_e.get_property_list():
+		if int(pr["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE == 0:
+			continue
+		var cl_a = cl_e.get(pr["name"])
+		var cl_b = cl_c.get(pr["name"])
+		if (cl_a is Array or cl_a is Dictionary) and cl_a.size() != cl_b.size():
+			cl_diff.append(pr["name"])
+		elif not (cl_a is Object or cl_a is Array or cl_a is Dictionary) and cl_a != cl_b:
+			cl_diff.append(pr["name"])
+	check(cl_diff.is_empty(), "clone_for_sim copia todos os campos do motor %s" % str(cl_diff))
+
 	# ---- Torneio: realocação equilibrada entre mesas
 	for rb in [[16, [4, 4, 4, 4]], [11, [4, 4, 3]], [9, [3, 3, 3]], [5, [3, 2]], [4, [4]], [2, [2]]]:
 		var rb_tables: Array = []
@@ -1066,7 +1087,12 @@ func _test_colors() -> void:
 		for fn in fgs:
 			check(UIKit.contrast(fgs[fn], bgs[bn]) >= 4.5, "cor %s legível sobre %s (%.1f:1)" % [fn, bn, UIKit.contrast(fgs[fn], bgs[bn])])
 	check(UIKit.text_on(UIKit.GOLD) == UIKit.TEXT_ON_LIGHT and UIKit.text_on(UIKit.OK) == UIKit.TEXT_ON_LIGHT, "botões dourado e verde usam texto escuro")
-	check(UIKit.text_on(UIKit.PURPLE_DEEP) == UIKit.INK and UIKit.text_on(UIKit.VIOLET) == UIKit.INK, "botões escuros usam texto claro")
+	check(UIKit.text_on(UIKit.PURPLE_DEEP) == UIKit.INK, "botões escuros usam texto claro")
+	# Regra real: o texto escolhido sempre tem contraste ≥ 3:1 com a face (claro em fundo escuro, escuro em fundo claro).
+	var faces := {"PURPLE_DEEP": UIKit.PURPLE_DEEP, "VIOLET": UIKit.VIOLET, "GOLD": UIKit.GOLD, "OK": UIKit.OK, "NIGHT": UIKit.NIGHT}
+	for face_name in faces:
+		var face: Color = faces[face_name]
+		check(UIKit.contrast(UIKit.text_on(face), face) >= 3.0, "texto do botão %s legível (%.1f:1)" % [face_name, UIKit.contrast(UIKit.text_on(face), face)])
 	check(UIKit.contrast(UIKit.TEXT_ON_LIGHT, UIKit.GOLD) >= 4.5, "texto escuro legível sobre dourado")
 
 

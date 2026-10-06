@@ -828,6 +828,7 @@ func clone_for_sim() -> ChaosEngine:
 	c.trick_pot = trick_pot
 	c.contrib = contrib.duplicate()
 	c.folded = folded.duplicate()
+	c.busted = busted.duplicate()
 	c.bet_level = bet_level
 	c.raises = raises
 	c.betting = betting
@@ -1149,11 +1150,32 @@ func _settle_blitz() -> Dictionary:
 			net[p] -= pen
 			miss_penalty += pen
 	carry_out += miss_penalty
+	# Última rodada da mesa (ex.: torneio, 1 nível por mesa): ninguém acertou e não há "próximo nível" pra
+	# receber o acumulado — ele volta pra quem pôs, na proporção da entrada, em vez de sumir.
+	var carry_returned := 0.0
+	if is_final_round() and carry_out > 0.0:
+		var total_in := 0.0
+		var top_p := 0
+		for p in range(num_players):
+			total_in += float(stakes[p])
+			if float(stakes[p]) > float(stakes[top_p]):
+				top_p = p
+		if total_in > 0.0:
+			var given := 0.0
+			for p in range(num_players):
+				var share := floorf(carry_out * float(stakes[p]) / total_in)
+				stacks[p] += share
+				net[p] += share
+				given += share
+			stacks[top_p] += carry_out - given
+			net[top_p] += carry_out - given
+			carry_returned = carry_out
+			carry_out = 0.0
 	var res := {
 		"predicts": predicts.duplicate(), "stakes": stakes.duplicate(), "wins": wins.duplicate(), "doubles": doubles.duplicate(),
 		"hits": hits, "near": near, "payouts": payouts, "refunds": refunds, "net": net,
 		"pool": pool, "rake": rake, "carry_in": carry, "carry_out": carry_out,
-		"bonus": bonus, "streak": hit_streak,
+		"bonus": bonus, "streak": hit_streak, "carry_returned": carry_returned,
 	}
 	carry = carry_out
 	pot = 0.0
