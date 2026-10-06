@@ -1205,54 +1205,65 @@ func _intro_slides() -> void:
 	modal_open = false
 
 
+## Ajuda (botão "?"): painel que desliza da direita — o modificador ativo e, embaixo, o tutorial
+## (placeholder por enquanto). Fecha pelo X, tocando fora ou com swipe pra direita.
 func _open_help() -> void:
-	if engine.blitz:
-		StepsModal.open(overlay_layer, "COMO FUNCIONA O BLITZ", HelpContent.blitz(), "ENTENDI", false)
-	else:
-		StepsModal.open(overlay_layer, "COMO FUNCIONA O CAOS", HelpContent.chaos(), "ENTENDI", false)
+	var sp := SidePanel.open(overlay_layer, "AJUDA", true)
+	var m := engine.modifier
+	var tone := _modifier_color(m) if m != -1 else UIKit.TR_GOLD
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), tone.lightened(0.15), tone.darkened(0.4), "small", 14, 16, 14))
+	var cv := VBoxContainer.new()
+	cv.add_theme_constant_override("separation", 8)
+	card.add_child(cv)
+	var cap := UIKit.serif_label("MODIFICADOR ATIVO", 18, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
+	cap.autowrap_mode = TextServer.AUTOWRAP_OFF
+	cv.add_child(cap)
+	var nm := UIKit.serif_label(_modifier_label(m).to_upper() if m != -1 else "NENHUM", 30, tone, HORIZONTAL_ALIGNMENT_CENTER)
+	nm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	cv.add_child(nm)
+	var ds := UIKit.serif_label(ChaosModifiers.desc_of(m, engine.blitz) if m != -1 else "O modificador é sorteado no começo de cada jogada.", 24, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	ds.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	cv.add_child(ds)
+	sp.body.add_child(card)
+	var tut := UIKit.action_button("TUTORIAL", UIKit.ActionKind.GOLD, 26)
+	tut.custom_minimum_size = Vector2(0, 72)
+	sp.body.add_child(tut)   # placeholder: ainda sem tutorial
 
 
+## Menu (hambúrguer): painel que desliza da esquerda, com as opções da pausa. O jogo fica pausado
+## enquanto está aberto. Fecha pelo X, tocando fora ou com swipe pra esquerda.
 func _open_pause() -> void:
 	if finished:
 		return
-	var ov := UIKit.overlay()
-	overlay_layer.add_child(ov)
-	var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 24)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 12)
-	v.custom_minimum_size = Vector2(620, 0)
-	box.add_child(v)
-	v.add_child(UIKit.label("PAUSA", 40, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
-	var ph := UIKit.label("Toque numa carta para selecionar (ela sobe) e de novo para jogar, ou arraste-a pra cima e solte na mesa. Sair da mesa devolve suas fichas da stack pra carteira.", 28, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-	ph.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(ph)
+	var sp := SidePanel.open(overlay_layer, "MENU", false)
 	paused = true
-	ov.tree_exited.connect(func(): paused = false)
-	var resume := UIKit.button("CONTINUAR")
-	resume.pressed.connect(ov.queue_free)
-	v.add_child(resume)
-	var how := UIKit.button("COMO JOGAR", UIKit.BUTTON_MUTED)
-	how.pressed.connect(_open_help)
-	v.add_child(how)
-	var quit := UIKit.button("SAIR DA MESA  ◎%d" % int(engine.stacks[0]), UIKit.DANGER)
+	sp.closed.connect(func(): paused = false)
+	var resume := UIKit.action_button("CONTINUAR", UIKit.ActionKind.OK, 26)
+	resume.custom_minimum_size = Vector2(0, 72)
+	resume.pressed.connect(sp.close)
+	sp.body.add_child(resume)
+	var quit := UIKit.action_button("SAIR DA MESA  ◎%s" % UIKit.fmt_short(engine.stacks[0]), UIKit.ActionKind.DANGER, 26)
+	quit.custom_minimum_size = Vector2(0, 72)
 	quit.pressed.connect(func():
 		paused = false
-		ov.queue_free()
+		sp.queue_free()
 		modal_open = false
 		human_turn = false
 		_finish_match()
 		item_chosen.emit(-1)
 		human_card_chosen.emit(null))
-	v.add_child(quit)
-	ov.add_child(UIKit.centered(box))
-	UIKit.pop_in(box, GameState.anim(0.2))
-	resume.grab_focus.call_deferred()
+	sp.body.add_child(quit)
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		if overlay_layer.get_child_count() > 0 and not finished:
-			overlay_layer.get_child(overlay_layer.get_child_count() - 1).queue_free()
+			var top := overlay_layer.get_child(overlay_layer.get_child_count() - 1)
+			if top is SidePanel:
+				(top as SidePanel).close()
+			else:
+				top.queue_free()
 		else:
 			_open_pause()
 

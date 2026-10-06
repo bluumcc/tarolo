@@ -40,6 +40,7 @@ Em `scripts/ui/`, todos desenhados em código (sem textura/shader) e só com tok
 - `StatCard` — card legenda + número (POTE, TEMPO, FEZ/PALPITE, APOSTA). `value` é o Label a atualizar.
 - `ModifierStrip` — card do modificador da rodada (legenda + nome) em cima da barra de baixo; tocar abre a regra (`tapped`). Os avisos de ação ficam numa faixa reservada no topo (`banner_slot`).
 - `RoundDots` — losangos das jogadas: concluídos preenchidos (verde = venceu, vermelho = perdeu); os próximos `need` (vitórias que faltam pro palpite) com borda forte dourada; o resto borda normal (`set_state(total, results, need)`).
+- `SidePanel.open(layer, título, from_right)` — painel lateral deslizante (menu à esquerda, ajuda à direita): X, toque fora ou swipe pro lado de origem fecham, com animação de saída; preencha `body`.
 - `UIKit.action_button(texto, UIKit.ActionKind.DANGER|OK|GOLD)` — botões de ação (padrão `rim_box`, serifada).
 - `UIKit.serif()` / `UIKit.serif_label()` — serifada de títulos/legendas (DejaVu Serif Bold subset, ~28 KB, `assets/fonts/DejaVuSerif-Bold-Subset.ttf`). Legendas ≥ 20 px.
 - `TableEllipse` — mesa de runas em pílula (cápsula). `fit()` ajusta ao nº de jogadores (`seat_count`): largura = a maior em que o que estiver mais perto da margem (plaquinha fixa de 150% do avatar, avatar ou selo) encosta; altura = a maior que serve. A cena só refaz o ajuste no começo de cada rodada (`_lock_table_size`): durante as 8 jogadas a mesa não muda. `border_point(theta)` dá onde cada avatar senta. Gate: `godot --headless --path . -s res://tests/table_gate.gd`.
