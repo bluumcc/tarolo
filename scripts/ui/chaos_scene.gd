@@ -70,7 +70,7 @@ var action_color: Array = []
 var popup_layer: Control
 var overlay_layer: Control
 var table_views: Array = []
-var pot_box: Control             # coluna POTE do card do meio
+var pot_box: Control             # card do POTE (faixa do topo); some enquanto há aviso de ação
 var _turn_color := UIKit.TR_CYAN.lightened(0.15)   # moldura/nome de quem joga agora
 var pot_label: Label
 var pot_sub: Label
@@ -152,6 +152,7 @@ func _show_insufficient_fichas() -> void:
 const HAND_RAISE := 28.0   ## o leque sobe um pouco da base da faixa da mão
 const BAR_H := 96.0       ## barra de baixo (cards laterais: palpite e tempo)
 const ACT_H := BAR_H * 0.75   ## botões de ação e card de pote/prêmio: 75% dos cards laterais
+const POT_CARD_W := 300.0   ## largura fixa do card do pote (cabe "POTE ◎ 99999")
 const BANNER_SLOT_H := 46.0   ## faixa dos avisos de ação, logo abaixo do topo
 const MOD_GAP := 10.0       ## folga entre o leque e o card do modificador
 const BANNER_H := 100.0    ## do topo da zona até a mão: faixa de avisos, abaixo do seu avatar
@@ -202,56 +203,39 @@ func _build_ui() -> void:
 	dealer_badges.resize(engine.num_players)
 	seat_nodes.resize(engine.num_players)
 
-	# Topo: menu · título com os losangos das jogadas · fez/palpite (no lugar da ajuda, que
-	# agora fica dentro da pausa).
+	# Topo: menu · losangos das jogadas · ajuda. Bordas neutras, como as do card do tempo.
 	var topbar := HBoxContainer.new()
 	topbar.add_theme_constant_override("separation", 12)
 	root.add_child(topbar)
+	var neutral := UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 14, 8)
 	var menu_btn := Widgets.icon_button("☰")
 	for sn in ["normal", "hover", "pressed", "focus"]:
-		menu_btn.add_theme_stylebox_override(sn, UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_GOLD.darkened(0.2), UIKit.TR_GOLD.darkened(0.6), "small", 14, 8))
-	menu_btn.add_theme_color_override("font_color", UIKit.TR_GOLD)
+		menu_btn.add_theme_stylebox_override(sn, neutral)
+	menu_btn.add_theme_color_override("font_color", UIKit.TR_WHITE)
 	menu_btn.pressed.connect(_open_pause)
 	topbar.add_child(menu_btn)
 	var info_box := PanelContainer.new()
 	info_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info_box.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_GOLD.darkened(0.2), UIKit.TR_GOLD.darkened(0.6), "small", 14, 12, 6))
-	var info_v := VBoxContainer.new()
-	info_v.add_theme_constant_override("separation", 4)
-	info_v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	info_box.add_child(info_v)
+	info_box.add_theme_stylebox_override("panel", UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 14, 6))
 	round_dots = RoundDots.new()
 	round_dots.set_progress(ChaosEngine.HAND_SIZE, 0)
-	info_v.add_child(round_dots)
-	# Pote: uma linha só, logo abaixo dos losangos.
-	pot_box = HBoxContainer.new()
-	(pot_box as HBoxContainer).alignment = BoxContainer.ALIGNMENT_CENTER
-	(pot_box as HBoxContainer).add_theme_constant_override("separation", 10)
-	pot_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var pot_cap := UIKit.serif_label("POTE", 20, UIKit.TR_GOLD.lerp(UIKit.TR_WHITE, 0.25), HORIZONTAL_ALIGNMENT_CENTER)
-	pot_cap.autowrap_mode = TextServer.AUTOWRAP_OFF
-	pot_box.add_child(pot_cap)
-	pot_label = UIKit.label("◎ 0", 28, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	pot_label.add_theme_font_size_override("font_size", 28)
-	pot_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	pot_box.add_child(pot_label)
-	pot_sub = UIKit.label("", 18, UIKit.MUTED)   # sem lugar na tela
-	pot_sub.visible = false
-	pot_box.add_child(pot_sub)
-	info_v.add_child(pot_box)
+	round_dots.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	info_box.add_child(round_dots)
 	topbar.add_child(info_box)
 	var help_btn := Widgets.icon_button("?")
 	for sn in ["normal", "hover", "pressed", "focus"]:
-		help_btn.add_theme_stylebox_override(sn, UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_GOLD.darkened(0.2), UIKit.TR_GOLD.darkened(0.6), "small", 14, 8))
-	help_btn.add_theme_color_override("font_color", UIKit.TR_GOLD)
+		help_btn.add_theme_stylebox_override(sn, neutral)
+	help_btn.add_theme_color_override("font_color", UIKit.TR_WHITE)
 	help_btn.pressed.connect(_open_help)
 	topbar.add_child(help_btn)
 
-	# Modificador da jogada: faixa fixa, largura total — nenhum aviso passa por cima dela.
-	banner_slot = Control.new()   # faixa reservada: os avisos de ação aparecem aqui, sem empurrar nada
+	# Faixa logo abaixo: o POTE (largura fixa) fica aqui e dá lugar aos avisos de ação enquanto
+	# há um aviso. Altura fixa: nada se mexe quando troca.
+	banner_slot = Control.new()
 	banner_slot.custom_minimum_size = Vector2(0, BANNER_SLOT_H)
 	banner_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(banner_slot)
+	_build_pot_card(banner_slot)
 	_build_banner(banner_slot)
 
 	# Palco: a mesa de runas com os rivais sentados na borda, a distâncias iguais; você embaixo.
@@ -319,6 +303,37 @@ func _build_ui() -> void:
 
 	_apply_orientation()
 	_layout_table.call_deferred()
+
+
+## Pote: card de largura fixa (cabe valores altos), uma linha só — "POTE ◎ 12000" — centrado na
+## faixa do topo. Dá lugar aos avisos de ação enquanto houver um.
+func _build_pot_card(slot: Control) -> void:
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(POT_CARD_W, 0)
+	card.anchor_left = 0.5
+	card.anchor_right = 0.5
+	card.anchor_top = 0.0
+	card.anchor_bottom = 1.0
+	card.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_theme_stylebox_override("panel", UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 12, 6))
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 12)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(row)
+	var cap := UIKit.serif_label("POTE", 22, UIKit.TR_GOLD.lerp(UIKit.TR_WHITE, 0.25), HORIZONTAL_ALIGNMENT_CENTER)
+	cap.autowrap_mode = TextServer.AUTOWRAP_OFF
+	row.add_child(cap)
+	pot_label = UIKit.label("◎ 0", 30, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	pot_label.add_theme_font_size_override("font_size", 30)
+	pot_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	row.add_child(pot_label)
+	pot_sub = UIKit.label("", 18, UIKit.MUTED)   # sem lugar na tela
+	pot_sub.visible = false
+	row.add_child(pot_sub)
+	pot_box = card
+	slot.add_child(card)
 
 
 ## Aviso de ação (título curto, borda e texto na cor do tipo de ação), centrado na faixa do topo.
@@ -814,6 +829,7 @@ func _banner(title: String, sub: String, color: Color) -> void:
 	banner_sub.visible = sub != ""
 	banner_box.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), tone, tone.darkened(0.45), "small", 10, 14, 6))
 	banner_box.visible = title != "" or sub != ""
+	pot_box.visible = not banner_box.visible   # o aviso ocupa o lugar do pote
 	banner_box.modulate.a = 0.0
 	create_tween().tween_property(banner_box, "modulate:a", 1.0, GameState.anim(0.12))
 
@@ -841,10 +857,11 @@ func _pname(p: int) -> String:
 
 
 func _banner_clear() -> void:
-	# Em repouso a faixa fica livre: o modificador vive na faixa fixa do topo.
+	# Sem aviso: volta o pote.
 	banner_title.text = ""
 	banner_sub.text = ""
 	banner_box.visible = false
+	pot_box.visible = true
 
 
 # ------------------------------------------------------------------ loop de turnos
