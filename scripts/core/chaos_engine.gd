@@ -662,8 +662,8 @@ func _modifier_chips(ev: int, winner: int, rivals: Array) -> Dictionary:
 	var total := float(ChaosModifiers.STEAL_BLINDS * blind)
 	var out := {"saque": 0.0, "assalto": 0.0, "assalto_from": -1, "curse": 0.0}
 	if ev == ChaosModifiers.Modifier.ASSALTO_LIDER:
-		var rich := _highest_player()
-		if rich != winner:
+		var rich := _richest_rival(winner)
+		if rich != -1:
 			var take := minf(total, maxf(stacks[rich], 0.0))
 			stacks[rich] -= take
 			out["assalto"] = take
@@ -682,6 +682,17 @@ func _modifier_chips(ev: int, winner: int, rivals: Array) -> Dictionary:
 		out["curse"] = each * float(rivals.size())
 		stacks[winner] -= float(out["curse"])
 	return out
+
+
+## Rival com mais fichas (o próprio vencedor não conta: se ele lidera, rouba do segundo). -1 = ninguém tem fichas.
+func _richest_rival(winner: int) -> int:
+	var best := -1
+	for q in range(num_players):
+		if q == winner or busted[q] or stacks[q] <= 0.0:
+			continue
+		if best == -1 or stacks[q] > stacks[best]:
+			best = q
+	return best
 
 
 func _resolve_trick() -> Dictionary:

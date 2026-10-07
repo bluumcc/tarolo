@@ -14,3 +14,7 @@
 
 "Nível" ficou só no sentido de nível do jogador, e no Vanilla (cada mão). O degrau do torneio é o Ritual.
 O Louco, o Trunfo (arcano maior) e os naipes (arcanos menores) mantêm os nomes das cartas.
+
+## Cartas
+**Arcano maior** = as 21 cartas numeradas (antes "Trunfo"). **Arcano menor** = as cartas dos 4 naipes (antes "carta de naipe comum").
+**Naipe** continua sendo o grupo (Ouros, Paus, Copas, Espadas). O Louco mantém o nome. "Cortar" é jogar arcano maior sobre um naipe.

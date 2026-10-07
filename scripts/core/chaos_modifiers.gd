@@ -40,7 +40,7 @@ const DESCRIPTIONS := {
 	Modifier.VAZA_INVERTIDA: "Vence a menor carta do naipe. Arcano maior só vale se abrir a jogada.",
 	Modifier.VAZA_DOURADA: "O vencedor conta 2 vitórias na profecia.",
 	Modifier.SAQUE: "O vencedor rouba 3 blinds, divididos entre os rivais.",
-	Modifier.ASSALTO_LIDER: "O vencedor rouba 3 blinds de quem tem mais fichas.",
+	Modifier.ASSALTO_LIDER: "O vencedor rouba 3 blinds do rival com mais fichas.",
 	Modifier.VAZA_MALDITA: "O vencedor paga 3 blinds, divididos entre os rivais.",
 	Modifier.SILENCIO: "Arcano maior não vence naipe. Vence a maior carta do naipe.",
 	Modifier.PITAGORICO: "Jogue qualquer naipe. Vence o maior número e o arcano maior ainda vence.",
@@ -52,7 +52,7 @@ const TIPS := {
 	Modifier.VAZA_INVERTIDA: "Jogue baixo para ganhar. Se um arcano maior abrir a jogada, vence o menor arcano maior.",
 	Modifier.VAZA_DOURADA: "Faltam 2 vitórias para a sua profecia? Ganhar só essa já fecha a conta. Se não quer ganhar, fuja dela.",
 	Modifier.SAQUE: "Ganhar rende fichas dos rivais, além de contar a vitória. Só ganhe se também servir à sua profecia.",
-	Modifier.ASSALTO_LIDER: "Rouba de quem tem mais fichas na mesa, não de quem está perto na profecia.",
+	Modifier.ASSALTO_LIDER: "Rouba do rival com mais fichas na mesa, não de quem está perto na profecia.",
 	Modifier.VAZA_MALDITA: "Ganhar custa fichas de verdade, além de contar a vitória. Pense bem antes de forçar.",
 	Modifier.SILENCIO: "Quem não tem o naipe ainda é obrigado a jogar arcano maior, que não vence. Se um arcano maior abrir a jogada, eles disputam entre si.",
 	Modifier.PITAGORICO: "Toda a mão pode ser jogada. Se houver arcano maior na mesa, vence o maior deles. Empate de número: vale o naipe.",
@@ -68,7 +68,7 @@ const COMBO_NAMES := {
 	"MAO_QUENTE": "MÃO QUENTE",
 	"CORTADO": "CORTADO",
 	"CORTE_REI": "CORTE DE REI",
-	"CHUVA_TRUNFOS": "CHUVA DE TRUNFOS",
+	"CHUVA_TRUNFOS": "CHUVA DE ARCANOS",
 	"REALEZA": "REALEZA",
 	"ESCADA": "ESCADA",
 }
@@ -76,8 +76,8 @@ const COMBO_NAMES := {
 const COMBO_DESCRIPTIONS := {
 	"MAO_QUENTE": "3 jogadas seguidas: pontos ×1,5 (4 seguidas: ×2)",
 	"CORTADO": "Você quebrou a sequência de alguém: +2 pts",
-	"CORTE_REI": "Cortou um Rei com Trunfo: +3 pts",
-	"CHUVA_TRUNFOS": "3 ou mais Trunfos na mesa: pontos ×2",
+	"CORTE_REI": "Cortou um Rei com arcano maior: +3 pts",
+	"CHUVA_TRUNFOS": "3 ou mais arcanos maiores na mesa: pontos ×2",
 	"REALEZA": "3 ou mais figuras (Valete, Cavaleiro, Dama, Rei) na mesa: pontos ×1,5",
 	"ESCADA": "3 cartas seguidas do mesmo naipe na mesa: +3 pts",
 }

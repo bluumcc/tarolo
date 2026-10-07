@@ -1257,7 +1257,7 @@ func _wait_human() -> CardData:
 	if ls == -1:
 		_banner("Sua vez", "", UIKit.TURN)
 	elif ls == CardData.Suit.TRUNFO:
-		_banner("Sua vez · jogue Trunfo", "", UIKit.TURN)
+		_banner("Sua vez · jogue arcano maior", "", UIKit.TURN)
 	else:
 		_banner("Sua vez · siga %s" % CardData.SUIT_NAMES[ls], "", UIKit.TURN)
 	_clock_start(TURN_SECONDS, _on_play_timeout)

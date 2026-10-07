@@ -1115,7 +1115,19 @@ func _test_blitz() -> void:
 	ga.current = 0
 	for pl in range(4):
 		ga.play(pl, (ga.hands[pl] as Array)[0])
-	check(is_equal_approx(float(ga.stacks[0]), 230.0) and is_equal_approx(float(ga.stacks[2]), 470.0), "Blitz: Assalto rouba 3 blinds de quem tem mais fichas, além de contar a vitória")
+	check(is_equal_approx(float(ga.stacks[0]), 230.0) and is_equal_approx(float(ga.stacks[2]), 470.0), "Blitz: Assalto rouba 3 blinds do rival com mais fichas, além de contar a vitória")
+	var gl := ChaosEngine.new()
+	gl.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "point_factor": 0.0, "stacks": [500.0, 200.0, 250.0, 200.0]})
+	gl.modifier = ChaosModifiers.Modifier.ASSALTO_LIDER
+	gl.hands[0] = [c(CardData.Suit.TRUNFO, 20)]
+	gl.hands[1] = [c(CardData.Suit.PAUS, 3)]
+	gl.hands[2] = [c(CardData.Suit.PAUS, 4)]
+	gl.hands[3] = [c(CardData.Suit.PAUS, 5)]
+	gl.leader = 0
+	gl.current = 0
+	for pl in range(4):
+		gl.play(pl, (gl.hands[pl] as Array)[0])
+	check(is_equal_approx(float(gl.stacks[0]), 530.0) and is_equal_approx(float(gl.stacks[2]), 220.0), "Assalto: se o vencedor é o líder, rouba do segundo com mais fichas (nunca fica sem efeito)")
 
 	var gm := ChaosEngine.new()
 	gm.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "point_factor": 0.0, "stacks": [200.0, 200.0, 200.0, 200.0]})

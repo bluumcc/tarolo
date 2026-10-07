@@ -5,7 +5,7 @@ extends RefCounted
 
 enum Suit { OUROS, PAUS, COPAS, ESPADAS, TRUNFO, LOUCO }
 
-const SUIT_NAMES := ["Ouros", "Paus", "Copas", "Espadas", "Trunfo", "O Louco"]
+const SUIT_NAMES := ["Ouros", "Paus", "Copas", "Espadas", "Arcano Maior", "O Louco"]
 const SUIT_SYMBOLS := ["♦", "♣", "♥", "♠", "✦", "✶"]
 
 ## Os 3 "Bouts" (cartas de ponta): Le Petit, Le Monde e O Louco. Valem 4,5 pontos cada,
@@ -85,7 +85,7 @@ func display_name() -> String:
 	if is_louco():
 		return "O Louco"
 	if is_trunfo():
-		var label := "Le Petit" if rank == PETIT else ("Le Monde" if rank == MONDE else "Trunfo %d" % rank)
+		var label := "Le Petit" if rank == PETIT else ("Le Monde" if rank == MONDE else "Arcano %d" % rank)
 		return label
 	var names := {1: "Ás", 11: "Valete", 12: "Cavaleiro", 13: "Rainha", 14: "Rei"}
 	var r: String = names.get(rank, str(rank))

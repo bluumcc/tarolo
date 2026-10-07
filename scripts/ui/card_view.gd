@@ -323,5 +323,5 @@ func describe() -> String:
 	if data.is_bout():
 		lines.append("Bout — uma das 3 cartas mais valiosas do jogo.")
 	elif data.is_trunfo():
-		lines.append("Trunfo — sempre vence carta de naipe comum.")
+		lines.append("Arcano maior — sempre vence arcano menor.")
 	return "\n".join(lines)

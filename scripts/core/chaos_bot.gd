@@ -417,8 +417,7 @@ static func _blitz_choose(engine: ChaosEngine, player: int, difficulty: int, rng
 		ChaosModifiers.Modifier.SAQUE:
 			dv += float(ChaosModifiers.STEAL_BLINDS)
 		ChaosModifiers.Modifier.ASSALTO_LIDER:
-			if player != engine._highest_player():
-				dv += float(ChaosModifiers.STEAL_BLINDS)
+			dv += float(ChaosModifiers.STEAL_BLINDS)
 		ChaosModifiers.Modifier.VAZA_MALDITA:
 			dv -= float(ChaosModifiers.STEAL_BLINDS)
 	var greed := 0.75 if style_of(engine, player) == Style.CAUTELOSO else (1.15 if style_of(engine, player) == Style.AGRESSIVO else 1.0)

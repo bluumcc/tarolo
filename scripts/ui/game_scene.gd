@@ -499,7 +499,7 @@ func _refresh_hand_hint() -> void:
 			reis += 1
 	hint_strength.text = "SUA MÃO · força %s" % UIKit.fmt_dec(strength, 1)
 	hint_bar.set_values(strength, 42.0, false)
-	hint_counts.text = "Bouts %d/3 · Trunfos %d · Reis %d" % [bouts, trunfos, reis]
+	hint_counts.text = "Bouts %d/3 · Arcanos maiores %d · Reis %d" % [bouts, trunfos, reis]
 	_update_suggestion([])
 
 
@@ -1188,12 +1188,12 @@ func _run_declarations() -> void:
 	if engine.taker == 0 and not GameState.autoplay:
 		if eligible:
 			var bonus := int(Scoring.poignee_bonus(engine.taker_trump_count))
-			var declare: bool = await _ask_yes_no("MOSTRAR OS TRUNFOS?", "Você tem %d trunfos. Se mostrar (Poignée), ganha +%d pontos no fim, mas os outros veem seus trunfos. Mostrar?" % [engine.taker_trump_count, bonus])
+			var declare: bool = await _ask_yes_no("MOSTRAR OS ARCANOS MAIORES?", "Você tem %d arcanos maiores. Se mostrar (Poignée), ganha +%d pontos no fim, mas os outros veem seus arcanos maiores. Mostrar?" % [engine.taker_trump_count, bonus])
 			if not is_inside_tree():
 				return
 			engine.declare_poignee(declare)
 			if declare:
-				_announce_toast("Você mostrou os trunfos (Poignée)! +%d se fechar o nível" % bonus)
+				_announce_toast("Você mostrou os arcanos maiores (Poignée)! +%d se fechar o nível" % bonus)
 				_speech_bubble(0, "Poignée!")
 				await _wait(0.6)
 		var chelem: bool = await _ask_yes_no("CHELEM: GANHAR TODAS AS RODADAS?", "Quer avisar que vai ganhar as 18 rodadas? Se conseguir: +400. Se falhar: -200. Sem avisar, se ganhar todas mesmo assim: +200, sem risco.")
@@ -1208,7 +1208,7 @@ func _run_declarations() -> void:
 		var strength := BotAI.hand_strength(engine.hands[engine.taker])
 		if eligible and BotAI.decide_poignee(engine.taker_trump_count):
 			engine.declare_poignee(true)
-			_announce_toast("%s mostrou os trunfos (Poignée)!" % config["names"][engine.taker])
+			_announce_toast("%s mostrou os arcanos maiores (Poignée)!" % config["names"][engine.taker])
 			_speech_bubble(engine.taker, "Poignée!")
 			await _wait(0.6)
 			if not is_inside_tree():
@@ -1372,9 +1372,9 @@ func _wait_human() -> CardData:
 	if ls == -1:
 		status_label.text = "Sua vez — abra a rodada"
 	elif ls == CardData.Suit.TRUNFO:
-		status_label.text = "Sua vez — precisa cobrir com Trunfo maior, se tiver"
+		status_label.text = "Sua vez — precisa cobrir com arcano maior mais alto, se tiver"
 	else:
-		status_label.text = "Sua vez — siga %s (ou corte com Trunfo, ou jogue O Louco)" % CardData.SUIT_NAMES[ls]
+		status_label.text = "Sua vez — siga %s (ou corte com arcano maior, ou jogue O Louco)" % CardData.SUIT_NAMES[ls]
 	if tutorial:
 		_check_tutorial_trick_hints(ls)
 	_rebuild_hand()
@@ -1396,12 +1396,12 @@ func _check_tutorial_trick_hints(ls: int) -> void:
 				has_suit = true
 				break
 		if not has_suit:
-			_tutorial_once("forced_trunfo", "Você não tem mais %s, então tem que jogar um Trunfo (ou O Louco). Isso se chama cortar." % CardData.SUIT_NAMES[ls])
+			_tutorial_once("forced_trunfo", "Você não tem mais %s, então tem que jogar um arcano maior (ou O Louco). Isso se chama cortar." % CardData.SUIT_NAMES[ls])
 			return
 	var hand_trunfos := (hand as Array).filter(func(c: CardData) -> bool: return c.is_trunfo()).size()
 	var legal_trunfos := (legal as Array).filter(func(c: CardData) -> bool: return c.is_trunfo()).size()
 	if hand_trunfos > legal_trunfos and legal_trunfos > 0:
-		_tutorial_once("forced_cover", "Já tem um Trunfo na mesa e você tem um maior, então só os Trunfos maiores podem ser jogados.")
+		_tutorial_once("forced_cover", "Já tem um arcano maior na mesa e você tem um mais alto, então só os arcanos maiores mais altos podem ser jogados.")
 		return
 	for c in hand:
 		if (c as CardData).is_louco():
@@ -1412,7 +1412,7 @@ func _check_tutorial_trick_hints(ls: int) -> void:
 func _on_card_tapped(view: CardView) -> void:
 	if not human_turn or not view.playable:
 		if human_turn and not view.playable:
-			status_label.text = "Jogada ilegal — você é obrigado a seguir o naipe ou cortar com Trunfo."
+			status_label.text = "Jogada ilegal — você é obrigado a seguir o naipe ou cortar com arcano maior."
 		return
 	if view.selected:
 		_on_card_play(view)
@@ -1498,7 +1498,7 @@ func _resolve_trick(result: Dictionary) -> void:
 				has_petit = true
 				break
 		if has_petit:
-			_tutorial_hint("O Trunfo 1 (Le Petit) apareceu na última rodada! Quem ganhou essa rodada leva +10 pontos.")
+			_tutorial_hint("O arcano maior 1 (Le Petit) apareceu na última rodada! Quem ganhou essa rodada leva +10 pontos.")
 
 	# A barra do chefe só se mexe agora, junto do número que sobe da mesa.
 	hold_boss = false
@@ -1608,7 +1608,7 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 	var bonuses: Dictionary = r.get("bonuses", {})
 	var bonus_lines: Array = []
 	if float(bonuses.get("poignee", 0.0)) > 0.0:
-		bonus_lines.append("✦ Poignée: %s mostrou os trunfos (+%d)" % [str(config["names"][r["taker"]]), int(bonuses["poignee"])])
+		bonus_lines.append("✦ Poignée: %s mostrou os arcanos maiores (+%d)" % [str(config["names"][r["taker"]]), int(bonuses["poignee"])])
 	var chelem: float = float(bonuses.get("chelem", 0.0))
 	if chelem > 0.0 and engine.chelem_announced:
 		bonus_lines.append("✦ Chelem avisado e cumprido: %s ganhou todas as rodadas (+%d)" % [str(config["names"][r["taker"]]), int(chelem)])
