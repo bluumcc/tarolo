@@ -14,7 +14,7 @@ const CARD_SCENE := preload("res://scenes/Card.tscn")
 
 ## As cartas da mão têm o tamanho cheio; as da mesa ficam menores pra caber 4 lado a lado.
 ## Relógios da mesa (um só, `_clock_start`): estourou, jogamos por você.
-const TURN_SECONDS := 10.0      # jogar a carta; estourou, joga a mais fraca
+const TURN_SECONDS := 13.0      # jogar a carta; estourou, joga a mais fraca (3s cheio + 10s drenando)
 const TURN_RING_DELAY := 3.0    # o anel do avatar fica cheio por N segundos antes de começar a drenar
 const DISCARD_SECONDS := 18.0   # descarte inicial; estourou, descarta as 2 mais fracas
 const PREDICT_SECONDS := 15.0   # profecia de vitórias; estourou, confirma a que estiver na tela
