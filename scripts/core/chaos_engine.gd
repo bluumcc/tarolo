@@ -252,9 +252,13 @@ func active_players() -> Array:
 
 ## Marca como busted todo jogador com stack ≤ 0. Retorna os índices recém-bustados.
 ## Persiste entre níveis — não é resetado por _setup_round().
+## Quem zerou a stack é eliminado — menos quem ainda tem fichas no pote do palpite (all-in no
+## palpite): esse segue jogando até o fim da rodada e só cai depois da liquidação, se continuar zerado.
 func bust_broke(include_human := true) -> Array:
 	var newly: Array = []
 	for p in range(0 if include_human else 1, num_players):
+		if blitz and not is_round_over() and float(stakes[p]) > 0.0:
+			continue
 		if not busted[p] and stacks[p] <= 0.0:
 			busted[p] = true
 			newly.append(p)
@@ -553,6 +557,37 @@ func walkover_player() -> int:
 	if betting or active_count() != 1:
 		return -1
 	return int(active_players()[0])
+
+
+## Mesa desfeita no meio da rodada (torneio): as jogadas que faltam não são disputadas — não contam
+## vitória pra ninguém — e o palpite é conferido com o que já foi jogado. Fecha a rodada na hora.
+func void_remaining_tricks() -> void:
+	if not blitz or is_round_over():
+		return
+	plays = []
+	betting = false
+	to_act = []
+	trick_pot = 0.0
+	if trick_number == 0:
+		# Nenhuma jogada foi disputada: o nível não aconteceu — devolve as entradas do palpite.
+		for p in range(num_players):
+			stacks[p] += float(stakes[p])
+			pot -= float(stakes[p])
+			stakes[p] = 0.0
+	trick_number = HAND_SIZE
+	blitz_result = _settle_blitz()
+	var deltas: Array = []
+	for p in range(num_players):
+		deltas.append(stacks[p] - level_start_stacks[p])
+	round_result = {
+		"round": round_index, "modifier": modifier, "weak_suit": weak_suit,
+		"stacks": stacks.duplicate(), "deltas": deltas,
+		"tricks_won": tricks_won(), "wins": wins.duplicate(), "blitz": blitz_result,
+	}
+	round_finished.emit(round_result)
+	if is_match_over():
+		match_result = make_standings()
+		match_finished.emit(match_result)
 
 
 func resolve_walkover() -> Dictionary:

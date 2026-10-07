@@ -79,6 +79,7 @@ var hold_pot := -1.0
 var blitz_revealed: Array = []  # Blitz: entrada de cada um já paga (pote), pill visível na mesa
 var blitz_showdown := false     # Blitz: fim da rodada — só aí o alvo dos rivais aparece pra você
 var human_bet_timed_out := false  # a ação da aposta veio do relógio, não de um toque: o banner avisa
+var allin_notice_shown := false  # torneio: aviso de "all-in no palpite" já mostrado nessa rodada
 var blitz_sitting_out := false  # Blitz: jogador ficou sem fichas mid-rodada (sentado fora)
 var double_btn: Button
 var discard_picks: Array = []   # Blitz: cartas marcadas na mão pra descartar (até BLITZ_DISCARD_SIZE)
@@ -1547,6 +1548,12 @@ func _run_round() -> void:
 		if engine.blitz:
 			if await _bust_broke():
 				return
+			if bool(config.get("tournament", false)) and engine.stacks[0] <= 0.0 and not allin_notice_shown and float(engine.stakes[0]) > 0.0:
+				allin_notice_shown = true   # sem fichas pro blind, mas com o palpite no pote: joga as cartas (all-in)
+				_banner("All-in no palpite", "Sem fichas pro blind. Você joga as cartas; se acertar o palpite, o pote é seu.", UIKit.MUTED)
+				await _wait(2.4)
+				if not is_inside_tree() or finished:
+					return
 			if engine.stacks[0] <= 0.0 and not bool(config.get("tournament", false)):
 				if not await _ensure_solvent(true):
 					return
@@ -1694,17 +1701,18 @@ func _fast_forward_if_alone() -> bool:
 	for p in range(engine.num_players):
 		if not engine.busted[p]:
 			alive += 1
-	if alive != 1 or engine.busted[0]:
+	if engine.busted[0]:
 		return false
-	_banner("Mesa desfeita", "Você é o último da mesa. Vai pra outra mesa na próxima rodada.", UIKit.MUTED)
-	await _wait(1.8)
+	# Sobrou só você: nível acaba (campeão ou outra mesa). Com 2 vivos e outras mesas no torneio,
+	# a mesa também se desfaz (mesa de 2 só na final, quando não há mais ninguém pra juntar).
+	var other_tables := (GameState.tournament.get("tables", []) as Array).size() > 1
+	if alive > 2 or (alive == 2 and not other_tables):
+		return false
+	_banner("Mesa desfeita", "Sobraram poucos nessa mesa. As jogadas que faltam não valem; o palpite vale pelo que já foi jogado.", UIKit.MUTED)
+	await _wait(2.2)
 	if not is_inside_tree() or finished:
 		return true
-	while not engine.is_round_over():
-		engine.draw_trick_modifier()
-		engine.begin_trick()
-		if engine.resolve_walkover().is_empty():
-			break
+	engine.void_remaining_tricks()   # sem vitórias de graça: o palpite é conferido com as jogadas disputadas
 	_banner_clear()
 	_refresh_hud()
 	return true
@@ -2626,6 +2634,7 @@ func _blitz_open_level() -> bool:
 	hold_stacks = []
 	hold_pot = -1.0
 	blitz_sitting_out = false
+	allin_notice_shown = false
 	for p in range(engine.num_players):
 		blitz_revealed[p] = false
 	blitz_showdown = false

@@ -378,6 +378,31 @@ func _test_chaos() -> void:
 		bu_done = bu.play(bu_cur, (bu.legal_for(bu_cur) as Array)[0])["trick_complete"]
 	check(bu_order.size() == 3 and not bu_order.has(1) and bu_order.has(0), "com um eliminado, jogam os outros 3 (você incluído) e a vaza fecha certo")
 
+	# ---- All-in no palpite: zerou a stack mas tem fichas no pote do nível → segue jogando; só cai depois da liquidação
+	var ai := ChaosEngine.new()
+	ai.setup_match({"seed": 9, "levels": 1, "mode": "blitz", "blind": 10, "players": 3, "stacks": [60.0, 500.0, 500.0]})
+	for ai_p in range(3):
+		ai.blitz_place(ai_p, 2)
+	check(is_equal_approx(float(ai.stacks[0]), 0.0) and float(ai.stakes[0]) > 0.0, "entrada do palpite pode levar toda a stack (all-in no palpite)")
+	check(ai.bust_broke().is_empty() and not bool(ai.busted[0]), "all-in no palpite NÃO é eliminado no meio da rodada")
+	# ---- Mesa desfeita no meio da rodada: jogadas que faltam não contam vitória; palpite vale pelo que já foi jogado
+	var vd := ChaosEngine.new()
+	vd.setup_match({"seed": 9, "levels": 1, "mode": "blitz", "blind": 10, "players": 3, "stacks": [500.0, 500.0, 500.0]})
+	for vd_p in range(3):
+		vd.blitz_place(vd_p, 1 if vd_p == 0 else 5)
+	vd.wins[0] = 1   # já bateu o palpite
+	vd.trick_number = 4
+	vd.void_remaining_tricks()
+	check(vd.is_round_over() and int(vd.wins[0]) == 1, "mesa desfeita: nenhuma vitória de graça nas jogadas que faltavam")
+	check((vd.blitz_result["hits"] as Array).has(0), "mesa desfeita: quem já tinha batido o palpite leva o prêmio")
+	# Desfeita antes de qualquer jogada: o nível não aconteceu, as entradas voltam
+	var vz := ChaosEngine.new()
+	vz.setup_match({"seed": 9, "levels": 1, "mode": "blitz", "blind": 10, "players": 3, "stacks": [500.0, 500.0, 500.0]})
+	for vz_p in range(3):
+		vz.blitz_place(vz_p, 2)
+	vz.void_remaining_tricks()
+	check(is_equal_approx(float(vz.stacks[0]) + float(vz.stacks[1]) + float(vz.stacks[2]), 1500.0) and is_equal_approx(float(vz.stacks[0]), 500.0), "mesa desfeita antes da 1ª jogada devolve as entradas do palpite")
+
 	# ---- Aposta estilo poker
 	var p1 := ChaosEngine.new()
 	p1.setup_match({"seed": 3})
