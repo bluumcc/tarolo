@@ -192,6 +192,24 @@ func _finish_card_drag() -> void:
 		g.queue_free())
 
 
+## Cancela arrasto em curso (ex.: timeout da vez) sem emitir throw_requested.
+func cancel_drag() -> void:
+	if _ghost == null or not is_instance_valid(_ghost):
+		_ghost = null
+		_card = null
+		return
+	var g := _ghost
+	var c := _card
+	_ghost = null
+	_card = null
+	_mode = ""
+	_pressing = false
+	if is_instance_valid(c):
+		c.visible = true
+		c.set_selected(false)
+	g.queue_free()
+
+
 func _draw() -> void:
 	var m := max_scroll()
 	if m <= 1.0:

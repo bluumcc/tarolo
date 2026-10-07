@@ -1317,7 +1317,9 @@ func _on_play_timeout() -> void:
 		if (c as CardData).points() < weakest.points():
 			weakest = c
 	human_turn = false
-	# Limpa qualquer carta que estivesse selecionada/ampliada no swipe.
+	# Cancela arrasto em curso (ghost pendurado no ghost_layer) e desmarca seleção.
+	if hand_scroller != null:
+		hand_scroller.cancel_drag()
 	if hand_container != null:
 		for c in hand_container.get_children():
 			(c as CardView).set_selected(false)
