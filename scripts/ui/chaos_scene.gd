@@ -45,6 +45,7 @@ var clock_in_modal := false    # palpite e aposta rodam com `modal_open` ligado:
 var clock_timeout := Callable()
 var main_area: Control
 var seat_nodes: Array = []
+var empty_seat_nodes: Array = []  # slots vazios (assentos 0–5 sem jogador real)
 var bet_pills: Array = []      # fichas apostadas na frente de cada jogador
 var order_badges: Array = []   # 1, 2, 3... = ordem de fala / de jogada
 var dealer_badges: Array = []
@@ -267,6 +268,11 @@ func _build_ui() -> void:
 	table_center.resized.connect(_layout_table)
 	for p in range(engine.num_players):
 		stage.add_child(_build_seat(p))
+	# Assentos fixos extras: slots vazios para os lugares não ocupados nessa partida.
+	for s in range(engine.num_players, TableEllipse.FIXED_SEATS):
+		var slot := _build_empty_slot(s)
+		empty_seat_nodes.append(slot)
+		stage.add_child(slot)
 	# Sua aposta da jogada: o mesmo texto de fichas dos rivais, em cima do seu avatar.
 	var me_seat := seat_nodes[0] as SeatView
 	my_bet_label = me_seat.bet_label
@@ -685,6 +691,23 @@ func _build_seat(p: int) -> SeatView:
 	return seat
 
 
+## Assento vazio: círculo pontilhado neon-dimmed para os slots sem jogador real.
+func _build_empty_slot(slot: int) -> Control:
+	var c := Control.new()
+	c.name = "EmptySlot%d" % slot
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.custom_minimum_size = Vector2(HexAvatar.SIZE_PX.x, HexAvatar.SIZE_PX.y)
+	c.set_script(null)
+	# Runa de tarot dimmed no centro do slot vazio.
+	var lbl := UIKit.label("✦", 28, Color(UIKit.TR_PURPLE_LIGHT, 0.35))
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.add_child(lbl)
+	return c
+
+
 ## Rivais em volta da mesa, com ângulos iguais entre si (o centro do avatar fica a ~12 px acima
 ## do ponto da borda); você no centro de baixo, com o avatar cruzando o topo do card roxo.
 func _layout_seats() -> void:
@@ -710,6 +733,18 @@ func _layout_seats() -> void:
 		seat.scale = Vector2(seat_k, seat_k)
 		var pt := table_center.seat_point(p, n)
 		seat.position = Vector2(pt.x - SeatView.W / 2.0, pt.y - SeatView.AVATAR_CENTER_Y)   # centro do avatar NA borda
+	# Posiciona os slots vazios nos ângulos fixos não ocupados.
+	var hw := HexAvatar.SIZE_PX.x / 2.0
+	var hh := HexAvatar.SIZE_PX.y / 2.0
+	for i in range(empty_seat_nodes.size()):
+		var slot := empty_seat_nodes[i] as Control
+		if slot == null:
+			continue
+		var s := n + i   # slot global (n..5)
+		var pt := table_center.seat_point(s, n)
+		slot.custom_minimum_size = Vector2(HexAvatar.SIZE_PX.x, HexAvatar.SIZE_PX.y)
+		slot.size = slot.custom_minimum_size
+		slot.position = Vector2(pt.x - hw, pt.y - hh)
 
 
 

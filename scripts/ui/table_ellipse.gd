@@ -15,6 +15,8 @@ const SEAT_BELOW := 78.0
 ## Quanto a mesa pode descer além da área do palco: o pedaço de baixo fica atrás do card roxo.
 const TABLE_DROP := 70.0
 
+## Mesa sempre exibe 6 assentos fixos; assentos sem jogador ficam vazios (dimmed).
+const FIXED_SEATS := 6
 var seat_count := 4
 var my_seat_y := 0.0           ## y máximo do centro do SEU avatar (embaixo, perto do card roxo); a mesa não passa disso
 var seat_floor := 0.0          ## y (da área da mesa) abaixo do qual nenhum rival pode chegar: o card roxo
@@ -110,7 +112,7 @@ func _fits(r_avail: float, ry: float, topc: float, n: int) -> bool:
 	if seat_floor <= 0.0:
 		return true
 	for p in range(1, n):
-		if border_point(seat_angle(p, n)).y + SEAT_BELOW > seat_floor:
+		if border_point(fixed_seat_angle(p)).y + SEAT_BELOW > seat_floor:
 			return false
 	return true
 
@@ -119,12 +121,14 @@ func center_point() -> Vector2:
 	return _center
 
 
-## Onde fica o centro do avatar do assento `p` (de `n`), na borda da mesa. Em pé: ângulos iguais.
+## Onde fica o centro do avatar do assento `p` (de `n`), na borda da mesa.
+## Em pé: sempre 6 posições fixas (a mesa acomoda qualquer quantidade de 2–6 jogadores sem
+## reposicionar; assentos ociosos ficam vazios mas ocupam o mesmo slot).
 ## Deitada (tela larga): você embaixo no centro; com 4+ jogadores um rival em cada ponta e o resto
 ## em cima, da esquerda pra direita (6: 3 em cima; 5: 2; 4: 1); com 2 ou 3, todos em cima.
 func seat_point(p: int, n: int) -> Vector2:
 	if not wide:
-		return border_point(seat_angle(p, n))
+		return border_point(fixed_seat_angle(p))
 	if p == 0:
 		return border_point(PI / 2.0)
 	var sides := n >= 4
@@ -168,7 +172,13 @@ func seat_dir(p: int, n: int) -> Vector2:
 	return d.normalized() if d.length() > 0.001 else Vector2(0.0, 1.0)
 
 
-## Ângulo do assento: o jogador 0 fica embaixo e os demais se distribuem com ângulos iguais.
+## Ângulo fixo do assento p (0–5) na mesa de 6 lugares: p=0 embaixo, sentido anti-horário.
+## p=0 baixo, p=1 baixo-esq, p=2 cima-esq, p=3 topo, p=4 cima-dir, p=5 baixo-dir.
+static func fixed_seat_angle(p: int) -> float:
+	return PI / 2.0 + TAU * float(p) / float(FIXED_SEATS)
+
+
+## Ângulo do assento (legado, usado pela mesa larga e por `seat_dir`).
 static func seat_angle(player: int, count: int) -> float:
 	return PI / 2.0 + TAU * float(player) / float(maxi(count, 1))
 
