@@ -15,9 +15,10 @@ const CARD_SCENE := preload("res://scenes/Card.tscn")
 ## As cartas da mão têm o tamanho cheio; as da mesa ficam menores pra caber 4 lado a lado.
 ## Relógios da mesa (um só, `_clock_start`): estourou, jogamos por você.
 const TURN_SECONDS := 10.0      # jogar a carta; estourou, joga a mais fraca
+const TURN_RING_DELAY := 3.0    # o anel do avatar fica cheio por N segundos antes de começar a drenar
 const DISCARD_SECONDS := 18.0   # descarte inicial; estourou, descarta as 2 mais fracas
 const PREDICT_SECONDS := 15.0   # profecia de vitórias; estourou, confirma a que estiver na tela
-const BET_SECONDS := 12.0       # apostar/passar/pagar/aumentar/desistir; estourou, passa (ou desiste se tiver que pagar)
+const BET_SECONDS := TURN_SECONDS  # apostar/passar/pagar/aumentar/desistir; estourou, passa (ou desiste se tiver que pagar)
 
 var engine := ChaosEngine.new()
 var config: Dictionary = {}
@@ -1349,14 +1350,23 @@ func _clock_stop() -> void:
 	clock_timeout = Callable()
 
 
+## Fração 1→0 para o anel do avatar humano.
+## Fica em 1.0 (cheio) durante TURN_RING_DELAY s; depois drena linearmente no tempo restante.
+func _ring_frac() -> float:
+	var active_window := maxf(clock_total - TURN_RING_DELAY, 0.1)
+	if clock_left >= active_window:
+		return 1.0
+	return clampf(clock_left / active_window, 0.0, 1.0)
+
+
 func _process(delta: float) -> void:
 	_sync_focus_ghost()
 	var me := seat_avatars[0] as HexAvatar if not seat_avatars.is_empty() else null
 	if me == null:
 		return
-	me.set_timer(clock_left / clock_total if clock_on else -1.0)
+	me.set_timer(_ring_frac() if clock_on else -1.0)
 	if phase_screen != null and phase_screen.visible:   # nas etapas sem mesa o anel de tempo fica no avatar grande
-		phase_screen.set_timer(clock_left / clock_total if clock_on else -1.0)
+		phase_screen.set_timer(_ring_frac() if clock_on else -1.0)
 	if not clock_on or paused or finished or (modal_open and not clock_in_modal):
 		return
 	clock_left -= minf(delta, 0.25)   # app em segundo plano/travada devolve um delta enorme: não pode estourar o relógio de uma vez
