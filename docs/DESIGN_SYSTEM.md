@@ -33,3 +33,8 @@ Coluna direita fixa (420 px): Registro, Modificador, Prêmio, Pote, ações. Cen
 
 ## Regra de ouro
 Precisa de um estilo novo? Primeiro veja se `DS`/`UIKit` já tem. Se não tiver, adicione lá — nunca na tela.
+
+## Imagens das cartas
+- Originais: `assets/cards/*.png` (540×900) — usadas no celular. **Editou/trocou uma? Mantenha o nome do arquivo.**
+- Desktop: `assets/cards_md/*.png` (360×600), geradas das originais. Depois de trocar qualquer imagem em `assets/cards/`, rode:
+  `godot --headless --path . -s res://tools/gen_cards_md.gd` (sem isso o desktop continua com a arte antiga).

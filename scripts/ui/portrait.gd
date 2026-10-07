@@ -41,6 +41,7 @@ func _draw() -> void:
 	for i in range(8):
 		var t := float(i) / 7.0
 		draw_circle(c, r * (1.0 - t * 0.85), (pal["bg2"] as Color).lerp(pal["bg1"], t))
+	draw_arc(c, r, 0.0, TAU, 96, pal["bg2"], 1.6, true)   # borda suavizada (draw_circle não tem antialiasing)
 	# ombros: fatia inferior do círculo com a borda de cima curva
 	var pts := PackedVector2Array()
 	for k in range(0, 21):
@@ -53,6 +54,7 @@ func _draw() -> void:
 		var t := float(k) / 12.0
 		pts.append(Vector2(lerpf(xl, xr, t), y_edge - r * 0.24 * sin(PI * t)))
 	draw_colored_polygon(pts, Color("#0d0a0b"))
+	draw_polyline(pts, Color("#0d0a0b"), 1.5, true)
 	# cabelo atrás, rosto, franja e olhos
 	_ellipse(c + Vector2(0, -r * 0.18), Vector2(r * 0.42, r * 0.46), pal["hair"])
 	_ellipse(c + Vector2(0, -r * 0.08), Vector2(r * 0.34, r * 0.40), pal["skin"])
@@ -71,6 +73,8 @@ func _ellipse(center: Vector2, radii: Vector2, col: Color) -> void:
 		var a := TAU * float(k) / 32.0
 		pts.append(center + Vector2(cos(a) * radii.x, sin(a) * radii.y))
 	draw_colored_polygon(pts, col)
+	draw_polyline(pts, col, 1.5, true)
+	draw_polyline(pts, col, 1.5, true)   # contorno suavizado na mesma cor: tira o serrilhado
 
 
 func _half_ellipse_top(center: Vector2, radii: Vector2, col: Color) -> void:
@@ -79,3 +83,4 @@ func _half_ellipse_top(center: Vector2, radii: Vector2, col: Color) -> void:
 		var a := PI + PI * float(k) / 16.0
 		pts.append(center + Vector2(cos(a) * radii.x, sin(a) * radii.y))
 	draw_colored_polygon(pts, col)
+	draw_polyline(pts, col, 1.5, true)
