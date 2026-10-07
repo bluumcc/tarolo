@@ -1317,6 +1317,11 @@ func _on_play_timeout() -> void:
 		if (c as CardData).points() < weakest.points():
 			weakest = c
 	human_turn = false
+	# Limpa qualquer carta que estivesse selecionada/ampliada no swipe.
+	if hand_container != null:
+		for c in hand_container.get_children():
+			(c as CardView).set_selected(false)
+	selected_view = null
 	_banner("Tempo esgotado", "", UIKit.LOSS)
 	human_card_chosen.emit(weakest)
 
