@@ -181,7 +181,12 @@ static func hand_strength(engine: ChaosEngine, player: int) -> float:
 ## Poder de uma carta (0 a 1) considerando as regras do nível.
 static func _card_power(engine: ChaosEngine, card: CardData, inverted: bool) -> float:
 	if card.is_louco():
-		return 0.05 if inverted else (0.85 if engine.louco_can_win() else 0.05)
+		return 0.05 if inverted else (1.0 if engine.louco_can_win() else 0.05)
+	if engine.modifier == ChaosModifiers.Modifier.SILENCIO:
+		# Arcano maior não corta: gastar um é desperdício, e a maior carta do naipe é que vence.
+		return 0.15 if card.is_trunfo() else 0.2 + 0.7 * float(card.rank) / 14.0
+	if engine.modifier == ChaosModifiers.Modifier.PITAGORICO and not card.is_trunfo():
+		return 0.1 + 0.7 * float(card.rank) / 14.0   # qualquer naipe: só o número conta
 	if inverted:
 		return 0.1 if card.is_trunfo() else 1.0 - float(card.rank) / 14.0 * 0.85
 	if card.is_trunfo():
@@ -408,15 +413,14 @@ static func _blitz_choose(engine: ChaosEngine, player: int, difficulty: int, rng
 	elif need == 0:
 		dv = -HIT_VALUE_BLINDS
 	# Efeitos de fichas do modificador (em blinds): Saque/Assalto rendem a quem vence, Maldita custa.
-	var blind := float(engine.blind)
 	match engine.active_modifier():
 		ChaosModifiers.Modifier.SAQUE:
-			dv += engine.chips_of(ChaosEngine.SAQUE_AMOUNT) * float(engine.active_count() - 1) / blind
+			dv += float(ChaosModifiers.STEAL_BLINDS)
 		ChaosModifiers.Modifier.ASSALTO_LIDER:
 			if player != engine._highest_player():
-				dv += engine.chips_of(ChaosEngine.ASSALTO_AMOUNT) / blind
+				dv += float(ChaosModifiers.STEAL_BLINDS)
 		ChaosModifiers.Modifier.VAZA_MALDITA:
-			dv -= engine.chips_of(ChaosEngine.CURSE_PENALTY) / blind
+			dv -= float(ChaosModifiers.STEAL_BLINDS)
 	var greed := 0.75 if style_of(engine, player) == Style.CAUTELOSO else (1.15 if style_of(engine, player) == Style.AGRESSIVO else 1.0)
 	var k := ChaosEngine.PRIZE_PER_POINT * engine.point_factor * greed
 	var n_active := engine.active_count()

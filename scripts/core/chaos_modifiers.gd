@@ -1,100 +1,68 @@
 class_name ChaosModifiers
 extends RefCounted
-## Modificadores do Caos/Blitz: SEMPRE por uma vaza só. Cada rodada sorteia uma ordem embaralhada
-## dos 12 (sem repetir dentro da rodada) e cada uma das 8 vazas usa a próxima da lista. Sempre
-## anunciado numa tela cheia antes da vaza começar — nenhum é surpresa: dá tempo de pensar e, no
-## Blitz, de decidir se vale a pena tentar vencer aquela vaza específica.
+## Modificadores do Blitz: SEMPRE por uma jogada só. Cada Ritual sorteia uma ordem embaralhada
+## dos 8 (sem repetir dentro do Ritual) e cada uma das 8 jogadas usa a próxima da lista. Sempre
+## anunciado numa tela cheia antes da jogada começar — nenhum é surpresa: dá tempo de pensar e
+## de decidir se vale a pena tentar vencer aquela jogada específica.
+## Nenhum mexe no valor (pontos) das cartas: só em quem vence, em quantas vitórias a jogada conta
+## ou em fichas movidas pelo blind (todos os de ficha movem o mesmo total).
 
 enum Modifier {
-	TRUNFO_DOBRO, FIGURAS_DOBRO, LOUCO_VENCE, NAIPE_FRACO, NAIPE_FORTE, VAZA_INVERTIDA,
-	VAZA_MAIS_UM, PEQUENAS_IMPORTAM, VAZA_DOURADA, SAQUE, ASSALTO_LIDER, VAZA_MALDITA,
+	LOUCO_VENCE, VAZA_INVERTIDA, VAZA_DOURADA, SAQUE, ASSALTO_LIDER, VAZA_MALDITA, SILENCIO, PITAGORICO,
 }
 
-## Os 11 modificadores ativos (Cada Jogada Vale +1 foi removido; o enum mantém o valor só por compatibilidade) — toda rodada embaralha esta lista e usa 8, um por vaza.
+## Os 8 modificadores: um por jogada do Ritual, sem repetir.
 const ALL := [
-	Modifier.TRUNFO_DOBRO, Modifier.FIGURAS_DOBRO, Modifier.LOUCO_VENCE, Modifier.NAIPE_FRACO,
-	Modifier.NAIPE_FORTE, Modifier.VAZA_INVERTIDA, Modifier.PEQUENAS_IMPORTAM,
-	Modifier.VAZA_DOURADA, Modifier.SAQUE, Modifier.ASSALTO_LIDER, Modifier.VAZA_MALDITA,
+	Modifier.LOUCO_VENCE, Modifier.VAZA_INVERTIDA, Modifier.VAZA_DOURADA, Modifier.SAQUE,
+	Modifier.ASSALTO_LIDER, Modifier.VAZA_MALDITA, Modifier.SILENCIO, Modifier.PITAGORICO,
 ]
-## Modificadores que sorteiam um naipe-alvo.
-const SUIT_MODS := [Modifier.NAIPE_FRACO, Modifier.NAIPE_FORTE]
+
 const NAMES := {
-	Modifier.TRUNFO_DOBRO: "Trunfo em Dobro",
-	Modifier.FIGURAS_DOBRO: "Figuras em Dobro",
-	Modifier.LOUCO_VENCE: "O Louco Vence",
-	Modifier.NAIPE_FRACO: "Naipe Fraco",
-	Modifier.NAIPE_FORTE: "Naipe Forte",
-	Modifier.VAZA_INVERTIDA: "Jogada Invertida",
-	Modifier.VAZA_MAIS_UM: "Cada Jogada Vale +1",
-	Modifier.PEQUENAS_IMPORTAM: "Cartas Pequenas Importam",
-	Modifier.VAZA_DOURADA: "Jogada Dourada",
+	Modifier.LOUCO_VENCE: "Loucura",
+	Modifier.VAZA_INVERTIDA: "Oposição",
+	Modifier.VAZA_DOURADA: "Transmutação",
 	Modifier.SAQUE: "Saque",
-	Modifier.ASSALTO_LIDER: "Assalto ao Líder",
-	Modifier.VAZA_MALDITA: "Jogada Maldita",
+	Modifier.ASSALTO_LIDER: "Assalto",
+	Modifier.VAZA_MALDITA: "Maldição",
+	Modifier.SILENCIO: "Silêncio",
+	Modifier.PITAGORICO: "Pitagórico",
 }
 
 const ICONS := {
-	Modifier.TRUNFO_DOBRO: "✦", Modifier.FIGURAS_DOBRO: "♛", Modifier.LOUCO_VENCE: "🃏",
-	Modifier.NAIPE_FRACO: "▽", Modifier.NAIPE_FORTE: "▲", Modifier.VAZA_INVERTIDA: "⇅",
-	Modifier.VAZA_MAIS_UM: "+1", Modifier.PEQUENAS_IMPORTAM: "•", Modifier.VAZA_DOURADA: "★",
+	Modifier.LOUCO_VENCE: "🃏", Modifier.VAZA_INVERTIDA: "⇅", Modifier.VAZA_DOURADA: "★",
 	Modifier.SAQUE: "⚔", Modifier.ASSALTO_LIDER: "♛", Modifier.VAZA_MALDITA: "☠",
+	Modifier.SILENCIO: "⊘", Modifier.PITAGORICO: "Σ",
 }
 
+## Texto curto (uma linha, entende-se em segundos). Serve de descrição na tela e na faixa da mesa.
 const DESCRIPTIONS := {
-	Modifier.TRUNFO_DOBRO: "Toda carta de Trunfo vale o DOBRO de pontos nessa jogada.",
-	Modifier.FIGURAS_DOBRO: "Valete, Cavaleiro, Dama e Rei valem o DOBRO de pontos nessa jogada.",
-	Modifier.LOUCO_VENCE: "Nessa jogada O Louco PODE vencer, como um Trunfo fraquinho (perde pra Trunfo de verdade, vence naipe comum).",
-	Modifier.NAIPE_FRACO: "Um naipe sorteado vale só METADE dos pontos nessa jogada.",
-	Modifier.NAIPE_FORTE: "Um naipe sorteado vale 1,5× os pontos nessa jogada.",
-	Modifier.VAZA_INVERTIDA: "Nessa jogada vence a MENOR carta do naipe. Trunfo não corta.",
-	Modifier.VAZA_MAIS_UM: "Quem vencer essa jogada ganha +1 ponto fixo.",
-	Modifier.PEQUENAS_IMPORTAM: "Nessa jogada, as cartas de 0,5 ponto valem 1,0.",
-	Modifier.VAZA_DOURADA: "Os pontos dessa jogada valem ×3.",
-	Modifier.SAQUE: "Quem vencer essa jogada rouba 2 pontos de cada rival.",
-	Modifier.ASSALTO_LIDER: "Quem vencer essa jogada rouba 4 pontos de quem lidera o placar.",
-	Modifier.VAZA_MALDITA: "Quem vencer essa jogada PERDE 3 pontos. Todo mundo quer perder!",
+	Modifier.LOUCO_VENCE: "O Louco vence qualquer carta, até arcano maior.",
+	Modifier.VAZA_INVERTIDA: "Vence a menor carta do naipe. Arcano maior só vale se abrir a jogada.",
+	Modifier.VAZA_DOURADA: "O vencedor conta 2 vitórias na profecia.",
+	Modifier.SAQUE: "O vencedor rouba 3 blinds, divididos entre os rivais.",
+	Modifier.ASSALTO_LIDER: "O vencedor rouba 3 blinds de quem tem mais fichas.",
+	Modifier.VAZA_MALDITA: "O vencedor paga 3 blinds, divididos entre os rivais.",
+	Modifier.SILENCIO: "Arcano maior não vence naipe. Vence a maior carta do naipe.",
+	Modifier.PITAGORICO: "Jogue qualquer naipe. Vence o maior número e o arcano maior ainda vence.",
 }
 
 ## Dica de jogada — o que fazer DIFERENTE por causa do modificador dessa jogada.
 const TIPS := {
-	Modifier.TRUNFO_DOBRO: "Vale gastar um Trunfo forte agora: essa jogada paga o dobro.",
-	Modifier.FIGURAS_DOBRO: "Se tiver uma figura na mão, essa é a hora de jogá-la.",
-	Modifier.LOUCO_VENCE: "O Louco pode roubar a jogada de qualquer naipe comum. Use-o como arma, não como fuga.",
-	Modifier.NAIPE_FRACO: "Livre-se agora das cartas desse naipe: elas não valem quase nada nessa jogada.",
-	Modifier.NAIPE_FORTE: "Vale disputar essa jogada com esse naipe: paga mais que o normal.",
-	Modifier.VAZA_INVERTIDA: "Tudo se inverte: a menor carta vence. Jogue baixo se quiser ganhar.",
-	Modifier.VAZA_MAIS_UM: "Jogada pequena que ainda compensa: vale +1 ponto fixo além do normal.",
-	Modifier.PEQUENAS_IMPORTAM: "Até a carta mais fraca da mão rende o dobro agora.",
-	Modifier.VAZA_DOURADA: "Essa jogada vale ×3. Se tiver uma carta forte, é a hora de usá-la.",
-	Modifier.SAQUE: "Vencer essa jogada rouba pontos dos rivais, além do normal.",
-	Modifier.ASSALTO_LIDER: "Vencer essa jogada rouba de quem lidera o placar.",
-	Modifier.VAZA_MALDITA: "Vencer essa jogada custa pontos. Tente perder essa uma!",
+	Modifier.LOUCO_VENCE: "Quem tiver O Louco na mão ganha a jogada na hora, se o jogar.",
+	Modifier.VAZA_INVERTIDA: "Jogue baixo para ganhar. Se um arcano maior abrir a jogada, vence o menor arcano maior.",
+	Modifier.VAZA_DOURADA: "Faltam 2 vitórias para a sua profecia? Ganhar só essa já fecha a conta. Se não quer ganhar, fuja dela.",
+	Modifier.SAQUE: "Ganhar rende fichas dos rivais, além de contar a vitória. Só ganhe se também servir à sua profecia.",
+	Modifier.ASSALTO_LIDER: "Rouba de quem tem mais fichas na mesa, não de quem está perto na profecia.",
+	Modifier.VAZA_MALDITA: "Ganhar custa fichas de verdade, além de contar a vitória. Pense bem antes de forçar.",
+	Modifier.SILENCIO: "Quem não tem o naipe ainda é obrigado a jogar arcano maior, que não vence. Se um arcano maior abrir a jogada, eles disputam entre si.",
+	Modifier.PITAGORICO: "Toda a mão pode ser jogada. Se houver arcano maior na mesa, vence o maior deles. Empate de número: vale o naipe.",
 }
 
-## No Blitz os pontos das cartas viram fichas (pagas pelos rivais, num fator menor que no Caos).
-## O único "dobro" que vale lá é a Jogada Dobrada: a jogada conta 2 VITÓRIAS no palpite. Os
-## modificadores que dobram pontos (Trunfo em Dobro, Figuras em Dobro) ficam de fora do Blitz —
-## se confundiriam com as vitórias. Textos próprios trocam "pontos" por "fichas das cartas".
-const BLITZ_EXCLUDED := [Modifier.TRUNFO_DOBRO, Modifier.FIGURAS_DOBRO]
-const BLITZ_NAMES := {Modifier.VAZA_DOURADA: "Jogada Dobrada"}
-const BLITZ_DESCRIPTIONS := {
-	Modifier.VAZA_DOURADA: "Quem vencer essa jogada conta 2 vitórias no palpite, em vez de 1.",
-	Modifier.NAIPE_FRACO: "Um naipe sorteado paga só METADE das fichas nessa jogada.",
-	Modifier.NAIPE_FORTE: "Um naipe sorteado paga 1,5× as fichas nessa jogada.",
-	Modifier.PEQUENAS_IMPORTAM: "Nessa jogada, as cartas de 0,5 pt pagam como se valessem 1,0.",
-	Modifier.SAQUE: "Quem vencer essa jogada rouba fichas de cada rival, além de contar a vitória.",
-	Modifier.ASSALTO_LIDER: "Quem vencer essa jogada rouba fichas de quem lidera a stack, além de contar a vitória.",
-	Modifier.VAZA_MALDITA: "Quem vencer essa jogada PAGA fichas aos rivais, além de contar a vitória.",
-}
-const BLITZ_TIPS := {
-	Modifier.VAZA_DOURADA: "Muda a conta do palpite: se você quer 2 vitórias, basta ganhar só essa. Se não quer, fuja dela.",
-	Modifier.NAIPE_FRACO: "As cartas desse naipe quase não pagam: bom momento pra descartá-las sem pagar caro se perder.",
-	Modifier.NAIPE_FORTE: "As cartas desse naipe pagam mais: quem perder com uma delas na mesa paga a mais.",
-	Modifier.PEQUENAS_IMPORTAM: "Até as cartas fracas pagam agora: a jogada fica mais cara pra quem perde.",
-	Modifier.SAQUE: "Vencer rende fichas extras aqui, mas só conta 1 vitória — vença só se também servir ao seu palpite.",
-	Modifier.ASSALTO_LIDER: "Rouba de quem tem mais fichas na mesa, não necessariamente de quem está por perto no palpite.",
-	Modifier.VAZA_MALDITA: "Vencer aqui custa fichas de verdade, não só a conta do palpite. Pense bem antes de forçar essa vitória.",
-}
+## Fichas movidas (em blinds) pelos três modificadores de ficha: o mesmo total em qualquer mesa.
+const STEAL_BLINDS := 3
+
+## Desempate do Pitagórico, do mais forte ao mais fraco: Espadas, Copas, Paus, Ouros.
+const TIE_ORDER := [CardData.Suit.ESPADAS, CardData.Suit.COPAS, CardData.Suit.PAUS, CardData.Suit.OUROS]
 
 const COMBO_NAMES := {
 	"MAO_QUENTE": "MÃO QUENTE",
@@ -115,18 +83,9 @@ const COMBO_DESCRIPTIONS := {
 }
 
 
-static func has_suit(modifier: int) -> bool:
-	return SUIT_MODS.has(modifier)
-
-
-## Modificadores sorteáveis no Blitz (todos menos a Jogada Dourada).
+## Os 8 modificadores são sorteáveis (o Blitz usa todos).
 static func blitz_pool() -> Array:
-	return ALL.filter(func(m: int) -> bool: return not BLITZ_EXCLUDED.has(m))
-
-
-## Verdadeiro se o modificador aparece no Blitz.
-static func has_blitz_effect(modifier: int) -> bool:
-	return not BLITZ_EXCLUDED.has(modifier)
+	return ALL.duplicate()
 
 
 static func color_of(modifier: int) -> Color:
@@ -135,47 +94,23 @@ static func color_of(modifier: int) -> Color:
 	return UIKit.COMBO
 
 
-## Rótulo pronto pra tela — inclui o naipe sorteado quando o modificador tem naipe.
-static func label(modifier: int, weak_suit: int) -> String:
-	if has_suit(modifier) and weak_suit != -1:
-		return "%s (%s)" % [NAMES[modifier], CardData.SUIT_NAMES[weak_suit]]
-	return NAMES[modifier]
+## Rótulo pronto pra tela.
+static func label(modifier: int) -> String:
+	return str(NAMES[modifier])
 
 
-## Texto do modificador conforme o modo (Blitz reescreve alguns).
-static func name_of(modifier: int, blitz := false) -> String:
-	return str(BLITZ_NAMES[modifier]) if blitz and BLITZ_NAMES.has(modifier) else str(NAMES[modifier])
+static func name_of(modifier: int) -> String:
+	return str(NAMES[modifier])
 
 
-static func desc_of(modifier: int, blitz := false) -> String:
-	if blitz and BLITZ_DESCRIPTIONS.has(modifier):
-		return str(BLITZ_DESCRIPTIONS[modifier])
+static func desc_of(modifier: int) -> String:
 	return str(DESCRIPTIONS[modifier])
 
 
 ## Descrição de uma linha (cabe na faixa do card da mesa).
-const SHORT := {
-	Modifier.TRUNFO_DOBRO: "Trunfos valem o dobro.",
-	Modifier.FIGURAS_DOBRO: "Figuras valem o dobro.",
-	Modifier.LOUCO_VENCE: "O Louco pode vencer.",
-	Modifier.NAIPE_FRACO: "Naipe sorteado paga metade.",
-	Modifier.NAIPE_FORTE: "Naipe sorteado paga 1,5×.",
-	Modifier.VAZA_INVERTIDA: "Vence a menor carta. Trunfo não corta.",
-	Modifier.VAZA_MAIS_UM: "Quem vence ganha +1 ponto.",
-	Modifier.PEQUENAS_IMPORTAM: "Cartas de 0,5 valem 1,0.",
-	Modifier.VAZA_DOURADA: "Pontos ×3.",
-	Modifier.SAQUE: "Quem vence rouba de cada rival.",
-	Modifier.ASSALTO_LIDER: "Quem vence rouba de quem lidera.",
-	Modifier.VAZA_MALDITA: "Quem vence paga aos rivais.",
-}
-const BLITZ_SHORT := {Modifier.VAZA_DOURADA: "Vale 2 vitórias no palpite."}
+static func short_of(modifier: int) -> String:
+	return str(DESCRIPTIONS[modifier])
 
 
-static func short_of(modifier: int, blitz := false) -> String:
-	if blitz and BLITZ_SHORT.has(modifier):
-		return str(BLITZ_SHORT[modifier])
-	return str(SHORT[modifier])
-
-
-static func tip_of(modifier: int, blitz := false) -> String:
-	return str(BLITZ_TIPS[modifier]) if blitz and BLITZ_TIPS.has(modifier) else str(TIPS[modifier])
+static func tip_of(modifier: int) -> String:
+	return str(TIPS[modifier])

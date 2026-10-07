@@ -272,31 +272,92 @@ func _test_chaos() -> void:
 	check((e.hands[0] as Array).size() == ChaosEngine.HAND_SIZE, "Caos: 8 cartas por jogador")
 	check(e.blind == 10 and int(e.stacks[0]) == 400, "mesa padrão: blind 10 e stack de 40 blinds")
 
-	e.modifier = ChaosModifiers.Modifier.TRUNFO_DOBRO
-	check(e.card_value(c(4, 5)) == 1.0, "Trunfo em Dobro: 0,5 vira 1,0")
-	check(e.card_value(c(0, 14)) == 4.5, "Trunfo em Dobro não afeta Rei de naipe comum")
+	# Nenhum modificador mexe no valor (pontos) das cartas.
+	for m in ChaosModifiers.ALL:
+		e.modifier = m
+		check(e.card_value(c(0, 14)) == 4.5 and e.card_value(c(4, 5)) == 0.5 and e.card_value(c(1, 3)) == 0.5, "modificador %s não muda o valor das cartas" % ChaosModifiers.name_of(m))
 
-	e.modifier = ChaosModifiers.Modifier.FIGURAS_DOBRO
-	check(e.card_value(c(0, 14)) == 9.0, "Figuras em Dobro: Rei de 4,5 vira 9,0")
-	check(e.card_value(c(0, 11)) == 3.0, "Figuras em Dobro: Valete de 1,5 vira 3,0")
-	check(e.card_value(c(4, 14)) == 0.5, "Figuras em Dobro não afeta Trunfo 14 (não é figura de naipe comum)")
-
-	e.modifier = ChaosModifiers.Modifier.NAIPE_FRACO
-	e.weak_suit = CardData.Suit.OUROS
-	check(e.card_value(c(0, 14)) == 2.25, "Naipe Fraco: Rei de Ouros de 4,5 vira 2,25")
-	check(e.card_value(c(1, 14)) == 4.5, "Naipe Fraco não afeta naipe diferente do sorteado")
-
-	# O Louco Vence: TrickRules trata O Louco como Trunfo fraco (perde pra Trunfo real).
+	# Loucura: O Louco vence qualquer carta, até arcano maior.
+	var mods := ChaosModifiers.Modifier
 	var louco_plays := [
 		{"player": 0, "card": c(2, 14)},
 		{"player": 1, "card": CardData.louco()},
 		{"player": 2, "card": c(2, 3)},
 		{"player": 3, "card": c(2, 9)},
 	]
-	check(TrickRules.winning_index(louco_plays, true) == 1, "com O Louco Vence, ele bate qualquer carta de naipe comum")
-	check(TrickRules.winning_index(louco_plays, false) == 0, "sem o modificador, O Louco nunca vence (regra normal intacta)")
+	check(TrickRules.winning_index_mod(louco_plays, mods.LOUCO_VENCE) == 1, "Loucura: O Louco bate qualquer carta de naipe comum")
+	check(TrickRules.winning_index_mod(louco_plays, mods.SAQUE) == 0, "sem a Loucura, O Louco nunca vence (regra normal intacta)")
 	var louco_vs_trunfo := louco_plays + [{"player": 0, "card": c(4, 3)}]
-	check(TrickRules.winning_index(louco_vs_trunfo, true) == 4, "O Louco perde pra um Trunfo de verdade mesmo com o modificador ativo")
+	check(TrickRules.winning_index_mod(louco_vs_trunfo, mods.LOUCO_VENCE) == 1, "Loucura: O Louco vence até um arcano maior")
+	check(TrickRules.would_win_mod(CardData.louco(), 1, [{"player": 0, "card": c(4, 21)}], mods.LOUCO_VENCE), "Loucura: would_win do Louco sobre o Trunfo 21")
+
+	# Oposição: vence a MENOR do naipe. Arcano maior só vale se abrir a jogada.
+	var opo := [
+		{"player": 0, "card": c(1, 9)},
+		{"player": 1, "card": c(1, 2)},
+		{"player": 2, "card": c(4, 5)},
+		{"player": 3, "card": c(1, 12)},
+	]
+	check(TrickRules.winning_index_mod(opo, mods.VAZA_INVERTIDA) == 1, "Oposição: a menor do naipe vence e o arcano maior não corta")
+	var opo_trunfo := [
+		{"player": 0, "card": c(4, 15)},
+		{"player": 1, "card": c(4, 3)},
+		{"player": 2, "card": c(1, 2)},
+		{"player": 3, "card": c(4, 20)},
+	]
+	check(TrickRules.winning_index_mod(opo_trunfo, mods.VAZA_INVERTIDA) == 1, "Oposição: se o arcano maior abriu, vence o menor arcano maior")
+
+	# Silêncio: arcano maior não vence naipe (vence a maior do naipe). Se ele abriu, disputam entre si.
+	var sil := [
+		{"player": 0, "card": c(1, 9)},
+		{"player": 1, "card": c(1, 12)},
+		{"player": 2, "card": c(4, 21)},
+		{"player": 3, "card": c(1, 3)},
+	]
+	check(TrickRules.winning_index_mod(sil, mods.SILENCIO) == 1, "Silêncio: o arcano maior não corta, vence a maior do naipe")
+	check(TrickRules.winning_index(sil) == 2, "sem o Silêncio, o Trunfo corta (regra normal intacta)")
+	var sil_trunfo := [
+		{"player": 0, "card": c(4, 8)},
+		{"player": 1, "card": c(1, 14)},
+		{"player": 2, "card": c(4, 19)},
+		{"player": 3, "card": c(4, 2)},
+	]
+	check(TrickRules.winning_index_mod(sil_trunfo, mods.SILENCIO) == 2, "Silêncio: se o arcano maior abriu, vence o maior arcano maior")
+
+	# Pitagórico: qualquer carta pode ser jogada; vence o maior número (arcano maior ainda vence); empate pelo naipe.
+	var pit_hand := [c(0, 3), c(2, 9), c(4, 5), CardData.louco()]
+	check(TrickRules.legal_cards_for(pit_hand, [{"player": 3, "card": c(1, 8)}], false, mods.PITAGORICO).size() == 4, "Pitagórico: toda a mão é jogável, sem seguir o naipe")
+	check(TrickRules.legal_cards_for(pit_hand, [{"player": 3, "card": c(1, 8)}], false, mods.SAQUE).size() == 2, "fora do Pitagórico, a obrigação de naipe/Trunfo continua")
+	var pit := [
+		{"player": 0, "card": c(1, 8)},
+		{"player": 1, "card": c(2, 13)},
+		{"player": 2, "card": c(0, 11)},
+		{"player": 3, "card": c(3, 6)},
+	]
+	check(TrickRules.winning_index_mod(pit, mods.PITAGORICO) == 1, "Pitagórico: vence o maior número, qualquer naipe")
+	var pit_tie := [
+		{"player": 0, "card": c(1, 10)},
+		{"player": 1, "card": c(2, 10)},
+		{"player": 2, "card": c(0, 10)},
+		{"player": 3, "card": c(3, 10)},
+	]
+	check(TrickRules.winning_index_mod(pit_tie, mods.PITAGORICO) == 3, "Pitagórico: empate de número vale o naipe (Espadas > Copas > Paus > Ouros)")
+	var pit_order := ChaosModifiers.TIE_ORDER
+	check(pit_order == [CardData.Suit.ESPADAS, CardData.Suit.COPAS, CardData.Suit.PAUS, CardData.Suit.OUROS], "ordem de desempate: Espadas, Copas, Paus, Ouros")
+	var pit_trunfo := [
+		{"player": 0, "card": c(1, 14)},
+		{"player": 1, "card": c(4, 2)},
+		{"player": 2, "card": c(2, 14)},
+		{"player": 3, "card": c(4, 7)},
+	]
+	check(TrickRules.winning_index_mod(pit_trunfo, mods.PITAGORICO) == 3, "Pitagórico: o arcano maior ainda vence (o maior deles)")
+	var pe := ChaosEngine.new()
+	pe.setup_match({"seed": 4, "mode": "blitz", "blind": 10})
+	pe.modifier = mods.PITAGORICO
+	pe.hands[0] = [c(0, 3), c(2, 9)]
+	pe.plays = [{"player": 3, "card": c(1, 8)}]
+	pe.current = 0
+	check(pe.legal_for(0).size() == 2 and bool(pe.play(0, c(0, 3))["ok"]), "Pitagórico: o motor aceita jogar outro naipe")
 
 	# Sem obrigação de cobrir no Caos (o Vanilla continua com ela).
 	var lg := ChaosEngine.new()
@@ -602,8 +663,8 @@ func _test_chaos() -> void:
 	pb.hands[2] = [c(CardData.Suit.PAUS, 2), c(CardData.Suit.PAUS, 3), c(CardData.Suit.COPAS, 4), c(CardData.Suit.OUROS, 5)]
 	check(ChaosBot.hand_strength(pb, 3) > ChaosBot.hand_strength(pb, 2) + 0.4, "mão com Trunfos altos e Reis é bem mais forte")
 	pb.modifier = ChaosModifiers.Modifier.VAZA_INVERTIDA
-	check(ChaosBot.hand_strength(pb, 2) > ChaosBot.hand_strength(pb, 3), "na Rodada Invertida, cartas baixas são fortes")
-	pb.modifier = ChaosModifiers.Modifier.TRUNFO_DOBRO
+	check(ChaosBot.hand_strength(pb, 2) > ChaosBot.hand_strength(pb, 3), "na Oposição, cartas baixas são fortes")
+	pb.modifier = ChaosModifiers.Modifier.VAZA_DOURADA
 	pb.begin_trick()
 	var pbr := RandomNumberGenerator.new()
 	pbr.seed = 3
@@ -666,8 +727,9 @@ func _test_chaos() -> void:
 		{"player": 2, "card": c(CardData.Suit.PAUS, 3)},
 		{"player": 3, "card": c(CardData.Suit.PAUS, 6)},
 	]
+	e7.stacks = [200.0, 200.0, 200.0, 200.0]
 	var curse := e7._resolve_trick()
-	check(float(curse["points"]) < 0.0, "Vaza Maldita: quem vence perde pontos")
+	check(is_equal_approx(float(curse["curse_amount"]), 30.0), "Maldição: quem vence paga 3 blinds (30 com blind 10), divididos entre os rivais")
 	# Bots cientes dos modificadores
 	var eb := ChaosEngine.new()
 	eb.setup_match({"seed": 1})
@@ -691,23 +753,7 @@ func _test_chaos() -> void:
 	eb.hands[3] = [c(CardData.Suit.PAUS, 12), c(CardData.Suit.PAUS, 1)]
 	pick = ChaosBot.choose(eb, 3, BotAI.Difficulty.HARD, brng)
 	check(pick.rank == 1 and eb.would_win(pick, 3), "Vaza Invertida: bot vence com a menor carta")
-	e7.modifier = ChaosModifiers.Modifier.PEQUENAS_IMPORTAM
-	check(e7.card_value(c(CardData.Suit.PAUS, 3)) == 1.0, "Cartas Pequenas Importam: 0,5 vira 1,0")
-	e7.modifier = ChaosModifiers.Modifier.NAIPE_FORTE
-	e7.weak_suit = CardData.Suit.PAUS
-	check(e7.card_value(c(CardData.Suit.PAUS, 14)) == 6.75, "Naipe Forte: 1,5x nos pontos do naipe")
-	e7.modifier = ChaosModifiers.Modifier.VAZA_MAIS_UM
-	e7.streak = [0, 0, 0, 0]
-	e7.last_winner = -1
-	e7.trick_number = 1
-	e7.plays = [
-		{"player": 0, "card": c(CardData.Suit.PAUS, 9)},
-		{"player": 1, "card": c(CardData.Suit.PAUS, 2)},
-		{"player": 2, "card": c(CardData.Suit.PAUS, 3)},
-		{"player": 3, "card": c(CardData.Suit.PAUS, 6)},
-	]
-	check(is_equal_approx(float(e7._resolve_trick()["bonus"]), 1.0), "Cada Vaza Vale +1 soma 1 ponto fixo")
-	e7.modifier = ChaosModifiers.Modifier.TRUNFO_DOBRO
+	e7.modifier = ChaosModifiers.Modifier.LOUCO_VENCE
 	e7.trick_number = 0
 	e7.last_winner = 0
 	e7.streak = [2, 0, 0, 0]
@@ -719,7 +765,7 @@ func _test_chaos() -> void:
 	]
 	var hot := e7._resolve_trick()
 	check("MAO_QUENTE" in hot["combos"], "3ª vitória seguida é MÃO QUENTE")
-	# Sorteio por vaza: cada nível embaralha os 12 e usa 8, um por vaza, sem repetir no nível.
+	# Sorteio por jogada: cada Ritual embaralha os 8 e usa todos, um por vaza, sem repetir no nível.
 	var e8 := ChaosEngine.new()
 	e8.setup_match({"seed": 11})
 	check(e8.modifier == -1, "antes da 1ª vaza começar, ainda não tem modificador sorteado")
@@ -730,10 +776,8 @@ func _test_chaos() -> void:
 		check(e8.modifier != -1, "toda vaza sorteia um modificador")
 		check(not seen.has(e8.modifier), "não repete modificador dentro do mesmo nível")
 		seen[e8.modifier] = true
-		if ChaosModifiers.has_suit(e8.modifier):
-			check(e8.weak_suit != -1, "modificador de naipe sorteia o naipe")
 	check(seen.size() == ChaosEngine.HAND_SIZE, "as 8 vazas do nível usam 8 modificadores diferentes")
-	check(ChaosModifiers.ALL.size() == 11, "são 11 modificadores ao todo")
+	check(ChaosModifiers.ALL.size() == 8, "são 8 modificadores ao todo")
 
 
 ## Bots estratégicos: só fazem jogadas legais em qualquer nível e, na defesa, seguram muito
@@ -984,17 +1028,16 @@ func _test_blitz() -> void:
 	cv.stacks[2] = 0.0
 	check(not cv.can_cover(2), "Blitz: sem fichas pra pagar a entrada, não cobre")
 
-	# Rodada Dourada não entra no sorteio do Blitz (confundiria com as vitórias do palpite).
+	# Os 8 modificadores entram no sorteio e nenhum Ritual repete um.
 	var pool := ChaosModifiers.blitz_pool()
-	check(pool.size() == 9 and pool.has(ChaosModifiers.Modifier.VAZA_DOURADA) and not pool.has(ChaosModifiers.Modifier.TRUNFO_DOBRO) and not pool.has(ChaosModifiers.Modifier.FIGURAS_DOBRO), "Blitz: sorteio de 9 (Rodada Dobrada fica; Trunfo/Figuras em Dobro saem)")
+	check(pool.size() == 8 and pool.has(ChaosModifiers.Modifier.PITAGORICO) and pool.has(ChaosModifiers.Modifier.SILENCIO), "Blitz: sorteio dos 8 modificadores novos")
 	var gp := ChaosEngine.new()
-	var dobro_seen := false
 	for lv in range(12):
 		gp.setup_match({"seed": 100 + lv, "mode": "blitz", "blind": 10})
-		var sq: Array = gp.modifier_sequence
-		if sq.has(ChaosModifiers.Modifier.TRUNFO_DOBRO) or sq.has(ChaosModifiers.Modifier.FIGURAS_DOBRO):
-			dobro_seen = true
-	check(not dobro_seen, "Blitz: nenhum nível sorteia modificador que dobra pontos")
+		var uniq := {}
+		for m in gp.modifier_sequence:
+			uniq[m] = true
+		check(uniq.size() == 8 and gp.modifier_sequence.size() == ChaosEngine.HAND_SIZE, "Blitz: cada Ritual usa os 8 modificadores, sem repetir")
 
 	# Pontos das cartas viram fichas, pagas pelos rivais: 4,5 + 3×0,5 = 6 pts → 6×0,25×10×0,5 = 7,5 → 8, 3 cada.
 	var g2 := ChaosEngine.new()
@@ -1059,8 +1102,7 @@ func _test_blitz() -> void:
 	gs.current = 0
 	for pl in range(4):
 		gs.play(pl, (gs.hands[pl] as Array)[0])
-	var take := gs.chips_of(ChaosEngine.SAQUE_AMOUNT)
-	check(is_equal_approx(float(gs.stacks[0]), 200.0 + 3.0 * take) and is_equal_approx(float(gs.stacks[1]), 200.0 - take), "Blitz: Saque rouba fichas de cada rival, além de contar a vitória")
+	check(is_equal_approx(float(gs.stacks[0]), 230.0) and is_equal_approx(float(gs.stacks[1]), 190.0), "Blitz: Saque rouba 3 blinds no total (10 de cada rival), além de contar a vitória")
 
 	var ga := ChaosEngine.new()
 	ga.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "point_factor": 0.0, "stacks": [200.0, 200.0, 500.0, 200.0]})
@@ -1073,8 +1115,7 @@ func _test_blitz() -> void:
 	ga.current = 0
 	for pl in range(4):
 		ga.play(pl, (ga.hands[pl] as Array)[0])
-	var stolen := ga.chips_of(ChaosEngine.ASSALTO_AMOUNT)
-	check(is_equal_approx(float(ga.stacks[0]), 200.0 + stolen) and is_equal_approx(float(ga.stacks[2]), 500.0 - stolen), "Blitz: Assalto ao Líder rouba de quem lidera a stack, além de contar a vitória")
+	check(is_equal_approx(float(ga.stacks[0]), 230.0) and is_equal_approx(float(ga.stacks[2]), 470.0), "Blitz: Assalto rouba 3 blinds de quem tem mais fichas, além de contar a vitória")
 
 	var gm := ChaosEngine.new()
 	gm.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "point_factor": 0.0, "stacks": [200.0, 200.0, 200.0, 200.0]})
@@ -1087,7 +1128,36 @@ func _test_blitz() -> void:
 	gm.current = 0
 	for pl in range(4):
 		gm.play(pl, (gm.hands[pl] as Array)[0])
-	check(float(gm.stacks[0]) < 200.0 and float(gm.stacks[1]) > 200.0, "Blitz: Rodada Maldita faz quem vence pagar aos rivais, além de contar a vitória")
+	check(is_equal_approx(float(gm.stacks[0]), 170.0) and is_equal_approx(float(gm.stacks[1]), 210.0), "Blitz: Maldição faz quem vence pagar 3 blinds aos rivais, além de contar a vitória")
+
+	# Quem zera por causa de um modificador de ficha é eliminado (perde a mão e sai da mesa).
+	var gz := ChaosEngine.new()
+	gz.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "point_factor": 0.0, "stacks": [200.0, 5.0, 200.0, 200.0]})
+	gz.modifier = ChaosModifiers.Modifier.SAQUE
+	gz.hands[0] = [c(CardData.Suit.TRUNFO, 20)]
+	gz.hands[1] = [c(CardData.Suit.PAUS, 3)]
+	gz.hands[2] = [c(CardData.Suit.PAUS, 4)]
+	gz.hands[3] = [c(CardData.Suit.PAUS, 5)]
+	gz.leader = 0
+	gz.current = 0
+	for pl in range(4):
+		gz.play(pl, (gz.hands[pl] as Array)[0])
+	check(float(gz.stacks[1]) == 0.0 and not bool(gz.busted[1]), "Saque: quem tinha 5 fichas paga só o que tem e zera")
+	check(gz.bust_broke() == [1] and bool(gz.busted[1]), "quem zerou pelo Saque é eliminado na checagem de quebra")
+	gz.begin_trick()
+	check(bool(gz.folded[1]) and not gz.to_act.has(1), "eliminado fica fora da jogada seguinte: sem ante, sem fala, sem carta")
+	var gw := ChaosEngine.new()
+	gw.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "point_factor": 0.0, "stacks": [18.0, 200.0, 200.0, 200.0]})
+	gw.modifier = ChaosModifiers.Modifier.VAZA_MALDITA
+	gw.hands[0] = [c(CardData.Suit.TRUNFO, 20)]
+	gw.hands[1] = [c(CardData.Suit.PAUS, 3)]
+	gw.hands[2] = [c(CardData.Suit.PAUS, 4)]
+	gw.hands[3] = [c(CardData.Suit.PAUS, 5)]
+	gw.leader = 0
+	gw.current = 0
+	for pl in range(4):
+		gw.play(pl, (gw.hands[pl] as Array)[0])
+	check(float(gw.stacks[0]) == 0.0 and gw.bust_broke() == [0], "Maldição: quem vence e fica sem fichas é eliminado também")
 
 	# Bots: palpite em 0..8, calibrado com a média real (2 vitórias por jogador).
 	var cal := ChaosEngine.new()

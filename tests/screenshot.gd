@@ -34,6 +34,8 @@ func _ready() -> void:
 	get_tree().root.add_child.call_deferred(inst)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	if args.has("firstmod") and inst.get("engine") != null:
+		inst.engine.modifier_sequence[0] = int(args["firstmod"])   # força o modificador da 1ª jogada (ex.: 7 = Pitagórico)
 	if args.has("bid"):
 		await get_tree().create_timer(0.6).timeout
 		inst.human_bid_chosen.emit(int(args["bid"]))

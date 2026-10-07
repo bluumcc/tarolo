@@ -1,57 +1,42 @@
-# Modificadores do modo Caos/Blitz
+# Modificadores do Blitz
 
-Todo nível embaralha os modificadores (11 no Caos, 9 no Blitz — sem Trunfo/Figuras em Dobro) e usa 8, um por rodada, sem repetir dentro do
-nível. Sempre por UMA rodada só — não existe mais modificador de nível inteiro. Antes de cada
-rodada, uma tela cheia explica a regra com objetividade (sem distrações) e uma contagem visível
-até começar (~3s; toca em "ENTENDI, CONTINUAR" pra pular). Nenhum é surpresa: o jogador sempre
-sabe a regra antes de decidir, e no Blitz o palpite pode contar com essa informação a cada rodada.
+Todo Ritual usa os 8 modificadores, embaralhados, um por jogada e sem repetir. Cada um vale por UMA
+jogada só. Antes de cada jogada, uma tela cheia explica a regra (e uma contagem visível até
+começar, ~3s, que se pula tocando em "ENTENDI, CONTINUAR"). Nenhum é surpresa: o jogador sempre
+sabe a regra antes de decidir.
 
-Código: `scripts/core/chaos_modifiers.gd` (lista, textos), `ChaosEngine.draw_trick_modifier()`
-(sorteio), `ChaosScene._trick_start()` (tela cheia + contagem).
+Nenhum modificador mexe no valor (pontos) das cartas. Eles mudam só quem vence, quantas vitórias
+a jogada conta ou quantas fichas se movem. Os três de ficha movem o MESMO total, **3 blinds**, em
+qualquer mesa, dividido entre os rivais quando há vários.
 
-## Os 11 (o Blitz sorteia 9)
+Código: `scripts/core/chaos_modifiers.gd` (lista, nomes, textos), `scripts/core/trick_rules.gd`
+(`winning_index_mod`, `legal_cards_for`), `ChaosEngine.draw_trick_modifier()` (sorteio),
+`ChaosEngine._modifier_chips()` (fichas), `ChaosScene._modifier_transition()` (tela cheia).
 
-| Modificador | O que muda | No Blitz |
+## Os 8
+
+| Nome | Texto (uma linha) | Regra |
 |---|---|---|
-| Trunfo em Dobro | Todo Trunfo vale o dobro de pontos | não entra no sorteio (dobrar pontos se confunde com vitórias) |
-| Figuras em Dobro | Valete, Cavaleiro, Dama e Rei valem o dobro | não entra no sorteio (idem) |
-| O Louco Vence | O Louco pode vencer, como um Trunfo fraquinho | muda quem vence |
-| Naipe Fraco | Um naipe sorteado vale metade dos pontos | o naipe sorteado paga metade |
-| Naipe Forte | Um naipe sorteado vale 1,5× os pontos | o naipe sorteado paga 1,5× |
-| Rodada Invertida | Vence a MENOR carta do naipe; Trunfo não corta | muda quem vence |
-| Cartas Pequenas Importam | As cartas de 0,5 ponto valem 1,0 | cartas de 0,5 pt pagam como 1,0 |
-| Rodada Dourada | Os pontos valem ×3 | vira "Rodada Dobrada": conta 2 vitórias, sem multiplicar pontos |
-| Saque | Quem vencer rouba 2 pontos de cada rival | rouba fichas de verdade, além da vitória |
-| Assalto ao Líder | Quem vencer rouba 4 pontos de quem lidera o placar | rouba fichas de quem lidera a stack, além da vitória |
-| Rodada Maldita | Quem vencer PERDE 3 pontos | paga fichas aos rivais, além da vitória |
+| Loucura | O Louco vence qualquer carta, até arcano maior. | Quem jogar O Louco vence a jogada. |
+| Oposição | Vence a menor carta do naipe. Arcano maior só vale se abrir a jogada. | Vence a menor do naipe da 1ª carta. Trunfo não corta. Se o Trunfo abriu, vence o menor Trunfo. |
+| Transmutação | O vencedor conta 2 vitórias na profecia. | A vitória vale por 2. Os pontos das cartas não são multiplicados. |
+| Saque | O vencedor rouba 3 blinds, divididos entre os rivais. | Cada rival que jogou paga a sua parte (limitada ao que tem). |
+| Assalto | O vencedor rouba 3 blinds de quem tem mais fichas. | Tira do líder da stack (nada se o líder é o vencedor). |
+| Maldição | O vencedor paga 3 blinds, divididos entre os rivais. | Quem vence paga (limitado ao que tem). |
+| Silêncio | Arcano maior não vence naipe. Vence a maior carta do naipe. | Trunfo não corta. Quem não tem o naipe ainda é obrigado a jogar Trunfo, que não vence. Se o Trunfo abriu, vence o maior Trunfo. |
+| Pitagórico | Jogue qualquer naipe. Vence o maior número e o arcano maior ainda vence. | Toda a mão é jogável. Se há Trunfo na mesa, vence o maior. Senão vence o maior número, de qualquer naipe. Empate de número: Espadas > Copas > Paus > Ouros (a tela mostra a ordem, com símbolo, cor e nome). |
 
-No Blitz os pontos das cartas viram fichas (ver `docs/BLITZ.md`, "Fichas das cartas"), então os
-modificadores de pontos passam a valer também lá: mudam quanto a rodada paga a quem vence e quanto
-custa perder. Nenhum modifica a contagem de vitórias do palpite — quem vence a rodada conta sempre 1.
+## Quem zera por modificador sai da mesa
+Se um Saque, um Assalto ou uma Maldição zera as fichas de alguém, ele é eliminado na checagem de
+quebra que roda depois de cada jogada (`bust_broke`): perde a mão e sai da mesa. No torneio é a
+eliminação definitiva. No ranqueado aparece "VOCÊ QUEBROU" com recomprar ou sair. Ninguém paga mais
+do que tem: se faltar, paga só o que sobra.
 
-## O que mudou nesta revisão
-- **Mundo ao Contrário e Rodada Invertida eram a mesma regra em escopos diferentes** (nível
-  inteiro vs. uma rodada). Como agora tudo é por rodada, viraram um modificador só: Rodada
-  Invertida.
-- **Rodada Relâmpago (1ª rodada ×2) e Última é Tudo (última ×3)** ficavam presas a uma posição
-  fixa, o que só fazia sentido quando havia um modificador "de nível". Com toda rodada já
-  ganhando uma regra sorteada, essa posição fixa deixou de ser necessária — o papel de "rodada
-  que vale muito" já é coberto pela Rodada Dourada, agora podendo cair em qualquer rodada.
-- **Reis em Dobro virou Figuras em Dobro**: Valete, Cavaleiro e Dama também dobram, não só o Rei.
-- **Naipe Maldito foi removido**: fazia praticamente a mesma coisa que Naipe Fraco (reduzir o
-  valor de um naipe-alvo), só que com sinal trocado — redundante o bastante pra não valer os dois.
+## O Louco
+Regra normal: o Louco pode ser jogado a qualquer momento, ignora naipe e Trunfo, mas nunca vence. Quem o
+joga mantém os pontos dele (4,5, um dos 3 Bouts). Só na Loucura ele vence qualquer carta.
 
-## Sobre o Saque (por que "pontos" além do pote)
-O pote (fichas apostadas) e os pontos das cartas são duas coisas separadas. Pontos são o valor
-tradicional do Jeu de Tarot (0,5 a 4,5 por carta) e servem só de unidade de conta pros
-modificadores: cada ponto vira ficha a uma taxa fixa (`ChaosEngine.PRIZE_PER_POINT`), paga
-diretamente pelos rivais, por fora do pote. O Saque rouba 2 desses pontos (convertidos em fichas)
-de cada rival na rodada, sem precisar capturar carta nenhuma — é uma fonte de fichas à parte do
-pote, que dá um motivo pra disputar rodadas mesmo quando o pote da vez é pequeno.
-
-## O Louco Vence (detalhe à parte, porque não é óbvio)
-Regra normal: O Louco pode ser jogado a qualquer momento — ignora naipe e Trunfo — mas nunca
-vence a rodada; quem o joga mantém os pontos dele (4,5, como um Rei — é um dos 3 Bouts), e quem
-realmente ganhou leva as outras cartas. Com O Louco Vence ativo, ele passa a poder vencer, mas se
-comporta como um Trunfo muito fraco: perde pra qualquer Trunfo de verdade, vence naipe comum.
-Continua sem seguir naipe nem ser obrigado a acompanhar nada.
+## Saíram nesta revisão
+Trunfo em Dobro, Figuras em Dobro, Naipe Fraco, Naipe Forte e Cartas Pequenas Importam saíram por
+mexerem nos pontos das cartas. "Cada Jogada Vale +1" saiu antes. Por isso Saque, Assalto e Maldição
+deixaram de usar "pontos" e passaram a usar o blind.

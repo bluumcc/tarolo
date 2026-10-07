@@ -165,7 +165,7 @@ const RANKED_ROOMS := [
 	{"blind": 1000, "weight": 1},
 ]
 const RANKED_STACK_BLINDS := 40   # buy-in de toda sala: 40 blinds
-var ranked_table := {}   # {blind, stack_blinds} da mesa rankeada que está sendo aberta
+var ranked_table := {}   # {blind, stack_blinds} da mesa ranqueada que está sendo aberta
 
 
 func ranked_room_buy_in(room: Dictionary) -> int:
@@ -219,7 +219,7 @@ func chaos_config() -> Dictionary:
 		difficulty = [BotAI.Difficulty.NORMAL]
 		for _i in range(n_players - 1):
 			difficulty.append(d)
-		table_name = "Rankeada · blind ◎%d · %d jogadores" % [blind, n_players]
+		table_name = "Ranqueada · blind ◎%d · %d jogadores" % [blind, n_players]
 		stacks = [float(buy_in)]
 		for _i in range(n_players - 1):
 			stacks.append(float(randi_range(int(ChaosEconomy.BOT_STACK_BLINDS[0]), int(ChaosEconomy.BOT_STACK_BLINDS[1])) * blind))
@@ -436,7 +436,7 @@ func report_tournament_table(result: Dictionary) -> Dictionary:
 		tournament["total_entrants"] = survivors.size()
 		tournament["level"] = int(tournament.get("level", 0)) + 1
 		if busted_count > 0:
-			lines.append("%d jogador(es) eliminado(s) nessa rodada — %d restantes." % [busted_count, survivors.size()])
+			lines.append("%d jogador(es) eliminado(s) nesse Ritual — %d restantes." % [busted_count, survivors.size()])
 		else:
 			lines.append("%d jogadores restantes." % survivors.size())
 		next = "advance"

@@ -33,7 +33,7 @@ const TEXT_ON_LIGHT := Color("#1A1240") ## texto sobre superfícies claras (dour
 ## Identidade (o dourado da marca): títulos e molduras de popup; e o jogador local.
 const BRAND := GOLD
 const BROWN := Color("#D9B48F")   ## marrom claro: títulos e valores do hub
-const RANK_PLAY_BG := Color("#4A0D1A")      ## botão JOGAR RANKEADA: vermelho escuro
+const RANK_PLAY_BG := Color("#4A0D1A")      ## botão JOGAR RANQUEADA: vermelho escuro
 const RANK_PLAY_GLOW := Color("#FF2D55")    ## brilho/borda falhada do botão de jogar
 const ENTER_BLUE := Color("#2A4373")        ## botão ENTRAR dos torneios
 const ENTER_BLUE_EDGE := Color("#16264A")   ## borda suave do botão ENTRAR
@@ -74,7 +74,7 @@ const TR_WHITE  := Color("#e8e7e6")   ## branco — texto principal, face de car
 const TR_GOLD   := Color("#d8c7aa")   ## dourado — recompensas, fichas, destaque
 const TR_CYAN   := Color("#6cbfc5")   ## ciano (info, seleção, ação secundária)
 const TR_RED_LIGHT := Color("#ffd4e0")  ## vermelho-claro — quase branco, texto sobre vermelho
-const TR_RED       := Color("#f61b54")  ## vermelho-normal — perigo, naipes, RANKEADA
+const TR_RED       := Color("#f61b54")  ## vermelho-normal — perigo, naipes, RANQUEADA
 const TR_RED_DARK  := Color("#5d1440")  ## vermelho-escuro — fundo/sombra de botão vermelho
 const TR_RED_GLOW  := Color("#d63060")  ## glow difuso do botão vermelho
 const TR_RED_NEON  := Color("#ff8099")  ## neon quente: borda interna do botão big-glow

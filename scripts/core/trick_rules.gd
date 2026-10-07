@@ -113,3 +113,76 @@ static func would_win(card: CardData, player: int, plays: Array, louco_can_win: 
 	var sim := plays.duplicate()
 	sim.append({"player": player, "card": card})
 	return winning_index(sim, louco_can_win) == sim.size() - 1
+
+
+## Cartas jogáveis sob um modificador: no Pitagórico qualquer carta da mão serve (sem obrigação de
+## seguir o naipe nem de cortar); nos demais valem as regras de sempre.
+static func legal_cards_for(hand: Array, plays: Array, must_cover: bool, modifier: int) -> Array:
+	if modifier == ChaosModifiers.Modifier.PITAGORICO:
+		return hand.duplicate()
+	return legal_cards(hand, plays, must_cover)
+
+
+## Índice da carta vencedora sob um modificador de jogada (-1 = nenhum). O Louco só vence na Loucura.
+##  - Loucura: O Louco vence qualquer carta, até arcano maior.
+##  - Oposição: vence a MENOR carta do naipe líder; Trunfo só vale se abriu a jogada (aí o naipe é Trunfo).
+##  - Silêncio: Trunfo não corta; vence a MAIOR carta do naipe líder (se o Trunfo abriu, eles disputam).
+##  - Pitagórico: vence o maior Trunfo, se houver; senão o maior número, qualquer naipe (empate: ver TIE_ORDER).
+static func winning_index_mod(plays: Array, modifier: int) -> int:
+	var mods := ChaosModifiers.Modifier
+	var ls := lead_suit(plays)
+	match modifier:
+		mods.LOUCO_VENCE:
+			for i in range(plays.size()):
+				if (plays[i]["card"] as CardData).is_louco():
+					return i
+		mods.VAZA_INVERTIDA:
+			var low := -1
+			for i in range(plays.size()):
+				var c: CardData = plays[i]["card"]
+				if c.is_louco() or c.suit != ls:
+					continue
+				if low == -1 or c.rank < (plays[low]["card"] as CardData).rank:
+					low = i
+			if low != -1:
+				return low
+		mods.SILENCIO:
+			if ls != CardData.Suit.TRUNFO:
+				var high := -1
+				for i in range(plays.size()):
+					var c: CardData = plays[i]["card"]
+					if c.is_louco() or c.suit != ls:
+						continue
+					if high == -1 or c.rank > (plays[high]["card"] as CardData).rank:
+						high = i
+				if high != -1:
+					return high
+		mods.PITAGORICO:
+			var best := -1
+			for i in range(plays.size()):
+				var c: CardData = plays[i]["card"]
+				if c.is_louco():
+					continue
+				if best == -1 or _pitagorico_beats(c, plays[best]["card"]):
+					best = i
+			if best != -1:
+				return best
+	return winning_index(plays, false)
+
+
+## Pitagórico: `a` vence `b`? Trunfo antes de naipe, depois o maior número, depois o naipe.
+static func _pitagorico_beats(a: CardData, b: CardData) -> bool:
+	if a.is_trunfo() != b.is_trunfo():
+		return a.is_trunfo()
+	if a.rank != b.rank:
+		return a.rank > b.rank
+	if a.is_trunfo():
+		return false
+	return ChaosModifiers.TIE_ORDER.find(a.suit) < ChaosModifiers.TIE_ORDER.find(b.suit)
+
+
+## Se `card` fosse jogada agora pelo `player`, ela venceria a jogada parcial sob esse modificador?
+static func would_win_mod(card: CardData, player: int, plays: Array, modifier: int) -> bool:
+	var sim := plays.duplicate()
+	sim.append({"player": player, "card": card})
+	return winning_index_mod(sim, modifier) == sim.size() - 1

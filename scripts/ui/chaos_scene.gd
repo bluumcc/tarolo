@@ -16,7 +16,7 @@ const CARD_SCENE := preload("res://scenes/Card.tscn")
 ## Relógios da mesa (um só, `_clock_start`): estourou, jogamos por você.
 const TURN_SECONDS := 10.0      # jogar a carta; estourou, joga a mais fraca
 const DISCARD_SECONDS := 18.0   # descarte inicial; estourou, descarta as 2 mais fracas
-const PREDICT_SECONDS := 15.0   # lance de vitórias; estourou, confirma o palpite que estiver na tela
+const PREDICT_SECONDS := 15.0   # profecia de vitórias; estourou, confirma a que estiver na tela
 const BET_SECONDS := 12.0       # apostar/passar/pagar/aumentar/desistir; estourou, passa (ou desiste se tiver que pagar)
 
 var engine := ChaosEngine.new()
@@ -113,7 +113,7 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_on_resize)
 	_refresh_hud()
 	_rebuild_hand()
-	var intro_key := "blitz_intro" if engine.blitz else "chaos_intro"
+	var intro_key := "blitz_intro"
 	if not GameState.autoplay and not bool(SaveManager.section("tips").get(intro_key, false)):
 		await _intro_slides()
 		SaveManager.section("tips")[intro_key] = true
@@ -554,7 +554,7 @@ func _refresh_mod_card() -> void:
 		return
 	mod_name_label.text = _modifier_label(m).to_upper()
 	mod_name_label.add_theme_color_override("font_color", _modifier_color(m))
-	mod_desc_label.text = ChaosModifiers.desc_of(m, engine.blitz)
+	mod_desc_label.text = ChaosModifiers.desc_of(m)
 
 
 func _set_pot_cards(on: bool) -> void:
@@ -890,7 +890,7 @@ func _plural(n: int, one: String, many: String) -> String:
 ## rodada só é avisado e fica de fora até a próxima; quem sai deixa o assento onde está até a
 ## rodada acabar. A mesa só se refaz em `_lock_table_size`, no começo da rodada seguinte.
 func notify_player_joining(player_name: String) -> void:
-	_banner("%s entra na próxima rodada" % player_name.capitalize(), "", UIKit.MUTED)
+	_banner("%s entra no próximo Ritual" % player_name.capitalize(), "", UIKit.MUTED)
 
 
 func notify_player_left(player_name: String) -> void:
@@ -908,14 +908,14 @@ func _announce_round() -> void:
 		_set_discard_chrome(true)
 	_refresh_hud()
 	_rebuild_hand()
-	var kicker := "RODADA %d%s" % [engine.round_index + 1, (" DE %d" % engine.levels) if engine.levels > 0 else ""]
+	var kicker := "RITUAL %d%s" % [engine.round_index + 1, (" DE %d" % engine.levels) if engine.levels > 0 else ""]
 	var lines: Array = []
 	if engine.round_index == 0 and engine.blitz:
-		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "ENTRADA ◎%d" % int(engine.blitz_entry()), "text": "Em cada rodada você palpita quantas jogadas vai ganhar e paga a entrada. Acertou o número exato, leva o pote. Cada jogada ainda paga fichas pelos pontos das cartas. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.MONEY})
+		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "ENTRADA ◎%d" % int(engine.blitz_entry()), "text": "Em cada Ritual você sacrifica 2 cartas, faz a sua profecia (quantas jogadas vai ganhar) e paga a entrada. Acertou o número exato, leva o pote. Cada jogada ainda paga fichas pelos pontos das cartas. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.MONEY})
 	elif engine.round_index == 0:
 		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "BLIND ◎%d" % engine.blind, "text": "Todo mundo paga o blind a cada jogada. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.MONEY})
 	else:
-		lines.append({"head": "CARTAS NOVAS", "title": "RODADA %d" % (engine.round_index + 1), "text": "Mão nova, 8 jogadas — cada uma com o seu próprio modificador, anunciado antes de começar.", "color": UIKit.MODIFIER})
+		lines.append({"head": "CARTAS NOVAS", "title": "RITUAL %d" % (engine.round_index + 1), "text": "Cartas novas, 8 jogadas — cada uma com o seu próprio modificador, anunciado antes de começar.", "color": UIKit.MODIFIER})
 	var hold := 0.0 if (engine.round_index == 0 and engine.blitz and not first_round_done) else (2.6 if not first_round_done else 2.2)
 	await _transition(kicker, lines, hold)
 	first_round_done = true
@@ -927,13 +927,30 @@ func _modifier_color(m: int) -> Color:
 	return UIKit.TR_RED if ChaosModifiers.color_of(m) == UIKit.LOSS else UIKit.TR_GOLD
 
 
-## Nome do modificador, incluindo o naipe sorteado quando ele tiver um (e já traduzido pro
-## Blitz, quando o nome muda de mão pra lá).
+## Nome do modificador.
 func _modifier_label(m: int) -> String:
-	var nm := ChaosModifiers.name_of(m, engine.blitz)
-	if ChaosModifiers.has_suit(m) and engine.weak_suit != -1:
-		nm = "%s (%s)" % [nm, CardData.SUIT_NAMES[engine.weak_suit]]
-	return nm
+	return ChaosModifiers.name_of(m)
+
+
+## Pitagórico: linha extra com a ordem de desempate entre naipes (símbolo, nome e a cor da carta),
+## do mais forte ao mais fraco.
+func _tie_order_row() -> Control:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", DS.SP_S)
+	var cap := UIKit.label("Desempate, do mais forte ao mais fraco", 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	cap.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(cap)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", DS.SP_S)
+	var order: Array = ChaosModifiers.TIE_ORDER
+	for i in range(order.size()):
+		var su: int = order[i]
+		if i > 0:
+			row.add_child(UIKit.label("›", 22, UIKit.MUTED))
+		row.add_child(UIKit.label("%s %s" % [CardData.SUIT_SYMBOLS[su], CardData.SUIT_NAMES[su]], 22, UIKit.SUIT_COLORS[su]))
+	box.add_child(row)
+	return box
 
 
 ## Tela cheia de transição. `blocks`: [{head, title, text, color}]. Fecha ao tocar ou
@@ -1108,14 +1125,19 @@ func _modifier_transition(m: int, color: Color) -> void:
 	var title_lbl := UIKit.label("", 40, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(title_lbl)
 	# Efeito e dica em linhas separadas (não um parágrafo só) — mais fácil de ler de relance.
-	var desc_lbl := UIKit.label(ChaosModifiers.desc_of(m, engine.blitz), 28, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var desc_lbl := UIKit.label(ChaosModifiers.desc_of(m), 28, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc_lbl.modulate.a = 0.0
 	v.add_child(desc_lbl)
-	var tip_lbl := UIKit.label(ChaosModifiers.tip_of(m, engine.blitz), 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	var tip_lbl := UIKit.label(ChaosModifiers.tip_of(m), 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	tip_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tip_lbl.modulate.a = 0.0
 	v.add_child(tip_lbl)
+	if m == ChaosModifiers.Modifier.PITAGORICO:
+		var tie := _tie_order_row()
+		tie.modulate.a = 0.0
+		tip_lbl.set_meta("extra", tie)
+		v.add_child(tie)
 	var go := UIKit.button("ENTENDI, CONTINUAR")
 	go.disabled = true
 	go.modulate.a = 0.0
@@ -1174,6 +1196,8 @@ func _open_modifier_orb(orb: PanelContainer, orb_icon: Label, title_lbl: Label, 
 		create_tween().tween_property(desc_lbl, "modulate:a", 1.0, GameState.anim(0.3))
 	if is_instance_valid(tip_lbl):
 		create_tween().tween_property(tip_lbl, "modulate:a", 1.0, GameState.anim(0.3))
+		if tip_lbl.has_meta("extra") and is_instance_valid(tip_lbl.get_meta("extra")):
+			create_tween().tween_property(tip_lbl.get_meta("extra"), "modulate:a", 1.0, GameState.anim(0.3))
 	if is_instance_valid(go):
 		go.disabled = false
 		create_tween().tween_property(go, "modulate:a", 1.0, GameState.anim(0.3))
@@ -1228,7 +1252,7 @@ func _wait_human() -> CardData:
 	human_turn = true
 	await _tip("turn", "SUA VEZ!", "Toque numa carta pra selecioná-la (ela sobe) e toque de novo pra jogar. Você tem 10 segundos por jogada.")
 	if engine.blitz and engine.can_double(0):
-		await _tip("double", "PODE DOBRAR!", "A partir da 4ª jogada, o botão DOBRAR paga mais uma entrada e dobra o peso do seu palpite no pote; da 6ª em diante dá pra TRIPLICAR. Vale a pena quando você já está no alvo e a mão que sobrou é fraca demais pra ganhar mais uma jogada. Só dá pra dobrar até duas vezes por rodada.")
+		await _tip("double", "PODE DOBRAR!", "A partir da 4ª jogada, o botão DOBRAR paga mais uma entrada e dobra o peso da sua profecia no pote; da 6ª em diante dá pra TRIPLICAR. Vale a pena quando você já está no alvo e a mão que sobrou é fraca demais pra ganhar mais uma jogada. Só dá pra dobrar até duas vezes por Ritual.")
 	var ls := TrickRules.lead_suit(engine.plays)
 	if ls == -1:
 		_banner("Sua vez", "", UIKit.TURN)
@@ -1412,7 +1436,7 @@ func _tip(key: String, title: String, text: String) -> void:
 ## Tutorial de 3 passos: mostrado na primeira partida e sempre que tocar em "?".
 func _intro_slides() -> void:
 	modal_open = true
-	var m := StepsModal.open(overlay_layer, "MESA BLITZ" if engine.blitz else "MESA CAOS", HelpContent.blitz_intro() if engine.blitz else HelpContent.chaos_intro(), "VAMOS JOGAR!")
+	var m := StepsModal.open(overlay_layer, "MESA BLITZ", HelpContent.blitz_intro(), "VAMOS JOGAR!")
 	await m.closed
 	modal_open = false
 
@@ -1434,7 +1458,7 @@ func _open_help() -> void:
 	var nm := UIKit.serif_label(_modifier_label(m).to_upper() if m != -1 else "NENHUM", 30, tone, HORIZONTAL_ALIGNMENT_CENTER)
 	nm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	cv.add_child(nm)
-	var ds := UIKit.serif_label(ChaosModifiers.desc_of(m, engine.blitz) if m != -1 else "O modificador é sorteado no começo de cada jogada.", 24, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	var ds := UIKit.serif_label(ChaosModifiers.desc_of(m) if m != -1 else "O modificador é sorteado no começo de cada jogada.", 24, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
 	ds.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	cv.add_child(ds)
 	sp.body.add_child(card)
@@ -1458,7 +1482,7 @@ func _open_pot_details() -> void:
 	var total := engine.trick_pot if in_trick else (engine.pot if engine.pot > 0.0 else engine.carry)
 	var head := UIKit.label("◎ %s" % UIKit.fmt_short(total), 46, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	sp.body.add_child(head)
-	sp.body.add_child(UIKit.label("aposta da jogada" if in_trick else "entradas do palpite", 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	sp.body.add_child(UIKit.label("aposta da jogada" if in_trick else "entradas da profecia", 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	var layers: Array = engine.pot_layers() if in_trick else []
 	if layers.size() > 1:
 		sp.body.add_child(UIKit.label("DIVISÃO DO POTE", 24, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
@@ -1475,7 +1499,7 @@ func _open_pot_details() -> void:
 				who = "volta pra %s" % names[0]
 			_pot_row(sp.body, title, float(layer["amount"]), who)
 	else:
-		sp.body.add_child(UIKit.label("Sem divisão: todos concorrem ao pote inteiro." if in_trick else "Quem acertar o palpite leva.", 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+		sp.body.add_child(UIKit.label("Sem divisão: todos concorrem ao pote inteiro." if in_trick else "Quem acertar a profecia leva.", 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	sp.body.add_child(UIKit.label("QUANTO CADA UM PÔS", 24, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	for p in range(engine.num_players):
 		if engine.busted[p]:
@@ -1714,11 +1738,11 @@ func _fast_forward_if_alone() -> bool:
 	var other_tables := (GameState.tournament.get("tables", []) as Array).size() > 1
 	if alive > 2 or (alive == 2 and not other_tables):
 		return false
-	_banner("Mesa desfeita", "Sobraram poucos nessa mesa. As jogadas que faltam não valem; o palpite vale pelo que já foi jogado.", UIKit.MUTED)
+	_banner("Mesa desfeita", "Sobraram poucos nessa mesa. As jogadas que faltam não valem; a profecia vale pelo que já foi jogado.", UIKit.MUTED)
 	await _wait(2.2)
 	if not is_inside_tree() or finished:
 		return true
-	engine.void_remaining_tricks()   # sem vitórias de graça: o palpite é conferido com as jogadas disputadas
+	engine.void_remaining_tricks()   # sem vitórias de graça: a profecia é conferida com as jogadas disputadas
 	_banner_clear()
 	_refresh_hud()
 	return true
@@ -1950,7 +1974,7 @@ func _resolve_trick(result: Dictionary) -> void:
 	var wname := str(config["names"][winner]).to_upper()
 	var notes: Array = []
 	if int(result.get("modifier", -1)) == ChaosModifiers.Modifier.VAZA_DOURADA:
-		notes.append("jogada dourada ×3")
+		notes.append("transmutação: 2 vitórias")
 	var sub := "Pote ◎%d" % int(pot_amt)
 	if absf(prize) >= 1.0:
 		sub += "  ·  bônus dos rivais %s◎%d" % ["+" if prize >= 0.0 else "−", absi(int(prize))]
@@ -1981,7 +2005,7 @@ func _resolve_trick(result: Dictionary) -> void:
 	if float(result.get("assalto_amount", 0.0)) > 0.0:
 		extras.append(["⚔ ASSALTO!", "%s roubou ◎%d de quem tinha mais fichas" % [wname, int(result["assalto_amount"])], UIKit.LOSS])
 	if int(result.get("modifier", -1)) == ChaosModifiers.Modifier.VAZA_MALDITA:
-		extras.append(["☠ JOGADA MALDITA!", "%s paga aos rivais por vencer essa jogada" % wname, UIKit.LOSS])
+		extras.append(["☠ MALDIÇÃO!", "%s pagou ◎%d aos rivais por vencer essa jogada" % [wname, int(result.get("curse_amount", 0.0))], UIKit.LOSS])
 	for e in extras:
 		_banner(e[0], e[1], e[2])
 		Sfx.play("combo")
@@ -2025,7 +2049,7 @@ func _show_round_summary() -> String:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	box.add_child(v)
-	v.add_child(UIKit.label("FIM DA RODADA %d" % (int(r["round"]) + 1), 30, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("FIM DO RITUAL %d" % (int(r["round"]) + 1), 30, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))
 	var stacks: Array = r["stacks"]
 	var deltas: Array = r["deltas"]
 	# Saldo do próprio jogador, bem grande e com sinal, antes de qualquer outra coisa — o número
@@ -2034,7 +2058,7 @@ func _show_round_summary() -> String:
 	var saldo_color := UIKit.OK if my_delta >= 0 else UIKit.LOSS
 	var saldo := UIKit.label("%s◎%d" % ["+" if my_delta >= 0 else "−", absi(my_delta)], 56, saldo_color, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(saldo)
-	var saldo_cap := UIKit.label("SEU SALDO NESSA RODADA", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	var saldo_cap := UIKit.label("SEU SALDO NESSE RITUAL", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(saldo_cap)
 	v.add_child(HSeparator.new())
 	var won: Array = r["tricks_won"]
@@ -2053,18 +2077,18 @@ func _show_round_summary() -> String:
 			var hit: bool = (b["hits"] as Array).has(p)
 			var near: bool = (b["near"] as Array).has(p)
 			var verdict := "ACERTOU ✓" if hit else ("ERROU POR 1" if near else "ERROU ✕")
-			var sub_l := UIKit.label("palpite %d · fez %d · %s%s" % [int(b["predicts"][p]), int(b["wins"][p]), verdict, " · ×%d" % (1 + int(b["doubles"][p])) if int(b["doubles"][p]) > 0 else ""], 22, UIKit.OK if hit else (UIKit.MUTED if near else UIKit.LOSS), HORIZONTAL_ALIGNMENT_CENTER)
+			var sub_l := UIKit.label("profecia %d · fez %d · %s%s" % [int(b["predicts"][p]), int(b["wins"][p]), verdict, " · ×%d" % (1 + int(b["doubles"][p])) if int(b["doubles"][p]) > 0 else ""], 22, UIKit.OK if hit else (UIKit.MUTED if near else UIKit.LOSS), HORIZONTAL_ALIGNMENT_CENTER)
 			v.add_child(sub_l)
 	if r.has("blitz") and float(r["blitz"]["bonus"]) > 0.0:
 		var bl := UIKit.label("Prêmio de sequência da casa: +◎%d (%d acertos seguidos)" % [int(r["blitz"]["bonus"]), int(r["blitz"]["streak"])], 24, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
 		bl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(bl)
 	if r.has("blitz") and float(r["blitz"]["carry_out"]) > 0.0:
-		var cl := UIKit.label("Ninguém acertou: ◎%d acumulam pra próxima rodada" % int(r["blitz"]["carry_out"]), 24, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+		var cl := UIKit.label("Ninguém acertou: ◎%d acumulam pro próximo Ritual" % int(r["blitz"]["carry_out"]), 24, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
 		cl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(cl)
 	var result := {"choice": "continue"}
-	var next := UIKit.button("PRÓXIMA RODADA")
+	var next := UIKit.button("PRÓXIMO RITUAL")
 	next.pressed.connect(func(): item_chosen.emit(1))
 	v.add_child(next)
 	var profile := SaveManager.section("profile")
@@ -2145,7 +2169,7 @@ func _show_tournament_results(summary: Dictionary) -> void:
 		ll.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(ll)
 	if next == "advance":
-		var go := UIKit.button("PRÓXIMA RODADA", UIKit.OK)
+		var go := UIKit.button("PRÓXIMO RITUAL", UIKit.OK)
 		go.pressed.connect(func(): get_tree().reload_current_scene())
 		v.add_child(go)
 	var btn := UIKit.button("MENU PRINCIPAL", UIKit.MUTED)
@@ -2178,7 +2202,7 @@ func _show_results(summary: Dictionary) -> void:
 	var st: Dictionary = engine.session_stats[0]
 	var stat := "%d jogadas na mesa · %d potes ganhos · %d blefes vencidos · %d desistências" % [engine.hand_no, int(st["pots"]), int(st["bluffs"]), int(st["folds"])]
 	if engine.blitz:
-		stat = "%d rodadas · %d palpites certos · %d por 1 de diferença" % [int(st["levels"]), int(st["hits"]), int(st["near"])]
+		stat = "%d rituais · %d profecias certas · %d por 1 de diferença" % [int(st["levels"]), int(st["hits"]), int(st["near"])]
 	var stat_l := UIKit.label(stat, 26, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	stat_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(stat_l)
@@ -2654,13 +2678,13 @@ func _blitz_open_level() -> bool:
 			if q == 0:
 				continue
 			if not GameState.autoplay:
-				_banner("%s eliminado" % _pname(q), "Sem fichas pra entrada do palpite (◎%d)." % int(engine.blitz_entry()), UIKit.DANGER)
+				_banner("%s eliminado" % _pname(q), "Sem fichas pra entrada da profecia (◎%d)." % int(engine.blitz_entry()), UIKit.DANGER)
 			_refresh_hud()
 			await _wait(0.9)
 			if not is_inside_tree() or finished:
 				return false
 		if cant.has(0):
-			_banner("Você foi eliminado", "Sem fichas pra entrada do palpite (◎%d)." % int(engine.blitz_entry()), UIKit.DANGER)
+			_banner("Você foi eliminado", "Sem fichas pra entrada da profecia (◎%d)." % int(engine.blitz_entry()), UIKit.DANGER)
 			_refresh_hud()
 			await _wait(1.6)
 			if is_inside_tree() and not finished:
@@ -2675,7 +2699,7 @@ func _blitz_open_level() -> bool:
 		if not engine.can_discard(p):
 			continue
 		if p == 0 and not GameState.autoplay:
-			await _tip("discard", "ESCOLHA 2 PRA DESCARTAR", "Você recebeu 10 cartas. Toque numa carta pra focar — ela sobe. Toque de novo nela (ou arraste pra cima e solte) pra descartar. Repita até descartar 2.")
+			await _tip("discard", "SACRIFÍCIO", "Você recebeu 10 cartas. Escolha 2 para sacrificar. Toque numa carta pra focar — ela sobe. Toque de novo nela (ou arraste pra cima e solte) pra sacrificar. Repita até sacrificar 2.")
 			await _human_discard_play()
 			if not is_inside_tree() or finished:
 				return false
@@ -2693,7 +2717,7 @@ func _blitz_open_level() -> bool:
 	if GameState.autoplay:
 		pick = ChaosBot.blitz_pick(engine, 0, int(config["difficulty"][0]), bot_rng)
 	else:
-		await _tip("predict", "SEU PALPITE", "Toda rodada você diz quantas jogadas vai ganhar (de 0 a 8) e paga a entrada. Quem acertar o número exato leva o pote. Errou por 1? Recebe metade da entrada de volta. A estrela ★ marca o palpite que combina com a sua mão.")
+		await _tip("predict", "PROFECIA", "Todo Ritual você diz quantas jogadas vai ganhar (de 0 a 8) e paga a entrada. Quem acertar o número exato leva o pote. Errou por 1? Recebe metade da entrada de volta. A estrela ★ marca a profecia que combina com a sua mão.")
 		pick = await _human_predict()
 		if not is_inside_tree() or finished:
 			return false
@@ -2745,13 +2769,13 @@ func _human_discard_play() -> void:
 	phase = "discard"
 	discard_picks = []
 	_rebuild_hand()
-	_open_phase("ESCOLHA DUAS CARTAS PARA DESCARTAR", "Deslize a carta para cima ou toque nela duas vezes para descartar", str(config["names"][0]).capitalize())
+	_open_phase("SACRIFÍCIO", "Escolha 2 cartas para sacrificar. Deslize para cima ou toque duas vezes.", str(config["names"][0]).capitalize())
 	_banner_clear()
 	round_dots.visible = false   # no descarte o card do header mostra só o título da fase
-	banner_title.text = "FASE DE DESCARTE"
+	banner_title.text = "PREPARAÇÃO"
 	banner_title.add_theme_color_override("font_color", UIKit.TR_GOLD)
 	banner_title.modulate.a = 1.0
-	status_label.text = "0/%d descartadas" % ChaosEngine.BLITZ_DISCARD_SIZE
+	status_label.text = "0/%d sacrificadas" % ChaosEngine.BLITZ_DISCARD_SIZE
 	_clock_start(DISCARD_SECONDS, _on_discard_timeout)
 	await item_chosen
 	_clock_stop()
@@ -2796,7 +2820,7 @@ func _commit_discard(view: CardView, drop_global := Vector2.ZERO) -> void:
 	tw.tween_property(view, "global_position", from + Vector2(0.0, -320.0), GameState.anim(0.3))
 	tw.parallel().tween_property(view, "rotation", randf_range(-0.35, 0.35), GameState.anim(0.3))
 	tw.parallel().tween_property(view, "modulate:a", 0.0, GameState.anim(0.3))
-	status_label.text = "%d/%d descartadas" % [discard_picks.size(), ChaosEngine.BLITZ_DISCARD_SIZE]
+	status_label.text = "%d/%d sacrificadas" % [discard_picks.size(), ChaosEngine.BLITZ_DISCARD_SIZE]
 	await tw.finished
 	if not is_inside_tree():
 		return
@@ -2823,11 +2847,11 @@ func _open_phase(title: String, subtitle: String, player_name := "", avatar_scal
 func _human_predict() -> int:
 	modal_open = true
 	round_dots.visible = false
-	banner_title.text = "DÊ O SEU PALPITE"
+	banner_title.text = "PREPARAÇÃO"
 	banner_title.add_theme_color_override("font_color", UIKit.TR_GOLD)
 	banner_title.modulate.a = 1.0
-	_open_phase("QUANTAS JOGADAS VOCÊ VAI GANHAR?",
-		"Entrada ◎%s  ·  Pote ◎%s" % [UIKit.fmt_short(engine.blitz_entry()), UIKit.fmt_short(engine.carry)],
+	_open_phase("PROFECIA",
+		"Quantas jogadas você vai ganhar?\nEntrada ◎%s  ·  Pote ◎%s" % [UIKit.fmt_short(engine.blitz_entry()), UIKit.fmt_short(engine.carry)],
 		"", 1.3, 130.0)   # sem nome: o espaço é do seletor
 	var picker := PredictPicker.new().setup(ChaosBot.suggested_predict(engine, 0), ChaosEngine.HAND_SIZE,
 		func(n: int) -> float: return ChaosEngine.blitz_weight(n), get_viewport_rect().size.x - 48.0)
@@ -3024,7 +3048,7 @@ func _refresh_pot_blitz() -> void:
 	elif phase == "play":
 		sub = "quem acertar leva"
 	elif engine.carry > 0.0:
-		sub = "acumulado pra próxima rodada"
+		sub = "acumulado pro próximo Ritual"
 	pot_sub.text = sub
 	_layout_table.call_deferred()
 

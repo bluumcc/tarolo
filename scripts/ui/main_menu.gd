@@ -1,13 +1,13 @@
 extends Control
-## Hub principal — TAROLO logo, abas RANKEADA / CLÁSSICO / LOJA / MENU.
+## Hub principal — TAROLO logo, abas RANQUEADA / CLÁSSICO / LOJA / MENU.
 ## Portrait (coluna única) e landscape (top bar unificada) com rebuild no cruzamento do limiar.
 
 var _overlay: Control        ## camada de modais (filha mais alta)
 var _wallet: HBoxContainer   ## pílulas de fichas/gemas (para refresh)
 var _content_col: VBoxContainer
-var _action_bar: VBoxContainer  ## botão de ação fixo fora do scroll (aba RANKEADA)
+var _action_bar: VBoxContainer  ## botão de ação fixo fora do scroll (aba RANQUEADA)
 
-var _active_tab := "RANKEADA"
+var _active_tab := "RANQUEADA"
 var _last_wide  := false
 
 
@@ -137,7 +137,7 @@ func _build_topbar(wide: bool) -> MarginContainer:
 func _make_topbar_nav() -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 14)
-	for tab in ["RANKEADA", "CLÁSSICO", "LOJA", "AJUSTES"]:
+	for tab in ["RANQUEADA", "CLÁSSICO", "LOJA", "AJUSTES"]:
 		var btn := _topbar_nav_btn(tab, tab == _active_tab)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(btn)
@@ -145,7 +145,7 @@ func _make_topbar_nav() -> HBoxContainer:
 
 
 func _topbar_nav_btn(tab: String, active: bool) -> Button:
-	var is_ranked := tab == "RANKEADA"
+	var is_ranked := tab == "RANQUEADA"
 	var text_col := UIKit.TR_GOLD if is_ranked else UIKit.TR_WHITE
 	var base_bg  := UIKit.TR_RED_DARK if is_ranked else (UIKit.TR_PURPLE_LIGHT if active else UIKit.TR_PURPLE)
 
@@ -196,7 +196,7 @@ func _build_tabbar_portrait() -> Control:
 func _make_tab_buttons(expand: bool) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 0)
-	for name in ["RANKEADA", "CLÁSSICO", "LOJA", "AJUSTES"]:
+	for name in ["RANQUEADA", "CLÁSSICO", "LOJA", "AJUSTES"]:
 		var btn := _tab_btn(name, name == _active_tab, expand)
 		if expand:
 			btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -235,7 +235,7 @@ func _tab_btn(tab: String, active: bool, tall: bool = false) -> Button:
 
 func _tab_accent(tab: String) -> Color:
 	match tab:
-		"RANKEADA": return UIKit.TR_RED
+		"RANQUEADA": return UIKit.TR_RED
 		_:          return UIKit.TR_CYAN
 
 
@@ -301,7 +301,7 @@ func _refresh_wallet() -> void:
 
 func _populate_tab(wide: bool) -> void:
 	match _active_tab:
-		"RANKEADA": _build_ranked(wide)
+		"RANQUEADA": _build_ranked(wide)
 		"CLÁSSICO": _build_classic(wide)
 		"LOJA":     _build_shop(wide)
 		"AJUSTES":  _build_menu(wide)
@@ -447,7 +447,7 @@ func _ranked_tournament_block(col: VBoxContainer, fichas: int, fill_height: bool
 		var ev_title := UIKit.label("%s (%d jogadores)" % [str(ev["name"]), Tournament.FIELD_SIZE], 24, UIKit.TR_GOLD)
 		ev_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.add_child(ev_title)
-		var ev_info := UIKit.label("Inscrição ◎%s · Stack ◎%s · Blind %d" % [UIKit.fmt_int(buy), UIKit.fmt_int(int(ev["stack"])), int(ev["blind_base"])], 20, UIKit.TR_WHITE)
+		var ev_info := UIKit.label("Buy-in ◎%s · Stack ◎%s · Blind %d" % [UIKit.fmt_int(buy), UIKit.fmt_int(int(ev["stack"])), int(ev["blind_base"])], 20, UIKit.TR_WHITE)
 		ev_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.add_child(ev_info)
 		var prizes := UIKit.label("1º ◎%s · 2º ◎%s · 3º ◎%s" % [
@@ -477,7 +477,7 @@ func _ranked_tournament_block(col: VBoxContainer, fichas: int, fill_height: bool
 
 func _make_ranked_play_btn() -> Button:
 	# Padrão borda grande: fundo vermelho-escuro, borda vermelho-claro, glow vermelho-normal esparso
-	var b := UIKit.button("JOGAR RANKEADA", UIKit.TR_RED_DARK, 44)
+	var b := UIKit.button("JOGAR RANQUEADA", UIKit.TR_RED_DARK, 44)
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(0, 112)
 	var mk := func(bg: Color) -> StyleBoxFlat:
@@ -778,7 +778,7 @@ func _ranked_search(exclude_blind: int) -> void:
 	bv.add_theme_constant_override("separation", 20)
 	bv.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 96.0, 520.0), 0)
 	box.add_child(bv)
-	bv.add_child(UIKit.label("RANKEADA", 38, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+	bv.add_child(UIKit.label("RANQUEADA", 38, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
 	var status_lbl := UIKit.label("Procurando sala...", 26, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	status_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bv.add_child(status_lbl)
@@ -815,7 +815,7 @@ func _ranked_search(exclude_blind: int) -> void:
 	var info_color := UIKit.MONEY if affordable else UIKit.MUTED
 	bv.add_child(UIKit.label("Buy-in ◎%s  ·  Blind ◎%s  ·  %d jogadores" % [UIKit.fmt_int(GameState.ranked_room_buy_in(room)), UIKit.fmt_int(blind), n_found], 26, info_color, HORIZONTAL_ALIGNMENT_CENTER))
 	if rounds_left > 0:
-		bv.add_child(UIKit.label("Partida em andamento — entra na próxima (%d rodadas)" % rounds_left, 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+		bv.add_child(UIKit.label("Partida em andamento — entra na próxima (%d rituais)" % rounds_left, 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	else:
 		bv.add_child(UIKit.label("Aguardando jogadores", 22, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER))
 	var who := UIKit.label("Com %s" % names, 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)

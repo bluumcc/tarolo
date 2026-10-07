@@ -16,15 +16,9 @@ const ROUNDS := 5            # níveis de uma partida com fim (config "levels");
 const BLIND := 10
 const BUY_IN_BLINDS := ChaosEconomy.BUY_IN_BLINDS    # stack de entrada = 20 blinds
 const PRIZE_PER_POINT := 0.25  # cada ponto das cartas vale 0,25 blind, pago pelos rivais
-const GOLD_MULT := 3.0       # Rodada Dourada
+const GOLD_MULT := 3.0       # Transmutação (só no modo antigo de pontos)
 const KING_CUT_BONUS := 3.0  # Corte de Rei (pontos)
 const BREAK_BONUS := 2.0     # Cortado: quebrar a sequência de 2+ vitórias de alguém
-const SAQUE_AMOUNT := 2.0    # pontos roubados de cada rival no Saque
-const ASSALTO_AMOUNT := 4.0  # pontos roubados de quem tem a maior stack
-const CURSE_PENALTY := 3.0   # pontos que quem vence a Rodada Maldita paga aos rivais
-const FORTE_MULT := 1.5      # Naipe Forte
-const VAZA_PLUS := 1.0       # bônus fixo de Cada Rodada Vale +1
-const NAIPE_CURSED_VALUE := -1.0  # valor de cada carta do Naipe Maldito
 
 var num_players := 4
 var rng := RandomNumberGenerator.new()
@@ -37,7 +31,6 @@ var level_start_stacks: Array = []
 var round_index := 0          # nível atual (0-based)
 var modifier_sequence: Array = []  # ordem embaralhada dos 11 modificadores pra esse nível: 1 por vaza
 var modifier := -1            # modificador da vaza atual (-1 = ainda não sorteado pra essa vaza)
-var weak_suit := -1
 var streak: Array = []
 var last_winner := -1
 var combo_count: Array = []
@@ -161,7 +154,6 @@ func _setup_round() -> void:
 	modifier_sequence = (ChaosModifiers.blitz_pool() if blitz else ChaosModifiers.ALL).duplicate()
 	Deck.shuffle(modifier_sequence, rng)
 	modifier = -1
-	weak_suit = -1
 	# Dealer: sorteado só no começo da partida (1ª rodada, `start_leader`); depois é sempre o vencedor da
 	# última jogada da rodada anterior. Se ele não está mais na mesa (eliminado), passa pro próximo vivo.
 	if round_index == 0 or leader < 0:
@@ -210,15 +202,10 @@ func louco_can_win() -> bool:
 	return modifier == ChaosModifiers.Modifier.LOUCO_VENCE
 
 
-## Sorteia o modificador dessa vaza (o próximo da ordem embaralhada do nível) e, se ele tiver
-## naipe-alvo, sorteia o naipe também. Chamado uma vez no começo de cada vaza, antes de
-## qualquer decisão (aposta ou palpite) que dependa dele.
+## Sorteia o modificador dessa jogada (o próximo da ordem embaralhada do Ritual). Chamado uma vez
+## no começo de cada jogada, antes de qualquer decisão (aposta ou profecia) que dependa dele.
 func draw_trick_modifier() -> void:
 	modifier = modifier_sequence[trick_number]
-	weak_suit = -1
-	if ChaosModifiers.has_suit(modifier):
-		var suits := [CardData.Suit.OUROS, CardData.Suit.PAUS, CardData.Suit.COPAS, CardData.Suit.ESPADAS]
-		weak_suit = suits[rng.randi_range(0, suits.size() - 1)]
 
 
 ## Modificador da vaza atual (-1 antes de `draw_trick_modifier` ser chamado).
@@ -231,8 +218,8 @@ func is_active(mod: int) -> bool:
 
 
 func legal_for(player: int) -> Array:
-	# No Caos não existe a obrigação de cobrir: qualquer Trunfo serve.
-	return TrickRules.legal_cards(hands[player], plays, false)
+	# Não existe a obrigação de cobrir: qualquer Trunfo serve. No Pitagórico, qualquer carta serve.
+	return TrickRules.legal_cards_for(hands[player], plays, false, modifier)
 
 
 func is_round_over() -> bool:
@@ -497,29 +484,14 @@ func pot_layers() -> Array:
 ## Jogadores do melhor pro pior na rodada de cartas, com `winner` sempre primeiro (os demais seguem
 ## a mesma regra de quem vence, pelo naipe líder; quem não jogou carta — desistiu — fica de fora).
 func _trick_order(winner: int) -> Array:
-	var scored: Array = []
-	var ls := TrickRules.lead_suit(plays)
-	var inverted := active_modifier() == ChaosModifiers.Modifier.VAZA_INVERTIDA
-	for pl in plays:
-		var q: int = pl["player"]
-		if q == winner:
-			continue
-		var c: CardData = pl["card"]
-		var score := -1000.0
-		if c.is_louco():
-			score = -500.0 if louco_can_win() else -1000.0
-		elif inverted:
-			if c.suit == ls and not c.is_trunfo():
-				score = 100.0 - float(c.rank)
-		elif c.is_trunfo():
-			score = 200.0 + float(c.rank)
-		elif c.suit == ls:
-			score = float(c.rank)
-		scored.append([score, q])
-	scored.sort_custom(func(a, b): return a[0] > b[0])
 	var out: Array = [winner]
-	for e in scored:
-		out.append(int(e[1]))
+	var rest: Array = plays.filter(func(pl: Dictionary) -> bool: return int(pl["player"]) != winner)
+	while not rest.is_empty():
+		var i := TrickRules.winning_index_mod(rest, active_modifier())
+		if i == -1:
+			i = 0   # só sobrou O Louco (sem poder): ordem irrelevante
+		out.append(int(rest[i]["player"]))
+		rest.remove_at(i)
 	for q in range(num_players):   # quem ainda não jogou carta (ordem desconhecida) vem por último
 		if not folded[q] and not out.has(q):
 			out.append(q)
@@ -597,7 +569,7 @@ func void_remaining_tricks() -> void:
 	for p in range(num_players):
 		deltas.append(stacks[p] - level_start_stacks[p])
 	round_result = {
-		"round": round_index, "modifier": modifier, "weak_suit": weak_suit,
+		"round": round_index, "modifier": modifier,
 		"stacks": stacks.duplicate(), "deltas": deltas,
 		"tricks_won": tricks_won(), "wins": wins.duplicate(), "blitz": blitz_result,
 	}
@@ -650,7 +622,12 @@ func play(player: int, card: CardData) -> Dictionary:
 	if betting or player != current or is_round_over() or folded[player]:
 		return {"ok": false, "error": "fora de turno"}
 	var hand: Array = hands[player]
-	if not TrickRules.is_legal(card, hand, plays, false):
+	var is_legal := false
+	for lc in legal_for(player):
+		if (lc as CardData).equals(card):
+			is_legal = true
+			break
+	if not is_legal:
 		return {"ok": false, "error": "jogada ilegal"}
 	hand.erase(card)
 	plays.append({"player": player, "card": card})
@@ -663,51 +640,14 @@ func play(player: int, card: CardData) -> Dictionary:
 	return {"ok": true, "trick_complete": true, "result": _resolve_trick()}
 
 
-## Valor de uma carta já considerando o modificador ativo.
+## Valor de uma carta em pontos. Nenhum modificador mexe nele.
 func card_value(c: CardData, _player: int = -1) -> float:
-	var v := c.points()
-	match modifier:
-		ChaosModifiers.Modifier.TRUNFO_DOBRO:
-			if c.is_trunfo():
-				v *= 2.0
-		ChaosModifiers.Modifier.FIGURAS_DOBRO:
-			if c.rank >= 11 and c.rank <= 14 and not c.is_trunfo():
-				v *= 2.0
-		ChaosModifiers.Modifier.NAIPE_FRACO:
-			if c.suit == weak_suit:
-				v *= 0.5
-		ChaosModifiers.Modifier.NAIPE_FORTE:
-			if c.suit == weak_suit:
-				v *= FORTE_MULT
-		ChaosModifiers.Modifier.PEQUENAS_IMPORTAM:
-			if is_equal_approx(c.points(), 0.5):
-				v = 1.0
-	return v
+	return c.points()
 
 
-## Rodada Invertida: vence a MENOR carta do naipe líder (Trunfo que corta não vale nada).
-func _lowest_index(trick: Array = []) -> int:
-	if trick.is_empty():
-		trick = plays
-	var ls := TrickRules.lead_suit(trick)
-	var best := -1
-	for i in range(trick.size()):
-		var c: CardData = trick[i]["card"]
-		if c.is_louco() or c.suit != ls:
-			continue
-		if best == -1 or c.rank < (trick[best]["card"] as CardData).rank:
-			best = i
-	return best if best != -1 else TrickRules.winning_index(trick, louco_can_win())
-
-
-## Se `card`, jogada por `player` agora, venceria a rodada como está.
+## Se `card`, jogada por `player` agora, venceria a jogada como está.
 func would_win(card: CardData, player: int) -> bool:
-	var ev := active_modifier()
-	if ev != ChaosModifiers.Modifier.VAZA_INVERTIDA:
-		return TrickRules.would_win(card, player, plays, louco_can_win())
-	var trick := plays.duplicate()
-	trick.append({"player": player, "card": card})
-	return int(trick[_lowest_index(trick)]["player"]) == player
+	return TrickRules.would_win_mod(card, player, plays, modifier)
 
 
 ## Pontos das cartas viram fichas (pagas pelos rivais): 1 ponto = PRIZE_PER_POINT blinds.
@@ -715,10 +655,38 @@ func chips_of(points: float) -> float:
 	return roundf(points * PRIZE_PER_POINT * float(blind))
 
 
+## Fichas que os modificadores Saque, Assalto e Maldição movem (sempre STEAL_BLINDS blinds no total,
+## em qualquer mesa). Tira dos pagadores na hora, devolve o que o vencedor deve receber (Saque e
+## Assalto) e já desconta do vencedor o que ele paga (Maldição). Ninguém paga mais do que tem.
+func _modifier_chips(ev: int, winner: int, rivals: Array) -> Dictionary:
+	var total := float(ChaosModifiers.STEAL_BLINDS * blind)
+	var out := {"saque": 0.0, "assalto": 0.0, "assalto_from": -1, "curse": 0.0}
+	if ev == ChaosModifiers.Modifier.ASSALTO_LIDER:
+		var rich := _highest_player()
+		if rich != winner:
+			var take := minf(total, maxf(stacks[rich], 0.0))
+			stacks[rich] -= take
+			out["assalto"] = take
+			out["assalto_from"] = rich
+	elif ev == ChaosModifiers.Modifier.SAQUE and not rivals.is_empty():
+		var share := ceilf(total / float(rivals.size()))
+		for q in rivals:
+			var take := minf(share, maxf(stacks[q], 0.0))
+			stacks[q] -= take
+			out["saque"] = float(out["saque"]) + take
+	elif ev == ChaosModifiers.Modifier.VAZA_MALDITA and not rivals.is_empty():
+		var cost := minf(total, maxf(stacks[winner], 0.0))
+		var each := floorf(cost / float(rivals.size()))
+		for q in rivals:
+			stacks[q] += each
+		out["curse"] = each * float(rivals.size())
+		stacks[winner] -= float(out["curse"])
+	return out
+
+
 func _resolve_trick() -> Dictionary:
 	var ev := active_modifier()
-	var inverted := ev == ChaosModifiers.Modifier.VAZA_INVERTIDA
-	var idx := _lowest_index() if inverted else TrickRules.winning_index(plays, louco_can_win())
+	var idx := TrickRules.winning_index_mod(plays, ev)
 	var winner: int = plays[idx]["player"]
 	var cards: Array = plays.map(func(p): return p["card"])
 	captured[winner].append_array(cards)
@@ -732,10 +700,6 @@ func _resolve_trick() -> Dictionary:
 		mult *= GOLD_MULT
 	var combos: Array = []
 	var bonus := 0.0
-	if ev == ChaosModifiers.Modifier.VAZA_MAIS_UM:
-		bonus += VAZA_PLUS
-	if ev == ChaosModifiers.Modifier.VAZA_MALDITA:
-		bonus -= CURSE_PENALTY
 	var prev_streak: int = streak[last_winner] if last_winner != -1 else 0
 	var broke := last_winner != -1 and last_winner != winner and prev_streak >= 2
 	for q in range(num_players):
@@ -767,27 +731,14 @@ func _resolve_trick() -> Dictionary:
 	combo_count[winner] += combos.size()
 	var points := base_points * mult + bonus
 	var raw_prize := chips_of(points)
-	var saque_amount := 0.0
-	var assalto_amount := 0.0
-	if ev == ChaosModifiers.Modifier.ASSALTO_LIDER:
-		var rich := _highest_player()
-		if rich != winner:
-			assalto_amount = minf(chips_of(ASSALTO_AMOUNT), stacks[rich])
-			stacks[rich] -= assalto_amount
-	if ev == ChaosModifiers.Modifier.SAQUE:
-		for pl in plays:
-			var q: int = pl["player"]
-			if q == winner:
-				continue
-			var take := minf(chips_of(SAQUE_AMOUNT), stacks[q])
-			stacks[q] -= take
-			saque_amount += take
-	# Prêmio das cartas: pago pelos rivais que jogaram a rodada (soma zero, a casa não cria
-	# fichas). Prêmio negativo (Rodada Maldita): o vencedor paga aos rivais, saindo do pote.
+	# Prêmio das cartas: pago pelos rivais que jogaram a jogada (soma zero, a casa não cria fichas).
 	var rivals: Array = []
 	for pl in plays:
 		if int(pl["player"]) != winner:
 			rivals.append(int(pl["player"]))
+	var chips := _modifier_chips(ev, winner, rivals)
+	var saque_amount := float(chips["saque"])
+	var assalto_amount := float(chips["assalto"])
 	var prize := 0.0
 	if raw_prize > 0.0 and not rivals.is_empty():
 		var share := ceilf(raw_prize / float(rivals.size()))
@@ -795,18 +746,12 @@ func _resolve_trick() -> Dictionary:
 			var pay := minf(share, stacks[q])
 			stacks[q] -= pay
 			prize += pay
-	elif raw_prize < 0.0 and not rivals.is_empty():
-		var cost := minf(-raw_prize, trick_pot)
-		var each := floorf(cost / float(rivals.size()))
-		for q in rivals:
-			stacks[q] += each
-		prize = -each * float(rivals.size())
 	var result := {
 		"winner": winner, "winning_index": idx, "plays": plays.duplicate(), "points": points,
 		"base_points": base_points, "mult": mult, "prize": prize, "pot": trick_pot, "combos": combos,
 		"streak": int(streak[winner]), "streak_mult": streak_mult, "bonus": bonus,
-		"saque_amount": saque_amount, "assalto_amount": assalto_amount, "walkover": false,
-		"trick_number": trick_number, "modifier": ev,
+		"saque_amount": saque_amount, "assalto_amount": assalto_amount, "curse_amount": float(chips["curse"]),
+		"walkover": false, "trick_number": trick_number, "modifier": ev,
 	}
 	return _finish_trick(result, winner)
 
@@ -845,7 +790,7 @@ func _finish_trick(result: Dictionary, winner: int) -> Dictionary:
 		for p in range(num_players):
 			deltas.append(stacks[p] - level_start_stacks[p])
 		round_result = {
-			"round": round_index, "modifier": modifier, "weak_suit": weak_suit,
+			"round": round_index, "modifier": modifier,
 			"stacks": stacks.duplicate(), "deltas": deltas,
 			"tricks_won": tricks_won(),
 		}
@@ -874,7 +819,6 @@ func clone_for_sim() -> ChaosEngine:
 	c.round_index = round_index
 	c.modifier_sequence = modifier_sequence.duplicate()
 	c.modifier = modifier
-	c.weak_suit = weak_suit
 	c.streak = streak.duplicate()
 	c.last_winner = last_winner
 	c.combo_count = combo_count.duplicate()
@@ -1055,31 +999,11 @@ func _resolve_trick_blitz(idx: int, winner: int, ev: int) -> Dictionary:
 			var pay := minf(share, stacks[q])
 			stacks[q] -= pay
 			prize += pay
-	var saque_amount := 0.0
-	var assalto_amount := 0.0
-	var assalto_from := -1
-	if ev == ChaosModifiers.Modifier.ASSALTO_LIDER:
-		var rich := _highest_player()
-		if rich != winner:
-			assalto_from = rich
-			assalto_amount = minf(chips_of(ASSALTO_AMOUNT), stacks[rich])
-			stacks[rich] -= assalto_amount
-	if ev == ChaosModifiers.Modifier.SAQUE:
-		for pl in plays:
-			var q: int = pl["player"]
-			if q == winner:
-				continue
-			var take := minf(chips_of(SAQUE_AMOUNT), stacks[q])
-			stacks[q] -= take
-			saque_amount += take
-	var curse_amount := 0.0
-	if ev == ChaosModifiers.Modifier.VAZA_MALDITA:
-		if not rivals.is_empty():
-			var cost := minf(chips_of(CURSE_PENALTY), stacks[winner])
-			var each := floorf(cost / float(rivals.size()))
-			for q in rivals:
-				stacks[q] += each
-			curse_amount = each * float(rivals.size())
+	var chips := _modifier_chips(ev, winner, rivals)
+	var saque_amount := float(chips["saque"])
+	var assalto_amount := float(chips["assalto"])
+	var assalto_from := int(chips["assalto_from"])
+	var curse_amount := float(chips["curse"])
 	# Pote da aposta por rodada: paga pra quem venceu a rodada de cartas, por cima do tempero de
 	# pontos acima — o ganho líquido desconta o que o próprio vencedor pôs nessa rodada.
 	_settle_side_pots(winner)
@@ -1087,7 +1011,7 @@ func _resolve_trick_blitz(idx: int, winner: int, ev: int) -> Dictionary:
 	stacks[winner] += trick_pot_total
 	var trick_gain: float = trick_pot_total - float(contrib[winner])
 	trick_pot = 0.0
-	stacks[winner] += prize + saque_amount + assalto_amount - curse_amount
+	stacks[winner] += prize + saque_amount + assalto_amount
 	var result := {
 		"winner": winner, "winning_index": idx, "plays": plays.duplicate(), "points": base_points,
 		"base_points": base_points, "mult": 1.0, "prize": prize, "pot": pot, "combos": [], "streak": 0,
@@ -1114,7 +1038,7 @@ func _finish_trick_blitz(result: Dictionary, winner: int) -> Dictionary:
 		for p in range(num_players):
 			deltas.append(stacks[p] - level_start_stacks[p])
 		round_result = {
-			"round": round_index, "modifier": modifier, "weak_suit": weak_suit,
+			"round": round_index, "modifier": modifier,
 			"stacks": stacks.duplicate(), "deltas": deltas,
 			"tricks_won": tricks_won(), "wins": wins.duplicate(), "blitz": blitz_result,
 		}
