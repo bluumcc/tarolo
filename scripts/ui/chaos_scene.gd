@@ -2482,7 +2482,9 @@ func _run_ring(avatar: HexAvatar, active: bool) -> void:
 		avatar.set_timer(-1.0)
 		return
 	var tw := create_tween()
-	tw.tween_method(avatar.set_timer, 1.0, 0.0, TURN_SECONDS)
+	var drain_time := maxf(TURN_SECONDS - TURN_RING_DELAY, 0.1)
+	tw.tween_interval(TURN_RING_DELAY)
+	tw.tween_method(avatar.set_timer, 1.0, 0.0, drain_time)
 	tw.tween_callback(func():   # esgotou: apaga o anel e a vez (não fica vermelho até a próxima mão)
 		avatar.set_timer(-1.0)
 		avatar.set_active(false))
