@@ -799,14 +799,19 @@ func _make_card_ghost(view: CardView) -> CardView:
 		(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	g.pivot_offset = CardView.SIZE / 2.0
 	var k := CardView.focus_scale(true, get_viewport_rect().size.y)
-	g.scale = Vector2(k, k)
 	g.rotation = view.get_global_transform().get_rotation()   # mantém a inclinação da carta no leque
 	var center := view.get_global_transform() * (CardView.SIZE / 2.0)
 	var vp := get_viewport_rect().size
 	var half := CardView.SIZE * k / 2.0
-	center.y = minf(center.y, vp.y - half.y - 8.0)   # não sai da tela embaixo
-	center.y = maxf(center.y - CardView.SIZE.y * 0.25, half.y + 8.0)
+	var target := center
+	target.y = minf(target.y, vp.y - half.y - 8.0)   # não sai da tela embaixo
+	target.y = maxf(target.y - CardView.SIZE.y * 0.25, half.y + 8.0)
+	# Nasce exatamente em cima da carta da mão e cresce/sobe com suavidade até o tamanho ampliado.
+	g.scale = view.scale
 	g.global_position = center - CardView.SIZE / 2.0
+	var tw := g.create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(g, "scale", Vector2(k, k), GameState.anim(0.16))
+	tw.tween_property(g, "global_position", target - CardView.SIZE / 2.0, GameState.anim(0.16))
 	g.z_index = 200   # por cima de tudo (assentos, colunas, camadas de cena)
 	return g
 

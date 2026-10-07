@@ -48,9 +48,9 @@ var selected := false
 var interactive := true
 var hover_zoom := false   ## desktop (mão): o mouse em cima mostra a carta ampliada (a cena desenha)
 var _hovered := false
-## Tela larga: a arte (540×900) encolhe pouco, e a mistura de dois níveis de mipmap deixa a carta
-## borrada. Um viés de -0.5 na leitura da textura escolhe o nível mais nítido (medido: +23% de nitidez).
-static var _sharp_mat: ShaderMaterial
+## Desktop: a arte original (540×900) encolhe ~2×; o filtro em tempo real (bilinear + mipmap) ou borra ou
+## serrilha. Então o desktop usa `assets/cards_md/` (360×600, reduzida offline com Lanczos), exibida quase 1:1.
+var _use_md := false
 var zoom_enabled := true   ## segurar / botão direito abre o zoom (a mesa Blitz desliga)
 
 var _pressing := false
@@ -89,13 +89,7 @@ func _ready() -> void:
 	_card_tex.clip_contents = true
 	_card_tex.visible = false
 	var vp := get_viewport_rect().size
-	if vp.x > vp.y:
-		if _sharp_mat == null:
-			var sh := Shader.new()
-			sh.code = "shader_type canvas_item;\nvoid fragment() { COLOR = texture(TEXTURE, UV, -0.5); }"
-			_sharp_mat = ShaderMaterial.new()
-			_sharp_mat.shader = sh
-		_card_tex.material = _sharp_mat
+	_use_md = vp.x > vp.y   # desktop: versões pré-reduzidas com Lanczos (nítidas e sem serrilhado)
 	body.add_child(_card_tex)
 	body.move_child(_card_tex, 0)
 	_refresh()
@@ -141,7 +135,7 @@ func _refresh() -> void:
 		var cover_name: String = back_def.get("cover", "")
 		var cover_tex: Texture2D = null
 		if cover_name != "":
-			var path := "res://assets/cards/%s.png" % cover_name
+			var path := _art_dir() + "%s.png" % cover_name
 			if ResourceLoader.exists(path):
 				cover_tex = load(path) as Texture2D
 		if cover_tex != null:
@@ -192,13 +186,17 @@ func _refresh() -> void:
 ## Caminho do PNG customizado para esta carta (convenção: assets/cards/).
 ## Maiores: 0.png (Louco), 1–21.png (Trunfos).
 ## Menores: o/p/c/e + rank. Ex.: e2.png, c9.png, o12.png.
+func _art_dir() -> String:
+	return "res://assets/cards_md/" if _use_md else "res://assets/cards/"
+
+
 func _asset_path() -> String:
 	if data.is_louco():
-		return "res://assets/cards/0.png"
+		return _art_dir() + "0.png"
 	if data.is_trunfo():
-		return "res://assets/cards/%d.png" % data.rank
+		return _art_dir() + "%d.png" % data.rank
 	const PREFIXES := ["o", "p", "c", "e"]
-	return "res://assets/cards/%s%d.png" % [PREFIXES[data.suit], data.rank]
+	return _art_dir() + "%s%d.png" % [PREFIXES[data.suit], data.rank]
 
 
 func _load_card_texture() -> bool:
