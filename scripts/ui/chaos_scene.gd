@@ -956,7 +956,7 @@ func _announce_round() -> void:
 		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "BLIND ◎%d" % engine.blind, "text": "Todo mundo paga o blind a cada jogada. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.MONEY})
 	else:
 		lines.append({"head": "CARTAS NOVAS", "title": "RITUAL %d" % (engine.round_index + 1), "text": "Cartas novas, 8 jogadas — cada uma com o seu próprio modificador, anunciado antes de começar.", "color": UIKit.MODIFIER})
-	var hold := 0.0 if (engine.round_index == 0 and engine.blitz and not first_round_done) else (2.6 if not first_round_done else 2.2)
+	var hold := 5.0
 	await _transition(kicker, lines, hold)
 	first_round_done = true
 	_banner_clear()
@@ -1192,7 +1192,7 @@ func _modifier_transition(m: int, color: Color) -> void:
 	Sfx.play("tick")
 	_open_modifier_orb(orb, orb_icon, title_lbl, desc_lbl, tip_lbl, go, m, color)
 	# +3s a mais pra realmente dar tempo de ler o modificador sorteado antes de avançar sozinho.
-	_count_down(go, timer_lbl, 6.2)
+	_count_down(go, timer_lbl, 8.0)
 	await go.pressed
 	if not is_inside_tree():
 		return
@@ -3022,13 +3022,7 @@ func _human_cover_choice(actor: int) -> bool:
 		item_chosen.emit(1))
 	row.add_child(cover_btn)
 	UIKit.pop_in(box, GameState.anim(0.15))
-	var timed_out := {"v": false}
-	get_tree().create_timer(GameState.anim(5.0)).timeout.connect(func():
-		if is_inside_tree() and modal_open and not timed_out["v"]:
-			timed_out["v"] = true
-			item_chosen.emit(-1))
 	await item_chosen
-	timed_out["v"] = true
 	modal_open = false
 	if is_inside_tree():
 		holder.queue_free()
