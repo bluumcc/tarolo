@@ -302,7 +302,7 @@ func _build_ui() -> void:
 	add_child(popup_layer)
 
 	hand_scroller.ghost_layer = popup_layer
-	hand_scroller.throw_allowed = func() -> bool: return phase == "discard" or human_turn
+	hand_scroller.throw_allowed = func() -> bool: return (phase == "discard" and discard_picks.size() < ChaosEngine.BLITZ_DISCARD_SIZE) or human_turn
 	hand_scroller.throw_requested.connect(_on_card_thrown)
 	hand_scroller.deselect_on_cancel = true
 	hand_scroller.drag_cancelled.connect(func(v: CardView):
@@ -2869,6 +2869,7 @@ func _on_discard_tapped(view: CardView) -> void:
 ## reflui pro tamanho cheio assim que ela sai. Com as 2 descartadas, segue sozinho pro palpite.
 func _commit_discard(view: CardView, drop_global := Vector2.ZERO) -> void:
 	if discard_picks.has(view.data) or discard_picks.size() >= ChaosEngine.BLITZ_DISCARD_SIZE:
+		hand_scroller.cancel_drag()
 		return
 	discard_picks.append(view.data)
 	view.mouse_filter = Control.MOUSE_FILTER_IGNORE
