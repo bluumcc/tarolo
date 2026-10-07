@@ -328,17 +328,9 @@ func _tournament_player_table() -> Array:
 ## reais do torneio (viajam com cada jogador entre mesas), mas o buy-in já foi cobrado na
 ## inscrição, então não mexe nas fichas de verdade até o prêmio final
 ## (`report_tournament_table`). A mesa toca só esse nível; o resultado decide a próxima.
-## Blind deste nível: calendário do evento + piso pela stack média dos sobreviventes (ver Tournament.blind_for).
-## Calculado uma vez por nível (ao montar a mesa do jogador) e guardado — as outras mesas jogam no mesmo blind.
+## Blind deste nível: tabela fixa do evento (Tournament.blind_for). Guardado em `tournament["blind_now"]`.
 func _tournament_blind() -> int:
-	var total := 0.0
-	var alive := 0
-	for tb in (tournament["tables"] as Array):
-		for e in (tb as Array):
-			total += float((e as Dictionary)["stack"])
-			alive += 1
-	var avg := total / float(maxi(alive, 1))
-	var b := Tournament.blind_for(int(tournament.get("level", 0)), tournament.get("cfg", {}), avg, alive, int(tournament.get("blind_now", 0)))
+	var b := Tournament.blind_for(int(tournament.get("level", 0)), tournament.get("cfg", {}))
 	tournament["blind_now"] = b
 	return b
 

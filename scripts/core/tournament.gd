@@ -26,44 +26,39 @@ const BLIND_BASE := 10
 const BLIND_DOUBLE_EVERY := 3
 
 
-## Blinds "redondos" (10, 15, 20, 25, 30, 40, 50, 60, 80, 100, 120, 160, 200...): o menor >= `v`.
-static func round_up_blind(v: float) -> int:
-	var mant := [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0]
-	var mag := 10.0
-	while mag < 1.0e9:
-		for m in mant:
-			var cand := int(round(float(m) * mag))
-			if float(cand) >= v - 0.001:
-				return cand
+## Blind "redondo" mais próximo de `v` (…10, 12, 15, 20, 25, 30, 40, 50, 60, 80, 100, 120, 150, 200…).
+static func nice_blind(v: float) -> int:
+	var mant := [1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0]
+	var mag := 1.0
+	while mag < 1.0e9 and v >= 10.0 * mag:
 		mag *= 10.0
-	return int(v)
+	var best := int(round(float(mant[0]) * mag))
+	for m in mant:
+		var cand := float(m) * mag
+		if absf(cand - v) < absf(float(best) - v):
+			best = int(round(cand))
+	return maxi(best, 1)
 
 
-## Blind do nível = o MAIOR entre (a) o calendário do evento (base, dobra a cada `double_every`, e a cada
-## `late_double_every` depois de `late_from`) e (b) um piso ligado ao tamanho médio das stacks: conforme
-## gente cai, as fichas se concentram e a stack média cresce — sem esse piso o blind fica minúsculo perto
-## das stacks (um 1x1 final com 12 mil fichas cada e blind 80 nunca acabava). O piso mantém a stack média em
-## ~12 entradas de palpite (mesa grande), 9 (≤ 6 jogadores) e 6 (final 1x1). Nunca cai (`prev_blind`).
-static func blind_for(level: int, cfg: Dictionary = {}, avg_stack := 0.0, alive := 0, prev_blind := 0) -> int:
-	var base := int(cfg.get("blind_base", BLIND_BASE))
-	var every := maxi(int(cfg.get("double_every", BLIND_DOUBLE_EVERY)), 1)
-	var late_from := int(cfg.get("late_from", 9999))
-	var late_every := maxi(int(cfg.get("late_double_every", every)), 1)
-	var lv := maxi(level, 0)
-	var doublings := 0
-	if lv <= late_from:
-		doublings = lv / every
-	else:
-		doublings = late_from / every + (lv - late_from) / late_every
-	var blind := base * (1 << doublings)
-	if avg_stack > 0.0 and alive > 0:
-		var depth := 12.0 if alive > 6 else (9.0 if alive > 2 else 6.0)   # stack média em entradas de palpite
-		blind = maxi(blind, round_up_blind(avg_stack / (depth * float(ChaosEngine.BLITZ_ENTRY_BLINDS))))
-	if alive == 2 and prev_blind > 0:
-		blind = maxi(blind, round_up_blind(float(prev_blind) * 2.0))   # final 1x1: o blind dobra a cada nível até alguém não cobrir a entrada
-	elif alive > 2 and alive <= 4 and prev_blind > 0:
-		blind = maxi(blind, round_up_blind(float(prev_blind) * 1.5))   # mesa final (3-4): sobe 50% por nível
-	return maxi(blind, prev_blind)
+## Próximo blind redondo acima de `v`.
+static func nice_above(v: int) -> int:
+	var cand := nice_blind(float(v) * 1.2)
+	while cand <= v:
+		cand = nice_blind(float(cand) * 1.15 + 1.0)
+	return cand
+
+
+## Tabela de blinds FIXA do evento: nível 0 = `blind_base` (1% da stack) e cada nível seguinte multiplica por
+## `growth` (arredondado pra um valor redondo, sempre estritamente maior que o anterior). Tudo sai do evento:
+## buy-in → stack (10×) → blind inicial (stack/100) → ritmo (`growth`). Mesmo calendário pra todas as mesas.
+static func blind_for(level: int, cfg: Dictionary = {}) -> int:
+	var base := float(cfg.get("blind_base", BLIND_BASE))
+	var growth := float(cfg.get("growth", 1.5))
+	var b := int(base)
+	for k in range(1, maxi(level, 0) + 1):
+		var nxt := nice_blind(base * pow(growth, float(k)))
+		b = nxt if nxt > b else nice_above(b)
+	return b
 
 
 ## Estrutura do torneio pelo valor de inscrição (cada evento tem a sua). Stack inicial em fichas de
@@ -232,10 +227,10 @@ static func simulate_level(entrants: Array, blind: int, rng: RandomNumberGenerat
 
 ## Torneios abertos no hub: nome, entrada (fichas) e selo de dificuldade. Mesmo formato (16 jogadores).
 const OPEN_EVENTS := [
-	{"name": "Freeroll Arcano",  "buy_in": 100,  "stack": 800.0,  "blind_base": 10, "double_every": 3, "late_from": 8,  "late_double_every": 2},
-	{"name": "Torneio Clássico", "buy_in": 300,  "stack": 1000.0, "blind_base": 10, "double_every": 3, "late_from": 10, "late_double_every": 2},
-	{"name": "Mesa dos Magos",   "buy_in": 600,  "stack": 1200.0, "blind_base": 10, "double_every": 4, "late_from": 11, "late_double_every": 2},
-	{"name": "Grande Arcano",    "buy_in": 1500, "stack": 1600.0, "blind_base": 10, "double_every": 4, "late_from": 12, "late_double_every": 2},
+	{"name": "Freeroll Arcano",  "buy_in": 100,  "stack": 1000.0,  "blind_base": 10,  "growth": 1.35},
+	{"name": "Torneio Clássico", "buy_in": 300,  "stack": 3000.0,  "blind_base": 30,  "growth": 1.32},
+	{"name": "Mesa dos Magos",   "buy_in": 600,  "stack": 6000.0,  "blind_base": 60,  "growth": 1.3},
+	{"name": "Grande Arcano",    "buy_in": 1500, "stack": 15000.0, "blind_base": 150, "growth": 1.28},
 ]
 
 

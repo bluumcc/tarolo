@@ -23,7 +23,7 @@ func _init() -> void:
 					for ee in (tt as Array):
 						tot_s += float(ee["stack"])
 						alive_s += 1
-				var blind := Tournament.blind_for(level, cfg, tot_s / float(maxi(alive_s, 1)), alive_s, prev_blind)
+				var blind := Tournament.blind_for(level, cfg)
 				prev_blind = blind
 				var before := 0
 				for t in tables:

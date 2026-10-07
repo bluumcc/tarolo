@@ -286,7 +286,7 @@ func _tournament() -> void:
 				for ee in (tt as Array):
 					tot_s += float(ee["stack"])
 					alive_s += 1
-			var blind := Tournament.blind_for(level, {}, tot_s / float(maxi(alive_s, 1)), alive_s)
+			var blind := Tournament.blind_for(level, {})
 			for t in tables:
 				Tournament.simulate_level(t, blind, rng, tables.size() == 1)
 			var survivors: Array = []
@@ -343,7 +343,7 @@ func _placement(rng: RandomNumberGenerator, my_difficulty: int) -> int:
 			for ee in (tt as Array):
 				tot_s += float(ee["stack"])
 				alive_s += 1
-		var blind := Tournament.blind_for(level, {}, tot_s / float(maxi(alive_s, 1)), alive_s)
+		var blind := Tournament.blind_for(level, {})
 		for t in tables:
 			Tournament.simulate_level(t, blind, rng, tables.size() == 1)
 		var survivors: Array = []

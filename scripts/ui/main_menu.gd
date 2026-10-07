@@ -445,7 +445,7 @@ func _ranked_tournament_block(col: VBoxContainer, fichas: int, fill_height: bool
 		var info := VBoxContainer.new()
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		info.add_child(UIKit.label("%s (%d jogadores)" % [str(ev["name"]), Tournament.FIELD_SIZE], 24, UIKit.TR_GOLD))
-		info.add_child(UIKit.label("Inscrição ◎%s · Stack ◎%s" % [UIKit.fmt_int(buy), UIKit.fmt_int(int(ev["stack"]))], 20, UIKit.TR_WHITE))
+		info.add_child(UIKit.label("Inscrição ◎%s · Stack ◎%s · Blind %d" % [UIKit.fmt_int(buy), UIKit.fmt_int(int(ev["stack"])), int(ev["blind_base"])], 20, UIKit.TR_WHITE))
 		var prizes := UIKit.label("1º ◎%s · 2º ◎%s · 3º ◎%s" % [
 			UIKit.fmt_int(Tournament.payout_for(0, buy)), UIKit.fmt_int(Tournament.payout_for(1, buy)),
 			UIKit.fmt_int(Tournament.payout_for(2, buy))], 20, UIKit.TR_WHITE)
