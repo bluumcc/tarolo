@@ -785,7 +785,7 @@ func _layout_hand() -> void:
 	(parent as HandScroller).set_content_size(Vector2(content_w, zone_h))
 
 
-## Desktop: o mouse sobre uma carta da mão mostra uma cópia ampliada (reta) por cima de tudo. A cópia
+## Desktop: o mouse sobre uma carta da mão mostra uma cópia ampliada (com a mesma inclinação do leque) por cima de tudo. A cópia
 ## ignora o mouse e a carta real não muda, então toque, swipe e duplo toque funcionam como sempre.
 var hover_ghost: CardView
 
@@ -800,6 +800,7 @@ func _make_card_ghost(view: CardView) -> CardView:
 	g.pivot_offset = CardView.SIZE / 2.0
 	var k := CardView.focus_scale(true, get_viewport_rect().size.y)
 	g.scale = Vector2(k, k)
+	g.rotation = view.get_global_transform().get_rotation()   # mantém a inclinação da carta no leque
 	var center := view.get_global_transform() * (CardView.SIZE / 2.0)
 	var vp := get_viewport_rect().size
 	var half := CardView.SIZE * k / 2.0
