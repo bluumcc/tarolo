@@ -378,6 +378,18 @@ func _test_chaos() -> void:
 		bu_done = bu.play(bu_cur, (bu.legal_for(bu_cur) as Array)[0])["trick_complete"]
 	check(bu_order.size() == 3 and not bu_order.has(1) and bu_order.has(0), "com um eliminado, jogam os outros 3 (você incluído) e a vaza fecha certo")
 
+	# ---- Dealer: sorteado na 1ª rodada; depois é sempre o vencedor da última jogada da rodada anterior
+	var dl := ChaosEngine.new()
+	dl.setup_match({"seed": 4, "levels": 3, "mode": "blitz", "blind": 10, "players": 4, "start_leader": 2, "stacks": [500.0, 500.0, 500.0, 500.0]})
+	check(dl.leader == 2, "dealer da 1ª rodada = o sorteado na abertura da partida")
+	dl.leader = 3   # (a última jogada da rodada foi vencida pelo jogador 3)
+	dl.trick_number = ChaosEngine.HAND_SIZE
+	dl.advance_round()
+	check(dl.leader == 3, "dealer da rodada seguinte = vencedor da última jogada")
+	dl.busted[3] = true
+	dl.trick_number = ChaosEngine.HAND_SIZE
+	dl.advance_round()
+	check(dl.leader == 0, "vencedor eliminado: o dealer passa pro próximo vivo")
 	# ---- Torneio: sem fichas pra entrada do palpite = eliminado antes de jogar; sobrou ≥1 ficha = joga em all-in
 	var ai := ChaosEngine.new()
 	ai.setup_match({"seed": 9, "levels": 1, "mode": "blitz", "blind": 10, "players": 3, "stacks": [60.0, 85.0, 500.0]})

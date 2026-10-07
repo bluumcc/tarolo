@@ -162,8 +162,15 @@ func _setup_round() -> void:
 	Deck.shuffle(modifier_sequence, rng)
 	modifier = -1
 	weak_suit = -1
-	# 1ª rodada: quem a cena sorteou; nas seguintes, novo sorteio do dealer (sem rodízio).
-	leader = start_leader if round_index == 0 else rng.randi() % num_players
+	# Dealer: sorteado só no começo da partida (1ª rodada, `start_leader`); depois é sempre o vencedor da
+	# última jogada da rodada anterior. Se ele não está mais na mesa (eliminado), passa pro próximo vivo.
+	if round_index == 0 or leader < 0:
+		leader = start_leader
+	else:
+		var tries := 0
+		while busted[leader] and tries < num_players:
+			leader = (leader + 1) % num_players
+			tries += 1
 	current = leader
 	trick_number = 0
 	plays = []
