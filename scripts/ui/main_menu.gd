@@ -444,8 +444,12 @@ func _ranked_tournament_block(col: VBoxContainer, fichas: int, fill_height: bool
 		item.add_child(ir)
 		var info := VBoxContainer.new()
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		info.add_child(UIKit.label("%s (%d jogadores)" % [str(ev["name"]), Tournament.FIELD_SIZE], 24, UIKit.TR_GOLD))
-		info.add_child(UIKit.label("Inscrição ◎%s · Stack ◎%s · Blind %d" % [UIKit.fmt_int(buy), UIKit.fmt_int(int(ev["stack"])), int(ev["blind_base"])], 20, UIKit.TR_WHITE))
+		var ev_title := UIKit.label("%s (%d jogadores)" % [str(ev["name"]), Tournament.FIELD_SIZE], 24, UIKit.TR_GOLD)
+		ev_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		info.add_child(ev_title)
+		var ev_info := UIKit.label("Inscrição ◎%s · Stack ◎%s · Blind %d" % [UIKit.fmt_int(buy), UIKit.fmt_int(int(ev["stack"])), int(ev["blind_base"])], 20, UIKit.TR_WHITE)
+		ev_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		info.add_child(ev_info)
 		var prizes := UIKit.label("1º ◎%s · 2º ◎%s · 3º ◎%s" % [
 			UIKit.fmt_int(Tournament.payout_for(0, buy)), UIKit.fmt_int(Tournament.payout_for(1, buy)),
 			UIKit.fmt_int(Tournament.payout_for(2, buy))], 20, UIKit.TR_WHITE)
