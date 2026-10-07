@@ -55,6 +55,7 @@ var first_round_done := false
 var round_dots: RoundDots
 var bottom_mid: Control          # meio da barra de baixo: ações OU o card de pote/prêmio
 var prize_card: StatCard         # PRÊMIO, canto inferior direito
+var stack_card: StatCard         # STACK, fichas do jogador
 var table_players := 0           # nº de jogadores com que a mesa foi dimensionada; só é refeito entre rodadas
 var phase_layer: Control        # camada acima da mesa e da mão: etapas sem mesa (descarte, palpite)
 var phase_screen: PhaseScreen   # título, subtítulo e seu avatar grande com o anel do relógio
@@ -418,6 +419,11 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	prize_card.modulate.a = 0.0
 	bottom_bar.add_child(prize_card)
 
+	stack_card = StatCard.new().setup("STACK", "◎ 0", UIKit.TR_CYAN, DS.FS_TITLE, DS.FS_LABEL)
+	stack_card.custom_minimum_size = Vector2(SIDE_W, 0)
+	stack_card.value.autowrap_mode = TextServer.AUTOWRAP_OFF
+	bottom_bar.add_child(stack_card)
+
 
 ## Desktop (tela larga): coluna fixa à direita — Registro, Modificador, Prêmio, Pote e, embaixo, as
 ## ações. Pote, prêmio e ações são os mesmos nós da barra de baixo do celular: `_dock_bottom` só
@@ -508,13 +514,16 @@ func _dock_bottom(wide: bool) -> void:
 	bottom_bar.visible = not wide
 	if banner_title != null:
 		banner_title.visible = not wide   # no desktop os avisos vão pro Registro
-	for n in [prize_card, pot_box, bottom_mid]:
-		(n as Node).get_parent().remove_child(n)
+	for n in [prize_card, pot_box, bottom_mid, stack_card]:
+		if is_instance_valid(n) and n.get_parent() != null:
+			(n as Node).get_parent().remove_child(n)
 	if wide:
 		prize_card.custom_minimum_size = Vector2(0, 80)
 		pot_box.custom_minimum_size = Vector2(0, 80)
+		stack_card.custom_minimum_size = Vector2(0, 80)
 		side_col.add_child(prize_card)
 		side_col.add_child(pot_box)
+		side_col.add_child(stack_card)
 		var gap := Control.new()
 		gap.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -529,9 +538,11 @@ func _dock_bottom(wide: bool) -> void:
 			gap_node.queue_free()
 		pot_box.custom_minimum_size = Vector2(SIDE_W, 0)
 		prize_card.custom_minimum_size = Vector2(SIDE_W, 0)
+		stack_card.custom_minimum_size = Vector2(SIDE_W, 0)
 		bottom_bar.add_child(pot_box)
 		bottom_bar.add_child(bottom_mid)
 		bottom_bar.add_child(prize_card)
+		bottom_bar.add_child(stack_card)
 		bottom_mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 
@@ -2355,6 +2366,8 @@ func _refresh_hud() -> void:
 	_refresh_double_button()
 	_refresh_idle_card()
 	_refresh_mod_card()
+	if is_instance_valid(stack_card):
+		stack_card.value.text = "◎ " + UIKit.fmt_short(float(engine.stacks[0]))
 
 
 func _reset_actions() -> void:

@@ -183,14 +183,49 @@ func _topbar_nav_btn(tab: String, active: bool) -> Button:
 
 
 func _build_tabbar_portrait() -> Control:
-	var p := PanelContainer.new()
-	var sb := UIKit.box(UIKit.SURFACE_DEEP, UIKit.OUTLINE, 2, 0, 0)
-	sb.set_corner_radius_all(0)
-	sb.set_border_width_all(0)
-	sb.border_width_bottom = 2
-	p.add_theme_stylebox_override("panel", sb)
-	p.add_child(_make_tab_buttons(true))
-	return p
+	var bar := PanelContainer.new()
+	var sb := UIKit.box(Color(0.05, 0.02, 0.10, 1.0), UIKit.TR_PURPLE_LIGHT, 0, 0, 0)
+	sb.border_width_top = 1
+	bar.add_theme_stylebox_override("panel", sb)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 0)
+	bar.add_child(row)
+	const _NAV := [["RANQUEADA","⚔","RANKED"],["CLÁSSICO","♠","CLÁSSICOS"],["LOJA","◈","LOJA"],["AJUSTES","⚙","CONFIG"]]
+	for td: Array in _NAV:
+		var item := _nav_tab_item(str(td[0]), str(td[1]), str(td[2]), str(td[0]) == _active_tab)
+		item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(item)
+	return bar
+
+
+func _nav_tab_item(tab_id: String, icon: String, short_lbl: String, active: bool) -> Control:
+	var accent := _tab_accent(tab_id)
+	var fg := accent if active else UIKit.MUTED
+	var wrap := Control.new()
+	wrap.custom_minimum_size = Vector2(0, 88)
+	wrap.mouse_filter = Control.MOUSE_FILTER_STOP
+	wrap.gui_input.connect(func(ev: InputEvent):
+		if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and ev.pressed:
+			UIKit.sfx("tick")
+			_switch_tab(tab_id))
+	var bg := ColorRect.new()
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.color = Color(accent.r, accent.g, accent.b, 0.10) if active else Color.TRANSPARENT
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.add_child(bg)
+	var vbox := VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 4)
+	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.add_child(vbox)
+	var icon_lbl := UIKit.label(icon, 28, fg, HORIZONTAL_ALIGNMENT_CENTER)
+	icon_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(icon_lbl)
+	var text_lbl := UIKit.label(short_lbl, 14, fg, HORIZONTAL_ALIGNMENT_CENTER)
+	text_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(text_lbl)
+	return wrap
 
 
 func _make_tab_buttons(expand: bool) -> HBoxContainer:
