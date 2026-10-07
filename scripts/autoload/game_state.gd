@@ -328,6 +328,21 @@ func _tournament_player_table() -> Array:
 ## reais do torneio (viajam com cada jogador entre mesas), mas o buy-in já foi cobrado na
 ## inscrição, então não mexe nas fichas de verdade até o prêmio final
 ## (`report_tournament_table`). A mesa toca só esse nível; o resultado decide a próxima.
+## Blind deste nível: calendário do evento + piso pela stack média dos sobreviventes (ver Tournament.blind_for).
+## Calculado uma vez por nível (ao montar a mesa do jogador) e guardado — as outras mesas jogam no mesmo blind.
+func _tournament_blind() -> int:
+	var total := 0.0
+	var alive := 0
+	for tb in (tournament["tables"] as Array):
+		for e in (tb as Array):
+			total += float((e as Dictionary)["stack"])
+			alive += 1
+	var avg := total / float(maxi(alive, 1))
+	var b := Tournament.blind_for(int(tournament.get("level", 0)), tournament.get("cfg", {}), avg, alive, int(tournament.get("blind_now", 0)))
+	tournament["blind_now"] = b
+	return b
+
+
 func tournament_table_config() -> Dictionary:
 	var t := _tournament_player_table()
 	var human_i := 0
@@ -344,7 +359,7 @@ func tournament_table_config() -> Dictionary:
 		names.append(str(e["name"]))
 		difficulty.append(int(e["difficulty"]))
 		stacks.append(float(e["stack"]))
-	var blind := Tournament.blind_for(int(tournament.get("level", 0)), tournament.get("cfg", {}))
+	var blind := _tournament_blind()
 	var alive := 0
 	for tb in (tournament["tables"] as Array):
 		alive += (tb as Array).size()
@@ -376,7 +391,9 @@ func report_tournament_table(result: Dictionary) -> Dictionary:
 		(_tournament_order[i] as Dictionary)["stack"] = 0.0 if is_out else maxf(float(final_stacks[i]), 0.0)
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	var blind := Tournament.blind_for(int(tournament.get("level", 0)), tournament.get("cfg", {}))
+	var blind := int(tournament.get("blind_now", 0))
+	if blind <= 0:
+		blind = _tournament_blind()
 	# Mesas de bots (todas, exceto a do jogador, que já tocou de verdade) jogam o mesmo nível,
 	# no mesmo blind — o blind sobe com o torneio inteiro, não por mesa.
 	for t in (tournament["tables"] as Array):

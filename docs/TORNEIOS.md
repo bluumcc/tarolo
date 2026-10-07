@@ -24,3 +24,12 @@
 Entrada do palpite = 8 blinds. Stack em entradas (blind 10): 10 / 12,5 / 15 / 20. Bolão = inscrição × 16 × 0,9;
 prêmios 60% / 28% / 12% (1º/2º/3º).
 `godot --headless --path . -s res://tests/sim/tournament_pace.gd` mede a duração e as quebras por nível.
+
+## Blind (como sobe)
+`Tournament.blind_for(level, evento, stack_média, vivos, blind_anterior)` = o **maior** entre:
+1. o calendário do evento (tabela acima);
+2. um **piso pela stack média**: conforme gente cai as fichas se concentram, então o blind sobe pra manter a stack média em
+   ~12 entradas de palpite (mesa grande), 9 (≤ 6 jogadores) e 6 (1x1). Sem isso um 1x1 final com 12 mil fichas cada e blind 80
+   levava ~20 níveis pra acabar;
+3. **mesa final**: com 3–4 vivos o blind sobe 50% por nível; com 2 (1x1) ele **dobra a cada nível** até alguém não cobrir a entrada.
+O blind nunca desce. Calculado uma vez por nível (`GameState._tournament_blind`) e guardado em `tournament["blind_now"]`.

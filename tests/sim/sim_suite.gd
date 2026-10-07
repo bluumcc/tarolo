@@ -280,7 +280,13 @@ func _tournament() -> void:
 		for e in field:
 			total0 += float(e["stack"])
 		while level < 80:
-			var blind := Tournament.blind_for(level)
+			var tot_s := 0.0
+			var alive_s := 0
+			for tt in tables:
+				for ee in (tt as Array):
+					tot_s += float(ee["stack"])
+					alive_s += 1
+			var blind := Tournament.blind_for(level, {}, tot_s / float(maxi(alive_s, 1)), alive_s)
 			for t in tables:
 				Tournament.simulate_level(t, blind, rng, tables.size() == 1)
 			var survivors: Array = []
@@ -331,7 +337,13 @@ func _placement(rng: RandomNumberGenerator, my_difficulty: int) -> int:
 	var me: Dictionary = field[0]
 	var tables := Tournament.split_into_tables(field)
 	for level in range(80):
-		var blind := Tournament.blind_for(level)
+		var tot_s := 0.0
+		var alive_s := 0
+		for tt in tables:
+			for ee in (tt as Array):
+				tot_s += float(ee["stack"])
+				alive_s += 1
+		var blind := Tournament.blind_for(level, {}, tot_s / float(maxi(alive_s, 1)), alive_s)
 		for t in tables:
 			Tournament.simulate_level(t, blind, rng, tables.size() == 1)
 		var survivors: Array = []

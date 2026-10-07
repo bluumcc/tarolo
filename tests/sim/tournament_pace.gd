@@ -15,8 +15,16 @@ func _init() -> void:
 			var field := Tournament.make_field("eu", names, rng, float(cfg["stack"]))
 			var tables := Tournament.split_into_tables(field)
 			var level := 0
+			var prev_blind := 0
 			while level < 80:
-				var blind := Tournament.blind_for(level, cfg)
+				var tot_s := 0.0
+				var alive_s := 0
+				for tt in tables:
+					for ee in (tt as Array):
+						tot_s += float(ee["stack"])
+						alive_s += 1
+				var blind := Tournament.blind_for(level, cfg, tot_s / float(maxi(alive_s, 1)), alive_s, prev_blind)
+				prev_blind = blind
 				var before := 0
 				for t in tables:
 					before += (t as Array).size()

@@ -378,6 +378,14 @@ func _test_chaos() -> void:
 		bu_done = bu.play(bu_cur, (bu.legal_for(bu_cur) as Array)[0])["trick_complete"]
 	check(bu_order.size() == 3 and not bu_order.has(1) and bu_order.has(0), "com um eliminado, jogam os outros 3 (você incluído) e a vaza fecha certo")
 
+	# ---- Blind do torneio: calendário + piso pela stack média; nunca cai; 1x1 final dobra a cada nível
+	var bcfg: Dictionary = Tournament.OPEN_EVENTS[3]
+	check(Tournament.blind_for(0, bcfg) == 10 and Tournament.blind_for(4, bcfg) == 20, "blind segue o calendário do evento")
+	check(Tournament.blind_for(0, bcfg, 1600.0, 16) == 20 or Tournament.blind_for(0, bcfg, 1600.0, 16) == 15 or Tournament.blind_for(0, bcfg, 1600.0, 16) == 10, "stack média normal não infla o blind")
+	check(Tournament.blind_for(12, bcfg, 12800.0, 3) >= 12800.0 / (9.0 * 8.0) - 1.0, "poucos jogadores com stacks enormes: o piso sobe o blind (stack média ≤ ~9 entradas)")
+	check(Tournament.blind_for(3, bcfg, 100.0, 8, 640) == 640, "o blind nunca desce")
+	check(Tournament.blind_for(13, bcfg, 12800.0, 2, 300) >= 600, "final 1x1: o blind dobra a cada nível")
+	check(Tournament.round_up_blind(75.0) == 80 and Tournament.round_up_blind(10.0) == 10 and Tournament.round_up_blind(101.0) == 150, "blinds arredondados pra valores redondos")
 	# ---- Dealer: sorteado na 1ª rodada; depois é sempre o vencedor da última jogada da rodada anterior
 	var dl := ChaosEngine.new()
 	dl.setup_match({"seed": 4, "levels": 3, "mode": "blitz", "blind": 10, "players": 4, "start_leader": 2, "stacks": [500.0, 500.0, 500.0, 500.0]})
