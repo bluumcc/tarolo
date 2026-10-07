@@ -378,9 +378,15 @@ func _test_chaos() -> void:
 		bu_done = bu.play(bu_cur, (bu.legal_for(bu_cur) as Array)[0])["trick_complete"]
 	check(bu_order.size() == 3 and not bu_order.has(1) and bu_order.has(0), "com um eliminado, jogam os outros 3 (você incluído) e a vaza fecha certo")
 
-	# ---- Blind do torneio: tabela fixa por evento (buy-in → stack → blind inicial → ritmo)
+	# ---- Blind do torneio: UMA escada fixa pra todos × unidade do evento (1% da stack; stack = 10× buy-in)
+	var want_ladder := [10, 15, 20, 25, 30, 40, 50, 60, 80, 100, 150, 200, 250, 300, 400, 500, 600, 800, 1000, 1500]
+	var ladder_ok := true
+	for li in range(want_ladder.size()):
+		if Tournament.blind_for(li, {"blind_base": 10}) != int(want_ladder[li]):
+			ladder_ok = false
+	check(ladder_ok, "escada de blinds (u=10): 10, 15, 20, 25, 30, 40, 50, 60, 80, 100, 150, 200, 250, 300, 400…")
 	var bl_ok := true
-	var bl_prop := true
+	var bl_int := true
 	for ev in Tournament.OPEN_EVENTS:
 		var prev_b := 0
 		for lv in range(0, 40):
@@ -388,18 +394,12 @@ func _test_chaos() -> void:
 			if cur_b <= prev_b:
 				bl_ok = false
 			prev_b = cur_b
-		if absf(float(ev["stack"]) / float(ev["blind_base"]) - 100.0) > 0.01 or float(ev["stack"]) != float(ev["buy_in"]) * 10.0:
-			bl_prop = false
-		if Tournament.blind_for(0, ev) != int(ev["blind_base"]):
+			if cur_b % 5 != 0:
+				bl_int = false
+		if Tournament.blind_for(0, ev) != int(ev["blind_base"]) or float(ev["stack"]) != float(ev["buy_in"]) * 10.0 or float(ev["blind_base"]) != float(ev["stack"]) / 100.0:
 			bl_ok = false
-	check(bl_ok, "blind de cada evento começa na base e sobe estritamente a cada nível")
-	check(bl_prop, "stack = 10× o buy-in e blind inicial = 1% da stack (tudo proporcional ao buy-in)")
-	var ladder_ok := true
-	for li in range(0, 60):
-		var lb := Tournament.blind_at(li)
-		if lb % 5 != 0 or (li > 0 and lb <= Tournament.blind_at(li - 1)):
-			ladder_ok = false
-	check(ladder_ok and Tournament.blind_at(0) == 10 and Tournament.blind_at(8) == 80 and Tournament.blind_at(9) == 100 and Tournament.blind_at(10) == 150, "escada de blinds: 10, 15, 20, 25, 30, 40, 50, 60, 80, 100, 150… (inteiros, múltiplos de 5, crescente)")
+	check(bl_ok, "evento: stack = 10× buy-in, blind inicial = 1% da stack, blind sobe um degrau por nível")
+	check(bl_int, "blinds sempre inteiros e múltiplos de 5 (ante de 20% e entrada de 8 blinds sem decimais)")
 	# ---- Dealer: sorteado na 1ª rodada; depois é sempre o vencedor da última jogada da rodada anterior
 	var dl := ChaosEngine.new()
 	dl.setup_match({"seed": 4, "levels": 3, "mode": "blitz", "blind": 10, "players": 4, "start_leader": 2, "stacks": [500.0, 500.0, 500.0, 500.0]})
