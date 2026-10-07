@@ -26,39 +26,32 @@ const BLIND_BASE := 10
 const BLIND_DOUBLE_EVERY := 3
 
 
-## Blind "redondo" mais próximo de `v` (…10, 12, 15, 20, 25, 30, 40, 50, 60, 80, 100, 120, 150, 200…).
-static func nice_blind(v: float) -> int:
-	var mant := [1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0]
-	var mag := 1.0
-	while mag < 1.0e9 and v >= 10.0 * mag:
-		mag *= 10.0
-	var best := int(round(float(mant[0]) * mag))
-	for m in mant:
-		var cand := float(m) * mag
-		if absf(cand - v) < absf(float(best) - v):
-			best = int(round(cand))
-	return maxi(best, 1)
+## Escada de blinds (a de torneio de verdade): 10, 15, 20, 25, 30, 40, 50, 60, 80, 100, 150, 200, 250, 300, 400…
+## (mantissas 1; 1,5; 2; 2,5; 3; 4; 5; 6; 8 × potência de 10). Todos os valores são inteiros e múltiplos de 5 → a
+## ante (20% do blind) e a entrada do palpite (8 blinds) também são sempre inteiras, sem decimais.
+const BLIND_LADDER_MANT := [10, 15, 20, 25, 30, 40, 50, 60, 80]
 
 
-## Próximo blind redondo acima de `v`.
-static func nice_above(v: int) -> int:
-	var cand := nice_blind(float(v) * 1.2)
-	while cand <= v:
-		cand = nice_blind(float(cand) * 1.15 + 1.0)
-	return cand
+static func blind_at(index: int) -> int:
+	var i := maxi(index, 0)
+	var dec := i / BLIND_LADDER_MANT.size()
+	return int(BLIND_LADDER_MANT[i % BLIND_LADDER_MANT.size()]) * int(pow(10.0, float(dec)))
 
 
-## Tabela de blinds FIXA do evento: nível 0 = `blind_base` (1% da stack) e cada nível seguinte multiplica por
-## `growth` (arredondado pra um valor redondo, sempre estritamente maior que o anterior). Tudo sai do evento:
-## buy-in → stack (10×) → blind inicial (stack/100) → ritmo (`growth`). Mesmo calendário pra todas as mesas.
+static func blind_index_of(blind: int) -> int:
+	var i := 0
+	while blind_at(i) < blind and i < 200:
+		i += 1
+	return i
+
+
+## Blind do nível: tabela FIXA do evento. Começa em `blind_base` (1% da stack) e sobe `steps` degraus da escada por
+## nível (1 = um degrau, ≈ +29% em média; 1,2 = às vezes dois degraus). Tudo sai do evento: buy-in → stack (10×) →
+## blind inicial (stack/100) → ritmo. Mesmo calendário pra todas as mesas do torneio.
 static func blind_for(level: int, cfg: Dictionary = {}) -> int:
-	var base := float(cfg.get("blind_base", BLIND_BASE))
-	var growth := float(cfg.get("growth", 1.5))
-	var b := int(base)
-	for k in range(1, maxi(level, 0) + 1):
-		var nxt := nice_blind(base * pow(growth, float(k)))
-		b = nxt if nxt > b else nice_above(b)
-	return b
+	var base := int(cfg.get("blind_base", BLIND_BASE))
+	var steps := float(cfg.get("steps", 1.0))
+	return blind_at(blind_index_of(base) + int(round(float(maxi(level, 0)) * steps)))
 
 
 ## Estrutura do torneio pelo valor de inscrição (cada evento tem a sua). Stack inicial em fichas de
@@ -227,10 +220,10 @@ static func simulate_level(entrants: Array, blind: int, rng: RandomNumberGenerat
 
 ## Torneios abertos no hub: nome, entrada (fichas) e selo de dificuldade. Mesmo formato (16 jogadores).
 const OPEN_EVENTS := [
-	{"name": "Freeroll Arcano",  "buy_in": 100,  "stack": 1000.0,  "blind_base": 10,  "growth": 1.35},
-	{"name": "Torneio Clássico", "buy_in": 300,  "stack": 3000.0,  "blind_base": 30,  "growth": 1.32},
-	{"name": "Mesa dos Magos",   "buy_in": 600,  "stack": 6000.0,  "blind_base": 60,  "growth": 1.3},
-	{"name": "Grande Arcano",    "buy_in": 1500, "stack": 15000.0, "blind_base": 150, "growth": 1.28},
+	{"name": "Freeroll Arcano",  "buy_in": 100,  "stack": 1000.0,  "blind_base": 10,  "steps": 1.2},
+	{"name": "Torneio Clássico", "buy_in": 300,  "stack": 3000.0,  "blind_base": 30,  "steps": 1.1},
+	{"name": "Mesa dos Magos",   "buy_in": 600,  "stack": 6000.0,  "blind_base": 60,  "steps": 1.0},
+	{"name": "Grande Arcano",    "buy_in": 1500, "stack": 15000.0, "blind_base": 150, "steps": 1.0},
 ]
 
 

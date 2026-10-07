@@ -394,7 +394,12 @@ func _test_chaos() -> void:
 			bl_ok = false
 	check(bl_ok, "blind de cada evento começa na base e sobe estritamente a cada nível")
 	check(bl_prop, "stack = 10× o buy-in e blind inicial = 1% da stack (tudo proporcional ao buy-in)")
-	check(Tournament.nice_blind(75.0) == 80 and Tournament.nice_blind(11.0) == 10 and Tournament.nice_blind(14.0) == 15, "blinds arredondados pra valores redondos")
+	var ladder_ok := true
+	for li in range(0, 60):
+		var lb := Tournament.blind_at(li)
+		if lb % 5 != 0 or (li > 0 and lb <= Tournament.blind_at(li - 1)):
+			ladder_ok = false
+	check(ladder_ok and Tournament.blind_at(0) == 10 and Tournament.blind_at(8) == 80 and Tournament.blind_at(9) == 100 and Tournament.blind_at(10) == 150, "escada de blinds: 10, 15, 20, 25, 30, 40, 50, 60, 80, 100, 150… (inteiros, múltiplos de 5, crescente)")
 	# ---- Dealer: sorteado na 1ª rodada; depois é sempre o vencedor da última jogada da rodada anterior
 	var dl := ChaosEngine.new()
 	dl.setup_match({"seed": 4, "levels": 3, "mode": "blitz", "blind": 10, "players": 4, "start_leader": 2, "stacks": [500.0, 500.0, 500.0, 500.0]})
