@@ -773,12 +773,13 @@ func _layout_table() -> void:
 ## disso), agrupadas no centro e sobrepostas.
 func _slot_pos(player: int) -> Vector2:
 	var n := table_players if table_players > 0 else engine.num_players
-	var dir := table_center.seat_dir(player, n)
 	var ts := _table_scale()
 	if _is_wide():
 		return table_center.card_point(player, n, CardView.SIZE * ts) - CardView.SIZE / 2.0
-	var off := Vector2(dir.x * CardView.SIZE.x * ts * 0.75, dir.y * CardView.SIZE.y * ts * 0.22)
-	return table_center.center_point() + off - CardView.SIZE / 2.0
+	# Retrato: posição fixa pelo ângulo do assento (independente de n).
+	var angle := TableEllipse.fixed_seat_angle(player)
+	var card_center := table_center.border_point(angle, 0.42)
+	return card_center - CardView.SIZE * ts / 2.0
 
 
 ## Camada da carta de cada assento, FIXA pela posição na tela (não pela ordem da jogada): de cima
@@ -799,8 +800,9 @@ func _slot_rank(player: int) -> int:
 				return i + 1
 		return 1
 	for p in range(n):
-		var dir := table_center.seat_dir(p, n)
-		order.append([int(round(dir.y * 100.0 / 35.0)), dir.x, p])   # linha (y agrupado), x, assento
+		var a := TableEllipse.fixed_seat_angle(p)
+		var dir := Vector2(cos(a), sin(a))
+		order.append([int(round(dir.y * 100.0 / 35.0)), dir.x, p])
 	order.sort_custom(func(a, b): return a[0] < b[0] or (a[0] == b[0] and a[1] < b[1]))
 	for i in range(order.size()):
 		if int(order[i][2]) == player:
