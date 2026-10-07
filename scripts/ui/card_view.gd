@@ -187,7 +187,7 @@ func _refresh() -> void:
 ## Maiores: 0.png (Louco), 1–21.png (Trunfos).
 ## Menores: o/p/c/e + rank. Ex.: e2.png, c9.png, o12.png.
 func _art_dir() -> String:
-	return "res://assets/cards_md/" if _use_md else "res://assets/cards/"
+	return "res://assets/cards_md/"   # sempre as cópias 432×720 (as originais ficam só como fonte)
 
 
 func _asset_path() -> String:

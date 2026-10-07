@@ -1,6 +1,6 @@
 extends SceneTree
-## Gera `assets/cards_md/` (360×600, reduzida com Lanczos) a partir de `assets/cards/` (540×900).
-## O desktop usa essas cópias (nítidas, sem serrilhado); o celular usa as originais.
+## Gera `assets/cards_md/` (432×720, reduzida com Lanczos) a partir de `assets/cards/` (qualquer tamanho, proporção 3:5 — ex.: 540×900 ou 720×1200).
+## O jogo (celular e desktop) usa SÓ essas cópias: nítidas, sem serrilhado e leves na memória. As originais são o fonte.
 ## RODE SEMPRE QUE TROCAR/EDITAR UMA IMAGEM EM assets/cards/ (mesmos nomes de arquivo):
 ##   godot --headless --path . -s res://tools/gen_cards_md.gd
 func _init() -> void:
@@ -13,7 +13,7 @@ func _init() -> void:
 		var img := Image.load_from_file("res://assets/cards/" + f)
 		if img == null:
 			continue
-		img.resize(360, 600, Image.INTERPOLATE_LANCZOS)
+		img.resize(432, 720, Image.INTERPOLATE_LANCZOS)
 		img.save_png("res://assets/cards_md/" + f)
 		n += 1
 	print("cards_md: %d imagens geradas" % n)
