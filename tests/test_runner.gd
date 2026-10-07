@@ -378,13 +378,24 @@ func _test_chaos() -> void:
 		bu_done = bu.play(bu_cur, (bu.legal_for(bu_cur) as Array)[0])["trick_complete"]
 	check(bu_order.size() == 3 and not bu_order.has(1) and bu_order.has(0), "com um eliminado, jogam os outros 3 (você incluído) e a vaza fecha certo")
 
-	# ---- All-in no palpite: zerou a stack mas tem fichas no pote do nível → segue jogando; só cai depois da liquidação
+	# ---- Torneio: sem fichas pra entrada do palpite = eliminado antes de jogar; sobrou ≥1 ficha = joga em all-in
 	var ai := ChaosEngine.new()
-	ai.setup_match({"seed": 9, "levels": 1, "mode": "blitz", "blind": 10, "players": 3, "stacks": [60.0, 500.0, 500.0]})
-	for ai_p in range(3):
-		ai.blitz_place(ai_p, 2)
-	check(is_equal_approx(float(ai.stacks[0]), 0.0) and float(ai.stakes[0]) > 0.0, "entrada do palpite pode levar toda a stack (all-in no palpite)")
-	check(ai.bust_broke().is_empty() and not bool(ai.busted[0]), "all-in no palpite NÃO é eliminado no meio da rodada")
+	ai.setup_match({"seed": 9, "levels": 1, "mode": "blitz", "blind": 10, "players": 3, "stacks": [60.0, 85.0, 500.0]})
+	var ai_out := ai.bust_cant_enter()
+	check(ai_out == [0] and bool(ai.busted[0]) and not bool(ai.busted[1]), "sem fichas pra entrada do palpite (60 < 80): eliminado; com 85 pode palpitar")
+	check(not ai.blitz_place(0, 2) and float(ai.stakes[0]) == 0.0, "eliminado não põe entrada no pote")
+	ai.blitz_place(1, 2)
+	ai.blitz_place(2, 2)
+	check(is_equal_approx(float(ai.stacks[1]), 5.0) and ai.bust_broke().is_empty(), "sobrou 5 ficha depois da entrada: segue jogando (all-in), não é eliminado")
+	# Eliminado deixa de ganhar o palpite (a entrada fica no pote): é o que impedia ele de "voltar" a cada nível
+	var ez := ChaosEngine.new()
+	ez.setup_match({"seed": 9, "levels": 1, "mode": "blitz", "blind": 10, "players": 3, "stacks": [80.0, 500.0, 500.0]})
+	for ez_p in range(3):
+		ez.blitz_place(ez_p, 0)
+	check(ez.bust_broke() == [0], "entrada levou tudo (stack 0): eliminado")
+	ez.trick_number = ChaosEngine.HAND_SIZE
+	var ez_res := ez._settle_blitz()
+	check(not (ez_res["hits"] as Array).has(0) and is_equal_approx(float(ez_res["payouts"][0]), 0.0), "eliminado com palpite 0 certo NÃO recebe prêmio")
 	# ---- Mesa desfeita no meio da rodada: jogadas que faltam não contam vitória; palpite vale pelo que já foi jogado
 	var vd := ChaosEngine.new()
 	vd.setup_match({"seed": 9, "levels": 1, "mode": "blitz", "blind": 10, "players": 3, "stacks": [500.0, 500.0, 500.0]})

@@ -445,7 +445,7 @@ func _ranked_tournament_block(col: VBoxContainer, fichas: int, fill_height: bool
 		var info := VBoxContainer.new()
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		info.add_child(UIKit.label("%s (%d jogadores)" % [str(ev["name"]), Tournament.FIELD_SIZE], 24, UIKit.TR_GOLD))
-		info.add_child(UIKit.label("Inscrição ◎%s" % UIKit.fmt_int(buy), 20, UIKit.TR_WHITE))
+		info.add_child(UIKit.label("Inscrição ◎%s · Stack ◎%s" % [UIKit.fmt_int(buy), UIKit.fmt_int(int(ev["stack"]))], 20, UIKit.TR_WHITE))
 		var prizes := UIKit.label("1º ◎%s · 2º ◎%s · 3º ◎%s" % [
 			UIKit.fmt_int(Tournament.payout_for(0, buy)), UIKit.fmt_int(Tournament.payout_for(1, buy)),
 			UIKit.fmt_int(Tournament.payout_for(2, buy))], 20, UIKit.TR_WHITE)
@@ -657,6 +657,7 @@ func _open_tournament(buy_in: int = Tournament.BUY_IN, ev_name: String = "TORNEI
 	var trk := GameState.tournaments()
 	v.add_child(UIKit.label("16 jogadores · mesas de %d a %d, preenchidas com bots." % [Tournament.MIN_TABLE, Tournament.MAX_TABLE], 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(UIKit.label("Entrada ◎%d  ·  Bolão ◎%d" % [buy_in, Tournament.prize_pool(buy_in)], 26, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UIKit.label("Stack inicial ◎%d · blind começa em ◎%d" % [int(Tournament.event_for(buy_in)["stack"]), int(Tournament.event_for(buy_in)["blind_base"])], 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(UIKit.label("1º ◎%d · 2º ◎%d · 3º ◎%d · 4º ◎%d" % [Tournament.payout_for(0, buy_in), Tournament.payout_for(1, buy_in), Tournament.payout_for(2, buy_in), Tournament.payout_for(3, buy_in)], 20, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(HSeparator.new())
 	v.add_child(UIKit.label("🏆 %d troféu(s)" % int(trk.get("trophies", 0)), 24, UIKit.BRAND, HORIZONTAL_ALIGNMENT_CENTER))

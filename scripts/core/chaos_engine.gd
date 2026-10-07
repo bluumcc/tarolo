@@ -252,13 +252,23 @@ func active_players() -> Array:
 
 ## Marca como busted todo jogador com stack ≤ 0. Retorna os índices recém-bustados.
 ## Persiste entre níveis — não é resetado por _setup_round().
-## Quem zerou a stack é eliminado — menos quem ainda tem fichas no pote do palpite (all-in no
-## palpite): esse segue jogando até o fim da rodada e só cai depois da liquidação, se continuar zerado.
+## Quem zerou a stack é eliminado, e acabou: o palpite dele deixa de valer (a entrada fica no pote
+## como dinheiro morto) — sem isso o eliminado "acertava" o palpite 0, recebia fichas e voltava.
+## Quem pagou a entrada e ainda tem ao menos 1 ficha segue jogando em all-in (ante limitada ao que sobrou).
+## Torneio, começo da rodada: quem não tem fichas pra pagar a entrada do palpite não pode jogar o nível
+## — eliminado antes de pôr qualquer ficha no pote. Devolve quem caiu.
+func bust_cant_enter(include_human := true) -> Array:
+	var out: Array = []
+	for p in range(0 if include_human else 1, num_players):
+		if not busted[p] and stacks[p] < blitz_entry():
+			busted[p] = true
+			out.append(p)
+	return out
+
+
 func bust_broke(include_human := true) -> Array:
 	var newly: Array = []
 	for p in range(0 if include_human else 1, num_players):
-		if blitz and not is_round_over() and float(stakes[p]) > 0.0:
-			continue
 		if not busted[p] and stacks[p] <= 0.0:
 			busted[p] = true
 			newly.append(p)
@@ -915,7 +925,7 @@ func blitz_entry() -> float:
 ## Palpite (0 a 8) de um jogador; a entrada sai da stack e vai pro pote do nível. Todos os
 ## palpites são revelados juntos depois.
 func blitz_place(player: int, predict: int) -> bool:
-	if not blitz or predicts[player] != -1:
+	if not blitz or predicts[player] != -1 or busted[player]:
 		return false
 	var amount := minf(blitz_entry(), stacks[player])
 	stacks[player] -= amount
@@ -1126,6 +1136,8 @@ func _settle_blitz() -> Dictionary:
 		refunds.append(0.0)
 		weights.append(0.0)
 		session_stats[p]["levels"] += 1
+		if busted[p]:
+			continue   # eliminado: a entrada fica no pote (dinheiro morto) e o palpite não vale
 		var diff := absi(int(wins[p]) - int(predicts[p]))
 		if diff == 0 and float(stakes[p]) > 0.0:
 			# (Quem não pôs nada no pote — sem fichas na hora do palpite — não tem o que levar.)

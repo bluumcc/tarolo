@@ -310,8 +310,9 @@ func start_tournament(buy_in: int = Tournament.BUY_IN) -> Dictionary:
 	var names: Array = BOT_NAMES.duplicate()
 	for n in BOT_NAMES:   # precisa de 15 bots e só há 12 nomes: os extras ganham um "2" pra nunca haver dois iguais na mesa
 		names.append("%s 2" % n)
-	var field := Tournament.make_field(player_name(), names, rng)
-	tournament = {"tables": Tournament.split_into_tables(field), "total_entrants": field.size(), "level": 0, "buy_in": buy_in}
+	var cfg := Tournament.event_for(buy_in)
+	var field := Tournament.make_field(player_name(), names, rng, float(cfg["stack"]))
+	tournament = {"tables": Tournament.split_into_tables(field), "total_entrants": field.size(), "level": 0, "buy_in": buy_in, "cfg": cfg}
 	return tournament
 
 
@@ -343,7 +344,7 @@ func tournament_table_config() -> Dictionary:
 		names.append(str(e["name"]))
 		difficulty.append(int(e["difficulty"]))
 		stacks.append(float(e["stack"]))
-	var blind := Tournament.blind_for(int(tournament.get("level", 0)))
+	var blind := Tournament.blind_for(int(tournament.get("level", 0)), tournament.get("cfg", {}))
 	var alive := 0
 	for tb in (tournament["tables"] as Array):
 		alive += (tb as Array).size()
@@ -369,11 +370,13 @@ func tournament_table_config() -> Dictionary:
 ## result: engine.make_standings() + stacks (igual report_chaos_match).
 func report_tournament_table(result: Dictionary) -> Dictionary:
 	var final_stacks: Array = result["stacks"]
+	var out_flags: Array = result.get("busted", [])
 	for i in range(_tournament_order.size()):
-		(_tournament_order[i] as Dictionary)["stack"] = maxf(float(final_stacks[i]), 0.0)
+		var is_out: bool = i < out_flags.size() and bool(out_flags[i])
+		(_tournament_order[i] as Dictionary)["stack"] = 0.0 if is_out else maxf(float(final_stacks[i]), 0.0)
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	var blind := Tournament.blind_for(int(tournament.get("level", 0)))
+	var blind := Tournament.blind_for(int(tournament.get("level", 0)), tournament.get("cfg", {}))
 	# Mesas de bots (todas, exceto a do jogador, que já tocou de verdade) jogam o mesmo nível,
 	# no mesmo blind — o blind sobe com o torneio inteiro, não por mesa.
 	for t in (tournament["tables"] as Array):

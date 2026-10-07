@@ -282,7 +282,7 @@ func _tournament() -> void:
 		while level < 80:
 			var blind := Tournament.blind_for(level)
 			for t in tables:
-				Tournament.simulate_level(t, blind, rng)
+				Tournament.simulate_level(t, blind, rng, tables.size() == 1)
 			var survivors: Array = []
 			for t in tables:
 				for e in t:
@@ -333,7 +333,7 @@ func _placement(rng: RandomNumberGenerator, my_difficulty: int) -> int:
 	for level in range(80):
 		var blind := Tournament.blind_for(level)
 		for t in tables:
-			Tournament.simulate_level(t, blind, rng)
+			Tournament.simulate_level(t, blind, rng, tables.size() == 1)
 		var survivors: Array = []
 		for t in tables:
 			for e in t:

@@ -17,7 +17,7 @@ const MIN_TABLE := 3
 const BUY_IN := 300             ## fichas, cobradas uma vez na inscrição (não por mesa/nível)
 const RAKE_PCT := 0.10          ## taxa da casa sobre o bolão total
 const PAYOUTS := [0.60, 0.28, 0.12]   ## fração do bolão pros 3 primeiros colocados
-const STARTING_STACK := 400.0   ## mesmo de uma mesa Iniciante — igual pra todo mundo
+const STARTING_STACK := 1000.0   ## ≈12 entradas de palpite (blind 10): fundo o bastante pra ninguém quebrar nos primeiros níveis — igual pra todo mundo
 ## Blind sobe com o torneio (igual qualquer MTT de poker de verdade) — sem isso, com blind fixo
 ## em 10 e stack de 400 (40 blinds), quase ninguém quebra e o torneio nunca anda. Dobra a cada
 ## 3 níveis GLOBAIS do torneio (não por mesa): todas as mesas, inclusive as headless, jogam no
@@ -26,14 +26,35 @@ const BLIND_BASE := 10
 const BLIND_DOUBLE_EVERY := 3
 
 
-static func blind_for(level: int) -> int:
-	return BLIND_BASE * (1 << (maxi(level, 0) / BLIND_DOUBLE_EVERY))
+## Blind do nível. `cfg` (de `event_for`) define a base e o ritmo: dobra a cada `double_every` níveis e,
+## a partir de `late_from`, a cada `late_double_every` (pressão de bolha no fim, como nos torneios reais).
+static func blind_for(level: int, cfg: Dictionary = {}) -> int:
+	var base := int(cfg.get("blind_base", BLIND_BASE))
+	var every := maxi(int(cfg.get("double_every", BLIND_DOUBLE_EVERY)), 1)
+	var late_from := int(cfg.get("late_from", 9999))
+	var late_every := maxi(int(cfg.get("late_double_every", every)), 1)
+	var lv := maxi(level, 0)
+	var doublings := 0
+	if lv <= late_from:
+		doublings = lv / every
+	else:
+		doublings = late_from / every + (lv - late_from) / late_every
+	return base * (1 << doublings)
+
+
+## Estrutura do torneio pelo valor de inscrição (cada evento tem a sua). Stack inicial em fichas de
+## torneio (≈ entradas de palpite = 8 blinds): quanto mais caro o evento, mais fundo e mais lento.
+static func event_for(buy_in: int) -> Dictionary:
+	for ev in OPEN_EVENTS:
+		if int(ev["buy_in"]) == buy_in:
+			return ev
+	return OPEN_EVENTS[1]
 
 
 ## Campo de 16: o jogador + 15 bots com dificuldade variada (régua: metade fácil, um terço
 ## normal, o resto difícil). Cada entrant carrega sua própria stack, que viaja com ele entre
 ## mesas conforme o torneio realoca.
-static func make_field(player_name: String, bot_names: Array, rng: RandomNumberGenerator) -> Array:
+static func make_field(player_name: String, bot_names: Array, rng: RandomNumberGenerator, stack: float = STARTING_STACK) -> Array:
 	var names: Array = bot_names.duplicate()
 	names.shuffle()
 	var diffs := [
@@ -42,9 +63,9 @@ static func make_field(player_name: String, bot_names: Array, rng: RandomNumberG
 		BotAI.Difficulty.HARD, BotAI.Difficulty.HARD, BotAI.Difficulty.HARD, BotAI.Difficulty.HARD, BotAI.Difficulty.HARD,
 	]
 	diffs.shuffle()
-	var field: Array = [{"name": player_name, "human": true, "difficulty": BotAI.Difficulty.HARD, "stack": STARTING_STACK}]
+	var field: Array = [{"name": player_name, "human": true, "difficulty": BotAI.Difficulty.HARD, "stack": stack}]
 	for i in range(FIELD_SIZE - 1):
-		field.append({"name": str(names[i % names.size()]), "human": false, "difficulty": int(diffs[i]), "stack": STARTING_STACK})
+		field.append({"name": str(names[i % names.size()]), "human": false, "difficulty": int(diffs[i]), "stack": stack})
 	return field
 
 
@@ -118,7 +139,9 @@ static func table_has_human(table: Array) -> bool:
 ## Roda exatamente 1 nível, headless (sem UI), numa mesa 100% de bots, a partir das stacks
 ## atuais dos `entrants` — e escreve as stacks finais de volta nos próprios dicionários
 ## (são as mesmas referências guardadas em `GameState.tournament`, por isso não devolve nada).
-static func simulate_level(entrants: Array, blind: int, rng: RandomNumberGenerator) -> void:
+## `final_table`: é a única mesa do torneio (a final) — só aí pode sobrar 2 jogando. Com outras mesas, a mesa
+## que cair abaixo de MIN_TABLE se desfaz na hora (o resto vira mesa nova no próximo nível): nunca 1x1.
+static func simulate_level(entrants: Array, blind: int, rng: RandomNumberGenerator, final_table := false) -> void:
 	var n := entrants.size()
 	if n <= 0:
 		return
@@ -127,16 +150,26 @@ static func simulate_level(entrants: Array, blind: int, rng: RandomNumberGenerat
 		stacks.append(float(e["stack"]))
 	var eng := ChaosEngine.new()
 	eng.setup_match({"seed": rng.randi(), "levels": 1, "mode": "blitz", "blind": blind, "players": n, "stacks": stacks})
+	eng.bust_cant_enter()   # sem fichas pra entrada do palpite = eliminado antes de jogar
 	for p in range(n):
-		if eng.can_discard(p):
+		if not eng.busted[p] and eng.can_discard(p):
 			eng.apply_discard(p, ChaosBot.wants_discard(eng, p, int(entrants[p]["difficulty"]), rng))
 	for p in range(n):
-		eng.blitz_place(p, ChaosBot.blitz_pick(eng, p, int(entrants[p]["difficulty"]), rng))
+		if not eng.busted[p]:
+			eng.blitz_place(p, ChaosBot.blitz_pick(eng, p, int(entrants[p]["difficulty"]), rng))
 	var outer_guard := 0
 	while not eng.is_round_over():
 		outer_guard += 1
 		if outer_guard > 40:   # jogada que não avança: nunca trava o torneio inteiro por causa de uma mesa headless
 			push_error("simulate_level preso: blind %d, stacks iniciais %s, agora %s, jogada %d, folded %s, mãos %s, vez %d, jogadas %d, apostando %s" % [blind, str(stacks), str(eng.stacks), eng.trick_number, str(eng.folded), str(eng.hands.map(func(h): return h.size())), eng.current, eng.plays.size(), str(eng.betting)])
+			break
+		eng.bust_broke()   # quem zerou saiu (e o palpite dele deixa de valer), como na mesa jogada
+		var alive_n := 0
+		for q in range(n):
+			if not eng.busted[q]:
+				alive_n += 1
+		if alive_n <= 1 or (alive_n < MIN_TABLE and not final_table):
+			eng.void_remaining_tricks()   # sobrou um só: o resto da rodada não vale vitória de graça
 			break
 		eng.draw_trick_modifier()
 		eng.begin_trick()
@@ -168,16 +201,17 @@ static func simulate_level(entrants: Array, blind: int, rng: RandomNumberGenerat
 			if not res.get("ok", false):
 				break
 			trick_done = bool(res.get("trick_complete", false))
+	eng.bust_broke()
 	for p in range(n):
-		entrants[p]["stack"] = maxf(eng.stacks[p], 0.0)
+		entrants[p]["stack"] = 0.0 if eng.busted[p] else maxf(eng.stacks[p], 0.0)
 
 
 ## Torneios abertos no hub: nome, entrada (fichas) e selo de dificuldade. Mesmo formato (16 jogadores).
 const OPEN_EVENTS := [
-	{"name": "Freeroll Arcano",   "buy_in": 100},
-	{"name": "Torneio Clássico",  "buy_in": 300},
-	{"name": "Mesa dos Magos",    "buy_in": 600},
-	{"name": "Grande Arcano",     "buy_in": 1500},
+	{"name": "Freeroll Arcano",  "buy_in": 100,  "stack": 800.0,  "blind_base": 10, "double_every": 3, "late_from": 8,  "late_double_every": 2},
+	{"name": "Torneio Clássico", "buy_in": 300,  "stack": 1000.0, "blind_base": 10, "double_every": 3, "late_from": 10, "late_double_every": 2},
+	{"name": "Mesa dos Magos",   "buy_in": 600,  "stack": 1200.0, "blind_base": 10, "double_every": 4, "late_from": 11, "late_double_every": 2},
+	{"name": "Grande Arcano",    "buy_in": 1500, "stack": 1600.0, "blind_base": 10, "double_every": 4, "late_from": 12, "late_double_every": 2},
 ]
 
 

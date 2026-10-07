@@ -1548,9 +1548,9 @@ func _run_round() -> void:
 		if engine.blitz:
 			if await _bust_broke():
 				return
-			if bool(config.get("tournament", false)) and engine.stacks[0] <= 0.0 and not allin_notice_shown and float(engine.stakes[0]) > 0.0:
-				allin_notice_shown = true   # sem fichas pro blind, mas com o palpite no pote: joga as cartas (all-in)
-				_banner("All-in no palpite", "Sem fichas pro blind. Você joga as cartas; se acertar o palpite, o pote é seu.", UIKit.MUTED)
+			if bool(config.get("tournament", false)) and not allin_notice_shown and engine.stacks[0] > 0.0 and engine.stacks[0] < float(engine.blind) * (1.0 + ChaosEngine.BLITZ_TRICK_ANTE_FACTOR):
+				allin_notice_shown = true   # as fichas não cobrem blind + taxa: a jogada vai em all-in
+				_banner("All-in", "Suas fichas não cobrem o blind e a taxa: você joga em all-in.", UIKit.MUTED)
 				await _wait(2.4)
 				if not is_inside_tree() or finished:
 					return
@@ -2098,6 +2098,7 @@ func _finish_match() -> void:
 	result["payout"] = engine.stacks[0]
 	result["buy_in"] = total_in
 	result["hands"] = engine.hand_no
+	result["busted"] = engine.busted.duplicate()
 	engine.match_result = result
 	var is_tournament := bool(config.get("tournament", false))
 	var summary := GameState.report_tournament_table(result) if is_tournament else GameState.report_chaos_match(result)
@@ -2640,6 +2641,25 @@ func _blitz_open_level() -> bool:
 	blitz_showdown = false
 	if not await _ensure_solvent():
 		return false
+	if bool(config.get("tournament", false)):
+		# Sem fichas pra entrada do palpite = não joga o nível: eliminado antes de pôr qualquer ficha no pote.
+		var cant: Array = engine.bust_cant_enter()
+		for q in cant:
+			if q == 0:
+				continue
+			if not GameState.autoplay:
+				_banner("%s eliminado" % _pname(q), "Sem fichas pra entrada do palpite (◎%d)." % int(engine.blitz_entry()), UIKit.DANGER)
+			_refresh_hud()
+			await _wait(0.9)
+			if not is_inside_tree() or finished:
+				return false
+		if cant.has(0):
+			_banner("Você foi eliminado", "Sem fichas pra entrada do palpite (◎%d)." % int(engine.blitz_entry()), UIKit.DANGER)
+			_refresh_hud()
+			await _wait(1.6)
+			if is_inside_tree() and not finished:
+				_finish_match()
+			return false
 	if not bool(config.get("tournament", false)):
 		# Torneio: ninguém senta no lugar de quem quebrou — a mesa só encolhe (MTT de verdade).
 		for q in engine.refill_bots():
