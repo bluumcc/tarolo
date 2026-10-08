@@ -49,6 +49,7 @@ var cashed_out := 0.0         # fichas que saíram da mesa com quem foi embora
 var cashed_in := 0.0          # fichas que entraram na mesa com quem sentou
 var _leave_at := -1           # jogada em que alguém vai embora neste Ritual (-1 = ninguém)
 var _join_at := -1            # jogada em que alguém senta neste Ritual (-1 = ninguém)
+const TABLE_SEATS := 6        # lugares da mesa ranqueada
 const MIN_SEATED := 4         # a mesa dinâmica nunca fica com menos gente sentada que isso
 var bet_level := 0.0          # valor que todos precisam igualar
 var raises := 0

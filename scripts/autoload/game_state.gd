@@ -209,19 +209,28 @@ func blitz_config() -> Dictionary:
 	var table_name := str(t["name"])
 	var stacks: Array = []
 	var n_players := 4
+	var vacant: Array = []
+	var dynamic := false
 	if not ranked_table.is_empty():
 		blind = int(ranked_table["blind"])
 		buy_in = blind * int(ranked_table["stack_blinds"])
-		n_players = clampi(int(ranked_table.get("players", 4)), 4, 6)
+		# A mesa ranqueada tem 6 lugares; você entra numa com 4 a 6 sentados e, durante a partida,
+		# gente sai e gente nova senta (espera o próximo Ritual). Ver BlitzEngine.pop_table_events.
+		var occupied := clampi(int(ranked_table.get("players", 4)), 4, BlitzEngine.TABLE_SEATS)
+		n_players = BlitzEngine.TABLE_SEATS
+		dynamic = true
+		var free_seats: Array = range(1, n_players)
+		free_seats.shuffle()
+		vacant = free_seats.slice(0, n_players - occupied)
 		var d := Ranked.bot_difficulty_for_mmr(int(ranked()["mmr"]))
-		# Slot 0 = humano; slots 1..n_players-1 = bots preenchendo a mesa
+		# Slot 0 = humano; slots 1..n_players-1 = bots (ou assento vago)
 		difficulty = [BotAI.Difficulty.NORMAL]
 		for _i in range(n_players - 1):
 			difficulty.append(d)
-		table_name = "Ranqueada · blind ◎%d · %d jogadores" % [blind, n_players]
+		table_name = "Ranqueada · blind ◎%d · mesa de %d lugares" % [blind, n_players]
 		stacks = [float(buy_in)]
-		for _i in range(n_players - 1):
-			stacks.append(float(randi_range(int(BlitzEconomy.BOT_STACK_BLINDS[0]), int(BlitzEconomy.BOT_STACK_BLINDS[1])) * blind))
+		for i in range(1, n_players):
+			stacks.append(0.0 if vacant.has(i) else float(randi_range(int(BlitzEconomy.BOT_STACK_BLINDS[0]), int(BlitzEconomy.BOT_STACK_BLINDS[1])) * blind))
 	var bot_names: Array = names.slice(0, n_players - 1)
 	var entered := int(profile["fichas"]) >= buy_in
 	if entered:
@@ -240,6 +249,9 @@ func blitz_config() -> Dictionary:
 	}
 	if not stacks.is_empty():
 		cfg["stacks"] = stacks
+	if dynamic:
+		cfg["dynamic_seats"] = true
+		cfg["vacant"] = vacant
 	return cfg
 
 

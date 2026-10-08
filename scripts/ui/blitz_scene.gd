@@ -49,6 +49,7 @@ var clock_timeout := Callable()
 var main_area: Control
 var seat_nodes: Array = []
 var empty_seat_nodes: Array = []  # slots vazios (assentos 0–5 sem jogador real)
+var vacant_slots: Dictionary = {}  # mesa dinâmica: assento -> marcador de lugar vago
 var bet_pills: Array = []      # fichas apostadas na frente de cada jogador
 var order_badges: Array = []   # 1, 2, 3... = ordem de fala / de jogada
 var dealer_badges: Array = []
@@ -270,6 +271,11 @@ func _build_ui() -> void:
 		var slot := _build_empty_slot(s)
 		empty_seat_nodes.append(slot)
 		stage.add_child(slot)
+	if engine.dynamic_seats:
+		for p in range(1, engine.num_players):
+			var vs := _build_empty_slot(p)
+			vacant_slots[p] = vs
+			stage.add_child(vs)
 	# Sua aposta da jogada: o mesmo texto de fichas dos rivais, em cima do seu avatar.
 	var me_seat := seat_nodes[0] as SeatView
 	my_bet_label = me_seat.bet_label
@@ -738,7 +744,6 @@ func _layout_seats() -> void:
 		seat.scale = Vector2(seat_k, seat_k)
 		var pt := table_center.seat_point(p, n)
 		seat.position = Vector2(pt.x - SeatView.W / 2.0, pt.y - SeatView.AVATAR_CENTER_Y)   # centro do avatar NA borda
-	# Posiciona os slots vazios nos ângulos fixos não ocupados.
 	var hw := HexAvatar.SIZE_PX.x / 2.0
 	var hh := HexAvatar.SIZE_PX.y / 2.0
 	for i in range(empty_seat_nodes.size()):
@@ -750,6 +755,11 @@ func _layout_seats() -> void:
 		slot.custom_minimum_size = Vector2(HexAvatar.SIZE_PX.x, HexAvatar.SIZE_PX.y)
 		slot.size = slot.custom_minimum_size
 		slot.position = Vector2(pt.x - hw, pt.y - hh)
+	for q in vacant_slots:
+		var vslot := vacant_slots[q] as Control
+		var vpt := table_center.seat_point(int(q), n)
+		vslot.size = vslot.custom_minimum_size
+		vslot.position = Vector2(vpt.x - hw, vpt.y - hh)
 
 
 
@@ -1653,6 +1663,9 @@ func _run_round() -> void:
 				return
 		if await _fast_forward_if_alone():
 			break
+		await _table_events()
+		if not is_inside_tree() or finished:
+			return
 		await _trick_start()
 		if not is_inside_tree() or finished:
 			return
@@ -1727,12 +1740,43 @@ func _play_cards() -> void:
 			return
 
 
-## Bot sem fichas sai e um jogador novo senta no lugar dele.
-func _new_player_sits(q: int) -> void:
+## Mesa dinâmica (ranqueada/Blitz): alguém sai ou entra entre uma jogada e outra. Quem entra
+## espera o próximo Ritual (sem mão, sem blind, sem profecia).
+func _table_events() -> void:
+	for ev in engine.pop_table_events():
+		var q := int(ev["seat"])
+		if ev["kind"] == "left":
+			shown_totals[q] = 0.0
+			_refresh_hud()
+			if GameState.autoplay:
+				continue
+			Sfx.play("chip")
+			_banner("%s saiu da mesa" % _pname(q), "", UIKit.MUTED)
+			await _wait(1.0)
+		else:
+			_assign_new_name(q)
+			shown_totals[q] = engine.stacks[q]
+			_refresh_hud()
+			if GameState.autoplay:
+				continue
+			Sfx.play("chip")
+			_banner("%s sentou na mesa" % _pname(q), "Joga a partir do próximo Ritual.", UIKit.MUTED)
+			await _wait(1.2)
+		if not is_inside_tree() or finished:
+			return
+	_banner_clear()
+
+
+func _assign_new_name(q: int) -> void:
 	var used: Array = config["names"]
 	var pool: Array = GameState.BOT_NAMES.filter(func(n): return not used.has(n))
 	if not pool.is_empty():
 		config["names"][q] = pool[bot_rng.randi_range(0, pool.size() - 1)]
+
+
+## Bot sem fichas sai e um jogador novo senta no lugar dele.
+func _new_player_sits(q: int) -> void:
+	_assign_new_name(q)
 	shown_totals[q] = engine.stacks[q]
 	_refresh_hud()
 	if GameState.autoplay:
@@ -1785,7 +1829,10 @@ func _ensure_solvent(mid_level := false) -> bool:
 ## nível fecha; o torneio então realoca você numa mesa com gente (`Tournament.rebalance`).
 ## Devolve true se fechou o nível.
 func _fast_forward_if_alone() -> bool:
-	if not bool(config.get("tournament", false)) or engine.is_round_over():
+	if engine.is_round_over():
+		return false
+	var is_tour := bool(config.get("tournament", false))
+	if not is_tour and not engine.dynamic_seats:
 		return false
 	var alive := 0
 	for p in range(engine.num_players):
@@ -1795,10 +1842,16 @@ func _fast_forward_if_alone() -> bool:
 		return false
 	# Sobrou só você: nível acaba (campeão ou outra mesa). Com 2 vivos e outras mesas no torneio,
 	# a mesa também se desfaz (mesa de 2 só na final, quando não há mais ninguém pra juntar).
-	var other_tables := (GameState.tournament.get("tables", []) as Array).size() > 1
-	if alive > 2 or (alive == 2 and not other_tables):
-		return false
-	_banner("Mesa desfeita", "Sobraram poucos nessa mesa. O Ritual não vale: as entradas voltam pra quem ficou.", UIKit.MUTED)
+	if is_tour:
+		var other_tables := (GameState.tournament.get("tables", []) as Array).size() > 1
+		if alive > 2 or (alive == 2 and not other_tables):
+			return false
+		_banner("Mesa desfeita", "Sobraram poucos nessa mesa. O Ritual não vale: as entradas voltam pra quem ficou.", UIKit.MUTED)
+	else:
+		# Ranqueada/Blitz: se você ficou sozinho (ninguém mais vivo, nem esperando), troca de mesa.
+		if alive > 1:
+			return false
+		_banner("Você ficou sozinho na mesa", "Realocando você em outra mesa. O Ritual não vale: sua entrada volta.", UIKit.MUTED)
 	await _wait(2.2)
 	if not is_inside_tree() or finished:
 		return true
@@ -2241,7 +2294,11 @@ func _refresh_hud() -> void:
 			FX.count(total_lbl, float(shown_totals[p]), new_total, _fmt_chips)
 			FX.pop(total_lbl, 1.3)
 			shown_totals[p] = new_total
-		(seat_nodes[p] as Control).visible = not chrome_discard and (p == 0 or not engine.busted[p])   # eliminado sai da mesa; descarte/palpite esconde todos
+		var waiting: bool = engine.waiting[p]
+		(seat_nodes[p] as Control).visible = not chrome_discard and (p == 0 or not engine.busted[p] or waiting)   # eliminado sai da mesa; descarte/palpite esconde todos
+		(seat_nodes[p] as Control).modulate.a = 0.5 if waiting else 1.0   # quem acabou de sentar espera o próximo Ritual
+		if vacant_slots.has(p):
+			(vacant_slots[p] as Control).visible = bool(engine.vacant[p]) and not chrome_discard
 		var out: bool = phase != "idle" and engine.folded[p]
 		var sitting: bool = p == 0 and blitz_sitting_out and phase != "idle"
 		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 0.3 if sitting else (0.45 if out else 1.0))
@@ -2250,7 +2307,7 @@ func _refresh_hud() -> void:
 		(dealer_badges[p] as Control).visible = engine.hand_no > 0 and engine.button == p
 		var idx := order.find(p)
 		var ob := order_badges[p] as PanelContainer
-		ob.visible = p != 0 or bool(blitz_revealed[0])   # você também mostra suas vitórias
+		ob.visible = (p != 0 or bool(blitz_revealed[0])) and not waiting   # você também mostra suas vitórias
 		if true:
 			var wl := ob.get_child(0) as Label
 			wl.text = str(int(engine.wins[p]))
@@ -2607,6 +2664,10 @@ func _blitz_open_level() -> bool:
 		# Torneio: ninguém senta no lugar de quem quebrou — a mesa só encolhe (MTT de verdade).
 		for q in engine.refill_bots():
 			await _new_player_sits(q)
+		for ev in engine.ensure_seated(BlitzEngine.MIN_SEATED):
+			_assign_new_name(int(ev["seat"]))
+			shown_totals[int(ev["seat"])] = engine.stacks[int(ev["seat"])]
+		_refresh_hud()
 	_set_discard_chrome(true)
 	for p in range(engine.num_players):
 		if not engine.can_discard(p):

@@ -347,20 +347,22 @@ quebra, mesas se fundindo, até sobrar 1 campeão.
   MTT, não o produto final.
 
 
-## Entrada e saída de jogadores no meio de uma partida (regra pro multiplayer)
-- **Mesa:** a mesa (largura e altura) é calculada pelo nº de jogadores e só se refaz no começo de
-  cada rodada (`BlitzScene._lock_table_size`). Durante as 8 jogadas ela não muda, mesmo que
-  alguém entre ou saia. `tests/table_gate.gd` confere a geometria pra 4, 5 e 6 jogadores.
-- **Quem chega no meio:** não aparece pra quem está jogando (os assentos não são universais: a
-  posição depende de quantos jogadores existem, então não dá pra "reservar" um lugar apagado).
-  Quem joga só vê o aviso "Fulano entra na próxima rodada" (`notify_player_joining`). Quem chegou
-  assiste à rodada sem mão e sem aposta; quando a rodada acaba ele é sentado junto com todos:
-  recebe as cartas, o dealer é sorteado de novo e a mesa se ajusta.
-- **Quem sai no meio:** o assento fica onde está, apagado, até a rodada acabar (`notify_player_left`);
-  as jogadas dele passam pra um bot ou ele desiste, pra a rodada fechar.
-- **Mais de 6 querendo entrar:** o limite da mesa é 6; quem sobra forma outra mesa.
-- **Estado:** só os avisos e o ajuste entre rodadas existem hoje; a fila de entrada, o estado de
-  espectador e o assento apagado dependem do motor multiplayer.
+## Mesa ranqueada dinâmica: gente entra e sai (Ranqueada/Blitz; torneio não muda)
+- **Mesa de 6 lugares.** Você senta com 4 a 6 ocupados (`ranked_table["players"]`); os vagos
+  aparecem como lugar vazio. Config: `dynamic_seats` + `vacant` (`GameState.blitz_config`).
+- **Quem sai** (sem ser eliminado): no máx. 1 por Ritual (45%), entre uma jogada e outra. Leva as
+  fichas (`cashed_out`); a entrada da profecia que já pôs fica no pote (dinheiro morto, como a de
+  um eliminado). Nunca deixa a mesa com menos de 4 sentados nem sem rival vivo pra você.
+- **Quem entra:** no máx. 1 por Ritual (55%), num lugar vago. Fica **em espera** (assento apagado):
+  sem mão, sem blind, sem profecia. Entra no jogo no começo do próximo Ritual (`waiting`).
+- **Mesa abaixo de 4:** ao abrir o Ritual, `ensure_seated(MIN_SEATED)` senta gente nova na hora.
+- **Ficou sozinho:** se todos os rivais quebram ou saem no meio do Ritual, o Ritual é desfeito
+  (`void_remaining_tricks`: as entradas voltam) em vez de rodar as jogadas sozinho; o Ritual
+  seguinte já abre com gente nova ("realocado").
+- **Conservação de fichas:** `total_chips` inclui `cashed_out − cashed_in` e fecha a cada Ritual
+  (`tests/test_runner.gd::_test_dynamic_seats`, 40 Rituais simulados).
+- **Mesa e telas:** a geometria usa sempre 6 assentos; lugar vago = marcador ✦ (`vacant_slots`),
+  em espera = assento a 50% de opacidade.
 
 ## Aposta por jogada: no-limit com potes laterais
 - Aumentar vai até o **all-in próprio**, mesmo acima do que qualquer rival tem; **sem teto de re-aumentos**.
