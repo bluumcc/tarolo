@@ -48,6 +48,7 @@ func table_add(deltas: Array) -> void:
 
 
 func _ready() -> void:
+	print("[dbg] GameState ready")
 	_install_symbol_font()
 	get_tree().root.theme = UIKit.build_theme()
 	apply_settings()
@@ -79,6 +80,7 @@ func _update_content_scale() -> void:
 	var win := get_tree().root.size
 	var portrait := win.y > win.x
 	get_tree().root.content_scale_size = Vector2i(720, 1280) if portrait else Vector2i(1920, 1200)
+	print("[dbg] content_scale win=", win, " portrait=", portrait)
 
 
 # ------------------------------------------------------------------ settings

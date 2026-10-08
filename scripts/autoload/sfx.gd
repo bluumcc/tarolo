@@ -31,7 +31,9 @@ func _ready() -> void:
 	_music.stream = _drone()
 	_music.volume_db = -14.0
 	add_child(_music)
-	if DisplayServer.get_name() != "headless":
+	var skip_music: bool = OS.has_feature("web") and bool(JavaScriptBridge.eval("/[?&]nomusic\\b/.test(location.search)", true))
+	if DisplayServer.get_name() != "headless" and not skip_music:
+		print("[dbg] music play")
 		_music.play()
 
 

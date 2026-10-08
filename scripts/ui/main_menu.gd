@@ -14,7 +14,9 @@ var _last_wide  := false
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_last_wide = _is_wide()
+	print("[dbg] menu build start ", get_viewport_rect().size)
 	_build()
+	print("[dbg] menu build done")
 
 
 func _is_wide() -> bool:
@@ -26,6 +28,7 @@ func _notification(what: int) -> void:
 		var wide := _is_wide()
 		if wide != _last_wide:
 			_last_wide = wide
+			print("[dbg] menu rebuild wide=", wide)
 			_build()
 
 

@@ -97,6 +97,48 @@ var __isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platfor
 if (__isIOS && window.devicePixelRatio > 2) {
 	Object.defineProperty(window, 'devicePixelRatio', { configurable: true, get: function () { return 2; } });
 }
+
+// Modo diagnóstico (?debug na URL): grava um log que sobrevive ao crash da aba e mostra, na
+// abertura seguinte, o que aconteceu antes da morte. Sem ?debug não faz nada.
+(function () {
+	if (!/[?&]debug\b/.test(location.search)) { window.__dbg = function () {}; return; }
+	var KEY = 'tarolo_dbg', t0 = Date.now(), log = [];
+	try { log = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) {}
+	var box = null;
+	function render() {
+		if (!box && document.body) {
+			box = document.createElement('pre');
+			box.style.cssText = 'position:fixed;left:0;top:0;right:0;max-height:55%;overflow:auto;margin:0;padding:4px;background:rgba(0,0,0,.82);color:#7CFC9A;font:10px/1.25 monospace;z-index:99999;pointer-events:none;white-space:pre-wrap;';
+			document.body.appendChild(box);
+		}
+		if (box) { box.textContent = log.slice(-45).join('\n'); }
+	}
+	window.__dbg = function (m) {
+		log.push(((Date.now() - t0) / 1000).toFixed(1) + 's ' + m);
+		if (log.length > 120) { log.shift(); }
+		try { localStorage.setItem(KEY, JSON.stringify(log)); } catch (e) {}
+		render();
+	};
+	__dbg('=== NOVA SESSAO === ' + navigator.userAgent.slice(0, 90));
+	__dbg('dpr=' + window.devicePixelRatio + ' mem=' + (navigator.deviceMemory || '?') + ' screen=' + screen.width + 'x' + screen.height);
+	function vv() { var v = window.visualViewport; return v ? Math.round(v.width) + 'x' + Math.round(v.height) : '?'; }
+	if (window.visualViewport) { visualViewport.addEventListener('resize', function () { __dbg('vv resize ' + vv()); }); }
+	window.addEventListener('resize', function () { __dbg('win resize ' + innerWidth + 'x' + innerHeight); });
+	window.addEventListener('orientationchange', function () { __dbg('orientationchange'); });
+	window.addEventListener('error', function (e) { __dbg('ERR ' + e.message); });
+	window.addEventListener('unhandledrejection', function (e) { __dbg('REJ ' + e.reason); });
+	document.addEventListener('visibilitychange', function () { __dbg('visibility ' + document.visibilityState); });
+	window.addEventListener('pagehide', function () { __dbg('pagehide'); });
+	window.addEventListener('DOMContentLoaded', function () {
+		var c = document.getElementById('canvas');
+		c.addEventListener('webglcontextlost', function () { __dbg('WEBGL CONTEXT LOST'); });
+		c.addEventListener('webglcontextrestored', function () { __dbg('webgl restored'); });
+		setInterval(function () {
+			var k = document.getElementById('canvas');
+			__dbg('hb canvas=' + k.width + 'x' + k.height + ' vv=' + vv());
+		}, 1000);
+	});
+}());
 var __fullH = 0, __lastW = 0;
 function __vvSize() {
 	var w = Math.round(window.visualViewport.width);
@@ -246,7 +288,10 @@ const engine = new Engine(GODOT_CONFIG);
 		}
 	} else {
 		setStatusMode('progress');
+		__dbg('startGame');
 		engine.startGame({
+			'onPrint': function () { __dbg('GD ' + Array.prototype.join.call(arguments, ' ')); },
+			'onPrintError': function () { __dbg('GDERR ' + Array.prototype.join.call(arguments, ' ')); },
 			'onProgress': function (current, total) {
 				if (current > 0 && total > 0) {
 					statusProgress.value = current;
@@ -257,6 +302,7 @@ const engine = new Engine(GODOT_CONFIG);
 				}
 			},
 		}).then(() => {
+			__dbg('startGame resolved');
 			setStatusMode('hidden');
 		}, displayFailureNotice);
 	}
