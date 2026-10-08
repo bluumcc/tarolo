@@ -65,21 +65,21 @@ static func _build(body: VBoxContainer, state: Dictionary, on_change: Callable) 
 	dv.add_theme_constant_override("separation", 6)
 	daily.add_child(dv)
 	dv.add_child(UIKit.label("RECARGA DIÁRIA GRÁTIS", 26, UIKit.GAIN, HORIZONTAL_ALIGNMENT_CENTER))
-	var avail := ChaosEconomy.daily_available(prof)
-	var msg := "Suas fichas acabaram: colete ◎%d agora." % ChaosEconomy.DAILY_AMOUNT
+	var avail := BlitzEconomy.daily_available(prof)
+	var msg := "Suas fichas acabaram: colete ◎%d agora." % BlitzEconomy.DAILY_AMOUNT
 	if not avail:
-		if ChaosEconomy.claimed_today(prof):
+		if BlitzEconomy.claimed_today(prof):
 			msg = "Você já coletou hoje. Volta amanhã!"
 		else:
-			msg = "Liberada quando você tiver menos de ◎%d (a entrada mais barata). Uma vez por dia." % ChaosEconomy.DAILY_MIN
+			msg = "Liberada quando você tiver menos de ◎%d (a entrada mais barata). Uma vez por dia." % BlitzEconomy.DAILY_MIN
 	var ml := UIKit.label(msg, 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	ml.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	dv.add_child(ml)
-	var claim := UIKit.button("COLETAR +◎%d" % ChaosEconomy.DAILY_AMOUNT, UIKit.OK, 30)
+	var claim := UIKit.button("COLETAR +◎%d" % BlitzEconomy.DAILY_AMOUNT, UIKit.OK, 30)
 	claim.custom_minimum_size = Vector2(0, 72)
 	claim.disabled = not avail
 	claim.pressed.connect(func():
-		var got := ChaosEconomy.claim_daily(prof)
+		var got := BlitzEconomy.claim_daily(prof)
 		if got > 0:
 			SaveManager.save_game()
 			UIKit.sfx("win")
@@ -88,7 +88,7 @@ static func _build(body: VBoxContainer, state: Dictionary, on_change: Callable) 
 	body.add_child(daily)
 
 	body.add_child(UIKit.label("PACOTES", 26, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
-	for pk in ChaosEconomy.PACKS:
+	for pk in BlitzEconomy.PACKS:
 		body.add_child(_pack_row(pk, prof, state, on_change))
 	var note := UIKit.label("Compra simulada: nenhum valor é cobrado por enquanto.", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -109,16 +109,16 @@ static func _pack_row(pk: Dictionary, prof: Dictionary, state: Dictionary, on_ch
 	left.add_child(top)
 	top.add_child(UIKit.label("◎ %s" % UIKit.fmt_int(int(pk["fichas"])), 32, UIKit.MONEY))
 	top.add_child(UIKit.label(str(pk["name"]).to_upper(), 20, UIKit.INK))
-	var bonus := ChaosEconomy.bonus_pct(pk)
+	var bonus := BlitzEconomy.bonus_pct(pk)
 	var sub := ("+%d%% bônus" % bonus) if bonus > 0 else "pacote base"
 	if str(pk["tag"]) != "":
 		sub += "  ·  " + str(pk["tag"])
 	var sl := UIKit.label(sub, 18, UIKit.GAIN if bonus > 0 else UIKit.MUTED)
 	left.add_child(sl)
-	var buy := UIKit.button(ChaosEconomy.price_text(int(pk["price_cents"])), UIKit.ACTION, 28)
+	var buy := UIKit.button(BlitzEconomy.price_text(int(pk["price_cents"])), UIKit.ACTION, 28)
 	buy.custom_minimum_size = Vector2(170, 68)
 	buy.pressed.connect(func():
-		var got := ChaosEconomy.buy_simulated(prof, str(pk["id"]))
+		var got := BlitzEconomy.buy_simulated(prof, str(pk["id"]))
 		if got > 0:
 			SaveManager.save_game()
 			UIKit.sfx("jackpot")

@@ -82,7 +82,7 @@ Cada fase: regra exata → motor → bots → testes → simulação → critér
 ### Fase 4 — Recebe 10, descarta 2 (substituiu a 1ª versão, que era uma carta aberta trocável)
 - Todo mundo recebe 10 cartas; antes de saber a regra da 1ª rodada, cada um descarta 2 (decisão
   simultânea, sem ver o que os outros descartaram). Sempre ativo.
-- Bots decidem pelas 2 cartas mais fracas da mão crua (`ChaosBot.wants_discard`).
+- Bots decidem pelas 2 cartas mais fracas da mão crua (`BlitzBot.wants_discard`).
 - Risco considerado: aumenta a força média das mãos (e portanto os acertos) → mitigar recalibrando
   os bots se a simulação mostrar desvio.
 
@@ -132,12 +132,12 @@ tutorial guiado, cosméticos, torneios, novos modificadores.
 
 
 ## Status (atualizado)
-- **Fase 0 (Oráculo/régua):** feito. `chaos_oracle.gd`, `tests/blitz_arena.gd`. Oráculo bate
+- **Fase 0 (Oráculo/régua):** feito. `blitz_oracle.gd`, `tests/blitz_arena.gd`. Oráculo bate
   Difícil por +0,66 blind/nível — confirma que existe teto de habilidade acima do bot atual.
-- **Fase 1 (estilos):** feito. 3 estilos (Calculista/Cauteloso/Agressivo, `ChaosBot.Style`),
+- **Fase 1 (estilos):** feito. 3 estilos (Calculista/Cauteloso/Agressivo, `BlitzBot.Style`),
   calibrados até nenhum ficar dominado (`tests/blitz_gate.gd`). Sorteados ao sentar/trocar
   (`refill_bots`), nunca mostrados na tela — só percebidos jogando. Timing de dobrar/cobrir varia
-  por estilo (`ChaosBot.style_delay_mult`) — o único "tell" visível, já que o palpite é segredo
+  por estilo (`BlitzBot.style_delay_mult`) — o único "tell" visível, já que o palpite é segredo
   (Fase 3).
 - **Fase 2 (enxugar regras):** parcialmente revertida — ver `docs/BLITZ.md`. Tirar o triplicar
   quebrou a escada de dificuldade (Difícil passou a perder de Normal); mantido como estava.
@@ -148,7 +148,7 @@ tutorial guiado, cosméticos, torneios, novos modificadores.
   (eles já não liam o palpite alheio).
 - **Fase 4 (recebe 10, descarta 2):** feito, refeito uma vez. A 1ª versão era uma carta aberta
   trocável (`engine.swap_cards`); substituída por pedido: todo mundo recebe `BLITZ_DEAL_SIZE`
-  (10) e descarta `BLITZ_DISCARD_SIZE` (2) antes de saber a regra da 1ª rodada — sempre. `engine.can_discard/apply_discard`, bot em `ChaosBot.wants_discard`, UI em
+  (10) e descarta `BLITZ_DISCARD_SIZE` (2) antes de saber a regra da 1ª rodada — sempre. `engine.can_discard/apply_discard`, bot em `BlitzBot.wants_discard`, UI em
   `_human_discard_play()` (seleciona direto da mão, sem popup).
 - **Onboarding (camadas de regra):** removido — dobrar/cobrir valem desde a 1ª mesa, em toda conta.
 - **Fase 5 (economia vs bots):** medida, não calibrada. `tests/blitz_economy_check.gd`: um

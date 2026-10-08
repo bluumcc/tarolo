@@ -1,4 +1,4 @@
-class_name ChaosOracle
+class_name BlitzOracle
 extends RefCounted
 ## "Oráculo": jogador quase perfeito do Blitz, usado só como RÉGUA do teto de habilidade (nunca
 ## como bot do jogo — é lento). Determiniza as mãos que não vê (sorteia cartas ainda não vistas
@@ -12,7 +12,7 @@ const ROLLOUTS_PREDICT := 14
 
 ## Sorteia um mundo compatível com o que `me` vê: mãos dos rivais, ordem dos modificadores futuros
 ## e os palpites dos rivais (pela mão sorteada, como um Difícil faria).
-static func _world(engine: ChaosEngine, me: int, known_mods: int, place_predicts: bool, rng: RandomNumberGenerator) -> ChaosEngine:
+static func _world(engine: BlitzEngine, me: int, known_mods: int, place_predicts: bool, rng: RandomNumberGenerator) -> BlitzEngine:
 	var sim := engine.clone_for_sim()
 	sim.rng.seed = rng.randi()
 	var seen := {}
@@ -36,7 +36,7 @@ static func _world(engine: ChaosEngine, me: int, known_mods: int, place_predicts
 		sim.hands[p] = unseen.slice(idx, idx + n)
 		idx += n
 	# Modificadores ainda não revelados: sorteia a ordem do que resta.
-	var pool := ChaosModifiers.blitz_pool() if engine.blitz else ChaosModifiers.ALL.duplicate()
+	var pool := BlitzModifiers.blitz_pool() if engine.blitz else BlitzModifiers.ALL.duplicate()
 	var known: Array = []
 	for i in range(known_mods):
 		known.append(engine.modifier_sequence[i])
@@ -46,35 +46,35 @@ static func _world(engine: ChaosEngine, me: int, known_mods: int, place_predicts
 	if place_predicts:
 		for p in range(engine.num_players):
 			if p != me and sim.predicts[p] == -1:
-				sim.blitz_place(p, ChaosBot.blitz_pick(sim, p, BotAI.Difficulty.HARD, rng))
+				sim.blitz_place(p, BlitzBot.blitz_pick(sim, p, BotAI.Difficulty.HARD, rng))
 	return sim
 
 
 ## Termina o nível com o Difícil jogando por todos (dobrar/cobrir incluídos).
-static func _play_out(sim: ChaosEngine, rng: RandomNumberGenerator) -> void:
+static func _play_out(sim: BlitzEngine, rng: RandomNumberGenerator) -> void:
 	while not sim.is_round_over():
 		if sim.plays.is_empty():
 			sim.draw_trick_modifier()
 		var pl := sim.current
-		if ChaosBot.wants_double(sim, pl, BotAI.Difficulty.HARD, rng):
+		if BlitzBot.wants_double(sim, pl, BotAI.Difficulty.HARD, rng):
 			sim.double_down(pl)
 			for q in range(sim.num_players):
-				if q != pl and ChaosBot.wants_cover(sim, q, BotAI.Difficulty.HARD, rng):
+				if q != pl and BlitzBot.wants_cover(sim, q, BotAI.Difficulty.HARD, rng):
 					sim.cover_double(q)
-		sim.play(pl, ChaosBot.choose(sim, pl, BotAI.Difficulty.HARD, rng))
+		sim.play(pl, BlitzBot.choose(sim, pl, BotAI.Difficulty.HARD, rng))
 
 
 ## Palpite: o que rende mais fichas esperadas no nível (mãos dos rivais sorteadas).
-static func pick_predict(engine: ChaosEngine, me: int, rng: RandomNumberGenerator) -> int:
+static func pick_predict(engine: BlitzEngine, me: int, rng: RandomNumberGenerator) -> int:
 	var base_worlds: Array = []
 	for i in range(ROLLOUTS_PREDICT):
 		base_worlds.append(_world(engine, me, 0, true, rng))
 	var best_k := 0
 	var best := -INF
-	for k in range(0, ChaosEngine.HAND_SIZE + 1):
+	for k in range(0, BlitzEngine.HAND_SIZE + 1):
 		var total := 0.0
 		for w in base_worlds:
-			var sim: ChaosEngine = (w as ChaosEngine).clone_for_sim()
+			var sim: BlitzEngine = (w as BlitzEngine).clone_for_sim()
 			var before: float = sim.stacks[me]
 			sim.blitz_place(me, k)
 			_play_out(sim, rng)
@@ -87,7 +87,7 @@ static func pick_predict(engine: ChaosEngine, me: int, rng: RandomNumberGenerato
 
 
 ## Carta: a de maior fichas esperadas até o fim do nível (mesmos mundos pra todas as candidatas).
-static func pick_card(engine: ChaosEngine, me: int, rng: RandomNumberGenerator) -> CardData:
+static func pick_card(engine: BlitzEngine, me: int, rng: RandomNumberGenerator) -> CardData:
 	var legal: Array = engine.legal_for(me)
 	if legal.size() == 1:
 		return legal[0]
@@ -99,7 +99,7 @@ static func pick_card(engine: ChaosEngine, me: int, rng: RandomNumberGenerator) 
 	for c in legal:
 		var total := 0.0
 		for w in worlds:
-			var sim: ChaosEngine = (w as ChaosEngine).clone_for_sim()
+			var sim: BlitzEngine = (w as BlitzEngine).clone_for_sim()
 			var before: float = sim.stacks[me]
 			sim.play(me, c)
 			_play_out(sim, rng)

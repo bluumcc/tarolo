@@ -1,4 +1,4 @@
-class_name ChaosEngine
+class_name BlitzEngine
 extends RefCounted
 ## Estado puro da Mesa Caos: um "poker de rodadas". Cada nível distribui 8 cartas e sorteia
 ## um modificador. Cada rodada (4 cartas) é uma mão de aposta: todos pagam o blind (ante),
@@ -14,7 +14,7 @@ signal match_finished(result: Dictionary)
 const HAND_SIZE := 8
 const ROUNDS := 5            # níveis de uma partida com fim (config "levels"); 0 = mesa sem fim
 const BLIND := 10
-const BUY_IN_BLINDS := ChaosEconomy.BUY_IN_BLINDS    # stack de entrada = 20 blinds
+const BUY_IN_BLINDS := BlitzEconomy.BUY_IN_BLINDS    # stack de entrada = 20 blinds
 const PRIZE_PER_POINT := 0.25  # cada ponto das cartas vale 0,25 blind, pago pelos rivais
 const GOLD_MULT := 3.0       # Transmutação (só no modo antigo de pontos)
 const KING_CUT_BONUS := 3.0  # Corte de Rei (pontos)
@@ -79,7 +79,7 @@ var hit_streak := 0           # acertos seguidos do jogador 0
 var human_bonus := 0.0        # total de prêmios da casa recebidos pelo jogador 0
 var blitz_result: Dictionary = {}
 var point_factor := BLITZ_POINT_FACTOR   # ajustável (simulação)
-var styles: Array = []                  # estilo de cada bot (ChaosBot.Style), fixo enquanto ele estiver na mesa
+var styles: Array = []                  # estilo de cada bot (BlitzBot.Style), fixo enquanto ele estiver na mesa
 const BLITZ_DEAL_SIZE := 10             # recebe 10, descarta 2 (ver DISCARD_SIZE), fica com HAND_SIZE (8)
 const BLITZ_DISCARD_SIZE := 2
 ## Aposta por rodada: cada uma das 8 rodadas tem sua própria mini-aposta (passar/apostar/
@@ -151,7 +151,7 @@ func _setup_round() -> void:
 		combo_count.append(0)
 	# Embaralha os modificadores: as 8 vazas do nível usam os 8 primeiros, sem repetir. Toda
 	# mesa de Blitz tem modificador em toda jogada, sem exceção.
-	modifier_sequence = (ChaosModifiers.blitz_pool() if blitz else ChaosModifiers.ALL).duplicate()
+	modifier_sequence = (BlitzModifiers.blitz_pool() if blitz else BlitzModifiers.ALL).duplicate()
 	Deck.shuffle(modifier_sequence, rng)
 	modifier = -1
 	# Dealer: sorteado só no começo da partida (1ª rodada, `start_leader`); depois é sempre o vencedor da
@@ -199,7 +199,7 @@ func _highest_player() -> int:
 
 ## Verdadeiro no modificador "O Louco Vence".
 func louco_can_win() -> bool:
-	return modifier == ChaosModifiers.Modifier.LOUCO_VENCE
+	return modifier == BlitzModifiers.Modifier.LOUCO_VENCE
 
 
 ## Sorteia o modificador dessa jogada (o próximo da ordem embaralhada do Ritual). Chamado uma vez
@@ -279,7 +279,7 @@ func refill_bots() -> Array:
 	var swapped: Array = []
 	for p in range(1, num_players):
 		if stacks[p] < blind:
-			var fresh := float(rng.randi_range(ChaosEconomy.BOT_STACK_BLINDS[0], ChaosEconomy.BOT_STACK_BLINDS[1]) * blind)
+			var fresh := float(rng.randi_range(BlitzEconomy.BOT_STACK_BLINDS[0], BlitzEconomy.BOT_STACK_BLINDS[1]) * blind)
 			stacks[p] = fresh
 			level_start_stacks[p] = fresh
 			streak[p] = 0
@@ -589,7 +589,7 @@ func resolve_walkover() -> Dictionary:
 	var dropped := _discard_random(winner) if blitz else _discard_weakest(winner)
 	if blitz:
 		var ev := active_modifier()
-		var value := 2 if ev == ChaosModifiers.Modifier.VAZA_DOURADA else 1
+		var value := 2 if ev == BlitzModifiers.Modifier.VAZA_DOURADA else 1
 		wins[winner] += value
 		_settle_side_pots(winner)
 		var trick_pot_total := trick_pot
@@ -659,22 +659,22 @@ func chips_of(points: float) -> float:
 ## em qualquer mesa). Tira dos pagadores na hora, devolve o que o vencedor deve receber (Saque e
 ## Assalto) e já desconta do vencedor o que ele paga (Maldição). Ninguém paga mais do que tem.
 func _modifier_chips(ev: int, winner: int, rivals: Array) -> Dictionary:
-	var total := float(ChaosModifiers.STEAL_BLINDS * blind)
+	var total := float(BlitzModifiers.STEAL_BLINDS * blind)
 	var out := {"saque": 0.0, "assalto": 0.0, "assalto_from": -1, "curse": 0.0}
-	if ev == ChaosModifiers.Modifier.ASSALTO_LIDER:
+	if ev == BlitzModifiers.Modifier.ASSALTO_LIDER:
 		var rich := _richest_rival(winner)
 		if rich != -1:
 			var take := minf(total, maxf(stacks[rich], 0.0))
 			stacks[rich] -= take
 			out["assalto"] = take
 			out["assalto_from"] = rich
-	elif ev == ChaosModifiers.Modifier.SAQUE and not rivals.is_empty():
+	elif ev == BlitzModifiers.Modifier.SAQUE and not rivals.is_empty():
 		var share := ceilf(total / float(rivals.size()))
 		for q in rivals:
 			var take := minf(share, maxf(stacks[q], 0.0))
 			stacks[q] -= take
 			out["saque"] = float(out["saque"]) + take
-	elif ev == ChaosModifiers.Modifier.VAZA_MALDITA and not rivals.is_empty():
+	elif ev == BlitzModifiers.Modifier.VAZA_MALDITA and not rivals.is_empty():
 		var cost := minf(total, maxf(stacks[winner], 0.0))
 		var each := floorf(cost / float(rivals.size()))
 		for q in rivals:
@@ -707,7 +707,7 @@ func _resolve_trick() -> Dictionary:
 	for c in cards:
 		base_points += card_value(c, winner)
 	var mult := 1.0
-	if ev == ChaosModifiers.Modifier.VAZA_DOURADA:
+	if ev == BlitzModifiers.Modifier.VAZA_DOURADA:
 		mult *= GOLD_MULT
 	var combos: Array = []
 	var bonus := 0.0
@@ -715,18 +715,18 @@ func _resolve_trick() -> Dictionary:
 	var broke := last_winner != -1 and last_winner != winner and prev_streak >= 2
 	for q in range(num_players):
 		streak[q] = streak[q] + 1 if q == winner else 0
-	var streak_mult := ChaosCombos.streak_mult(int(streak[winner]))
+	var streak_mult := BlitzCombos.streak_mult(int(streak[winner]))
 	mult *= streak_mult
 	if streak[winner] >= 3:
 		combos.append("MAO_QUENTE")
-	for cid in ChaosCombos.detect(plays):
+	for cid in BlitzCombos.detect(plays):
 		combos.append(cid)
 		if cid == "CHUVA_TRUNFOS":
-			mult *= ChaosCombos.CHUVA_MULT
+			mult *= BlitzCombos.CHUVA_MULT
 		elif cid == "REALEZA":
-			mult *= ChaosCombos.REALEZA_MULT
+			mult *= BlitzCombos.REALEZA_MULT
 		elif cid == "ESCADA":
-			bonus += ChaosCombos.ESCADA_BONUS
+			bonus += BlitzCombos.ESCADA_BONUS
 	if broke:
 		bonus += BREAK_BONUS
 		combos.append("CORTADO")
@@ -780,7 +780,7 @@ func _finish_trick(result: Dictionary, winner: int) -> Dictionary:
 	# Taxa da casa: só quando as cartas foram jogadas (sem disputa, sem taxa).
 	var rake := 0.0
 	if rake_on and not bool(result.get("walkover", false)):
-		rake = ChaosEconomy.rake_of(trick_pot, blind)
+		rake = BlitzEconomy.rake_of(trick_pot, blind)
 		house_rake += rake
 		if contrib[0] > 0.0:
 			human_rake += rake * contrib[0] / maxf(trick_pot, 1.0)
@@ -814,8 +814,8 @@ func _finish_trick(result: Dictionary, winner: int) -> Dictionary:
 
 ## Cópia leve do estado do Blitz pra simulação (bots/Oráculo): sem histórico, rng novo.
 ## As cartas são compartilhadas (imutáveis); os arrays são copiados.
-func clone_for_sim() -> ChaosEngine:
-	var c := ChaosEngine.new()
+func clone_for_sim() -> BlitzEngine:
+	var c := BlitzEngine.new()
 	c.num_players = num_players
 	c.blind = blind
 	c.buy_in = buy_in
@@ -991,7 +991,7 @@ func blitz_status(player: int) -> String:
 ## modificadores não têm efeito nenhum aqui (só valem no Caos).
 func _resolve_trick_blitz(idx: int, winner: int, ev: int) -> Dictionary:
 	# Rodada Dobrada (Dourada no Blitz) conta 2 vitórias; os pontos NÃO são multiplicados.
-	var value := 2 if ev == ChaosModifiers.Modifier.VAZA_DOURADA else 1
+	var value := 2 if ev == BlitzModifiers.Modifier.VAZA_DOURADA else 1
 	wins[winner] += value
 	# Pontos das cartas (já com o modificador) viram fichas pagas pelos rivais, como no Caos, só
 	# que num fator menor: o palpite continua sendo o prêmio principal, os pontos são o tempero.
@@ -1098,7 +1098,7 @@ func _settle_blitz() -> Dictionary:
 		carry_out = pool
 	else:
 		if rake_on:
-			rake = ChaosEconomy.blitz_rake_of(pool, blind)
+			rake = BlitzEconomy.blitz_rake_of(pool, blind)
 		var dist := pool - rake
 		var paid := 0.0
 		var top: int = hits[0]

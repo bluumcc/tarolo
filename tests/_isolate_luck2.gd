@@ -9,10 +9,10 @@ func deal_hand(seed_i: int) -> Array:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_i
 	var deck := Deck.build(rng)
-	return (Deck.deal(deck, 4, ChaosEngine.BLITZ_DEAL_SIZE)["hands"] as Array)[0].duplicate()
+	return (Deck.deal(deck, 4, BlitzEngine.BLITZ_DEAL_SIZE)["hands"] as Array)[0].duplicate()
 
 func play_once(my_hand: Array, diff0: int, seed_i: int) -> float:
-	var e := ChaosEngine.new()
+	var e := BlitzEngine.new()
 	e.setup_match({"seed": seed_i, "mode": "blitz", "blind": 10, "stacks": [400.0,400.0,400.0,400.0]})
 	e.rake_on = false
 	e.bonus_on = false
@@ -22,24 +22,24 @@ func play_once(my_hand: Array, diff0: int, seed_i: int) -> float:
 	for p in range(4):
 		if e.can_discard(p):
 			var d0 := diff0 if p == 0 else BotAI.Difficulty.HARD
-			e.apply_discard(p, ChaosBot.wants_discard(e, p, d0, rng2))
+			e.apply_discard(p, BlitzBot.wants_discard(e, p, d0, rng2))
 	var before: float = e.stacks[0]
 	for p in range(4):
 		var d0 := diff0 if p == 0 else BotAI.Difficulty.HARD
-		e.blitz_place(p, ChaosBot.blitz_pick(e, p, d0, rng2))
+		e.blitz_place(p, BlitzBot.blitz_pick(e, p, d0, rng2))
 	while not e.is_round_over():
 		if e.plays.is_empty():
 			e.draw_trick_modifier()
 		var pl := e.current
 		var d0 := diff0 if pl == 0 else BotAI.Difficulty.HARD
-		if ChaosBot.wants_double(e, pl, d0, rng2):
+		if BlitzBot.wants_double(e, pl, d0, rng2):
 			e.double_down(pl)
 			for q in range(4):
 				if q != pl:
 					var dq := diff0 if q == 0 else BotAI.Difficulty.HARD
-					if ChaosBot.wants_cover(e, q, dq, rng2):
+					if BlitzBot.wants_cover(e, q, dq, rng2):
 						e.cover_double(q)
-		e.play(pl, ChaosBot.choose(e, pl, d0, rng2))
+		e.play(pl, BlitzBot.choose(e, pl, d0, rng2))
 	return (e.stacks[0] - before) / 10.0
 
 func _init() -> void:

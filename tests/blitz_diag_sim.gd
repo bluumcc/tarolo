@@ -9,7 +9,7 @@ const SESSIONS := 30
 var stat := {"dbl1": 0, "dbl1_hit": 0, "dbl2": 0, "dbl2_hit": 0, "cover": 0, "cover_hit": 0, "levels": 0}
 
 func play(fixed: int, bots: int, seed_i: int, track := false) -> Dictionary:
-	var e := ChaosEngine.new()
+	var e := BlitzEngine.new()
 	e.setup_match({"seed": seed_i * 31 + 7, "levels": 0, "mode": "blitz", "blind": 10, "stacks": [400, 400, 400, 400]})
 	e.rake_on = false
 	e.bonus_on = false
@@ -25,10 +25,10 @@ func play(fixed: int, bots: int, seed_i: int, track := false) -> Dictionary:
 				e.stacks[p] = 400.0
 		for p in range(4):
 			if e.can_discard(p):
-				e.apply_discard(p, ChaosBot.wants_discard(e, p, BotAI.Difficulty.HARD, rng))
+				e.apply_discard(p, BlitzBot.wants_discard(e, p, BotAI.Difficulty.HARD, rng))
 		var before: float = e.stacks[seat]
 		for p in range(4):
-			var pick := ChaosBot.blitz_pick(e, p, BotAI.Difficulty.HARD, rng)
+			var pick := BlitzBot.blitz_pick(e, p, BotAI.Difficulty.HARD, rng)
 			if p == seat and fixed >= 0:
 				pick = fixed
 			e.blitz_place(p, pick)
@@ -37,13 +37,13 @@ func play(fixed: int, bots: int, seed_i: int, track := false) -> Dictionary:
 			if e.plays.is_empty():
 				e.draw_trick_modifier()
 			var pl := e.current
-			if ChaosBot.wants_double(e, pl, BotAI.Difficulty.HARD, rng):
+			if BlitzBot.wants_double(e, pl, BotAI.Difficulty.HARD, rng):
 				e.double_down(pl)
 				for q in range(4):
-					if q != pl and ChaosBot.wants_cover(e, q, BotAI.Difficulty.HARD, rng):
+					if q != pl and BlitzBot.wants_cover(e, q, BotAI.Difficulty.HARD, rng):
 						if e.cover_double(q):
 							cov[q] = true
-			e.play(pl, ChaosBot.choose(e, pl, bots, rng))
+			e.play(pl, BlitzBot.choose(e, pl, bots, rng))
 		if track:
 			var hits: Array = e.blitz_result["hits"]
 			stat["levels"] += 4

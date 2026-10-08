@@ -712,7 +712,7 @@ func _open_tournament(buy_in: int = Tournament.BUY_IN, ev_name: String = "TORNEI
 		var t := GameState.start_tournament(buy_in)
 		if t.is_empty():
 			return
-		get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn"))
+		get_tree().change_scene_to_file("res://scenes/BlitzScene.tscn"))
 	footer.add_child(enter)
 	var close := UIKit.button("FECHAR", UIKit.MUTED)
 	close.pressed.connect(_close_modal)
@@ -863,7 +863,7 @@ func _ranked_search(exclude_blind: int) -> void:
 	enter.pressed.connect(func():
 		GameState.ranked_table = {"blind": blind, "stack_blinds": GameState.RANKED_STACK_BLINDS, "players": int(room.get("players", 4))}
 		GameState.chaos_mode = "blitz"
-		get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn"))
+		get_tree().change_scene_to_file("res://scenes/BlitzScene.tscn"))
 	bv.add_child(enter)
 	if not affordable:
 		bv.add_child(UIKit.label("Saldo insuficiente — precisa de ◎%s" % UIKit.fmt_int(buy_in_cost), 20, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))

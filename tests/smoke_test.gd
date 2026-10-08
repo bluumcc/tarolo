@@ -5,7 +5,7 @@ extends Node
 ## Uso: godot --headless --path . res://tests/Smoke.tscn
 
 const GAME := preload("res://scenes/GameScene.tscn")
-const CHAOS := preload("res://scenes/ChaosScene.tscn")
+const BLITZ := preload("res://scenes/BlitzScene.tscn")
 
 var failures := 0
 
@@ -52,11 +52,11 @@ func _play(mode: int) -> Dictionary:
 	return summary
 
 
-func _play_chaos() -> Dictionary:
+func _play_blitz() -> Dictionary:
 	GameState.chaos_mode = "blitz"
 	# A mesa cobra o buy-in: sem saldo ela nem abre (e o teste ficaria esperando pra sempre).
 	SaveManager.section("profile")["fichas"] = maxi(int(SaveManager.section("profile")["fichas"]), 2000)
-	var g: Node = CHAOS.instantiate()
+	var g: Node = BLITZ.instantiate()
 	add_child(g)
 	var summary: Dictionary = await g.match_finished
 	check(g.engine.hand_no >= 1, "mesa de blitz rodou (%d rodadas)" % g.engine.hand_no)
@@ -69,7 +69,7 @@ func _play_chaos() -> Dictionary:
 
 
 func _play_tournament_table() -> Dictionary:
-	var g: Node = CHAOS.instantiate()
+	var g: Node = BLITZ.instantiate()
 	add_child(g)
 	var summary: Dictionary = await g.match_finished
 	check(not g.engine.match_result.is_empty(), "mesa de torneio terminou")
@@ -112,7 +112,7 @@ func _run() -> void:
 	lobby.queue_free()
 
 	for i in range(8):
-		var s := await _play_chaos()
+		var s := await _play_blitz()
 		print("Blitz %d: %dº lugar | %s" % [i + 1, int(s["placement"]) + 1, " | ".join(s["lines"])])
 	check((GameState.ranked()["history"] as Array).size() == 8, "fila única: toda mesa de blitz completa aplica LP/MMR (tem %d)" % (GameState.ranked()["history"] as Array).size())
 

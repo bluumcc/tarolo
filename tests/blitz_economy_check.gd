@@ -8,7 +8,7 @@ const LEVELS := 10
 func _init():
 	var totals := []
 	for i in range(SESSIONS):
-		var e := ChaosEngine.new()
+		var e := BlitzEngine.new()
 		e.setup_match({"seed": i*13+1, "mode": "blitz", "blind": 10, "stacks": [400,400,400,400]})
 		var rng := RandomNumberGenerator.new(); rng.seed = i + 900
 		var start = e.stacks[0]
@@ -18,18 +18,18 @@ func _init():
 				if e.stacks[p] < e.blind*6: e.stacks[p] = 400.0
 			for p in range(4):
 				# Descarte: o Oráculo não tem avaliador próprio pra isso ainda, usa a heurística do bot.
-				if e.can_discard(p): e.apply_discard(p, ChaosBot.wants_discard(e, p, BotAI.Difficulty.HARD, rng))
+				if e.can_discard(p): e.apply_discard(p, BlitzBot.wants_discard(e, p, BotAI.Difficulty.HARD, rng))
 			for p in range(4):
-				var k = ChaosOracle.pick_predict(e, p, rng) if p==0 else ChaosBot.blitz_pick(e,p,BotAI.Difficulty.HARD,rng)
+				var k = BlitzOracle.pick_predict(e, p, rng) if p==0 else BlitzBot.blitz_pick(e,p,BotAI.Difficulty.HARD,rng)
 				e.blitz_place(p,k)
 			while not e.is_round_over():
 				if e.plays.is_empty(): e.draw_trick_modifier()
 				var pl = e.current
-				if ChaosBot.wants_double(e,pl,BotAI.Difficulty.HARD,rng):
+				if BlitzBot.wants_double(e,pl,BotAI.Difficulty.HARD,rng):
 					e.double_down(pl)
 					for q in range(4):
-						if q!=pl and ChaosBot.wants_cover(e,q,BotAI.Difficulty.HARD,rng): e.cover_double(q)
-				var card = ChaosOracle.pick_card(e, pl, rng) if pl==0 else ChaosBot.choose(e,pl,BotAI.Difficulty.HARD,rng)
+						if q!=pl and BlitzBot.wants_cover(e,q,BotAI.Difficulty.HARD,rng): e.cover_double(q)
+				var card = BlitzOracle.pick_card(e, pl, rng) if pl==0 else BlitzBot.choose(e,pl,BotAI.Difficulty.HARD,rng)
 				e.play(pl, card)
 		var net = (e.stacks[0] - start) / 10.0 / LEVELS
 		totals.append(net)

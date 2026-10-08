@@ -8,8 +8,8 @@ Pensado para **PvP** (jogadores reais entre si): a mesa hoje só roda contra bot
 servidor multiplayer ainda não existe, mas toda a economia (entrada, dobrar/cobrir, taxa) já é
 desenhada como um sistema fechado entre jogadores — a casa não cria fichas, só cobra taxa.
 
-Código: `ChaosEngine` com `blitz = true` (config `"mode": "blitz"`), `ChaosBot.blitz_*`,
-`ChaosScene` (mesma cena, ramos `engine.blitz`). Simulação: `tests/blitz_sim.gd`.
+Código: `BlitzEngine` com `blitz = true` (config `"mode": "blitz"`), `BlitzBot.blitz_*`,
+`BlitzScene` (mesma cena, ramos `engine.blitz`). Simulação: `tests/blitz_sim.gd`.
 
 ## Regras (o que o jogador aprende)
 1. **Palpite:** no início do nível você vê a mão e diz quantas rodadas vai ganhar (0 a 8). A ★ sugere
@@ -42,11 +42,11 @@ Código: `ChaosEngine` com `blitz = true` (config `"mode": "blitz"`), `ChaosBot.
 Sem taxa, o Blitz é soma zero entre os jogadores: fichas só trocam de mão. A casa não cria ficha —
 os dois ralos são:
 - **Taxa (rake):** 4% do pote pago, teto de 2 blinds, só quando alguém acerta (jackpot acumulado
-  não paga). `ChaosEconomy.blitz_rake_of`.
+  não paga). `BlitzEconomy.blitz_rake_of`.
 - **Prêmio de sequência (rakeback):** 3 acertos exatos seguidos liberam um prêmio especial, mas ele
   só sai do "cofre" — no máximo 50% da taxa que a casa já cobrou de você naquela mesa — e tem teto
   de 3 blinds. Isso significa que **a casa nunca fica no prejuízo por causa do prêmio**: ele é
-  sempre menor que o que ela já embolsou. `ChaosEngine.BLITZ_STREAK_BONUS_BLINDS` / `BLITZ_BONUS_VAULT_SHARE`.
+  sempre menor que o que ela já embolsou. `BlitzEngine.BLITZ_STREAK_BONUS_BLINDS` / `BLITZ_BONUS_VAULT_SHARE`.
 
 Contra bots (hoje), o placar da mesa continua justo: eles não recebem prêmio de sequência, só o
 jogador humano. Em PvP isso deixa de fazer sentido nesses termos — o prêmio vale pra qualquer
@@ -86,7 +86,7 @@ jogador que fizer a sequência.
   40 blinds.
 
 ## Calibração dos bots
-`ChaosBot.EXPECT_SCALE` (1,48) calibra a soma de poder das cartas até a média real de 2 vitórias por
+`BlitzBot.EXPECT_SCALE` (1,48) calibra a soma de poder das cartas até a média real de 2 vitórias por
 jogador por nível. Fácil erra o palpite (±0,9) e nunca dobra/cobre; normal (±0,45) só entra com muita
 certeza; difícil (±0,15) descarta forte embaixo de carta maior, dobra/triplica quando no alvo com mão
 fraca, e cobre o lance de rivais nas mesmas condições.
@@ -117,14 +117,14 @@ bem rende de forma consistente (+1,1 blinds/nível ≈ 27% da entrada de 4 blind
 casa (4%, teto de 2 blinds por pote pago); (3) os pontos aumentam a vantagem de quem os joga bem
 (+0,4 blinds/nível a 0,5 em relação a 0) sem tirar o palpite do centro (acerto do novo ≈ 37%).
 Fator 0,5 escolhido: vantagem clara sem deixar os pontos dominarem o prêmio do pote. Ajuste em
-`ChaosEngine.BLITZ_POINT_FACTOR`. Limite: bots, não humanos — a vantagem real contra jogadores humanos
+`BlitzEngine.BLITZ_POINT_FACTOR`. Limite: bots, não humanos — a vantagem real contra jogadores humanos
 só se mede em PvP.
 
 
 ## Habilidade e teto do jogo (Fase 0 / Fase 1 do plano competitivo, ver `docs/PLANO_COMPETITIVO.md`)
 
 ### Oráculo: existe teto acima do bot Difícil
-`scripts/core/chaos_oracle.gd` é um jogador quase perfeito (só de medição, nunca senta como bot do
+`scripts/core/blitz_oracle.gd` é um jogador quase perfeito (só de medição, nunca senta como bot do
 jogo — é lento): sorteia mãos compatíveis com o que ele vê e escolhe palpite/carta pela maior ficha
 esperada em várias simulações. `tests/blitz_arena.gd` mede confrontos:
 
@@ -137,7 +137,7 @@ esperada em várias simulações. `tests/blitz_arena.gd` mede confrontos:
 Confirma que o Difícil não é o teto: um jogador melhor bate ele por margem real, não só ruído.
 
 ### Estilos dos bots (Fase 1)
-3 estilos fixos por bot enquanto ele estiver na mesa (`ChaosBot.Style`, `engine.styles`):
+3 estilos fixos por bot enquanto ele estiver na mesa (`BlitzBot.Style`, `engine.styles`):
 **Calculista** (padrão, equilibrado), **Cauteloso** (só dobra/cobre com bastante certeza, foge
 mais de fichas de carta) e **Agressivo** (persegue mais os pontos, cobre mais, e às vezes dobra
 sem estar no alvo — blefe, `BLUFF_CHANCE`). O jogador aprende o padrão de cada rival com o tempo
@@ -178,7 +178,7 @@ só aparece no fim do nível (showdown), junto do resultado. Dobrar/cobrir conti
 única pista que sobra sobre a confiança do rival, como um aumento no poker) — o Agressivo (Fase 1)
 às vezes dobra sem estar no alvo, então nem "vi ele dobrar" é garantia.
 
-Como os bots nunca leram o palpite dos rivais pra decidir nada (só o próprio, ver `chaos_bot.gd`),
+Como os bots nunca leram o palpite dos rivais pra decidir nada (só o próprio, ver `blitz_bot.gd`),
 esconder da tela não desequilibra nada: não são bots ficando "mais burros" nem "mais espertos",
 é só o jogador humano ganhando (e perdendo) a informação que os bots nunca tiveram de graça.
 
@@ -191,7 +191,7 @@ nível continua com `HAND_SIZE` (8) rodadas; só a mão inicial nasce maior pra 
 Conta do baralho: 78 cartas no total, 10×4=40 distribuídas (antes eram 32), sobram 38 sem uso —
 de sobra pro sorteio de naipe dos modificadores, que não consome carta nenhuma.
 
-`engine.can_discard/apply_discard` (motor), `ChaosBot.wants_discard` (bot: descarta as 2 mais
+`engine.can_discard/apply_discard` (motor), `BlitzBot.wants_discard` (bot: descarta as 2 mais
 fracas da mão crua, sem modificador — ainda não foi sorteado nesse ponto do nível). Sem popup: a
 seleção é direto na própria mão, igual escolher carta pra jogar — `_human_discard_play()` põe a
 cena em `phase == "discard"`, `_rebuild_hand()` deixa as 10 cartas tocáveis, `_on_discard_tapped()`
@@ -202,20 +202,20 @@ Tem relógio próprio: `DISCARD_SECONDS` (18s). Todos os relógios da mesa passa
 `_clock_start` / `_clock_stop` (card TEMPO): jogar carta `TURN_SECONDS` 10s (joga a mais fraca),
 descarte 18s, lance de vitórias `PREDICT_SECONDS` 15s (confirma o palpite que estiver na tela) e
 apostas `BET_SECONDS` 12s (passa, ou desiste se tiver que pagar). Estourou sem confirmar no descarte,
-descarta as 2 mais fracas por você (mesma heurística do bot, `ChaosBot.wants_discard`). Sempre ativo.
+descarta as 2 mais fracas por você (mesma heurística do bot, `BlitzBot.wants_discard`). Sempre ativo.
 
 ## Fase 5: economia vs bots (medida, ver `docs/PLANO_COMPETITIVO.md`)
 Um jogador nível Oráculo lucra em média mesmo com a taxa ligada, mas pouco (+0,39 blind/nível,
 amostra pequena e ruidosa — `tests/blitz_economy_check.gd`). Não farma sem fim; calibração fina
 fica pra quando houver amostra maior.
-`var blitz_showdown` (`chaos_scene.gd`) controla a revelação; sem UI nova além da pílula existente.
+`var blitz_showdown` (`blitz_scene.gd`) controla a revelação; sem UI nova além da pílula existente.
 
 ## Modo Caos removido
 O modo Caos (aposta por rodada, sem palpite) foi tirado do jogo: sumiu do menu, do Smoke test e
 da sua documentação própria (`docs/ECONOMIA.md`, `docs/MESA_CAOS.md`, `tests/economy_sim.gd` —
 removidos). O Blitz é o único modo de mesa daqui pra frente.
 
-**O que NÃO foi removido, de propósito:** o motor (`ChaosEngine`) e a cena (`chaos_scene.gd`)
+**O que NÃO foi removido, de propósito:** o motor (`BlitzEngine`) e a cena (`blitz_scene.gd`)
 continuam compartilhados entre os dois modos por baixo do capô — ainda têm `if engine.blitz else
 ...` para o Caos em alguns pontos (textos de intro, título do popup). Como `engine.blitz` nunca
 mais é `false` (nada no menu cria uma mesa sem ser Blitz), esse código fica morto, mas inofensivo.
@@ -260,7 +260,7 @@ que até aqui só um modo usava pote por rodada de cada vez), (2) a ante proporc
 pro vencedor dentro de `_resolve_trick_blitz`/`resolve_walkover` (que antes só cuidavam do palpite
 e não sabiam que existia um pote de rodada a liquidar).
 
-**Bots:** `ChaosBot.bet_decision` agora é ciente do palpite — ajusta o quanto "quer vencer" essa
+**Bots:** `BlitzBot.bet_decision` agora é ciente do palpite — ajusta o quanto "quer vencer" essa
 rodada conforme falta pra bater o número exato apostado: já bateu (ou passou) o palpite, evita
 vencer rodadas demais (só o acerto exato paga o pote cheio); precisa de quase todas as que
 faltam, força mais a sorte. `tests/blitz_betting_gate.gd` cobre o caminho que `blitz_gate.gd`
@@ -278,19 +278,19 @@ o "Ranqueado" de hoje é a vitrine da liga + um atalho pro Blitz, não uma fila 
 - **Vanilla é 100% recreativo.** Não lê nem escreve elo nenhum (`GameState.Mode` só tem
   `CLASSIC`). `report_match()` só dá Gemas e pontos — sem LP/MMR.
 - **Toda mesa real de Blitz conta pro Elo**, automaticamente, sem escolha de "casual" vs
-  "ranqueado": `report_chaos_match()` aplica `apply_ranked_progress()` (mesma fórmula de LP/MMR
+  "ranqueado": `report_blitz_match()` aplica `apply_ranked_progress()` (mesma fórmula de LP/MMR
   que o Vanilla usava antes) toda vez que o jogador completa pelo menos 1 nível inteiro
-  (`hands >= ChaosEngine.HAND_SIZE`), seja entrando pelo card "MODO BLITZ" do menu ou pela tela
+  (`hands >= BlitzEngine.HAND_SIZE`), seja entrando pelo card "MODO BLITZ" do menu ou pela tela
   de Ranqueado. Mesa de torneio (ver próxima seção) é um caminho **totalmente separado**
   (`report_tournament_table()`) que nunca chama `apply_ranked_progress()` — não precisa de flag
   nem exceção, só não passa por ali.
 - `RankedLobby.tscn` não muda de função: mostra liga/LP/histórico e, ao "buscar partida", abre
-  `ChaosScene.tscn` (antes abria `GameScene.tscn`, o motor Vanilla — por isso o Ranqueado nunca
+  `BlitzScene.tscn` (antes abria `GameScene.tscn`, o motor Vanilla — por isso o Ranqueado nunca
   bateu com a regra "Blitz é a espinha dorsal do elo").
 
 ## Carteiras: Fichas (jogo) e Gemas (cosmético)
 
-- **Fichas** continuam sem valor monetário, não saem do jogo. A recarga grátis (`ChaosEconomy.
+- **Fichas** continuam sem valor monetário, não saem do jogo. A recarga grátis (`BlitzEconomy.
   claim_daily`) continua **manual** — o jogador abre a Loja de Fichas e toca em RESGATAR — no
   máximo 1 vez a cada 24h (`daily_on`) e só aparece disponível com o saldo abaixo do teto
   (`DAILY_MIN`, 400). Nenhuma injeção automática de fichas existe em lugar nenhum do jogo.
@@ -339,7 +339,7 @@ quebra, mesas se fundindo, até sobrar 1 campeão.
   quem chega numa "mesa final" fixa: bolão = buy-in × 16, líquido da taxa da casa, dividido
   55/28/12/5%. Colocação de quem é eliminado é contada pelo tamanho do campo restante no
   momento (quebrar com 10 pessoas ainda vivas = 11º lugar).
-- **Nunca mexe no Elo da fila regular** (ver seção anterior) nem usa `report_chaos_match`.
+- **Nunca mexe no Elo da fila regular** (ver seção anterior) nem usa `report_blitz_match`.
 - Troféus e títulos ficam na seção `tournaments` do save (`trophies`, `titles`, `history`) —
   mostrados no popup "TORNEIO" do menu.
 - **Pendência real:** os bots das mesas simuladas usam a mesma IA de sempre (sem estilo "grinder
@@ -350,7 +350,7 @@ quebra, mesas se fundindo, até sobrar 1 campeão.
 
 ## Entrada e saída de jogadores no meio de uma partida (regra pro multiplayer)
 - **Mesa:** a mesa (largura e altura) é calculada pelo nº de jogadores e só se refaz no começo de
-  cada rodada (`ChaosScene._lock_table_size`). Durante as 8 jogadas ela não muda, mesmo que
+  cada rodada (`BlitzScene._lock_table_size`). Durante as 8 jogadas ela não muda, mesmo que
   alguém entre ou saia. `tests/table_gate.gd` confere a geometria pra 4, 5 e 6 jogadores.
 - **Quem chega no meio:** não aparece pra quem está jogando (os assentos não são universais: a
   posição depende de quantos jogadores existem, então não dá pra "reservar" um lugar apagado).

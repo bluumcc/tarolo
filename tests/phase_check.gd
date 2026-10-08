@@ -15,13 +15,13 @@ var failures := 0
 func _ready() -> void:
 	SaveManager.persist = false
 	SaveManager.section("profile")["fichas"] = 100000
-	for k in ["chaos_intro", "blitz_intro", "turn", "power", "double", "bet", "predict", "discard"]:
+	for k in ["blitz_intro", "turn", "power", "double", "bet", "predict", "discard"]:
 		SaveManager.section("tips")[k] = true
 	GameState.chaos_mode = "blitz"
 	GameState.autoplay = false
 	GameState.ranked_table = {"blind": 10, "stack_blinds": 40, "players": 4}
 	Engine.time_scale = 4.0
-	inst = load("res://scenes/ChaosScene.tscn").instantiate()
+	inst = load("res://scenes/BlitzScene.tscn").instantiate()
 	get_tree().root.add_child.call_deferred(inst)
 
 

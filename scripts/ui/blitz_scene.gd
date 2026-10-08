@@ -1,5 +1,5 @@
 extends Control
-## ChaosScene.tscn — mesa do modo Caos: 5 rodadas curtas de 8 cartas, todo mundo joga
+## BlitzScene.tscn — mesa do modo Caos: 5 rodadas curtas de 8 cartas, todo mundo joga
 ## pra si (sem Atacante/Defesa), com um modificador novo a cada rodada e um bônus de
 ## Fôlego pra quem estiver por baixo no total. Layout pensado pra celular (retrato):
 ## uma pilha vertical — status dos jogadores no topo, área de jogo compacta no meio,
@@ -20,7 +20,7 @@ const DISCARD_SECONDS := 18.0   # descarte inicial; estourou, descarta as 2 mais
 const PREDICT_SECONDS := 15.0   # profecia de vitórias; estourou, confirma a que estiver na tela
 const BET_SECONDS := TURN_SECONDS  # apostar/passar/pagar/aumentar/desistir; estourou, passa (ou desiste se tiver que pagar)
 
-var engine := ChaosEngine.new()
+var engine := BlitzEngine.new()
 var config: Dictionary = {}
 var bot_rng := RandomNumberGenerator.new()
 var human_turn := false
@@ -94,7 +94,7 @@ const FLAME := UIKit.COMBO
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bot_rng.randomize()
-	config = GameState.tournament_table_config() if not GameState.tournament.is_empty() else GameState.chaos_config()
+	config = GameState.tournament_table_config() if not GameState.tournament.is_empty() else GameState.blitz_config()
 	if not bool(config.get("entered", true)):
 		add_child(UIKit.background())
 		overlay_layer = Control.new()
@@ -232,7 +232,7 @@ func _build_ui() -> void:
 	info_box.custom_minimum_size = Vector2(0, HEADER_H)
 	info_box.add_theme_stylebox_override("panel", UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 14, 6))
 	round_dots = RoundDots.new()
-	round_dots.set_state(ChaosEngine.HAND_SIZE, [], 0)
+	round_dots.set_state(BlitzEngine.HAND_SIZE, [], 0)
 	var info_v := VBoxContainer.new()
 	info_v.alignment = BoxContainer.ALIGNMENT_CENTER
 	info_v.add_theme_constant_override("separation", 0)
@@ -302,7 +302,7 @@ func _build_ui() -> void:
 	add_child(popup_layer)
 
 	hand_scroller.ghost_layer = popup_layer
-	hand_scroller.throw_allowed = func() -> bool: return (phase == "discard" and discard_picks.size() < ChaosEngine.BLITZ_DISCARD_SIZE) or human_turn
+	hand_scroller.throw_allowed = func() -> bool: return (phase == "discard" and discard_picks.size() < BlitzEngine.BLITZ_DISCARD_SIZE) or human_turn
 	hand_scroller.throw_requested.connect(_on_card_thrown)
 	hand_scroller.deselect_on_cancel = true
 	hand_scroller.drag_cancelled.connect(func(v: CardView):
@@ -563,7 +563,7 @@ func _refresh_mod_card() -> void:
 		return
 	mod_name_label.text = _modifier_label(m).to_upper()
 	mod_name_label.add_theme_color_override("font_color", _modifier_color(m))
-	mod_desc_label.text = ChaosModifiers.desc_of(m)
+	mod_desc_label.text = BlitzModifiers.desc_of(m)
 
 
 func _set_pot_cards(on: bool) -> void:
@@ -964,12 +964,12 @@ func _announce_round() -> void:
 
 ## Cor da faixa: perigo/perda em vermelho, o resto em dourado (tokens da paleta).
 func _modifier_color(m: int) -> Color:
-	return UIKit.TR_RED if ChaosModifiers.color_of(m) == UIKit.LOSS else UIKit.TR_GOLD
+	return UIKit.TR_RED if BlitzModifiers.color_of(m) == UIKit.LOSS else UIKit.TR_GOLD
 
 
 ## Nome do modificador.
 func _modifier_label(m: int) -> String:
-	return ChaosModifiers.name_of(m)
+	return BlitzModifiers.name_of(m)
 
 
 ## Pitagórico: linha extra com a ordem de desempate entre naipes (símbolo, nome e a cor da carta),
@@ -983,7 +983,7 @@ func _tie_order_row() -> Control:
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", DS.SP_S)
-	var order: Array = ChaosModifiers.TIE_ORDER
+	var order: Array = BlitzModifiers.TIE_ORDER
 	for i in range(order.size()):
 		var su: int = order[i]
 		if i > 0:
@@ -1117,7 +1117,7 @@ func _trick_start() -> void:
 		# deveria disparar, mas evita travar a tela cheia se `modifier_sequence` vier vazio.
 		_banner_clear()
 		return
-	var color := ChaosModifiers.color_of(m)
+	var color := BlitzModifiers.color_of(m)
 	await _modifier_transition(m, color)
 	if is_inside_tree():
 		_banner_clear()
@@ -1136,7 +1136,7 @@ func _modifier_transition(m: int, color: Color) -> void:
 	ov.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay_layer.add_child(ov)
 	# Kicker lá no topo da tela (não no meio, junto do resto) — é só contexto, não o assunto.
-	var kicker := UIKit.label("JOGADA %d DE %d" % [engine.trick_number + 1, ChaosEngine.HAND_SIZE], 26, UIKit.ACTION, HORIZONTAL_ALIGNMENT_CENTER)
+	var kicker := UIKit.label("JOGADA %d DE %d" % [engine.trick_number + 1, BlitzEngine.HAND_SIZE], 26, UIKit.ACTION, HORIZONTAL_ALIGNMENT_CENTER)
 	kicker.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	kicker.offset_top = 56.0
 	ov.add_child(kicker)
@@ -1165,15 +1165,15 @@ func _modifier_transition(m: int, color: Color) -> void:
 	var title_lbl := UIKit.label("", 40, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(title_lbl)
 	# Efeito e dica em linhas separadas (não um parágrafo só) — mais fácil de ler de relance.
-	var desc_lbl := UIKit.label(ChaosModifiers.desc_of(m), 28, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var desc_lbl := UIKit.label(BlitzModifiers.desc_of(m), 28, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc_lbl.modulate.a = 0.0
 	v.add_child(desc_lbl)
-	var tip_lbl := UIKit.label(ChaosModifiers.tip_of(m), 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	var tip_lbl := UIKit.label(BlitzModifiers.tip_of(m), 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	tip_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tip_lbl.modulate.a = 0.0
 	v.add_child(tip_lbl)
-	if m == ChaosModifiers.Modifier.PITAGORICO:
+	if m == BlitzModifiers.Modifier.PITAGORICO:
 		var tie := _tie_order_row()
 		tie.modulate.a = 0.0
 		tip_lbl.set_meta("extra", tie)
@@ -1223,7 +1223,7 @@ func _open_modifier_orb(orb: PanelContainer, orb_icon: Label, title_lbl: Label, 
 	var opened := UIKit.box(color.darkened(0.55), color, 6, 85, 0)
 	opened.set_corner_radius_all(85)
 	orb.add_theme_stylebox_override("panel", opened)
-	orb_icon.text = str(ChaosModifiers.ICONS[m])
+	orb_icon.text = str(BlitzModifiers.ICONS[m])
 	orb_icon.add_theme_color_override("font_color", color)
 	title_lbl.text = _modifier_label(m)
 	FX.burst(popup_layer, orb.get_global_rect().get_center(), color, 20)
@@ -1514,7 +1514,7 @@ func _open_help() -> void:
 	var nm := UIKit.serif_label(_modifier_label(m).to_upper() if m != -1 else "NENHUM", 30, tone, HORIZONTAL_ALIGNMENT_CENTER)
 	nm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	cv.add_child(nm)
-	var ds := UIKit.serif_label(ChaosModifiers.desc_of(m) if m != -1 else "O modificador é sorteado no começo de cada jogada.", 24, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	var ds := UIKit.serif_label(BlitzModifiers.desc_of(m) if m != -1 else "O modificador é sorteado no começo de cada jogada.", 24, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
 	ds.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	cv.add_child(ds)
 	sp.body.add_child(card)
@@ -1634,7 +1634,7 @@ func _run_round() -> void:
 		if engine.blitz:
 			if await _bust_broke():
 				return
-			if bool(config.get("tournament", false)) and not allin_notice_shown and engine.stacks[0] > 0.0 and engine.stacks[0] < float(engine.blind) * (1.0 + ChaosEngine.BLITZ_TRICK_ANTE_FACTOR):
+			if bool(config.get("tournament", false)) and not allin_notice_shown and engine.stacks[0] > 0.0 and engine.stacks[0] < float(engine.blind) * (1.0 + BlitzEngine.BLITZ_TRICK_ANTE_FACTOR):
 				allin_notice_shown = true   # as fichas não cobrem blind + taxa: a jogada vai em all-in
 				_banner("All-in", "Suas fichas não cobrem o blind e a taxa: você joga em all-in.", UIKit.MUTED)
 				await _wait(2.4)
@@ -1692,9 +1692,9 @@ func _play_cards() -> void:
 			return
 		var p := engine.current
 		_refresh_hud()
-		if engine.blitz and (p != 0 or GameState.autoplay) and ChaosBot.wants_double(engine, p, int(config["difficulty"][p]), bot_rng):
+		if engine.blitz and (p != 0 or GameState.autoplay) and BlitzBot.wants_double(engine, p, int(config["difficulty"][p]), bot_rng):
 			if p != 0 and not GameState.autoplay:
-				await _wait(bot_rng.randf_range(0.5, 1.0) * ChaosBot.style_delay_mult(engine, p))
+				await _wait(bot_rng.randf_range(0.5, 1.0) * BlitzBot.style_delay_mult(engine, p))
 				if not is_inside_tree() or finished:
 					return
 			await _apply_double(p)
@@ -1707,7 +1707,7 @@ func _play_cards() -> void:
 			await _wait(0.9 if p == 0 else (bot_rng.randf_range(0.55, 0.95) if engine.blitz else bot_rng.randf_range(0.9, 1.5)))
 			if not is_inside_tree():
 				return
-			card = ChaosBot.choose(engine, p, int(config["difficulty"][p]), bot_rng)
+			card = BlitzBot.choose(engine, p, int(config["difficulty"][p]), bot_rng)
 		if card == null or not is_inside_tree():
 			return
 		var from := _source_position(p, card)
@@ -1833,7 +1833,7 @@ func _bust_broke() -> bool:
 # ------------------------------------------------------------------ apostas
 
 func _hand_label() -> String:
-	var s := ChaosBot.hand_strength(engine, 0)
+	var s := BlitzBot.hand_strength(engine, 0)
 	if s >= 0.75:
 		return "FORTE ★★★"
 	if s >= 0.55:
@@ -2029,7 +2029,7 @@ func _resolve_trick(result: Dictionary) -> void:
 		best_gain = gain
 	var wname := str(config["names"][winner]).to_upper()
 	var notes: Array = []
-	if int(result.get("modifier", -1)) == ChaosModifiers.Modifier.VAZA_DOURADA:
+	if int(result.get("modifier", -1)) == BlitzModifiers.Modifier.VAZA_DOURADA:
 		notes.append("transmutação: 2 vitórias")
 	var sub := "Pote ◎%d" % int(pot_amt)
 	if absf(prize) >= 1.0:
@@ -2055,12 +2055,12 @@ func _resolve_trick(result: Dictionary) -> void:
 	if streak_n >= 2 and not ("MAO_QUENTE" in result.get("combos", [])):
 		extras.append(["♨ SEQUÊNCIA ×%s!" % UIKit.fmt_dec(float(result.get("streak_mult", 1.0)), 2), "%s ganhou %d jogadas seguidas" % [wname, streak_n], FLAME])
 	for id in result.get("combos", []):
-		extras.append([str(ChaosModifiers.COMBO_NAMES[id]) + "!", "%s — %s" % [wname, ChaosModifiers.COMBO_DESCRIPTIONS[id]], UIKit.COMBO])
+		extras.append([str(BlitzModifiers.COMBO_NAMES[id]) + "!", "%s — %s" % [wname, BlitzModifiers.COMBO_DESCRIPTIONS[id]], UIKit.COMBO])
 	if float(result.get("saque_amount", 0.0)) > 0.0:
 		extras.append(["⚔ SAQUE!", "%s levou ◎%d dos rivais" % [wname, int(result["saque_amount"])], UIKit.LOSS])
 	if float(result.get("assalto_amount", 0.0)) > 0.0:
 		extras.append(["⚔ ASSALTO!", "%s roubou ◎%d de quem tinha mais fichas" % [wname, int(result["assalto_amount"])], UIKit.LOSS])
-	if int(result.get("modifier", -1)) == ChaosModifiers.Modifier.VAZA_MALDITA:
+	if int(result.get("modifier", -1)) == BlitzModifiers.Modifier.VAZA_MALDITA:
 		extras.append(["☠ MALDIÇÃO!", "%s pagou ◎%d aos rivais por vencer essa jogada" % [wname, int(result.get("curse_amount", 0.0))], UIKit.LOSS])
 	for e in extras:
 		_banner(e[0], e[1], e[2])
@@ -2187,7 +2187,7 @@ func _finish_match() -> void:
 	result["busted"] = engine.busted.duplicate()
 	engine.match_result = result
 	var is_tournament := bool(config.get("tournament", false))
-	var summary := GameState.report_tournament_table(result) if is_tournament else GameState.report_chaos_match(result)
+	var summary := GameState.report_tournament_table(result) if is_tournament else GameState.report_blitz_match(result)
 	var lost: bool = not bool(summary["won"]) and (not is_tournament or str(summary.get("next", "")) == "eliminated")
 	Sfx.play("lose" if lost else "win")
 	status_label.text = ""
@@ -2395,7 +2395,7 @@ func _refresh_bet_tags(p: int, idx: int) -> void:
 	var streak: int = engine.streak[p] if p < engine.streak.size() else 0
 	var flames := ""
 	if streak >= 2:
-		flames = "%s×%s" % ["♨".repeat(ChaosCombos.flame_level(streak)), UIKit.fmt_dec(ChaosCombos.streak_mult(streak), 2)]
+		flames = "%s×%s" % ["♨".repeat(BlitzCombos.flame_level(streak)), UIKit.fmt_dec(BlitzCombos.streak_mult(streak), 2)]
 	var pile := float(engine.contrib[p]) if not bets_gathered and phase != "idle" else 0.0
 	var pill := bet_pills[p] as Control
 	(bet_tags[p] as Label).text = "◎ " + UIKit.fmt_short(pile)
@@ -2545,7 +2545,7 @@ func _betting_phase() -> void:
 				return
 		else:
 			await _wait(bot_rng.randf_range(0.6, 1.1))
-			act = ChaosBot.bet_decision(engine, p, int(config["difficulty"][p]), bot_rng)
+			act = BlitzBot.bet_decision(engine, p, int(config["difficulty"][p]), bot_rng)
 		var r := engine.bet_act(p, str(act["action"]), float(act.get("to", 0.0)))
 		if not r.get("ok", false):
 			push_warning("Aposta rejeitada: %s" % r.get("error"))
@@ -2762,7 +2762,7 @@ func _blitz_open_level() -> bool:
 			if not is_inside_tree() or finished:
 				return false
 		else:
-			engine.apply_discard(p, ChaosBot.wants_discard(engine, p, int(config["difficulty"][p]), bot_rng))
+			engine.apply_discard(p, BlitzBot.wants_discard(engine, p, int(config["difficulty"][p]), bot_rng))
 	phase = "predict"
 	_rebuild_hand()   # o leque fica brilhante (como no descarte), não apagado
 	bets_gathered = true
@@ -2773,7 +2773,7 @@ func _blitz_open_level() -> bool:
 	_refresh_hud()
 	var pick: int
 	if GameState.autoplay:
-		pick = ChaosBot.blitz_pick(engine, 0, int(config["difficulty"][0]), bot_rng)
+		pick = BlitzBot.blitz_pick(engine, 0, int(config["difficulty"][0]), bot_rng)
 	else:
 		await _tip("predict", "PROFECIA", "Todo Ritual você diz quantas jogadas vai ganhar (de 0 a 8) e paga a entrada. Quem acertar o número exato leva o pote. Errou por 1? Recebe metade da entrada de volta. A estrela ★ marca a profecia que combina com a sua mão.")
 		pick = await _human_predict()
@@ -2783,7 +2783,7 @@ func _blitz_open_level() -> bool:
 	_refresh_hud()
 	engine.blitz_place(0, pick)
 	for p in range(1, engine.num_players):
-		engine.blitz_place(p, ChaosBot.blitz_pick(engine, p, int(config["difficulty"][p]), bot_rng))
+		engine.blitz_place(p, BlitzBot.blitz_pick(engine, p, int(config["difficulty"][p]), bot_rng))
 	await _blitz_reveal()
 	if not is_inside_tree() or finished:
 		return false
@@ -2833,7 +2833,7 @@ func _human_discard_play() -> void:
 	banner_title.text = "PREPARAÇÃO"
 	banner_title.add_theme_color_override("font_color", UIKit.TR_GOLD)
 	banner_title.modulate.a = 1.0
-	status_label.text = "0/%d sacrificadas" % ChaosEngine.BLITZ_DISCARD_SIZE
+	status_label.text = "0/%d sacrificadas" % BlitzEngine.BLITZ_DISCARD_SIZE
 	_clock_start(DISCARD_SECONDS, _on_discard_timeout)
 	await item_chosen
 	_clock_stop()
@@ -2847,7 +2847,7 @@ func _human_discard_play() -> void:
 
 
 func _on_discard_timeout() -> void:
-	var auto: Array = ChaosBot.wants_discard(engine, 0, BotAI.Difficulty.NORMAL, bot_rng)
+	var auto: Array = BlitzBot.wants_discard(engine, 0, BotAI.Difficulty.NORMAL, bot_rng)
 	engine.apply_discard(0, auto)
 	_banner("Tempo esgotado", "", UIKit.LOSS)
 	item_chosen.emit(1)
@@ -2868,7 +2868,7 @@ func _on_discard_tapped(view: CardView) -> void:
 ## Descarta `view` na hora: a carta voa pra fora da mão (igual uma carta jogada) e some; a mão
 ## reflui pro tamanho cheio assim que ela sai. Com as 2 descartadas, segue sozinho pro palpite.
 func _commit_discard(view: CardView, drop_global := Vector2.ZERO) -> void:
-	if discard_picks.has(view.data) or discard_picks.size() >= ChaosEngine.BLITZ_DISCARD_SIZE:
+	if discard_picks.has(view.data) or discard_picks.size() >= BlitzEngine.BLITZ_DISCARD_SIZE:
 		hand_scroller.cancel_drag()
 		return
 	discard_picks.append(view.data)
@@ -2879,7 +2879,7 @@ func _commit_discard(view: CardView, drop_global := Vector2.ZERO) -> void:
 	tw.tween_property(view, "global_position", from + Vector2(0.0, -320.0), GameState.anim(0.3))
 	tw.parallel().tween_property(view, "rotation", randf_range(-0.35, 0.35), GameState.anim(0.3))
 	tw.parallel().tween_property(view, "modulate:a", 0.0, GameState.anim(0.3))
-	status_label.text = "%d/%d sacrificadas" % [discard_picks.size(), ChaosEngine.BLITZ_DISCARD_SIZE]
+	status_label.text = "%d/%d sacrificadas" % [discard_picks.size(), BlitzEngine.BLITZ_DISCARD_SIZE]
 	await tw.finished
 	if not is_inside_tree():
 		return
@@ -2887,7 +2887,7 @@ func _commit_discard(view: CardView, drop_global := Vector2.ZERO) -> void:
 		hand_container.remove_child(view)
 		view.queue_free()
 	_layout_hand()
-	if discard_picks.size() == ChaosEngine.BLITZ_DISCARD_SIZE:
+	if discard_picks.size() == BlitzEngine.BLITZ_DISCARD_SIZE:
 		_clock_stop()
 		engine.apply_discard(0, discard_picks)
 		item_chosen.emit(1)
@@ -2912,8 +2912,8 @@ func _human_predict() -> int:
 	_open_phase("PROFECIA",
 		"Quantas jogadas você vai ganhar?\nEntrada ◎%s  ·  Pote ◎%s" % [UIKit.fmt_short(engine.blitz_entry()), UIKit.fmt_short(engine.carry)],
 		"", 1.3, 130.0)   # sem nome: o espaço é do seletor
-	var picker := PredictPicker.new().setup(ChaosBot.suggested_predict(engine, 0), ChaosEngine.HAND_SIZE,
-		func(n: int) -> float: return ChaosEngine.blitz_weight(n), get_viewport_rect().size.x - 48.0)
+	var picker := PredictPicker.new().setup(BlitzBot.suggested_predict(engine, 0), BlitzEngine.HAND_SIZE,
+		func(n: int) -> float: return BlitzEngine.blitz_weight(n), get_viewport_rect().size.x - 48.0)
 	phase_screen.content.add_child(picker)
 	picker.confirmed.connect(func(n: int): item_chosen.emit(n))
 	UIKit.pop_in(picker, GameState.anim(0.15))
@@ -2930,7 +2930,7 @@ func _human_predict() -> int:
 
 
 func _hand_label_blitz() -> String:
-	var ex := ChaosBot.expected_wins(engine, 0)
+	var ex := BlitzBot.expected_wins(engine, 0)
 	if ex >= 3.5:
 		return "MUITO FORTE ★★★"
 	if ex >= 2.5:
@@ -2976,9 +2976,9 @@ func _offer_cover(actor: int) -> void:
 		if q == 0 and not GameState.autoplay:
 			if await _human_cover_choice(actor):
 				await _apply_double(0, true)
-		elif ChaosBot.wants_cover(engine, q, int(config["difficulty"][q]), bot_rng):
+		elif BlitzBot.wants_cover(engine, q, int(config["difficulty"][q]), bot_rng):
 			if not GameState.autoplay:
-				await _wait(bot_rng.randf_range(0.3, 0.7) * ChaosBot.style_delay_mult(engine, q))
+				await _wait(bot_rng.randf_range(0.3, 0.7) * BlitzBot.style_delay_mult(engine, q))
 				if not is_inside_tree() or finished:
 					return
 			await _apply_double(q, true)
@@ -3067,14 +3067,14 @@ func _refresh_round_dots() -> void:
 	var results: Array = []
 	for h in engine.history:
 		var won := int(h["winner"]) == 0
-		var dobrada := int(h.get("modifier", -1)) == ChaosModifiers.Modifier.VAZA_DOURADA
+		var dobrada := int(h.get("modifier", -1)) == BlitzModifiers.Modifier.VAZA_DOURADA
 		results.append(2 if (won and dobrada) else (1 if won else 0))   # 2 = vitória que valia por duas (dourado)
 	var need := 0
 	if engine.blitz and bool(blitz_revealed[0]):
 		need = engine.blitz_need(0)
 		if need > engine.tricks_left():
 			need = 0   # não dá mais pra bater o palpite: nada de iluminar os dots
-	round_dots.set_state(ChaosEngine.HAND_SIZE, results, need)
+	round_dots.set_state(BlitzEngine.HAND_SIZE, results, need)
 
 
 func _refresh_pot_blitz() -> void:

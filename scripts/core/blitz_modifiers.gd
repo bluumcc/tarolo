@@ -1,4 +1,4 @@
-class_name ChaosModifiers
+class_name BlitzModifiers
 extends RefCounted
 ## Modificadores do Blitz: SEMPRE por uma jogada só. Cada Ritual sorteia uma ordem embaralhada
 ## dos 8 (sem repetir dentro do Ritual) e cada uma das 8 jogadas usa a próxima da lista. Sempre

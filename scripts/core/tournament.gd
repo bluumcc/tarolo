@@ -152,15 +152,15 @@ static func simulate_level(entrants: Array, blind: int, rng: RandomNumberGenerat
 	var stacks: Array = []
 	for e in entrants:
 		stacks.append(float(e["stack"]))
-	var eng := ChaosEngine.new()
+	var eng := BlitzEngine.new()
 	eng.setup_match({"seed": rng.randi(), "levels": 1, "mode": "blitz", "blind": blind, "players": n, "stacks": stacks})
 	eng.bust_cant_enter()   # sem fichas pra entrada do palpite = eliminado antes de jogar
 	for p in range(n):
 		if not eng.busted[p] and eng.can_discard(p):
-			eng.apply_discard(p, ChaosBot.wants_discard(eng, p, int(entrants[p]["difficulty"]), rng))
+			eng.apply_discard(p, BlitzBot.wants_discard(eng, p, int(entrants[p]["difficulty"]), rng))
 	for p in range(n):
 		if not eng.busted[p]:
-			eng.blitz_place(p, ChaosBot.blitz_pick(eng, p, int(entrants[p]["difficulty"]), rng))
+			eng.blitz_place(p, BlitzBot.blitz_pick(eng, p, int(entrants[p]["difficulty"]), rng))
 	var outer_guard := 0
 	while not eng.is_round_over():
 		outer_guard += 1
@@ -184,7 +184,7 @@ static func simulate_level(entrants: Array, blind: int, rng: RandomNumberGenerat
 			var ba := eng.bet_actor()
 			if ba == -1:
 				break
-			var act := ChaosBot.bet_decision(eng, ba, int(entrants[ba]["difficulty"]), rng)
+			var act := BlitzBot.bet_decision(eng, ba, int(entrants[ba]["difficulty"]), rng)
 			eng.bet_act(ba, str(act["action"]), float(act.get("to", 0.0)))
 		# Walkover: todos desistiram exceto um
 		if eng.walkover_player() != -1:
@@ -196,12 +196,12 @@ static func simulate_level(entrants: Array, blind: int, rng: RandomNumberGenerat
 		while not trick_done and play_guard < 10:
 			play_guard += 1
 			var pl := eng.current
-			if ChaosBot.wants_double(eng, pl, int(entrants[pl]["difficulty"]), rng):
+			if BlitzBot.wants_double(eng, pl, int(entrants[pl]["difficulty"]), rng):
 				eng.double_down(pl)
 				for q in range(n):
-					if q != pl and ChaosBot.wants_cover(eng, q, int(entrants[q]["difficulty"]), rng):
+					if q != pl and BlitzBot.wants_cover(eng, q, int(entrants[q]["difficulty"]), rng):
 						eng.cover_double(q)
-			var res := eng.play(pl, ChaosBot.choose(eng, pl, int(entrants[pl]["difficulty"]), rng))
+			var res := eng.play(pl, BlitzBot.choose(eng, pl, int(entrants[pl]["difficulty"]), rng))
 			if not res.get("ok", false):
 				break
 			trick_done = bool(res.get("trick_complete", false))

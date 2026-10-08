@@ -16,7 +16,7 @@ func _diff_of(kind: String) -> int:
 
 
 func net(kinds: Array, seat: int, seed_i: int) -> float:
-	var e := ChaosEngine.new()
+	var e := BlitzEngine.new()
 	e.setup_match({"seed": seed_i * 31 + 7, "levels": 0, "mode": "blitz", "blind": 10, "stacks": [400, 400, 400, 400]})
 	for p in range(4):
 		if kinds[p].begins_with("H/"):
@@ -34,10 +34,10 @@ func net(kinds: Array, seat: int, seed_i: int) -> float:
 				e.stacks[p] = 400.0
 		for p in range(4):
 			if e.can_discard(p):
-				e.apply_discard(p, ChaosBot.wants_discard(e, p, _diff_of(kinds[p]), rng))
+				e.apply_discard(p, BlitzBot.wants_discard(e, p, _diff_of(kinds[p]), rng))
 		var before: float = e.stacks[seat]
 		for p in range(4):
-			e.blitz_place(p, ChaosBot.blitz_pick(e, p, _diff_of(kinds[p]), rng))
+			e.blitz_place(p, BlitzBot.blitz_pick(e, p, _diff_of(kinds[p]), rng))
 		while not e.is_round_over():
 			e.draw_trick_modifier()
 			e.begin_trick()
@@ -47,7 +47,7 @@ func net(kinds: Array, seat: int, seed_i: int) -> float:
 				var p := e.bet_actor()
 				if p == -1:
 					break
-				var act := ChaosBot.bet_decision(e, p, _diff_of(kinds[p]), rng)
+				var act := BlitzBot.bet_decision(e, p, _diff_of(kinds[p]), rng)
 				e.bet_act(p, str(act["action"]), float(act.get("to", 0.0)))
 			if e.walkover_player() != -1:
 				e.resolve_walkover()
@@ -57,12 +57,12 @@ func net(kinds: Array, seat: int, seed_i: int) -> float:
 			while not trick_done and play_guard < 10:
 				play_guard += 1
 				var pl := e.current
-				if ChaosBot.wants_double(e, pl, _diff_of(kinds[pl]), rng):
+				if BlitzBot.wants_double(e, pl, _diff_of(kinds[pl]), rng):
 					e.double_down(pl)
 					for q in range(4):
-						if q != pl and ChaosBot.wants_cover(e, q, _diff_of(kinds[q]), rng):
+						if q != pl and BlitzBot.wants_cover(e, q, _diff_of(kinds[q]), rng):
 							e.cover_double(q)
-				var res := e.play(pl, ChaosBot.choose(e, pl, _diff_of(kinds[pl]), rng))
+				var res := e.play(pl, BlitzBot.choose(e, pl, _diff_of(kinds[pl]), rng))
 				if not res.get("ok", false):
 					break
 				trick_done = bool(res.get("trick_complete", false))

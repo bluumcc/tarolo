@@ -1,4 +1,4 @@
-class_name ChaosEconomy
+class_name BlitzEconomy
 extends RefCounted
 ## Economia de fichas (lógica pura). Números calculados por simulação, ver docs/ECONOMIA.md.
 ##

@@ -16,7 +16,7 @@ func _init() -> void:
 		if kv[0] == "n":
 			n = int(kv[1])
 	var stats := {}
-	for m in ChaosModifiers.ALL:
+	for m in BlitzModifiers.ALL:
 		stats[m] = {"n": 0, "flip": 0, "moved": 0.0, "value": 0.0, "profecia": 0, "swing": 0.0, "zero": 0}
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 2024
@@ -27,7 +27,7 @@ func _init() -> void:
 	var stuck := 0
 	var blind := 10.0
 	for r in range(n):
-		var e := ChaosEngine.new()
+		var e := BlitzEngine.new()
 		e.setup_match({"seed": 9000 + r, "mode": "blitz", "blind": int(blind), "stacks": [4000.0, 4000.0, 4000.0, 4000.0]})
 		e.rake_on = false
 		e.bonus_on = false
@@ -78,14 +78,14 @@ func _init() -> void:
 		st["swing"] += swing / 2.0
 	print("rituais jogados: %d (travados: %d) | média de fichas por categoria de profecia (blinds): acertou %+.2f, errou por 1 %+.2f, errou por 2+ %+.2f" % [n - stuck, stuck, cat_mean[0], cat_mean[1], cat_mean[2]])
 	print("%-14s %7s %16s %15s %9s %14s %13s" % ["modificador", "jogadas", "muda quem vence", "fichas (blinds)", "vitórias", "mexe profecia", "peso (blinds)"])
-	for m in ChaosModifiers.ALL:
+	for m in BlitzModifiers.ALL:
 		var st: Dictionary = stats[m]
 		var c := maxf(float(st["n"]), 1.0)
 		var weight: float = (float(st["moved"]) + float(st["swing"])) / c
-		print("%-14s %7d %15.1f%% %15.2f %9.2f %13.1f%% %13.2f" % [ChaosModifiers.name_of(m), int(st["n"]), 100.0 * float(st["flip"]) / c, float(st["moved"]) / c, float(st["value"]) / c, 100.0 * float(st["profecia"]) / c, weight])
-	for m in [ChaosModifiers.Modifier.SAQUE, ChaosModifiers.Modifier.ASSALTO_LIDER, ChaosModifiers.Modifier.VAZA_MALDITA]:
+		print("%-14s %7d %15.1f%% %15.2f %9.2f %13.1f%% %13.2f" % [BlitzModifiers.name_of(m), int(st["n"]), 100.0 * float(st["flip"]) / c, float(st["moved"]) / c, float(st["value"]) / c, 100.0 * float(st["profecia"]) / c, weight])
+	for m in [BlitzModifiers.Modifier.SAQUE, BlitzModifiers.Modifier.ASSALTO_LIDER, BlitzModifiers.Modifier.VAZA_MALDITA]:
 		var st: Dictionary = stats[m]
-		print("%s: sem nenhuma ficha movida em %.1f%% das jogadas" % [ChaosModifiers.name_of(m), 100.0 * float(st["zero"]) / maxf(float(st["n"]), 1.0)])
+		print("%s: sem nenhuma ficha movida em %.1f%% das jogadas" % [BlitzModifiers.name_of(m), 100.0 * float(st["zero"]) / maxf(float(st["n"]), 1.0)])
 	quit()
 
 

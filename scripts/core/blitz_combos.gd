@@ -1,4 +1,4 @@
-class_name ChaosCombos
+class_name BlitzCombos
 extends RefCounted
 ## Combos lidos direto na mesa (lógica pura): dá pra ver as cartas e saber na hora se
 ## valeu. Quem leva a rodada leva o bônus.

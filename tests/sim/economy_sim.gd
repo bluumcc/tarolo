@@ -16,7 +16,7 @@ func _diff(k: String) -> int:
 
 ## Joga uma sessão; o assento 0 usa `kind` ("O" = Oráculo). Devolve {net, rake, levels}.
 func session(kinds: Array, seed_i: int) -> Dictionary:
-	var e := ChaosEngine.new()
+	var e := BlitzEngine.new()
 	var stacks: Array = []
 	for p in range(N):
 		stacks.append(400.0)
@@ -39,9 +39,9 @@ func session(kinds: Array, seed_i: int) -> Dictionary:
 		var before: float = e.stacks[0]
 		for p in range(N):
 			if e.can_discard(p):
-				e.apply_discard(p, ChaosBot.wants_discard(e, p, _diff(kinds[p].replace("O", "H")), rng))
+				e.apply_discard(p, BlitzBot.wants_discard(e, p, _diff(kinds[p].replace("O", "H")), rng))
 		for p in range(N):
-			var k := ChaosOracle.pick_predict(e, p, rng) if kinds[p] == "O" else ChaosBot.blitz_pick(e, p, _diff(kinds[p]), rng)
+			var k := BlitzOracle.pick_predict(e, p, rng) if kinds[p] == "O" else BlitzBot.blitz_pick(e, p, _diff(kinds[p]), rng)
 			e.blitz_place(p, k)
 		while not e.is_round_over():
 			e.draw_trick_modifier()
@@ -52,7 +52,7 @@ func session(kinds: Array, seed_i: int) -> Dictionary:
 				var a := e.bet_actor()
 				if a == -1:
 					break
-				var act := ChaosBot.bet_decision(e, a, _diff(str(kinds[a]).replace("O", "H")), rng)
+				var act := BlitzBot.bet_decision(e, a, _diff(str(kinds[a]).replace("O", "H")), rng)
 				e.bet_act(a, str(act["action"]), float(act.get("to", 0.0)))
 			if e.walkover_player() != -1:
 				e.resolve_walkover()
@@ -62,7 +62,7 @@ func session(kinds: Array, seed_i: int) -> Dictionary:
 			while not done and pg < 12:
 				pg += 1
 				var pl := e.current
-				var card: CardData = ChaosOracle.pick_card(e, pl, rng) if kinds[pl] == "O" else ChaosBot.choose(e, pl, _diff(kinds[pl]), rng)
+				var card: CardData = BlitzOracle.pick_card(e, pl, rng) if kinds[pl] == "O" else BlitzBot.choose(e, pl, _diff(kinds[pl]), rng)
 				var res := e.play(pl, card)
 				if not res.get("ok", false):
 					break

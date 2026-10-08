@@ -38,8 +38,8 @@ func _init() -> void:
 	quit(1 if failures > 0 else 0)
 
 
-func _engine(seed_v: int, players: int, stacks: Array, blind := 10) -> ChaosEngine:
-	var e := ChaosEngine.new()
+func _engine(seed_v: int, players: int, stacks: Array, blind := 10) -> BlitzEngine:
+	var e := BlitzEngine.new()
 	e.setup_match({"seed": seed_v, "levels": 1, "mode": "blitz", "blind": blind, "players": players, "stacks": stacks})
 	return e
 
@@ -63,7 +63,7 @@ func _conservation() -> void:
 			diffs.append(rng.randi_range(0, 2))
 		var start := SimLib.total_chips(e)
 		var mode := "fuzz" if i % 2 == 0 else "bot"
-		var on_trick := func(en: ChaosEngine):
+		var on_trick := func(en: BlitzEngine):
 			for x in en.stacks:
 				if float(x) < -SimLib.EPS:
 					neg += 1
@@ -198,7 +198,7 @@ func _fuzz_invalid() -> void:
 		var n := rng.randi_range(2, 6)
 		var e := _engine(i, n, [])
 		for p in range(n):
-			e.apply_discard(p, ChaosBot.wants_discard(e, p, 1, rng))
+			e.apply_discard(p, BlitzBot.wants_discard(e, p, 1, rng))
 			e.blitz_place(p, rng.randi_range(-3, 12))   # palpite inválido (clampado)
 		for _t in range(8):
 			if e.is_round_over():
@@ -230,7 +230,7 @@ func _fuzz_invalid() -> void:
 				if bool(res.get("trick_complete", false)):
 					break
 		for p in range(n):
-			if (e.hands[p] as Array).size() != ChaosEngine.HAND_SIZE - e.trick_number:
+			if (e.hands[p] as Array).size() != BlitzEngine.HAND_SIZE - e.trick_number:
 				bad_hands += 1
 				break
 	check(corrupted == 0, "fuzz: nenhuma rodada de apostas ficou presa (%d níveis)" % N)
@@ -263,7 +263,7 @@ func _extremes() -> void:
 	check(drift == 0, "extremos: fichas conservadas (%d com deriva)" % drift)
 
 
-# 3b) Torneio completo, muitas vezes (lógica pura: Tournament + ChaosEngine headless).
+# 3b) Torneio completo, muitas vezes (lógica pura: Tournament + BlitzEngine headless).
 func _tournament() -> void:
 	var bad_end := 0
 	var champs_left := 0

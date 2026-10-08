@@ -1,13 +1,13 @@
 class_name SimLib
 extends RefCounted
-## Utilidades das simulações: dirigem o motor (ChaosEngine) com a mesma sequência do jogo real
+## Utilidades das simulações: dirigem o motor (BlitzEngine) com a mesma sequência do jogo real
 ## (descarte → palpite → [ante/blind + apostas + cartas] × 8 → fechamento) e conferem invariantes.
 
 const EPS := 0.01
 
 
 ## Fichas em jogo: tudo que existe numa mesa. A casa guarda a taxa e paga bônus do próprio cofre.
-static func total_chips(e: ChaosEngine) -> float:
+static func total_chips(e: BlitzEngine) -> float:
 	var s := 0.0
 	for x in e.stacks:
 		s += float(x)
@@ -15,12 +15,12 @@ static func total_chips(e: ChaosEngine) -> float:
 
 
 ## Política de aposta. mode: "bot" (decisão do bot), "fuzz" (ação válida aleatória, incl. all-in).
-static func bet_step(e: ChaosEngine, rng: RandomNumberGenerator, mode: String, diffs: Array) -> void:
+static func bet_step(e: BlitzEngine, rng: RandomNumberGenerator, mode: String, diffs: Array) -> void:
 	var a := e.bet_actor()
 	if a == -1:
 		return
 	if mode == "bot":
-		var act := ChaosBot.bet_decision(e, a, int(diffs[a]), rng)
+		var act := BlitzBot.bet_decision(e, a, int(diffs[a]), rng)
 		e.bet_act(a, str(act["action"]), float(act.get("to", 0.0)))
 		return
 	var o := e.bet_options(a)
@@ -38,13 +38,13 @@ static func bet_step(e: ChaosEngine, rng: RandomNumberGenerator, mode: String, d
 
 ## Joga UM nível completo. `on_trick` é chamado depois de cada jogada resolvida (invariantes).
 ## Devolve false se o motor travou (guarda de iterações).
-static func play_level(e: ChaosEngine, rng: RandomNumberGenerator, diffs: Array, mode: String, on_trick: Callable = Callable()) -> bool:
+static func play_level(e: BlitzEngine, rng: RandomNumberGenerator, diffs: Array, mode: String, on_trick: Callable = Callable()) -> bool:
 	var n := e.num_players
 	for p in range(n):
 		if e.can_discard(p):
-			e.apply_discard(p, ChaosBot.wants_discard(e, p, int(diffs[p]), rng))
+			e.apply_discard(p, BlitzBot.wants_discard(e, p, int(diffs[p]), rng))
 	for p in range(n):
-		e.blitz_place(p, ChaosBot.blitz_pick(e, p, int(diffs[p]), rng) if mode == "bot" else rng.randi_range(0, ChaosEngine.HAND_SIZE))
+		e.blitz_place(p, BlitzBot.blitz_pick(e, p, int(diffs[p]), rng) if mode == "bot" else rng.randi_range(0, BlitzEngine.HAND_SIZE))
 	var guard := 0
 	while not e.is_round_over():
 		guard += 1
@@ -68,7 +68,7 @@ static func play_level(e: ChaosEngine, rng: RandomNumberGenerator, diffs: Array,
 				if pg > 12:
 					return false
 				var pl := e.current
-				var res := e.play(pl, ChaosBot.choose(e, pl, int(diffs[pl]), rng))
+				var res := e.play(pl, BlitzBot.choose(e, pl, int(diffs[pl]), rng))
 				if not res.get("ok", false):
 					return false
 				done = bool(res.get("trick_complete", false))

@@ -27,26 +27,26 @@ func kind_diff(k0: String) -> int:
 	match k:
 		"E": return BotAI.Difficulty.EASY
 		"N": return BotAI.Difficulty.NORMAL
-		"L": return ChaosBot.LEGACY
+		"L": return BlitzBot.LEGACY
 	return BotAI.Difficulty.HARD
 
 
-func pick_predict(kind0: String, e: ChaosEngine, p: int, rng: RandomNumberGenerator) -> int:
+func pick_predict(kind0: String, e: BlitzEngine, p: int, rng: RandomNumberGenerator) -> int:
 	var kind := base(kind0)
 	if kind == "O":
-		return ChaosOracle.pick_predict(e, p, rng)
-	return ChaosBot.blitz_pick(e, p, BotAI.Difficulty.EASY if kind == "E" else (BotAI.Difficulty.NORMAL if kind == "N" else BotAI.Difficulty.HARD), rng)
+		return BlitzOracle.pick_predict(e, p, rng)
+	return BlitzBot.blitz_pick(e, p, BotAI.Difficulty.EASY if kind == "E" else (BotAI.Difficulty.NORMAL if kind == "N" else BotAI.Difficulty.HARD), rng)
 
 
-func pick_card(kind0: String, e: ChaosEngine, p: int, rng: RandomNumberGenerator) -> CardData:
+func pick_card(kind0: String, e: BlitzEngine, p: int, rng: RandomNumberGenerator) -> CardData:
 	var kind := base(kind0)
 	if kind == "O":
-		return ChaosOracle.pick_card(e, p, rng)
-	return ChaosBot.choose(e, p, kind_diff(kind), rng)
+		return BlitzOracle.pick_card(e, p, rng)
+	return BlitzBot.choose(e, p, kind_diff(kind), rng)
 
 
 func run_session(kinds: Array, seat: int, seed_i: int) -> Array:
-	var e := ChaosEngine.new()
+	var e := BlitzEngine.new()
 	var cfg := {"seed": seed_i * 31 + 7, "levels": 0, "mode": "blitz", "blind": 10, "point_factor": factor, "stacks": [400, 400, 400, 400]}
 	cfg.merge(opts)
 	e.setup_match(cfg)
@@ -66,7 +66,7 @@ func run_session(kinds: Array, seat: int, seed_i: int) -> Array:
 				e.stacks[p] = 400.0
 		for p in range(4):
 			if e.can_discard(p):
-				e.apply_discard(p, ChaosBot.wants_discard(e, p, kind_diff(kinds[p]), rng))
+				e.apply_discard(p, BlitzBot.wants_discard(e, p, kind_diff(kinds[p]), rng))
 		var before: float = e.stacks[seat]
 		for p in range(4):
 			e.blitz_place(p, pick_predict(kinds[p], e, p, rng))
@@ -77,12 +77,12 @@ func run_session(kinds: Array, seat: int, seed_i: int) -> Array:
 			var kd: int = kind_diff(kinds[pl])
 			if base(kinds[pl]) == "O":
 				kd = BotAI.Difficulty.HARD
-			if ChaosBot.wants_double(e, pl, kd, rng):
+			if BlitzBot.wants_double(e, pl, kd, rng):
 				e.double_down(pl)
 				for q in range(4):
 					if q != pl:
 						var kq: int = BotAI.Difficulty.HARD if base(kinds[q]) == "O" else kind_diff(kinds[q])
-						if ChaosBot.wants_cover(e, q, kq, rng):
+						if BlitzBot.wants_cover(e, q, kq, rng):
 							e.cover_double(q)
 			e.play(pl, pick_card(kinds[pl], e, pl, rng))
 		var hit := (e.blitz_result["hits"] as Array).has(seat)

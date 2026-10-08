@@ -18,7 +18,7 @@ func _init() -> void:
 	_test_winner()
 	_test_bidding()
 	_test_bonuses()
-	_test_chaos()
+	_test_blitz_engine()
 	_test_blitz()
 	_test_blitz_phase4()
 	_test_colors()
@@ -266,19 +266,19 @@ func _test_bonuses() -> void:
 	check(TrickRules.winning_index(cut) == 2, "trunfo mais alto vence quando a vaza é cortada")
 
 
-func _test_chaos() -> void:
-	var e := ChaosEngine.new()
+func _test_blitz_engine() -> void:
+	var e := BlitzEngine.new()
 	e.setup_match({"seed": 11})
-	check((e.hands[0] as Array).size() == ChaosEngine.HAND_SIZE, "Caos: 8 cartas por jogador")
+	check((e.hands[0] as Array).size() == BlitzEngine.HAND_SIZE, "Caos: 8 cartas por jogador")
 	check(e.blind == 10 and int(e.stacks[0]) == 400, "mesa padrão: blind 10 e stack de 40 blinds")
 
 	# Nenhum modificador mexe no valor (pontos) das cartas.
-	for m in ChaosModifiers.ALL:
+	for m in BlitzModifiers.ALL:
 		e.modifier = m
-		check(e.card_value(c(0, 14)) == 4.5 and e.card_value(c(4, 5)) == 0.5 and e.card_value(c(1, 3)) == 0.5, "modificador %s não muda o valor das cartas" % ChaosModifiers.name_of(m))
+		check(e.card_value(c(0, 14)) == 4.5 and e.card_value(c(4, 5)) == 0.5 and e.card_value(c(1, 3)) == 0.5, "modificador %s não muda o valor das cartas" % BlitzModifiers.name_of(m))
 
 	# Loucura: O Louco vence qualquer carta, até arcano maior.
-	var mods := ChaosModifiers.Modifier
+	var mods := BlitzModifiers.Modifier
 	var louco_plays := [
 		{"player": 0, "card": c(2, 14)},
 		{"player": 1, "card": CardData.louco()},
@@ -342,7 +342,7 @@ func _test_chaos() -> void:
 		{"player": 3, "card": c(3, 10)},
 	]
 	check(TrickRules.winning_index_mod(pit_tie, mods.PITAGORICO) == 3, "Pitagórico: empate de número vale o naipe (Espadas > Copas > Paus > Ouros)")
-	var pit_order := ChaosModifiers.TIE_ORDER
+	var pit_order := BlitzModifiers.TIE_ORDER
 	check(pit_order == [CardData.Suit.ESPADAS, CardData.Suit.COPAS, CardData.Suit.PAUS, CardData.Suit.OUROS], "ordem de desempate: Espadas, Copas, Paus, Ouros")
 	var pit_trunfo := [
 		{"player": 0, "card": c(1, 14)},
@@ -351,7 +351,7 @@ func _test_chaos() -> void:
 		{"player": 3, "card": c(4, 7)},
 	]
 	check(TrickRules.winning_index_mod(pit_trunfo, mods.PITAGORICO) == 3, "Pitagórico: o arcano maior ainda vence (o maior deles)")
-	var pe := ChaosEngine.new()
+	var pe := BlitzEngine.new()
 	pe.setup_match({"seed": 4, "mode": "blitz", "blind": 10})
 	pe.modifier = mods.PITAGORICO
 	pe.hands[0] = [c(0, 3), c(2, 9)]
@@ -360,7 +360,7 @@ func _test_chaos() -> void:
 	check(pe.legal_for(0).size() == 2 and bool(pe.play(0, c(0, 3))["ok"]), "Pitagórico: o motor aceita jogar outro naipe")
 
 	# Sem obrigação de cobrir no Caos (o Vanilla continua com ela).
-	var lg := ChaosEngine.new()
+	var lg := BlitzEngine.new()
 	lg.setup_match({"seed": 2})
 	lg.hands[0] = [c(CardData.Suit.TRUNFO, 9), c(CardData.Suit.TRUNFO, 19), c(CardData.Suit.PAUS, 3)]
 	lg.plays = [{"player": 3, "card": c(CardData.Suit.TRUNFO, 18)}]
@@ -371,10 +371,10 @@ func _test_chaos() -> void:
 	check(lg.legal_for(0).size() == 2, "Caos: sem naipe, corta com qualquer Trunfo (mesmo menor que o cortado)")
 
 	# ---- clone_for_sim copia todo o estado do motor (um campo esquecido quebra bots/Oráculo)
-	var cl_e := ChaosEngine.new()
+	var cl_e := BlitzEngine.new()
 	cl_e.setup_match({"seed": 5, "mode": "blitz", "blind": 10, "players": 4, "levels": 2})
 	for cl_p in range(4):
-		cl_e.apply_discard(cl_p, ChaosBot.wants_discard(cl_e, cl_p, 1, cl_e.rng))
+		cl_e.apply_discard(cl_p, BlitzBot.wants_discard(cl_e, cl_p, 1, cl_e.rng))
 		cl_e.blitz_place(cl_p, 2)
 	cl_e.draw_trick_modifier()
 	cl_e.begin_trick()
@@ -423,7 +423,7 @@ func _test_chaos() -> void:
 		check(rb_sizes.size() == ceili(float(rb_count) / float(Tournament.MAX_TABLE)), "Torneio: %d jogadores usam o mínimo de mesas" % rb_count)
 
 	# ---- Eliminado (torneio) sai da jogada: não ante, não fala, não ocupa vaga de carta
-	var bu := ChaosEngine.new()
+	var bu := BlitzEngine.new()
 	bu.setup_match({"seed": 5})
 	bu.stacks[1] = 0.0
 	bu.bust_broke()
@@ -462,19 +462,19 @@ func _test_chaos() -> void:
 	check(bl_ok, "evento: stack = 10× buy-in, blind inicial = 1% da stack, blind sobe um degrau por nível")
 	check(bl_int, "blinds sempre inteiros e múltiplos de 5 (ante de 20% e entrada de 8 blinds sem decimais)")
 	# ---- Dealer: sorteado na 1ª rodada; depois é sempre o vencedor da última jogada da rodada anterior
-	var dl := ChaosEngine.new()
+	var dl := BlitzEngine.new()
 	dl.setup_match({"seed": 4, "levels": 3, "mode": "blitz", "blind": 10, "players": 4, "start_leader": 2, "stacks": [500.0, 500.0, 500.0, 500.0]})
 	check(dl.leader == 2, "dealer da 1ª rodada = o sorteado na abertura da partida")
 	dl.leader = 3   # (a última jogada da rodada foi vencida pelo jogador 3)
-	dl.trick_number = ChaosEngine.HAND_SIZE
+	dl.trick_number = BlitzEngine.HAND_SIZE
 	dl.advance_round()
 	check(dl.leader == 3, "dealer da rodada seguinte = vencedor da última jogada")
 	dl.busted[3] = true
-	dl.trick_number = ChaosEngine.HAND_SIZE
+	dl.trick_number = BlitzEngine.HAND_SIZE
 	dl.advance_round()
 	check(dl.leader == 0, "vencedor eliminado: o dealer passa pro próximo vivo")
 	# ---- Torneio: sem fichas pra entrada do palpite = eliminado antes de jogar; sobrou ≥1 ficha = joga em all-in
-	var ai := ChaosEngine.new()
+	var ai := BlitzEngine.new()
 	ai.setup_match({"seed": 9, "levels": 1, "mode": "blitz", "blind": 10, "players": 3, "stacks": [60.0, 85.0, 500.0]})
 	var ai_out := ai.bust_cant_enter()
 	check(ai_out == [0] and bool(ai.busted[0]) and not bool(ai.busted[1]), "sem fichas pra entrada do palpite (60 < 80): eliminado; com 85 pode palpitar")
@@ -483,16 +483,16 @@ func _test_chaos() -> void:
 	ai.blitz_place(2, 2)
 	check(is_equal_approx(float(ai.stacks[1]), 5.0) and ai.bust_broke().is_empty(), "sobrou 5 ficha depois da entrada: segue jogando (all-in), não é eliminado")
 	# Eliminado deixa de ganhar o palpite (a entrada fica no pote): é o que impedia ele de "voltar" a cada nível
-	var ez := ChaosEngine.new()
+	var ez := BlitzEngine.new()
 	ez.setup_match({"seed": 9, "levels": 1, "mode": "blitz", "blind": 10, "players": 3, "stacks": [80.0, 500.0, 500.0]})
 	for ez_p in range(3):
 		ez.blitz_place(ez_p, 0)
 	check(ez.bust_broke() == [0], "entrada levou tudo (stack 0): eliminado")
-	ez.trick_number = ChaosEngine.HAND_SIZE
+	ez.trick_number = BlitzEngine.HAND_SIZE
 	var ez_res := ez._settle_blitz()
 	check(not (ez_res["hits"] as Array).has(0) and is_equal_approx(float(ez_res["payouts"][0]), 0.0), "eliminado com palpite 0 certo NÃO recebe prêmio")
 	# ---- Mesa desfeita no meio da rodada: jogadas que faltam não contam vitória; palpite vale pelo que já foi jogado
-	var vd := ChaosEngine.new()
+	var vd := BlitzEngine.new()
 	vd.setup_match({"seed": 9, "levels": 1, "mode": "blitz", "blind": 10, "players": 3, "stacks": [500.0, 500.0, 500.0]})
 	for vd_p in range(3):
 		vd.blitz_place(vd_p, 1 if vd_p == 0 else 5)
@@ -502,7 +502,7 @@ func _test_chaos() -> void:
 	check(vd.is_round_over() and int(vd.wins[0]) == 1, "mesa desfeita: nenhuma vitória de graça nas jogadas que faltavam")
 	check((vd.blitz_result["hits"] as Array).has(0), "mesa desfeita: quem já tinha batido o palpite leva o prêmio")
 	# Desfeita antes de qualquer jogada: o nível não aconteceu, as entradas voltam
-	var vz := ChaosEngine.new()
+	var vz := BlitzEngine.new()
 	vz.setup_match({"seed": 9, "levels": 1, "mode": "blitz", "blind": 10, "players": 3, "stacks": [500.0, 500.0, 500.0]})
 	for vz_p in range(3):
 		vz.blitz_place(vz_p, 2)
@@ -510,7 +510,7 @@ func _test_chaos() -> void:
 	check(is_equal_approx(float(vz.stacks[0]) + float(vz.stacks[1]) + float(vz.stacks[2]), 1500.0) and is_equal_approx(float(vz.stacks[0]), 500.0), "mesa desfeita antes da 1ª jogada devolve as entradas do palpite")
 
 	# ---- Aposta estilo poker
-	var p1 := ChaosEngine.new()
+	var p1 := BlitzEngine.new()
 	p1.setup_match({"seed": 3})
 	p1.begin_trick()
 	check(is_equal_approx(p1.trick_pot, 40.0) and is_equal_approx(p1.stacks[0], 390.0), "blind de todos vai pro pote")
@@ -544,7 +544,7 @@ func _test_chaos() -> void:
 			check(p1.stacks[int(rr["winner"])] >= 130.0 and float(rr["gain"]) > 0.0 - 200.0, "vencedor leva o pote")
 	check(p1.hands[0].size() == 7 and p1.hands[1].size() == 7 and p1.hands[3].size() == 7, "quem desistiu descarta a mais fraca: todas as mãos ficam do mesmo tamanho")
 	# Todo mundo desiste: o último leva o pote sem jogar.
-	var p2 := ChaosEngine.new()
+	var p2 := BlitzEngine.new()
 	p2.setup_match({"seed": 4})
 	p2.begin_trick()
 	p2.bet_act(1, "raise", 20.0)
@@ -557,7 +557,7 @@ func _test_chaos() -> void:
 	check(p2.hands[1].size() == 7 and p2.hands[2].size() == 7, "no blefe vencido o vencedor também descarta, mãos iguais")
 	check(p2.trick_number == 1 and p2.session_stats[1]["bluffs"] == 1, "rodada conta e o blefe é registrado")
 	# All-in: cada um vai até a própria stack; stack curta paga "o que tem" e nunca fica negativa.
-	var p3 := ChaosEngine.new()
+	var p3 := BlitzEngine.new()
 	p3.setup_match({"seed": 5, "stacks": [200, 200, 60, 200]})
 	p3.begin_trick()
 	var first := p3.bet_actor()
@@ -586,7 +586,7 @@ func _test_chaos() -> void:
 	check(is_equal_approx(total_before, total_after), "potes paralelos devolvem o excedente sem criar nem perder fichas")
 	check(p3.trick_pot <= 4.0 * float(p3.contrib[2]) + 0.001, "all-in curto só leva de cada rival o que ele mesmo pôs")
 	# Potes laterais de verdade: A (curto, melhor mão) ganha só o principal; o lateral vai pro melhor dos que cobriram.
-	var sp := ChaosEngine.new()
+	var sp := BlitzEngine.new()
 	sp.setup_match({"seed": 3, "levels": 1, "mode": "blitz", "blind": 10, "players": 4, "stacks": [500.0, 500.0, 500.0, 500.0]})
 	sp.contrib = [100.0, 300.0, 300.0, 40.0]   # 3 é all-in curto; 1 e 2 cobrem 300; 0 desistiu com 100
 	sp.folded = [true, false, false, false]
@@ -599,7 +599,7 @@ func _test_chaos() -> void:
 	check(sp.last_pots.size() == 2 and int(sp.last_pots[0]["winner"]) == 3 and not bool(sp.last_pots[1]["uncalled"]), "camadas do pote registradas pra UI (principal → all-in curto, lateral → quem cobriu)")
 	check(is_equal_approx(float(sp.stacks[1]) + float(sp.stacks[2]), 580.0), "pote lateral vai pro melhor dos que cobriram")
 	# All-in maior que o dos rivais: o excedente que ninguém cobriu volta pra quem pôs.
-	var up := ChaosEngine.new()
+	var up := BlitzEngine.new()
 	up.setup_match({"seed": 4, "levels": 1, "mode": "blitz", "blind": 10, "players": 4, "stacks": [500.0, 500.0, 500.0, 500.0]})
 	up.contrib = [400.0, 100.0, 0.0, 0.0]
 	up.folded = [false, false, true, true]
@@ -611,14 +611,14 @@ func _test_chaos() -> void:
 	check(up.last_pots.size() == 2 and bool(up.last_pots[1]["uncalled"]) and int(up.last_pots[1]["winner"]) == 0, "excedente aparece como 'sem cobertura' pra UI")
 
 	# Bot sem fichas pro blind é trocado.
-	p3 = ChaosEngine.new()
+	p3 = BlitzEngine.new()
 	p3.setup_match({"seed": 5, "stacks": [200, 200, 60, 200]})
 	p3.begin_trick()
 	p3.stacks[3] = 4.0
 	check(p3.refill_bots() == [3] and p3.stacks[3] >= 300.0 and p3.stacks[3] <= 600.0, "bot quebrado sai e um novo senta com 30 a 60 blinds")
 	# Prêmio da banca e mesa sem fim.
 	check(is_equal_approx(p3.chips_of(4.0), 10.0), "1 ponto de carta = 1/4 do blind (4 pts = ◎10)")
-	var p4 := ChaosEngine.new()
+	var p4 := BlitzEngine.new()
 	p4.setup_match({"seed": 21, "levels": 0})
 	var trick_count := 0
 	var rng4 := RandomNumberGenerator.new()
@@ -633,7 +633,7 @@ func _test_chaos() -> void:
 		p4.begin_trick()
 		while p4.betting:
 			var actor := p4.bet_actor()
-			var d := ChaosBot.bet_decision(p4, actor, BotAI.Difficulty.HARD, rng4)
+			var d := BlitzBot.bet_decision(p4, actor, BotAI.Difficulty.HARD, rng4)
 			var br := p4.bet_act(actor, str(d["action"]), float(d.get("to", 0.0)))
 			check(br["ok"], "decisão do bot é sempre uma ação válida")
 			if not br["ok"]:
@@ -643,7 +643,7 @@ func _test_chaos() -> void:
 		else:
 			while true:
 				var pl := p4.current
-				var rs := p4.play(pl, ChaosBot.choose(p4, pl, BotAI.Difficulty.HARD, rng4))
+				var rs := p4.play(pl, BlitzBot.choose(p4, pl, BotAI.Difficulty.HARD, rng4))
 				if rs["trick_complete"]:
 					break
 		trick_count += 1
@@ -651,48 +651,48 @@ func _test_chaos() -> void:
 	check(not p4.is_match_over(), "mesa livre nunca acaba sozinha")
 	for st in p4.stacks:
 		check(float(st) >= 0.0, "ninguém fica com stack negativa")
-	var pl2 := ChaosEngine.new()
+	var pl2 := BlitzEngine.new()
 	pl2.setup_match({"seed": 8, "levels": 2})
 	pl2.round_index = 1
-	pl2.trick_number = ChaosEngine.HAND_SIZE
+	pl2.trick_number = BlitzEngine.HAND_SIZE
 	check(pl2.is_match_over() and pl2.is_final_round(), "partida com fim acaba no último nível")
 	# Bot: força da mão e decisões.
-	var pb := ChaosEngine.new()
+	var pb := BlitzEngine.new()
 	pb.setup_match({"seed": 6})
 	pb.hands[3] = [c(CardData.Suit.TRUNFO, 21), c(CardData.Suit.TRUNFO, 20), c(CardData.Suit.PAUS, 14), c(CardData.Suit.COPAS, 14)]
 	pb.hands[2] = [c(CardData.Suit.PAUS, 2), c(CardData.Suit.PAUS, 3), c(CardData.Suit.COPAS, 4), c(CardData.Suit.OUROS, 5)]
-	check(ChaosBot.hand_strength(pb, 3) > ChaosBot.hand_strength(pb, 2) + 0.4, "mão com Trunfos altos e Reis é bem mais forte")
-	pb.modifier = ChaosModifiers.Modifier.VAZA_INVERTIDA
-	check(ChaosBot.hand_strength(pb, 2) > ChaosBot.hand_strength(pb, 3), "na Oposição, cartas baixas são fortes")
-	pb.modifier = ChaosModifiers.Modifier.VAZA_DOURADA
+	check(BlitzBot.hand_strength(pb, 3) > BlitzBot.hand_strength(pb, 2) + 0.4, "mão com Trunfos altos e Reis é bem mais forte")
+	pb.modifier = BlitzModifiers.Modifier.VAZA_INVERTIDA
+	check(BlitzBot.hand_strength(pb, 2) > BlitzBot.hand_strength(pb, 3), "na Oposição, cartas baixas são fortes")
+	pb.modifier = BlitzModifiers.Modifier.VAZA_DOURADA
 	pb.begin_trick()
 	var pbr := RandomNumberGenerator.new()
 	pbr.seed = 3
 	var raises := 0
 	for i in range(30):
-		var dd := ChaosBot.bet_decision(pb, 2, BotAI.Difficulty.HARD, pbr)
+		var dd := BlitzBot.bet_decision(pb, 2, BotAI.Difficulty.HARD, pbr)
 		if dd["action"] == "raise":
 			raises += 1
 	var raises_strong := 0
 	for i in range(30):
-		if ChaosBot.bet_decision(pb, 3, BotAI.Difficulty.HARD, pbr)["action"] == "raise":
+		if BlitzBot.bet_decision(pb, 3, BotAI.Difficulty.HARD, pbr)["action"] == "raise":
 			raises_strong += 1
 	check(raises_strong > raises, "bot aumenta mais com mão forte que com mão fraca (%d > %d)" % [raises_strong, raises])
 	pb.bet_act(pb.bet_actor(), "raise", 60.0)
-	var facing := ChaosBot.bet_decision(pb, pb.bet_actor(), BotAI.Difficulty.NORMAL, pbr)
+	var facing := BlitzBot.bet_decision(pb, pb.bet_actor(), BotAI.Difficulty.NORMAL, pbr)
 	check(facing["action"] in ["call", "fold", "raise"], "diante de aumento o bot paga, aumenta ou desiste (não passa)")
 
 	# Combos de mesa e sequência.
-	check("CHUVA_TRUNFOS" in ChaosCombos.detect([{"card": c(CardData.Suit.TRUNFO, 3)}, {"card": c(CardData.Suit.TRUNFO, 9)}, {"card": c(CardData.Suit.TRUNFO, 15)}, {"card": c(CardData.Suit.PAUS, 2)}]), "3 Trunfos na mesa = Chuva de Trunfos")
-	check("REALEZA" in ChaosCombos.detect([{"card": c(CardData.Suit.PAUS, 11)}, {"card": c(CardData.Suit.PAUS, 13)}, {"card": c(CardData.Suit.PAUS, 14)}, {"card": c(CardData.Suit.PAUS, 2)}]), "3 figuras na mesa = Realeza")
-	check("ESCADA" in ChaosCombos.detect([{"card": c(CardData.Suit.PAUS, 7)}, {"card": c(CardData.Suit.PAUS, 8)}, {"card": c(CardData.Suit.PAUS, 9)}, {"card": c(CardData.Suit.COPAS, 2)}]), "3 cartas seguidas do mesmo naipe = Escada")
-	check(ChaosCombos.detect([{"card": c(CardData.Suit.PAUS, 7)}, {"card": c(CardData.Suit.COPAS, 8)}, {"card": c(CardData.Suit.PAUS, 10)}, {"card": c(CardData.Suit.PAUS, 2)}]).is_empty(), "sem combo quando não há sequência, figuras ou Trunfos")
-	check(is_equal_approx(ChaosCombos.streak_mult(1), 1.0) and is_equal_approx(ChaosCombos.streak_mult(2), 1.25) and is_equal_approx(ChaosCombos.streak_mult(3), 1.5) and is_equal_approx(ChaosCombos.streak_mult(9), 2.0), "vitórias seguidas sobem o multiplicador até ×2")
+	check("CHUVA_TRUNFOS" in BlitzCombos.detect([{"card": c(CardData.Suit.TRUNFO, 3)}, {"card": c(CardData.Suit.TRUNFO, 9)}, {"card": c(CardData.Suit.TRUNFO, 15)}, {"card": c(CardData.Suit.PAUS, 2)}]), "3 Trunfos na mesa = Chuva de Trunfos")
+	check("REALEZA" in BlitzCombos.detect([{"card": c(CardData.Suit.PAUS, 11)}, {"card": c(CardData.Suit.PAUS, 13)}, {"card": c(CardData.Suit.PAUS, 14)}, {"card": c(CardData.Suit.PAUS, 2)}]), "3 figuras na mesa = Realeza")
+	check("ESCADA" in BlitzCombos.detect([{"card": c(CardData.Suit.PAUS, 7)}, {"card": c(CardData.Suit.PAUS, 8)}, {"card": c(CardData.Suit.PAUS, 9)}, {"card": c(CardData.Suit.COPAS, 2)}]), "3 cartas seguidas do mesmo naipe = Escada")
+	check(BlitzCombos.detect([{"card": c(CardData.Suit.PAUS, 7)}, {"card": c(CardData.Suit.COPAS, 8)}, {"card": c(CardData.Suit.PAUS, 10)}, {"card": c(CardData.Suit.PAUS, 2)}]).is_empty(), "sem combo quando não há sequência, figuras ou Trunfos")
+	check(is_equal_approx(BlitzCombos.streak_mult(1), 1.0) and is_equal_approx(BlitzCombos.streak_mult(2), 1.25) and is_equal_approx(BlitzCombos.streak_mult(3), 1.5) and is_equal_approx(BlitzCombos.streak_mult(9), 2.0), "vitórias seguidas sobem o multiplicador até ×2")
 
 	# Modificadores (sempre por vaza) e combos.
-	var e7 := ChaosEngine.new()
+	var e7 := BlitzEngine.new()
 	e7.setup_match({"seed": 9})
-	e7.modifier = ChaosModifiers.Modifier.VAZA_INVERTIDA
+	e7.modifier = BlitzModifiers.Modifier.VAZA_INVERTIDA
 	e7.round_index = 0
 	e7.trick_number = 3
 	e7.plays = [
@@ -703,7 +703,7 @@ func _test_chaos() -> void:
 	]
 	var inv := e7._resolve_trick()
 	check(int(inv["winner"]) == 1, "Vaza Invertida: a MENOR carta do naipe vence")
-	e7.modifier = ChaosModifiers.Modifier.VAZA_DOURADA
+	e7.modifier = BlitzModifiers.Modifier.VAZA_DOURADA
 	e7.trick_number = 3
 	e7.current = 0
 	e7.last_winner = 0
@@ -715,9 +715,9 @@ func _test_chaos() -> void:
 		{"player": 3, "card": c(CardData.Suit.PAUS, 6)},
 	]
 	var gold := e7._resolve_trick()
-	check(is_equal_approx(float(gold["mult"]), ChaosEngine.GOLD_MULT), "Vaza Dourada multiplica os pontos por 3")
+	check(is_equal_approx(float(gold["mult"]), BlitzEngine.GOLD_MULT), "Vaza Dourada multiplica os pontos por 3")
 	check("CORTADO" in gold["combos"], "vencer depois de alguém ter 2+ vitórias seguidas é CORTADO")
-	e7.modifier = ChaosModifiers.Modifier.VAZA_MALDITA
+	e7.modifier = BlitzModifiers.Modifier.VAZA_MALDITA
 	e7.trick_number = 3
 	e7.streak = [0, 0, 0, 0]
 	e7.last_winner = -1
@@ -731,11 +731,11 @@ func _test_chaos() -> void:
 	var curse := e7._resolve_trick()
 	check(is_equal_approx(float(curse["curse_amount"]), 30.0), "Maldição: quem vence paga 3 blinds (30 com blind 10), divididos entre os rivais")
 	# Bots cientes dos modificadores
-	var eb := ChaosEngine.new()
+	var eb := BlitzEngine.new()
 	eb.setup_match({"seed": 1})
 	var brng := RandomNumberGenerator.new()
 	brng.seed = 7
-	eb.modifier = ChaosModifiers.Modifier.VAZA_MALDITA
+	eb.modifier = BlitzModifiers.Modifier.VAZA_MALDITA
 	eb.trick_number = 3
 	eb.current = 3
 	eb.plays = [
@@ -744,16 +744,16 @@ func _test_chaos() -> void:
 		{"player": 2, "card": c(CardData.Suit.PAUS, 3)},
 	]
 	eb.hands[3] = [c(CardData.Suit.PAUS, 12), c(CardData.Suit.PAUS, 6)]
-	var pick := ChaosBot.choose(eb, 3, BotAI.Difficulty.HARD, brng)
+	var pick := BlitzBot.choose(eb, 3, BotAI.Difficulty.HARD, brng)
 	check(pick.rank == 6 or pick.rank == 12, "bot joga carta legal na Vaza Maldita")
 	eb.hands[3] = [c(CardData.Suit.PAUS, 12), c(CardData.Suit.PAUS, 1)]
-	pick = ChaosBot.choose(eb, 3, BotAI.Difficulty.HARD, brng)
+	pick = BlitzBot.choose(eb, 3, BotAI.Difficulty.HARD, brng)
 	check(not eb.would_win(pick, 3) and pick.rank == 1, "Vaza Maldita: bot foge de vencer")
-	eb.modifier = ChaosModifiers.Modifier.VAZA_INVERTIDA
+	eb.modifier = BlitzModifiers.Modifier.VAZA_INVERTIDA
 	eb.hands[3] = [c(CardData.Suit.PAUS, 12), c(CardData.Suit.PAUS, 1)]
-	pick = ChaosBot.choose(eb, 3, BotAI.Difficulty.HARD, brng)
+	pick = BlitzBot.choose(eb, 3, BotAI.Difficulty.HARD, brng)
 	check(pick.rank == 1 and eb.would_win(pick, 3), "Vaza Invertida: bot vence com a menor carta")
-	e7.modifier = ChaosModifiers.Modifier.LOUCO_VENCE
+	e7.modifier = BlitzModifiers.Modifier.LOUCO_VENCE
 	e7.trick_number = 0
 	e7.last_winner = 0
 	e7.streak = [2, 0, 0, 0]
@@ -766,18 +766,18 @@ func _test_chaos() -> void:
 	var hot := e7._resolve_trick()
 	check("MAO_QUENTE" in hot["combos"], "3ª vitória seguida é MÃO QUENTE")
 	# Sorteio por jogada: cada Ritual embaralha os 8 e usa todos, um por vaza, sem repetir no nível.
-	var e8 := ChaosEngine.new()
+	var e8 := BlitzEngine.new()
 	e8.setup_match({"seed": 11})
 	check(e8.modifier == -1, "antes da 1ª vaza começar, ainda não tem modificador sorteado")
 	var seen := {}
-	for t in range(ChaosEngine.HAND_SIZE):
+	for t in range(BlitzEngine.HAND_SIZE):
 		e8.trick_number = t
 		e8.draw_trick_modifier()
 		check(e8.modifier != -1, "toda vaza sorteia um modificador")
 		check(not seen.has(e8.modifier), "não repete modificador dentro do mesmo nível")
 		seen[e8.modifier] = true
-	check(seen.size() == ChaosEngine.HAND_SIZE, "as 8 vazas do nível usam 8 modificadores diferentes")
-	check(ChaosModifiers.ALL.size() == 8, "são 8 modificadores ao todo")
+	check(seen.size() == BlitzEngine.HAND_SIZE, "as 8 vazas do nível usam 8 modificadores diferentes")
+	check(BlitzModifiers.ALL.size() == 8, "são 8 modificadores ao todo")
 
 
 ## Bots estratégicos: só fazem jogadas legais em qualquer nível e, na defesa, seguram muito
@@ -877,13 +877,13 @@ func _test_louco_ownership() -> void:
 
 ## Contraste das cores por função sobre os fundos do jogo (WCAG: texto ≥ 4,5:1).
 func _test_blitz() -> void:
-	var e := ChaosEngine.new()
+	var e := BlitzEngine.new()
 	e.setup_match({"seed": 11, "mode": "blitz", "blind": 10, "levels": 0})
 	e.rake_on = false
 	e.bonus_on = false
 	e.trick_number = 0
 	e.draw_trick_modifier()
-	check(e.blitz and ChaosModifiers.ALL.has(e.modifier), "Blitz: sorteia dos mesmos 11 modificadores do Caos")
+	check(e.blitz and BlitzModifiers.ALL.has(e.modifier), "Blitz: sorteia dos mesmos 11 modificadores do Caos")
 	var start_total := 0.0
 	for x in e.stacks:
 		start_total += float(x)
@@ -898,10 +898,10 @@ func _test_blitz() -> void:
 	while not e.is_round_over():
 		if e.plays.is_empty():
 			e.draw_trick_modifier()
-			if e.modifier == ChaosModifiers.Modifier.VAZA_DOURADA:
+			if e.modifier == BlitzModifiers.Modifier.VAZA_DOURADA:
 				had_gold = true
 		var pl := e.current
-		e.play(pl, ChaosBot.choose(e, pl, BotAI.Difficulty.NORMAL, brng))
+		e.play(pl, BlitzBot.choose(e, pl, BotAI.Difficulty.NORMAL, brng))
 	var total := 0.0
 	for x in e.stacks:
 		total += float(x)
@@ -909,10 +909,10 @@ func _test_blitz() -> void:
 	var won_sum := 0
 	for w in e.wins:
 		won_sum += int(w)
-	check(won_sum == ChaosEngine.HAND_SIZE or had_gold, "Blitz: 8 vitórias distribuídas por nível")
+	check(won_sum == BlitzEngine.HAND_SIZE or had_gold, "Blitz: 8 vitórias distribuídas por nível")
 
 	# Liquidação com números forçados: entrada 20 por jogador, pote 80.
-	var f := ChaosEngine.new()
+	var f := BlitzEngine.new()
 	f.setup_match({"seed": 1, "mode": "blitz", "blind": 10})
 	f.rake_on = false
 	f.bonus_on = false
@@ -928,7 +928,7 @@ func _test_blitz() -> void:
 	check(is_equal_approx(float(r["net"][2]), -40.0) and is_equal_approx(float(r["net"][3]), -40.0), "Blitz: errou por 2+ perde a entrada e paga multa")
 	check(is_equal_approx(f.carry, 40.0) and is_equal_approx(f.pot, 0.0), "Blitz: pote pago zera, multas ficam no carry")
 
-	var f2 := ChaosEngine.new()
+	var f2 := BlitzEngine.new()
 	f2.setup_match({"seed": 1, "mode": "blitz", "blind": 10})
 	f2.rake_on = false
 	f2.bonus_on = false
@@ -949,7 +949,7 @@ func _test_blitz() -> void:
 
 	# Prêmio de sequência (rakeback): só pra você, só a partir do 3º acerto seguido, e nunca
 	# maior que metade da taxa que a casa já cobrou de você (o "cofre").
-	var bn := ChaosEngine.new()
+	var bn := BlitzEngine.new()
 	bn.setup_match({"seed": 1, "mode": "blitz", "blind": 10})
 	bn.rake_on = true
 	for i in range(2):
@@ -968,7 +968,7 @@ func _test_blitz() -> void:
 	var rb3 := bn._settle_blitz()
 	check(int(rb3["streak"]) == 3 and float(rb3["bonus"]) > 0.0, "Blitz: 3 acertos seguidos liberam o prêmio de sequência")
 	check(float(rb3["bonus"]) <= 0.5 * bn.human_rake + 0.001, "Blitz: prêmio nunca passa de metade da taxa acumulada no cofre")
-	check(float(rb3["bonus"]) <= ChaosEngine.BLITZ_STREAK_BONUS_BLINDS * bn.blind, "Blitz: prêmio tem teto de %d blinds" % ChaosEngine.BLITZ_STREAK_BONUS_BLINDS)
+	check(float(rb3["bonus"]) <= BlitzEngine.BLITZ_STREAK_BONUS_BLINDS * bn.blind, "Blitz: prêmio tem teto de %d blinds" % BlitzEngine.BLITZ_STREAK_BONUS_BLINDS)
 	check(bn.human_rake > vault_before, "Blitz: o cofre segue enchendo mesmo depois de pagar o prêmio")
 	bn.pot = 800.0
 	bn.predicts = [3, 0, 0, 0]
@@ -977,7 +977,7 @@ func _test_blitz() -> void:
 	check(is_equal_approx(float(rb4["bonus"]), 0.0) and bn.hit_streak == 0, "Blitz: errar zera a sequência e não dá prêmio")
 
 	# Taxa da casa só quando o pote é pago.
-	var f3 := ChaosEngine.new()
+	var f3 := BlitzEngine.new()
 	f3.setup_match({"seed": 1, "mode": "blitz", "blind": 10})
 	f3.pot = 80.0
 	f3.stakes = [20.0, 20.0, 20.0, 20.0]
@@ -987,7 +987,7 @@ func _test_blitz() -> void:
 	check(float(r4["rake"]) > 0.0 and float(r4["rake"]) <= 1.5 * 10.0, "Blitz: taxa da casa limitada quando há pagamento")
 
 	# Dobrar / triplicar.
-	var d := ChaosEngine.new()
+	var d := BlitzEngine.new()
 	d.doubles_enabled = true
 	d.setup_match({"seed": 4, "mode": "blitz", "blind": 10})
 	for p in range(4):
@@ -1011,7 +1011,7 @@ func _test_blitz() -> void:
 	check(not d.can_double(2), "Blitz: não dobra quando não dá mais tempo de acertar")
 
 	# Cobrir a dobra/triplicada de um rival.
-	var cv := ChaosEngine.new()
+	var cv := BlitzEngine.new()
 	cv.doubles_enabled = true
 	cv.setup_match({"seed": 4, "mode": "blitz", "blind": 10})
 	for p in range(4):
@@ -1029,18 +1029,18 @@ func _test_blitz() -> void:
 	check(not cv.can_cover(2), "Blitz: sem fichas pra pagar a entrada, não cobre")
 
 	# Os 8 modificadores entram no sorteio e nenhum Ritual repete um.
-	var pool := ChaosModifiers.blitz_pool()
-	check(pool.size() == 8 and pool.has(ChaosModifiers.Modifier.PITAGORICO) and pool.has(ChaosModifiers.Modifier.SILENCIO), "Blitz: sorteio dos 8 modificadores novos")
-	var gp := ChaosEngine.new()
+	var pool := BlitzModifiers.blitz_pool()
+	check(pool.size() == 8 and pool.has(BlitzModifiers.Modifier.PITAGORICO) and pool.has(BlitzModifiers.Modifier.SILENCIO), "Blitz: sorteio dos 8 modificadores novos")
+	var gp := BlitzEngine.new()
 	for lv in range(12):
 		gp.setup_match({"seed": 100 + lv, "mode": "blitz", "blind": 10})
 		var uniq := {}
 		for m in gp.modifier_sequence:
 			uniq[m] = true
-		check(uniq.size() == 8 and gp.modifier_sequence.size() == ChaosEngine.HAND_SIZE, "Blitz: cada Ritual usa os 8 modificadores, sem repetir")
+		check(uniq.size() == 8 and gp.modifier_sequence.size() == BlitzEngine.HAND_SIZE, "Blitz: cada Ritual usa os 8 modificadores, sem repetir")
 
 	# Pontos das cartas viram fichas, pagas pelos rivais: 4,5 + 3×0,5 = 6 pts → 6×0,25×10×0,5 = 7,5 → 8, 3 cada.
-	var g2 := ChaosEngine.new()
+	var g2 := BlitzEngine.new()
 	g2.setup_match({"seed": 9, "mode": "blitz", "blind": 10})
 	g2.modifier = -1
 	g2.hands[0] = [c(CardData.Suit.TRUNFO, 21)]
@@ -1062,9 +1062,9 @@ func _test_blitz() -> void:
 	check(is_equal_approx(g2_total, total0), "Blitz: fichas das cartas são soma zero")
 
 	# Rodada Dobrada: conta 2 vitórias e NÃO multiplica os pontos (mesmo prêmio de fichas de antes).
-	var g3 := ChaosEngine.new()
+	var g3 := BlitzEngine.new()
 	g3.setup_match({"seed": 9, "mode": "blitz", "blind": 10})
-	g3.modifier = ChaosModifiers.Modifier.VAZA_DOURADA
+	g3.modifier = BlitzModifiers.Modifier.VAZA_DOURADA
 	g3.hands[0] = [c(CardData.Suit.TRUNFO, 21)]
 	g3.hands[1] = [c(CardData.Suit.PAUS, 3)]
 	g3.hands[2] = [c(CardData.Suit.PAUS, 4)]
@@ -1077,7 +1077,7 @@ func _test_blitz() -> void:
 	check(is_equal_approx(float(g3.stacks[0]), float(g3.buy_in) + 9.0), "Blitz: Rodada Dobrada não multiplica o prêmio das cartas")
 
 	# Fator 0 desliga o prêmio das cartas (isola os efeitos de fichas dos outros modificadores).
-	var g0 := ChaosEngine.new()
+	var g0 := BlitzEngine.new()
 	g0.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "point_factor": 0.0})
 	g0.modifier = -1
 	g0.hands[0] = [c(CardData.Suit.TRUNFO, 20)]
@@ -1091,9 +1091,9 @@ func _test_blitz() -> void:
 	check(is_equal_approx(float(g0.stacks[0]), float(g0.buy_in)), "Blitz: fator 0 = sem prêmio das cartas")
 
 	# Saque/Assalto/Maldita mexem em fichas à parte dos pontos.
-	var gs := ChaosEngine.new()
+	var gs := BlitzEngine.new()
 	gs.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "point_factor": 0.0, "stacks": [200.0, 200.0, 200.0, 200.0]})
-	gs.modifier = ChaosModifiers.Modifier.SAQUE
+	gs.modifier = BlitzModifiers.Modifier.SAQUE
 	gs.hands[0] = [c(CardData.Suit.TRUNFO, 20)]
 	gs.hands[1] = [c(CardData.Suit.PAUS, 3)]
 	gs.hands[2] = [c(CardData.Suit.PAUS, 4)]
@@ -1104,9 +1104,9 @@ func _test_blitz() -> void:
 		gs.play(pl, (gs.hands[pl] as Array)[0])
 	check(is_equal_approx(float(gs.stacks[0]), 230.0) and is_equal_approx(float(gs.stacks[1]), 190.0), "Blitz: Saque rouba 3 blinds no total (10 de cada rival), além de contar a vitória")
 
-	var ga := ChaosEngine.new()
+	var ga := BlitzEngine.new()
 	ga.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "point_factor": 0.0, "stacks": [200.0, 200.0, 500.0, 200.0]})
-	ga.modifier = ChaosModifiers.Modifier.ASSALTO_LIDER
+	ga.modifier = BlitzModifiers.Modifier.ASSALTO_LIDER
 	ga.hands[0] = [c(CardData.Suit.TRUNFO, 20)]
 	ga.hands[1] = [c(CardData.Suit.PAUS, 3)]
 	ga.hands[2] = [c(CardData.Suit.PAUS, 4)]
@@ -1116,9 +1116,9 @@ func _test_blitz() -> void:
 	for pl in range(4):
 		ga.play(pl, (ga.hands[pl] as Array)[0])
 	check(is_equal_approx(float(ga.stacks[0]), 230.0) and is_equal_approx(float(ga.stacks[2]), 470.0), "Blitz: Assalto rouba 3 blinds do rival com mais fichas, além de contar a vitória")
-	var gl := ChaosEngine.new()
+	var gl := BlitzEngine.new()
 	gl.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "point_factor": 0.0, "stacks": [500.0, 200.0, 250.0, 200.0]})
-	gl.modifier = ChaosModifiers.Modifier.ASSALTO_LIDER
+	gl.modifier = BlitzModifiers.Modifier.ASSALTO_LIDER
 	gl.hands[0] = [c(CardData.Suit.TRUNFO, 20)]
 	gl.hands[1] = [c(CardData.Suit.PAUS, 3)]
 	gl.hands[2] = [c(CardData.Suit.PAUS, 4)]
@@ -1129,9 +1129,9 @@ func _test_blitz() -> void:
 		gl.play(pl, (gl.hands[pl] as Array)[0])
 	check(is_equal_approx(float(gl.stacks[0]), 530.0) and is_equal_approx(float(gl.stacks[2]), 220.0), "Assalto: se o vencedor é o líder, rouba do segundo com mais fichas (nunca fica sem efeito)")
 
-	var gm := ChaosEngine.new()
+	var gm := BlitzEngine.new()
 	gm.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "point_factor": 0.0, "stacks": [200.0, 200.0, 200.0, 200.0]})
-	gm.modifier = ChaosModifiers.Modifier.VAZA_MALDITA
+	gm.modifier = BlitzModifiers.Modifier.VAZA_MALDITA
 	gm.hands[0] = [c(CardData.Suit.TRUNFO, 20)]
 	gm.hands[1] = [c(CardData.Suit.PAUS, 3)]
 	gm.hands[2] = [c(CardData.Suit.PAUS, 4)]
@@ -1143,9 +1143,9 @@ func _test_blitz() -> void:
 	check(is_equal_approx(float(gm.stacks[0]), 170.0) and is_equal_approx(float(gm.stacks[1]), 210.0), "Blitz: Maldição faz quem vence pagar 3 blinds aos rivais, além de contar a vitória")
 
 	# Quem zera por causa de um modificador de ficha é eliminado (perde a mão e sai da mesa).
-	var gz := ChaosEngine.new()
+	var gz := BlitzEngine.new()
 	gz.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "point_factor": 0.0, "stacks": [200.0, 5.0, 200.0, 200.0]})
-	gz.modifier = ChaosModifiers.Modifier.SAQUE
+	gz.modifier = BlitzModifiers.Modifier.SAQUE
 	gz.hands[0] = [c(CardData.Suit.TRUNFO, 20)]
 	gz.hands[1] = [c(CardData.Suit.PAUS, 3)]
 	gz.hands[2] = [c(CardData.Suit.PAUS, 4)]
@@ -1158,9 +1158,9 @@ func _test_blitz() -> void:
 	check(gz.bust_broke() == [1] and bool(gz.busted[1]), "quem zerou pelo Saque é eliminado na checagem de quebra")
 	gz.begin_trick()
 	check(bool(gz.folded[1]) and not gz.to_act.has(1), "eliminado fica fora da jogada seguinte: sem ante, sem fala, sem carta")
-	var gw := ChaosEngine.new()
+	var gw := BlitzEngine.new()
 	gw.setup_match({"seed": 9, "mode": "blitz", "blind": 10, "point_factor": 0.0, "stacks": [18.0, 200.0, 200.0, 200.0]})
-	gw.modifier = ChaosModifiers.Modifier.VAZA_MALDITA
+	gw.modifier = BlitzModifiers.Modifier.VAZA_MALDITA
 	gw.hands[0] = [c(CardData.Suit.TRUNFO, 20)]
 	gw.hands[1] = [c(CardData.Suit.PAUS, 3)]
 	gw.hands[2] = [c(CardData.Suit.PAUS, 4)]
@@ -1172,7 +1172,7 @@ func _test_blitz() -> void:
 	check(float(gw.stacks[0]) == 0.0 and gw.bust_broke() == [0], "Maldição: quem vence e fica sem fichas é eliminado também")
 
 	# Bots: palpite em 0..8, calibrado com a média real (2 vitórias por jogador).
-	var cal := ChaosEngine.new()
+	var cal := BlitzEngine.new()
 	cal.setup_match({"seed": 77, "mode": "blitz", "blind": 10})
 	var sum_exp := 0.0
 	var n_exp := 0
@@ -1180,45 +1180,45 @@ func _test_blitz() -> void:
 		cal.advance_round()
 		for p in range(4):
 			if cal.can_discard(p):
-				cal.apply_discard(p, ChaosBot.wants_discard(cal, p, BotAI.Difficulty.HARD, brng))
+				cal.apply_discard(p, BlitzBot.wants_discard(cal, p, BotAI.Difficulty.HARD, brng))
 		for p in range(4):
-			var pick := ChaosBot.blitz_pick(cal, p, BotAI.Difficulty.HARD, brng)
-			check(pick >= 0 and pick <= ChaosEngine.HAND_SIZE, "Blitz: palpite do bot em 0..8")
-			sum_exp += ChaosBot.expected_wins(cal, p)
+			var pick := BlitzBot.blitz_pick(cal, p, BotAI.Difficulty.HARD, brng)
+			check(pick >= 0 and pick <= BlitzEngine.HAND_SIZE, "Blitz: palpite do bot em 0..8")
+			sum_exp += BlitzBot.expected_wins(cal, p)
 			n_exp += 1
 	check(absf(sum_exp / float(n_exp) - 2.0) < 0.35, "Blitz: palpite esperado calibrado perto de 2 (deu %s)" % [sum_exp / float(n_exp)])
 	# No alvo, o bot foge da rodada: joga a carta menor.
-	var fb := ChaosEngine.new()
+	var fb := BlitzEngine.new()
 	fb.setup_match({"seed": 2, "mode": "blitz", "blind": 10})
-	fb.modifier = ChaosModifiers.Modifier.LOUCO_VENCE
+	fb.modifier = BlitzModifiers.Modifier.LOUCO_VENCE
 	fb.predicts = [1, 1, 1, 1]
 	fb.wins = [1, 0, 0, 0]
 	fb.hands[0] = [c(CardData.Suit.PAUS, 14), c(CardData.Suit.PAUS, 2)]
 	fb.plays = [{"player": 3, "card": c(CardData.Suit.PAUS, 10)}]
 	fb.current = 0
-	check(ChaosBot.choose(fb, 0, BotAI.Difficulty.HARD, brng).rank == 2, "Blitz: bot já no alvo evita vencer a rodada")
+	check(BlitzBot.choose(fb, 0, BotAI.Difficulty.HARD, brng).rank == 2, "Blitz: bot já no alvo evita vencer a rodada")
 
 
 func _test_blitz_phase4() -> void:
 	# Descarte inicial: recebe 10, descarta 2, sempre a 1ª decisão do nível — antes de qualquer
 	# modificador ou palpite.
-	var d1 := ChaosEngine.new()
+	var d1 := BlitzEngine.new()
 	d1.setup_match({"seed": 22, "mode": "blitz", "blind": 10})
-	check((d1.hands[0] as Array).size() == ChaosEngine.BLITZ_DEAL_SIZE and d1.can_discard(0), "Descarte: recebe 10 cartas antes de descartar")
+	check((d1.hands[0] as Array).size() == BlitzEngine.BLITZ_DEAL_SIZE and d1.can_discard(0), "Descarte: recebe 10 cartas antes de descartar")
 	var hand10: Array = (d1.hands[0] as Array).duplicate()
 	var discard: Array = [hand10[0], hand10[1]]
 	check(d1.apply_discard(0, discard), "Descarte: descarta 2 válidas")
-	check((d1.hands[0] as Array).size() == ChaosEngine.HAND_SIZE and not d1.can_discard(0), "Descarte: fica com 8, não descarta de novo")
+	check((d1.hands[0] as Array).size() == BlitzEngine.HAND_SIZE and not d1.can_discard(0), "Descarte: fica com 8, não descarta de novo")
 	for c in discard:
 		check(not (d1.hands[0] as Array).any(func(h): return (h as CardData).equals(c)), "Descarte: a carta descartada sai da mão de verdade")
 	check(not d1.apply_discard(0, [hand10[2]]), "Descarte: precisa ser exatamente 2 cartas")
 
-	var d2 := ChaosEngine.new()
+	var d2 := BlitzEngine.new()
 	d2.setup_match({"seed": 23, "mode": "blitz", "blind": 10})
 	var hand2: Array = (d2.hands[1] as Array).duplicate()
 	check(not d2.apply_discard(1, [hand2[0], hand2[0]]), "Descarte: não descarta a mesma carta 2x")
 
-	var d3 := ChaosEngine.new()
+	var d3 := BlitzEngine.new()
 	d3.setup_match({"seed": 24, "mode": "blitz", "blind": 10})
 	var outside := CardData.louco()
 	if (d3.hands[2] as Array).any(func(c): return (c as CardData).equals(outside)):
@@ -1228,9 +1228,9 @@ func _test_blitz_phase4() -> void:
 	# Bot: descarta as 2 mais fracas da mão (calibrado, sem estourar a mão em cartas boas).
 	var brng2 := RandomNumberGenerator.new()
 	brng2.seed = 8
-	var d4 := ChaosEngine.new()
+	var d4 := BlitzEngine.new()
 	d4.setup_match({"seed": 25, "mode": "blitz", "blind": 10})
-	var picks: Array = ChaosBot.wants_discard(d4, 0, BotAI.Difficulty.HARD, brng2)
+	var picks: Array = BlitzBot.wants_discard(d4, 0, BotAI.Difficulty.HARD, brng2)
 	check(picks.size() == 2, "Descarte do bot: sempre escolhe 2")
 	check(d4.apply_discard(0, picks), "Descarte do bot: a escolha do bot sempre é válida")
 
@@ -1254,27 +1254,27 @@ func _test_colors() -> void:
 ## Economia de fichas: pacotes, recarga diária, taxa da casa e conservação de fichas.
 func _test_economy() -> void:
 	var prev := 0.0
-	for pk in ChaosEconomy.PACKS:
-		var rate := ChaosEconomy.fichas_per_real(pk)
+	for pk in BlitzEconomy.PACKS:
+		var rate := BlitzEconomy.fichas_per_real(pk)
 		check(rate >= prev, "pacote %s não dá menos fichas por real que o menor (%.0f/R$)" % [pk["name"], rate])
 		prev = rate
-	check(ChaosEconomy.bonus_pct(ChaosEconomy.PACKS[0]) == 0 and ChaosEconomy.bonus_pct(ChaosEconomy.PACKS[3]) >= 30, "bônus cresce com o tamanho do pacote")
-	check(ChaosEconomy.START_FICHAS >= 10 * ChaosEngine.BUY_IN_BLINDS * 3, "saldo inicial paga 3 entradas mínimas")
-	check(ChaosEconomy.DAILY_MIN >= 10 * ChaosEngine.BUY_IN_BLINDS, "recarga libera quando não dá pra pagar a entrada mais barata")
+	check(BlitzEconomy.bonus_pct(BlitzEconomy.PACKS[0]) == 0 and BlitzEconomy.bonus_pct(BlitzEconomy.PACKS[3]) >= 30, "bônus cresce com o tamanho do pacote")
+	check(BlitzEconomy.START_FICHAS >= 10 * BlitzEngine.BUY_IN_BLINDS * 3, "saldo inicial paga 3 entradas mínimas")
+	check(BlitzEconomy.DAILY_MIN >= 10 * BlitzEngine.BUY_IN_BLINDS, "recarga libera quando não dá pra pagar a entrada mais barata")
 	var prof := {"fichas": 100}
-	check(ChaosEconomy.daily_available(prof), "recarga liberada abaixo do mínimo")
-	check(ChaosEconomy.claim_daily(prof) == ChaosEconomy.DAILY_AMOUNT and int(prof["fichas"]) == 100 + ChaosEconomy.DAILY_AMOUNT, "coletar credita a recarga")
+	check(BlitzEconomy.daily_available(prof), "recarga liberada abaixo do mínimo")
+	check(BlitzEconomy.claim_daily(prof) == BlitzEconomy.DAILY_AMOUNT and int(prof["fichas"]) == 100 + BlitzEconomy.DAILY_AMOUNT, "coletar credita a recarga")
 	prof["fichas"] = 50
-	check(not ChaosEconomy.daily_available(prof) and ChaosEconomy.claim_daily(prof) == 0, "só uma recarga por dia")
+	check(not BlitzEconomy.daily_available(prof) and BlitzEconomy.claim_daily(prof) == 0, "só uma recarga por dia")
 	prof = {"fichas": 900}
-	check(not ChaosEconomy.daily_available(prof), "sem recarga com saldo acima do mínimo")
+	check(not BlitzEconomy.daily_available(prof), "sem recarga com saldo acima do mínimo")
 	prof = {"fichas": 10}
-	check(ChaosEconomy.PACKS.size() == 4 and ChaosEconomy.buy_simulated(prof, "cofre") == 3600 and int(prof["fichas"]) == 3610 and int(prof["spent_cents"]) == 1990, "compra simulada credita fichas e registra o gasto")
-	check(ChaosEconomy.buy_simulated(prof, "nada") == 0, "pacote inexistente não credita")
-	check(is_equal_approx(ChaosEconomy.rake_of(100.0, 10), 3.0) and is_equal_approx(ChaosEconomy.rake_of(2000.0, 10), 15.0), "taxa é 3% do pote com teto de 1,5 blinds")
-	check(ChaosEconomy.price_text(1990) == "R$ 19,90", "preço em reais")
+	check(BlitzEconomy.PACKS.size() == 4 and BlitzEconomy.buy_simulated(prof, "cofre") == 3600 and int(prof["fichas"]) == 3610 and int(prof["spent_cents"]) == 1990, "compra simulada credita fichas e registra o gasto")
+	check(BlitzEconomy.buy_simulated(prof, "nada") == 0, "pacote inexistente não credita")
+	check(is_equal_approx(BlitzEconomy.rake_of(100.0, 10), 3.0) and is_equal_approx(BlitzEconomy.rake_of(2000.0, 10), 15.0), "taxa é 3% do pote com teto de 1,5 blinds")
+	check(BlitzEconomy.price_text(1990) == "R$ 19,90", "preço em reais")
 	# Conservação: sem trocas de bot, fichas na mesa + taxa da casa não mudam.
-	var ec := ChaosEngine.new()
+	var ec := BlitzEngine.new()
 	ec.setup_match({"seed": 31, "levels": 0})
 	var total0 := 0.0
 	for st in ec.stacks:
@@ -1285,14 +1285,14 @@ func _test_economy() -> void:
 		ec.begin_trick()
 		while ec.betting:
 			var a := ec.bet_actor()
-			var d := ChaosBot.bet_decision(ec, a, BotAI.Difficulty.NORMAL, rr)
+			var d := BlitzBot.bet_decision(ec, a, BotAI.Difficulty.NORMAL, rr)
 			ec.bet_act(a, str(d["action"]), float(d.get("to", 0.0)))
 		if ec.walkover_player() != -1:
 			ec.resolve_walkover()
 		else:
 			while true:
 				var pl := ec.current
-				var rs := ec.play(pl, ChaosBot.choose(ec, pl, BotAI.Difficulty.NORMAL, rr))
+				var rs := ec.play(pl, BlitzBot.choose(ec, pl, BotAI.Difficulty.NORMAL, rr))
 				if rs["trick_complete"]:
 					break
 	var total1 := 0.0

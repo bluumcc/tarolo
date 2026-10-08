@@ -9,7 +9,7 @@ const LEVELS := 16
 var fails := 0
 
 func net(kinds: Array, seat: int, seed_i: int) -> float:
-	var e := ChaosEngine.new()
+	var e := BlitzEngine.new()
 	e.setup_match({"seed": seed_i * 31 + 7, "levels": 0, "mode": "blitz", "blind": 10, "stacks": [400, 400, 400, 400]})
 	for p in range(4):
 		if kinds[p].begins_with("H/"):
@@ -28,24 +28,24 @@ func net(kinds: Array, seat: int, seed_i: int) -> float:
 		for p in range(4):
 			var dd := BotAI.Difficulty.HARD if kinds[p].begins_with("H") else (BotAI.Difficulty.NORMAL if kinds[p] == "N" else BotAI.Difficulty.EASY)
 			if e.can_discard(p):
-				e.apply_discard(p, ChaosBot.wants_discard(e, p, dd, rng))
+				e.apply_discard(p, BlitzBot.wants_discard(e, p, dd, rng))
 		var before: float = e.stacks[seat]
 		for p in range(4):
 			var d := BotAI.Difficulty.HARD if kinds[p].begins_with("H") else (BotAI.Difficulty.NORMAL if kinds[p] == "N" else BotAI.Difficulty.EASY)
-			e.blitz_place(p, ChaosBot.blitz_pick(e, p, d, rng))
+			e.blitz_place(p, BlitzBot.blitz_pick(e, p, d, rng))
 		while not e.is_round_over():
 			if e.plays.is_empty():
 				e.draw_trick_modifier()
 			var pl := e.current
 			var d2 := BotAI.Difficulty.HARD if kinds[pl].begins_with("H") else (BotAI.Difficulty.NORMAL if kinds[pl] == "N" else BotAI.Difficulty.EASY)
-			if ChaosBot.wants_double(e, pl, d2, rng):
+			if BlitzBot.wants_double(e, pl, d2, rng):
 				e.double_down(pl)
 				for q in range(4):
 					if q != pl:
 						var dq := BotAI.Difficulty.HARD if kinds[q].begins_with("H") else (BotAI.Difficulty.NORMAL if kinds[q] == "N" else BotAI.Difficulty.EASY)
-						if ChaosBot.wants_cover(e, q, dq, rng):
+						if BlitzBot.wants_cover(e, q, dq, rng):
 							e.cover_double(q)
-			e.play(pl, ChaosBot.choose(e, pl, d2, rng))
+			e.play(pl, BlitzBot.choose(e, pl, d2, rng))
 		total += e.stacks[seat] - before
 	return total / 10.0 / LEVELS
 

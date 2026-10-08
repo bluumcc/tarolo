@@ -14,7 +14,7 @@ func _diff(kind: String) -> int:
 
 ## Devolve [ganho médio do assento por nível em blinds, acertos exatos do assento, níveis jogados].
 func play(kinds: Array, seat: int, seed_i: int) -> Array:
-	var e := ChaosEngine.new()
+	var e := BlitzEngine.new()
 	var stacks := []
 	for p in range(N):
 		stacks.append(400)
@@ -33,10 +33,10 @@ func play(kinds: Array, seat: int, seed_i: int) -> Array:
 				e.stacks[p] = 400.0
 		for p in range(N):
 			if e.can_discard(p):
-				e.apply_discard(p, ChaosBot.wants_discard(e, p, _diff(kinds[p]), rng))
+				e.apply_discard(p, BlitzBot.wants_discard(e, p, _diff(kinds[p]), rng))
 		var before: float = e.stacks[seat]
 		for p in range(N):
-			e.blitz_place(p, ChaosBot.blitz_pick(e, p, _diff(kinds[p]), rng))
+			e.blitz_place(p, BlitzBot.blitz_pick(e, p, _diff(kinds[p]), rng))
 		while not e.is_round_over():
 			e.draw_trick_modifier()
 			e.begin_trick()
@@ -46,7 +46,7 @@ func play(kinds: Array, seat: int, seed_i: int) -> Array:
 				var p := e.bet_actor()
 				if p == -1:
 					break
-				var act := ChaosBot.bet_decision(e, p, _diff(kinds[p]), rng)
+				var act := BlitzBot.bet_decision(e, p, _diff(kinds[p]), rng)
 				e.bet_act(p, str(act["action"]), float(act.get("to", 0.0)))
 			if e.walkover_player() != -1:
 				e.resolve_walkover()
@@ -56,7 +56,7 @@ func play(kinds: Array, seat: int, seed_i: int) -> Array:
 			while not done and pg < 12:
 				pg += 1
 				var pl := e.current
-				var res := e.play(pl, ChaosBot.choose(e, pl, _diff(kinds[pl]), rng))
+				var res := e.play(pl, BlitzBot.choose(e, pl, _diff(kinds[pl]), rng))
 				if not res.get("ok", false):
 					break
 				done = bool(res.get("trick_complete", false))

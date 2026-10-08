@@ -3,7 +3,7 @@ extends SceneTree
 ## Uso: godot --headless --path . -s res://tests/blitz_sim.gd
 
 func session(diffs: Array, seed_i: int, levels: int, use_seat0_bot := true) -> Dictionary:
-	var e := ChaosEngine.new()
+	var e := BlitzEngine.new()
 	e.setup_match({"seed": seed_i * 17 + 3, "levels": 0, "mode": "blitz", "blind": 10, "stacks": [400, 400, 400, 400]})
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_i + 4242
@@ -24,19 +24,19 @@ func session(diffs: Array, seed_i: int, levels: int, use_seat0_bot := true) -> D
 			bust = lv
 			break
 		for p in range(4):
-			exp_sum += ChaosBot.expected_wins(e, p)
+			exp_sum += BlitzBot.expected_wins(e, p)
 			exp_n += 1
-			e.blitz_place(p, ChaosBot.blitz_pick(e, p, diffs[p], rng))
+			e.blitz_place(p, BlitzBot.blitz_pick(e, p, diffs[p], rng))
 		while not e.is_round_over():
 			if e.plays.is_empty():
 				e.draw_trick_modifier()
 			var pl := e.current
-			if ChaosBot.wants_double(e, pl, diffs[pl], rng):
+			if BlitzBot.wants_double(e, pl, diffs[pl], rng):
 				e.double_down(pl)
 				for q in range(4):
-					if q != pl and ChaosBot.wants_cover(e, q, diffs[q], rng):
+					if q != pl and BlitzBot.wants_cover(e, q, diffs[q], rng):
 						e.cover_double(q)
-			e.play(pl, ChaosBot.choose(e, pl, diffs[pl], rng))
+			e.play(pl, BlitzBot.choose(e, pl, diffs[pl], rng))
 		for p in range(4):
 			act_sum += float(e.wins[p])
 		var br := e.blitz_result

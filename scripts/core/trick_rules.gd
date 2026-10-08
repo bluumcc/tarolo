@@ -118,7 +118,7 @@ static func would_win(card: CardData, player: int, plays: Array, louco_can_win: 
 ## Cartas jogáveis sob um modificador: no Pitagórico qualquer carta da mão serve (sem obrigação de
 ## seguir o naipe nem de cortar); nos demais valem as regras de sempre.
 static func legal_cards_for(hand: Array, plays: Array, must_cover: bool, modifier: int) -> Array:
-	if modifier == ChaosModifiers.Modifier.PITAGORICO:
+	if modifier == BlitzModifiers.Modifier.PITAGORICO:
 		return hand.duplicate()
 	return legal_cards(hand, plays, must_cover)
 
@@ -129,7 +129,7 @@ static func legal_cards_for(hand: Array, plays: Array, must_cover: bool, modifie
 ##  - Silêncio: Trunfo não corta; vence a MAIOR carta do naipe líder (se o Trunfo abriu, eles disputam).
 ##  - Pitagórico: vence o maior Trunfo, se houver; senão o maior número, qualquer naipe (empate: ver TIE_ORDER).
 static func winning_index_mod(plays: Array, modifier: int) -> int:
-	var mods := ChaosModifiers.Modifier
+	var mods := BlitzModifiers.Modifier
 	var ls := lead_suit(plays)
 	match modifier:
 		mods.LOUCO_VENCE:
@@ -178,7 +178,7 @@ static func _pitagorico_beats(a: CardData, b: CardData) -> bool:
 		return a.rank > b.rank
 	if a.is_trunfo():
 		return false
-	return ChaosModifiers.TIE_ORDER.find(a.suit) < ChaosModifiers.TIE_ORDER.find(b.suit)
+	return BlitzModifiers.TIE_ORDER.find(a.suit) < BlitzModifiers.TIE_ORDER.find(b.suit)
 
 
 ## Se `card` fosse jogada agora pelo `player`, ela venceria a jogada parcial sob esse modificador?

@@ -9,9 +9,9 @@ Nenhum modificador mexe no valor (pontos) das cartas. Eles mudam só quem vence,
 a jogada conta ou quantas fichas se movem. Os três de ficha movem o MESMO total, **3 blinds**, em
 qualquer mesa, dividido entre os rivais quando há vários.
 
-Código: `scripts/core/chaos_modifiers.gd` (lista, nomes, textos), `scripts/core/trick_rules.gd`
-(`winning_index_mod`, `legal_cards_for`), `ChaosEngine.draw_trick_modifier()` (sorteio),
-`ChaosEngine._modifier_chips()` (fichas), `ChaosScene._modifier_transition()` (tela cheia).
+Código: `scripts/core/blitz_modifiers.gd` (lista, nomes, textos), `scripts/core/trick_rules.gd`
+(`winning_index_mod`, `legal_cards_for`), `BlitzEngine.draw_trick_modifier()` (sorteio),
+`BlitzEngine._modifier_chips()` (fichas), `BlitzScene._modifier_transition()` (tela cheia).
 
 ## Os 8
 

@@ -2,7 +2,7 @@ extends Node
 ## Estado da sessão: modo atual, lobby ranqueado e fechamento de partidas.
 
 ## Vanilla é só recreativo (sem Mode.RANKED): o Elo agora é inteiramente do Blitz, fila única —
-## toda mesa real de Blitz vale fichas E LP/MMR ao mesmo tempo (`report_chaos_match`). Mesa de
+## toda mesa real de Blitz vale fichas E LP/MMR ao mesmo tempo (`report_blitz_match`). Mesa de
 ## torneio é um caminho totalmente separado (`report_tournament_table`) que nunca toca o Elo.
 enum Mode { CLASSIC }
 
@@ -149,12 +149,12 @@ func player_name() -> String:
 
 
 ## Mesas do Caos: blind, com buy-in de 20 blinds (a stack com que você senta).
-const CHAOS_TABLES := [
+const BLITZ_TABLES := [
 	{"name": "Iniciante", "blind": 10, "bots": [0, 0, 1]},   # Fácil, Fácil, Normal
 	{"name": "Regular", "blind": 50, "bots": [1, 1, 2]},     # Normal, Normal, Difícil
 	{"name": "Alta", "blind": 200, "bots": [2, 2, 2]},       # Difícil x3
 ]
-var chaos_table := 0
+var blitz_table := 0
 
 ## Rankeada = fila única com poucas salas (buy-in e blind fixos por sala). Quem busca partida cai
 ## numa sala que tenha gente e que o saldo pague; os pontos valem igual em qualquer sala.
@@ -188,24 +188,24 @@ func find_ranked_room(fichas: int, exclude_blind: int = -1) -> Dictionary:
 var chaos_mode := "blitz"    # só "blitz" existe hoje (Caos removido); campo mantido por compatibilidade de save
 
 
-func chaos_buy_in(table: int = -1) -> int:
-	var t: Dictionary = CHAOS_TABLES[clampi(chaos_table if table < 0 else table, 0, CHAOS_TABLES.size() - 1)]
-	return int(t["blind"]) * ChaosEngine.BUY_IN_BLINDS
+func blitz_buy_in(table: int = -1) -> int:
+	var t: Dictionary = BLITZ_TABLES[clampi(blitz_table if table < 0 else table, 0, BLITZ_TABLES.size() - 1)]
+	return int(t["blind"]) * BlitzEngine.BUY_IN_BLINDS
 
 
-## Configuração da mesa pra ChaosScene / ChaosEngine — todo mundo joga pra si. Já cobra o
+## Configuração da mesa pra BlitzScene / BlitzEngine — todo mundo joga pra si. Já cobra o
 ## buy-in das fichas do jogador (config["entered"] = false se não tinha saldo); ele volta
 ## como stack final quando você sai da mesa.
 
 
-func chaos_config() -> Dictionary:
+func blitz_config() -> Dictionary:
 	var names := BOT_NAMES.duplicate()
 	names.shuffle()
 	var profile := SaveManager.section("profile")
 	find_ranked_lobby()
-	var t: Dictionary = CHAOS_TABLES[clampi(chaos_table, 0, CHAOS_TABLES.size() - 1)]
+	var t: Dictionary = BLITZ_TABLES[clampi(blitz_table, 0, BLITZ_TABLES.size() - 1)]
 	var blind := int(t["blind"])
-	var buy_in := chaos_buy_in()
+	var buy_in := blitz_buy_in()
 	var difficulty := [BotAI.Difficulty.NORMAL, int(t["bots"][0]), int(t["bots"][1]), int(t["bots"][2])]
 	var table_name := str(t["name"])
 	var stacks: Array = []
@@ -222,7 +222,7 @@ func chaos_config() -> Dictionary:
 		table_name = "Ranqueada · blind ◎%d · %d jogadores" % [blind, n_players]
 		stacks = [float(buy_in)]
 		for _i in range(n_players - 1):
-			stacks.append(float(randi_range(int(ChaosEconomy.BOT_STACK_BLINDS[0]), int(ChaosEconomy.BOT_STACK_BLINDS[1])) * blind))
+			stacks.append(float(randi_range(int(BlitzEconomy.BOT_STACK_BLINDS[0]), int(BlitzEconomy.BOT_STACK_BLINDS[1])) * blind))
 	var bot_names: Array = names.slice(0, n_players - 1)
 	var entered := int(profile["fichas"]) >= buy_in
 	if entered:
@@ -249,7 +249,7 @@ func chaos_config() -> Dictionary:
 ## a stack final às fichas do perfil, dá Gemas e — fila única — aplica LP/MMR se jogou pelo menos
 ## um nível completo. Mesas de torneio NUNCA passam por aqui (ver `report_tournament_table`).
 ## result: { standings, stacks, payout (sua stack), buy_in, hands }
-func report_chaos_match(result: Dictionary) -> Dictionary:
+func report_blitz_match(result: Dictionary) -> Dictionary:
 	var standings: Array = result["standings"]
 	var placement := standings.find(0)
 	var profile := SaveManager.section("profile")
@@ -260,7 +260,7 @@ func report_chaos_match(result: Dictionary) -> Dictionary:
 	var won := net > 0
 	var frag := 0
 	var lines: Array = []
-	if hands >= ChaosEngine.HAND_SIZE:
+	if hands >= BlitzEngine.HAND_SIZE:
 		profile["matches"] = int(profile["matches"]) + 1
 		if won:
 			profile["wins"] = int(profile["wins"]) + 1
@@ -324,7 +324,7 @@ func _tournament_player_table() -> Array:
 	return []
 
 
-## Config pra ChaosScene jogar 1 RODADA da mesa atual do jogador no torneio — stacks são as
+## Config pra BlitzScene jogar 1 RODADA da mesa atual do jogador no torneio — stacks são as
 ## reais do torneio (viajam com cada jogador entre mesas), mas o buy-in já foi cobrado na
 ## inscrição, então não mexe nas fichas de verdade até o prêmio final
 ## (`report_tournament_table`). A mesa toca só esse nível; o resultado decide a próxima.
@@ -374,7 +374,7 @@ func tournament_table_config() -> Dictionary:
 ## Fecha o nível de torneio do jogador: atualiza as stacks de todo mundo (a mesa dele de
 ## verdade, as outras headless no mesmo nível), tira quem quebrou, realoca quem sobrou e diz
 ## se o jogador avança, é campeão (só 1 sobra no torneio inteiro) ou foi eliminado.
-## result: engine.make_standings() + stacks (igual report_chaos_match).
+## result: engine.make_standings() + stacks (igual report_blitz_match).
 func report_tournament_table(result: Dictionary) -> Dictionary:
 	var final_stacks: Array = result["stacks"]
 	var out_flags: Array = result.get("busted", [])
@@ -529,7 +529,7 @@ func report_match(result: Dictionary) -> Dictionary:
 
 
 ## Fila única do Blitz: placement (0 = 1º), players = tamanho real da mesa (3–6).
-## Devolve as linhas de resumo prontas pra mostrar. Chamado só por `report_chaos_match`.
+## Devolve as linhas de resumo prontas pra mostrar. Chamado só por `report_blitz_match`.
 func apply_ranked_progress(placement: int, score: int, players: int = 4) -> Array:
 	var rk := ranked()
 	var mmr := int(rk["mmr"])

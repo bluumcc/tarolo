@@ -8,7 +8,7 @@ const LEVELS := 30
 const SESSIONS := 60
 
 func play(diffs: Array, factor: float, seed_i: int, seat: int) -> Dictionary:
-	var e := ChaosEngine.new()
+	var e := BlitzEngine.new()
 	e.setup_match({"seed": seed_i * 31 + 7, "levels": 0, "mode": "blitz", "blind": 10, "point_factor": factor, "stacks": [400, 400, 400, 400]})
 	e.rake_on = false   # sem taxa/bônus da casa: mede só a habilidade (soma zero entre os 4)
 	e.bonus_on = false
@@ -28,20 +28,20 @@ func play(diffs: Array, factor: float, seed_i: int, seat: int) -> Dictionary:
 				e.stacks[p] = 400.0   # recompra de todos (mede só habilidade, sem quebrar)
 		for p in range(4):
 			if e.can_discard(p):
-				e.apply_discard(p, ChaosBot.wants_discard(e, p, BotAI.Difficulty.HARD, rng))
+				e.apply_discard(p, BlitzBot.wants_discard(e, p, BotAI.Difficulty.HARD, rng))
 		var before: float = e.stacks[seat]
 		for p in range(4):
-			e.blitz_place(p, ChaosBot.blitz_pick(e, p, BotAI.Difficulty.HARD, rng))
+			e.blitz_place(p, BlitzBot.blitz_pick(e, p, BotAI.Difficulty.HARD, rng))
 		while not e.is_round_over():
 			if e.plays.is_empty():
 				e.draw_trick_modifier()
 			var pl := e.current
-			if ChaosBot.wants_double(e, pl, BotAI.Difficulty.HARD, rng):
+			if BlitzBot.wants_double(e, pl, BotAI.Difficulty.HARD, rng):
 				e.double_down(pl)
 				for q in range(4):
-					if q != pl and ChaosBot.wants_cover(e, q, BotAI.Difficulty.HARD, rng):
+					if q != pl and BlitzBot.wants_cover(e, q, BotAI.Difficulty.HARD, rng):
 						e.cover_double(q)
-			e.play(pl, ChaosBot.choose(e, pl, diffs[pl], rng))
+			e.play(pl, BlitzBot.choose(e, pl, diffs[pl], rng))
 		if (e.blitz_result["hits"] as Array).has(seat):
 			hits += 1
 		var d: float = e.stacks[seat] - before
@@ -91,7 +91,7 @@ func _init() -> void:
 	var H := BotAI.Difficulty.HARD
 	var Nm := BotAI.Difficulty.NORMAL
 	var Ez := BotAI.Difficulty.EASY
-	var L := ChaosBot.LEGACY
+	var L := BlitzBot.LEGACY
 	var factors: Array = [0.0, 0.25, 0.5, 1.0]
 	var args := OS.get_cmdline_user_args()
 	if args.size() > 0:

@@ -68,14 +68,14 @@ Retrato (720×1280) e largo usam os mesmos blocos; só muda a posição.
 
 ## 5. Bots
 - Palpite: soma de valor esperado por carta (Trunfos e Reis) + regra sorteada; aposta por perfil (fácil: baixo, difícil: agressivo).
-- Jogo: se está no alvo, **evita ganhar** mais; se falta, **força** rodadas fortes. O `ChaosBot` já sabe evitar rodada; falta ler o alvo.
+- Jogo: se está no alvo, **evita ganhar** mais; se falta, **força** rodadas fortes. O `BlitzBot` já sabe evitar rodada; falta ler o alvo.
 - Dobrar: 1 rodada do alvo com mão forte.
 - Blefe (difícil): 15% de chance de apostar alto sem mão.
 
 ## 6. Arquitetura
-- `ChaosEngine`: `bets` passa a `{predict, stake, doubled}` por jogador; novos `pot`, `carry`, `combo_count[]`, `combo_level[]`; `set_bet(player, predict, stake)`, `double_bet(player)`, `_settle_pot()`; `trick_result` ganha `combos: []`.
-- Novo `ChaosCombos` (lógica pura): detecta Naipe Puro, Escada, Chuva de Trunfos na mesa.
-- `ChaosBot`: `choose_bet` → `{predict, stake}`, `maybe_double`, ajuste em `choose` para o alvo.
+- `BlitzEngine`: `bets` passa a `{predict, stake, doubled}` por jogador; novos `pot`, `carry`, `combo_count[]`, `combo_level[]`; `set_bet(player, predict, stake)`, `double_bet(player)`, `_settle_pot()`; `trick_result` ganha `combos: []`.
+- Novo `BlitzCombos` (lógica pura): detecta Naipe Puro, Escada, Chuva de Trunfos na mesa.
+- `BlitzBot`: `choose_bet` → `{predict, stake}`, `maybe_double`, ajuste em `choose` para o alvo.
 - UI: `bet_modal.gd` (palpite + aposta), `pot_view.gd` (pilha + contador), `seat_tag.gd` (aposta ao vivo + chamas), `payout_fx.gd` (fichas voando).
 - Testes: pote soma certo, acúmulo sem vencedor, divisão por peso, erro por 1, dobrar, cada combo, bots respeitam alvo; partidas completas no Smoke.
 

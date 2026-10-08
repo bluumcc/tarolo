@@ -245,4 +245,4 @@ func _search() -> void:
 	await get_tree().create_timer(GameState.anim(1.0)).timeout
 	if not is_inside_tree():
 		return
-	get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn")
+	get_tree().change_scene_to_file("res://scenes/BlitzScene.tscn")
