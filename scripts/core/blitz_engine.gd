@@ -341,6 +341,8 @@ func _sit(p: int, stack: float, style: int) -> void:
 
 
 func _new_player_stack() -> float:
+	if dynamic_seats:
+		return float(buy_in)   # mesa ranqueada: todo mundo senta com o mesmo stack (80 blinds)
 	return float(rng.randi_range(BlitzEconomy.BOT_STACK_BLINDS[0], BlitzEconomy.BOT_STACK_BLINDS[1]) * blind)
 
 

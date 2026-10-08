@@ -301,7 +301,7 @@ uma mesa dele (`RankedEco.find_table(fichas, blind)`; nível sem gente monta uma
 - LP/MMR dependem da colocação (não das fichas): valem igual em todos os níveis.
 - Economia ajustada ao buy-in maior: saldo inicial ◎2.400 (3 entradas do nível 0), recarga diária
   libera abaixo de ◎800 e paga ◎900.
-- Os bots sentam com 30 a 60 blinds (você, com 80: stack mais fundo que os rivais).
+- Todos sentam com o mesmo stack (80 blinds): você, os bots que já estavam e os que chegam depois.
 
 ## Carteiras: Fichas (jogo) e Gemas (cosmético)
 

@@ -239,7 +239,7 @@ func blitz_config() -> Dictionary:
 		table_name = "Ranqueada · %s · blind ◎%d" % [str(ranked_room_for_blind(blind)["name"]).capitalize(), blind]
 		stacks = [float(buy_in)]
 		for i in range(1, n_players):
-			stacks.append(0.0 if vacant.has(i) else float(randi_range(int(BlitzEconomy.BOT_STACK_BLINDS[0]), int(BlitzEconomy.BOT_STACK_BLINDS[1])) * blind))
+			stacks.append(0.0 if vacant.has(i) else float(buy_in))   # todos sentam com o mesmo stack
 	var bot_names: Array = names.slice(0, n_players - 1)
 	var entered := int(profile["fichas"]) >= buy_in
 	if entered:
