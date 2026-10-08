@@ -93,6 +93,12 @@ body {
 // teclado só pelo tamanho (nada de eventos de foco, que ficam trocando a cada toque): se a altura
 // visível é bem menor que a maior já vista com a mesma largura, seguimos reportando a maior.
 // Mudanças pequenas (barra de endereço do Safari) continuam sendo seguidas normalmente.
+// iPhone: o canvas nasce na densidade nativa (3x = ~3 milhões de pixels) e o iOS mata a aba por
+// memória. Limita a 2x: o framebuffer fica ~55% menor.
+var __isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+if (__isIOS && window.devicePixelRatio > 2) {
+	Object.defineProperty(window, 'devicePixelRatio', { configurable: true, get: function () { return 2; } });
+}
 var __fullH = 0, __lastW = 0;
 function __vvSize() {
 	var w = Math.round(window.visualViewport.width);
@@ -161,7 +167,7 @@ if (window.visualViewport) {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":true,"fileSizes":{"index.pck":27656688,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":true,"fileSizes":{"index.pck":7285808,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
