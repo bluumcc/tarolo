@@ -635,6 +635,7 @@ func _build_menu(_wide: bool) -> void:
 	_content_col.add_child(UIKit.label("MENU", 34, UIKit.BRAND))
 
 	var items: Array[Array] = [
+		["CONTA · %s" % Accounts.display_name().to_upper(), UIKit.BRAND, _open_account],
 		["COMO JOGAR",      UIKit.INFO,   _open_rules],
 		["CONFIGURAÇÕES",   UIKit.MUTED,  _open_settings],
 		["LOJA DE FICHAS",  UIKit.MONEY,  _open_fichas],
@@ -721,24 +722,14 @@ func _open_tournament(buy_in: int = Tournament.BUY_IN, ev_name: String = "TORNEI
 
 func _open_settings() -> void:
 	var v := _modal("CONFIGURAÇÕES")
-	var profile := SaveManager.section("profile")
-	v.add_child(UIKit.label("Seu nome", 20))
-	var name_edit := LineEdit.new()
-	name_edit.text       = str(profile["name"])
-	name_edit.max_length = 16
-	name_edit.custom_minimum_size = Vector2(0, 40)
-	name_edit.add_theme_stylebox_override("normal", UIKit.box(UIKit.PURPLE_DEEP, UIKit.MUTED, 2, 6, 10))
-	name_edit.add_theme_stylebox_override("focus",  UIKit.box(UIKit.PURPLE_DEEP, UIKit.BRAND, 2, 6, 10))
-	name_edit.add_theme_color_override("font_color",             UIKit.INK)
-	name_edit.add_theme_color_override("font_placeholder_color", UIKit.MUTED)
-	name_edit.placeholder_text = "Arcanista"
-	name_edit.text_submitted.connect(func(_t: String): name_edit.release_focus())
-	name_edit.focus_exited.connect(func():
-		var clean := name_edit.text.strip_edges()
-		profile["name"] = clean if not clean.is_empty() else "Arcanista"
-		name_edit.text = str(profile["name"])
-		SaveManager.save_game())
-	v.add_child(name_edit)
+	v.add_child(UIKit.label("Conta", 20))
+	var who := "%s · %s" % [Accounts.display_name(), "convidado" if Accounts.is_guest() else "@" + Accounts.username()]
+	v.add_child(UIKit.label(who, 22, UIKit.INK))
+	var manage := UIKit.button("GERENCIAR CONTA", UIKit.MUTED, 22)
+	manage.pressed.connect(func():
+		_close_modal()
+		_open_account())
+	v.add_child(manage)
 	var s := GameState.settings()
 	v.add_child(UIKit.label("Dificuldade dos bots", 20))
 	var diff_row := HBoxContainer.new()
@@ -776,6 +767,15 @@ func _open_settings() -> void:
 	var save_btn := UIKit.button("SALVAR E FECHAR")
 	save_btn.pressed.connect(func(): SaveManager.save_game(); _close_modal())
 	footer.add_child(save_btn)
+
+
+## Conta do jogador (perfil, entrar, criar conta, trocar nome). Cada tela reabre o modal na tela seguinte.
+func _open_account(mode: String = "") -> void:
+	var v := _modal(AccountForms.title_for(mode))
+	var reopen := func(next_mode: String):
+		_close_modal()
+		_open_account(next_mode)
+	AccountForms.build(v, v.get_meta("modal_footer", v), _close_modal, reopen, mode)
 
 
 func _reopen_settings() -> void:

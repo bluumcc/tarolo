@@ -9,6 +9,7 @@ var passed := 0
 
 func _init() -> void:
 	_test_deck()
+	await _test_accounts()
 	_test_points()
 	_test_follow_suit()
 	_test_trunfo_forced()
@@ -68,6 +69,77 @@ func _test_deck() -> void:
 	var caos := Deck.deal(deck2, 4, 8)
 	check((caos["hands"][0] as Array).size() == 8, "Deck: 8 cartas por jogador")
 	check((caos["rest"] as Array).size() == 78 - 32, "Deck: resto do baralho não usado")
+
+
+## Contas: regras de validação, backend local e o serviço da conta ativa (convidado → cadastrada).
+func _test_accounts() -> void:
+	check(AccountRules.validate_display_name("Ana") == "" and AccountRules.validate_display_name("João da Silva") == "", "nome aceita letras com acento e espaço")
+	check(AccountRules.validate_display_name("ab") == "name_short" and AccountRules.validate_display_name("a".repeat(17)) == "name_long", "nome tem de 3 a 16 caracteres")
+	check(AccountRules.validate_display_name("<script>") == "name_chars" and AccountRules.validate_display_name("Ana  Maria") == "", "nome recusa símbolos e espaços repetidos são colapsados")
+	check(AccountRules.clean_name("  Ana   Maria ") == "Ana Maria", "nome limpo: sem espaços nas pontas nem repetidos")
+	check(AccountRules.validate_username("ana_01") == "" and AccountRules.validate_username("ANA_01") == "", "usuário aceita letras, números e _ (maiúscula é normalizada)")
+	check(AccountRules.validate_username("an") == "user_short" and AccountRules.validate_username("ana maria") == "user_chars" and AccountRules.validate_username("jo\u00e3o") == "user_chars", "usuário recusa curto, espaço e acento")
+	check(AccountRules.validate_password("12345678") == "" and AccountRules.validate_password("1234567") == "pass_short", "senha tem no mínimo 8 caracteres")
+	check(AccountRules.validate_password("ana_0001", "ANA_0001") == "pass_same_as_user", "senha não pode ser igual ao usuário")
+	var grng := RandomNumberGenerator.new()
+	grng.seed = 5
+	var gname := AccountRules.guest_name(grng)
+	check(gname.begins_with(AccountRules.GUEST_BASE) and AccountRules.validate_display_name(gname) == "", "nome de convidado sorteado é um nome válido")
+
+	var be := LocalAccountBackend.new()
+	be.persist = false
+	var g := be.create_guest("Visitante")
+	check(bool(g["ok"]) and g["account"]["kind"] == "guest" and g["account"]["username"] == "", "convidado nasce só com nome")
+	check(not bool(be.create_guest("x")["ok"]) and be.create_guest("x")["error"] == "name_short", "convidado com nome inválido é recusado")
+	var gid: String = g["account"]["id"]
+	var linked := be.link_guest("Ana_01", "senha1234")
+	check(bool(linked["ok"]) and linked["account"]["id"] == gid and linked["account"]["kind"] == "registered" and linked["account"]["username"] == "ana_01", "criar conta promove o convidado mantendo id e nome")
+	check(linked["account"]["display_name"] == "Visitante", "promover não muda o nome de exibição")
+	check(be.link_guest("outra", "senha1234")["error"] == "not_guest", "quem já tem conta não promove de novo")
+	check(be.sign_out()["ok"] and be.restore_session()["error"] == "no_session", "sair encerra a sessão")
+	check(be.sign_in("ana_01", "errada123")["error"] == "bad_login" and be.sign_in("ninguem", "senha1234")["error"] == "bad_login", "senha errada e usuário inexistente dão o mesmo erro")
+	var back := be.sign_in("ANA_01", "senha1234")
+	check(bool(back["ok"]) and back["account"]["id"] == gid, "entrar com o usuário (qualquer caixa) recupera a mesma conta")
+	check(be.restore_session()["account"]["id"] == gid, "a sessão ativa é restaurável")
+	be.create_guest("Outro")
+	check(be.link_guest("ana_01", "senha1234")["error"] == "user_taken", "usuário repetido é recusado")
+	check(be.sign_up("novo_user", "senha1234", "Novo")["account"]["kind"] == "registered", "cadastro direto cria conta registrada")
+	check(be.sign_up("ab", "senha1234", "Novo")["error"] == "user_short" and be.sign_up("zeca", "1", "Zeca")["error"] == "pass_short", "cadastro valida usuário e senha")
+	check(be.update_display_name("Nome Novo")["account"]["display_name"] == "Nome Novo" and be.update_display_name("")["error"] == "name_short", "trocar nome valida o novo nome")
+
+	# Persistência: a conta e a sessão sobrevivem a reabrir o backend.
+	var pbe := LocalAccountBackend.new()
+	pbe.path = "user://tarolo_accounts_test.json"
+	pbe.sign_up("persist_1", "senha1234", "Persistente")
+	var pbe2 := LocalAccountBackend.new()
+	pbe2.path = pbe.path
+	var rs := pbe2.restore_session()
+	check(bool(rs["ok"]) and rs["account"]["username"] == "persist_1", "conta e sessão são lidas de volta do arquivo")
+	check(not FileAccess.open(pbe.path, FileAccess.READ).get_as_text().contains("senha1234"), "a senha não é gravada em texto puro")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(pbe.path))
+
+	# Serviço: convidado → cadastrada → sair volta a convidado novo.
+	var sbe := LocalAccountBackend.new()
+	sbe.persist = false
+	var svc := AccountService.new(sbe)
+	await svc.start("Arcanista", grng)
+	check(svc.is_guest() and svc.display_name().begins_with("Arcanista") and svc.display_name() != "Arcanista", "sem sessão, entra como convidado com nome sorteado (o genérico não vale)")
+	var svc2 := AccountService.new(sbe)
+	check(svc2.has_account() == false, "serviço novo começa sem conta")
+	await svc2.start("")
+	check(svc2.is_guest(), "reabrir sem sessão válida cria convidado")
+	var created := await svc.create_account("jogador_1", "senha1234")
+	check(bool(created["ok"]) and svc.is_registered() and svc.username() == "jogador_1", "criar conta pelo serviço registra o convidado")
+	var old_id := svc.id()
+	await svc.sign_out()
+	check(svc.is_guest() and svc.id() != old_id, "sair volta a um convidado novo, nunca sem identidade")
+	var again := await svc.sign_in("jogador_1", "senha1234")
+	check(bool(again["ok"]) and svc.id() == old_id, "entrar de novo recupera a conta")
+	check(not bool((await svc.rename(""))["ok"]) and bool((await svc.rename("Mestre"))["ok"]) and svc.display_name() == "Mestre", "renomear pelo serviço valida e atualiza")
+	var count := [0]
+	svc.changed.connect(func(): count[0] += 1)
+	await svc.rename("Mestre Dois")
+	check(count[0] == 1, "a mudança de conta avisa quem escuta")
 
 
 func _test_points() -> void:

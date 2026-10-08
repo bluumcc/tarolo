@@ -58,6 +58,7 @@ Partida → Rodada → Jogada (uma "jogada" tem 4 cartas, uma de cada jogador; u
 ## Fluxo
 - Godot 4.3, UI em código. Testes: `godot --headless --path . -s res://tests/test_runner.gd` e `res://tests/Smoke.tscn`.
 - Web export em `docs/play` (`godot --headless --path . --export-release "Web" docs/play/index.html`) e push direto no `main`.
+- Contas (convidado → conta com usuário/senha): `Accounts` (autoload), `AccountService`, backend local de teste atrás de `AccountBackend`; sem servidor ainda. Ver `docs/CONTAS.md`. Teste de telas: `res://tests/AccountUiTest.tscn`.
 - Modos: **Blitz** (`BlitzEngine`, `blitz_scene.gd`, `docs/BLITZ.md`; ranqueado e torneios) e **Clássico** (`MatchEngine`, `game_scene.gd`). O antigo modo Caos foi removido por inteiro: não existe flag de modo, o Blitz é o único motor de mesa.
 
 ## Testes e economia de tokens

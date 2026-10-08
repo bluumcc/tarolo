@@ -145,7 +145,7 @@ func lobby_avg_mmr() -> int:
 # ------------------------------------------------------------------ match setup / close
 
 func player_name() -> String:
-	return str(SaveManager.section("profile")["name"])
+	return Accounts.display_name()
 
 
 ## Mesas do Blitz: blind, com buy-in de 20 blinds (a stack com que você senta).
