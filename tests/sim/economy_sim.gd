@@ -20,7 +20,7 @@ func session(kinds: Array, seed_i: int) -> Dictionary:
 	var stacks: Array = []
 	for p in range(N):
 		stacks.append(400.0)
-	e.setup_match({"players": N, "seed": seed_i * 31 + 5, "levels": 0, "mode": "blitz", "blind": 10, "stacks": stacks})
+	e.setup_match({"players": N, "seed": seed_i * 31 + 5, "levels": 0, "blind": 10, "stacks": stacks})
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_i + 777
 	var nets: Array = []

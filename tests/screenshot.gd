@@ -18,7 +18,6 @@ func _ready() -> void:
 			SaveManager.section("tips")[k] = true
 	var lookup := {"menu": "res://scenes/MainMenu.tscn", "game": "res://scenes/GameScene.tscn", "bid": "res://scenes/GameScene.tscn", "tutorial": "res://scenes/GameScene.tscn", "ranked": "res://scenes/RankedLobby.tscn", "blitz": "res://scenes/BlitzScene.tscn"}  # "tutorial" reusa a mesa, só troca a mão/dicas
 	var path: String = lookup[scene]
-	GameState.chaos_mode = str(args.get("mode", "blitz"))
 	GameState.autoplay = scene == "game" or args.has("auto")
 	if args.has("players"):
 		GameState.ranked_table = {"blind": 10, "stack_blinds": 40, "players": int(args["players"])}   # mesa rankeada de N lugares

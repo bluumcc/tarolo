@@ -9,7 +9,7 @@ func _init():
 	var totals := []
 	for i in range(SESSIONS):
 		var e := BlitzEngine.new()
-		e.setup_match({"seed": i*13+1, "mode": "blitz", "blind": 10, "stacks": [400,400,400,400]})
+		e.setup_match({"seed": i*13+1, "blind": 10, "stacks": [400,400,400,400]})
 		var rng := RandomNumberGenerator.new(); rng.seed = i + 900
 		var start = e.stacks[0]
 		for lv in range(LEVELS):

@@ -10,7 +10,7 @@ var stat := {"dbl1": 0, "dbl1_hit": 0, "dbl2": 0, "dbl2_hit": 0, "cover": 0, "co
 
 func play(fixed: int, bots: int, seed_i: int, track := false) -> Dictionary:
 	var e := BlitzEngine.new()
-	e.setup_match({"seed": seed_i * 31 + 7, "levels": 0, "mode": "blitz", "blind": 10, "stacks": [400, 400, 400, 400]})
+	e.setup_match({"seed": seed_i * 31 + 7, "levels": 0, "blind": 10, "stacks": [400, 400, 400, 400]})
 	e.rake_on = false
 	e.bonus_on = false
 	var rng := RandomNumberGenerator.new()

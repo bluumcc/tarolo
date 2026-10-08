@@ -13,7 +13,7 @@ func deal_hand(seed_i: int) -> Array:
 
 func play_once(my_hand: Array, diff0: int, seed_i: int) -> float:
 	var e := BlitzEngine.new()
-	e.setup_match({"seed": seed_i, "mode": "blitz", "blind": 10, "stacks": [400.0,400.0,400.0,400.0]})
+	e.setup_match({"seed": seed_i, "blind": 10, "stacks": [400.0,400.0,400.0,400.0]})
 	e.rake_on = false
 	e.bonus_on = false
 	e.hands[0] = (my_hand as Array).duplicate()   # sua mão é sempre a mesma; o resto (rivais, naipes) varia

@@ -10,7 +10,7 @@ var fails := 0
 
 func net(kinds: Array, seat: int, seed_i: int) -> float:
 	var e := BlitzEngine.new()
-	e.setup_match({"seed": seed_i * 31 + 7, "levels": 0, "mode": "blitz", "blind": 10, "stacks": [400, 400, 400, 400]})
+	e.setup_match({"seed": seed_i * 31 + 7, "levels": 0, "blind": 10, "stacks": [400, 400, 400, 400]})
 	for p in range(4):
 		if kinds[p].begins_with("H/"):
 			e.styles[p] = {"k": 0, "c": 1, "a": 2}[kinds[p].split("/")[1]]

@@ -18,7 +18,7 @@ func play(kinds: Array, seat: int, seed_i: int) -> Array:
 	var stacks := []
 	for p in range(N):
 		stacks.append(400)
-	e.setup_match({"players": N, "seed": seed_i * 31 + 7, "levels": 0, "mode": "blitz", "blind": 10, "stacks": stacks})
+	e.setup_match({"players": N, "seed": seed_i * 31 + 7, "levels": 0, "blind": 10, "stacks": stacks})
 	e.rake_on = false
 	e.bonus_on = false
 	var rng := RandomNumberGenerator.new()

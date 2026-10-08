@@ -53,14 +53,12 @@ func _play(mode: int) -> Dictionary:
 
 
 func _play_blitz() -> Dictionary:
-	GameState.chaos_mode = "blitz"
 	# A mesa cobra o buy-in: sem saldo ela nem abre (e o teste ficaria esperando pra sempre).
 	SaveManager.section("profile")["fichas"] = maxi(int(SaveManager.section("profile")["fichas"]), 2000)
 	var g: Node = BLITZ.instantiate()
 	add_child(g)
 	var summary: Dictionary = await g.match_finished
 	check(g.engine.hand_no >= 1, "mesa de blitz rodou (%d rodadas)" % g.engine.hand_no)
-	check(g.engine.blitz, "modo da mesa respeitado")
 	check(not g.engine.match_result.is_empty(), "match_result preenchido no fim")
 	await get_tree().process_frame
 	g.queue_free()

@@ -153,7 +153,7 @@ static func simulate_level(entrants: Array, blind: int, rng: RandomNumberGenerat
 	for e in entrants:
 		stacks.append(float(e["stack"]))
 	var eng := BlitzEngine.new()
-	eng.setup_match({"seed": rng.randi(), "levels": 1, "mode": "blitz", "blind": blind, "players": n, "stacks": stacks})
+	eng.setup_match({"seed": rng.randi(), "levels": 1, "blind": blind, "players": n, "stacks": stacks})
 	eng.bust_cant_enter()   # sem fichas pra entrada do palpite = eliminado antes de jogar
 	for p in range(n):
 		if not eng.busted[p] and eng.can_discard(p):

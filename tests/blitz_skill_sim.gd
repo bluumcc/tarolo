@@ -9,7 +9,7 @@ const SESSIONS := 60
 
 func play(diffs: Array, factor: float, seed_i: int, seat: int) -> Dictionary:
 	var e := BlitzEngine.new()
-	e.setup_match({"seed": seed_i * 31 + 7, "levels": 0, "mode": "blitz", "blind": 10, "point_factor": factor, "stacks": [400, 400, 400, 400]})
+	e.setup_match({"seed": seed_i * 31 + 7, "levels": 0, "blind": 10, "point_factor": factor, "stacks": [400, 400, 400, 400]})
 	e.rake_on = false   # sem taxa/bônus da casa: mede só a habilidade (soma zero entre os 4)
 	e.bonus_on = false
 	var rng := RandomNumberGenerator.new()

@@ -12,13 +12,9 @@ signal round_finished(result: Dictionary)
 signal match_finished(result: Dictionary)
 
 const HAND_SIZE := 8
-const ROUNDS := 5            # níveis de uma partida com fim (config "levels"); 0 = mesa sem fim
 const BLIND := 10
 const BUY_IN_BLINDS := BlitzEconomy.BUY_IN_BLINDS    # stack de entrada = 20 blinds
 const PRIZE_PER_POINT := 0.25  # cada ponto das cartas vale 0,25 blind, pago pelos rivais
-const GOLD_MULT := 3.0       # Transmutação (só no modo antigo de pontos)
-const KING_CUT_BONUS := 3.0  # Corte de Rei (pontos)
-const BREAK_BONUS := 2.0     # Cortado: quebrar a sequência de 2+ vitórias de alguém
 
 var num_players := 4
 var rng := RandomNumberGenerator.new()
@@ -31,9 +27,7 @@ var level_start_stacks: Array = []
 var round_index := 0          # nível atual (0-based)
 var modifier_sequence: Array = []  # ordem embaralhada dos 11 modificadores pra esse nível: 1 por vaza
 var modifier := -1            # modificador da vaza atual (-1 = ainda não sorteado pra essa vaza)
-var streak: Array = []
 var last_winner := -1
-var combo_count: Array = []
 var hand_no := 0              # rodadas de aposta jogadas na mesa (roda o botão)
 var button := 0               # "dealer": fala por último
 var start_leader := 0         # quem abre a 1ª rodada (sorteado pela cena; 0 nos testes); as demais sorteiam de novo
@@ -55,6 +49,7 @@ var bet_log: Array = []       # [{player, action, to, amount}]
 var betting := false
 var last_discard: Dictionary = {}
 var rake_on := true            # taxa da casa (desligável nos testes de lógica)
+var trick_ante_factor := BLITZ_TRICK_ANTE_FACTOR   # ante da jogada, em fração do blind (config "ante_factor"; 0 isola a mecânica de apostas nos testes)
 var house_rake := 0.0          # total cobrado pela casa na mesa
 var human_rake := 0.0          # quanto do total saiu de fichas do jogador 0   # {player, card} do último descarte por desistência
 
@@ -64,8 +59,7 @@ const BLITZ_STREAK_BONUS_BLINDS := 3              # prêmio especial da casa: 3+
 const BLITZ_BONUS_VAULT_SHARE := 0.5              # o prêmio só sai de até 50% da taxa que a casa já cobrou de você
 const BLITZ_DOUBLE_FROM := 3                       # 1º dobrar a partir da 4ª rodada; o 2º, da 6ª
 const BLITZ_MAX_DOUBLES := 2   # dobrar + triplicar (testado remover: derrubava a escada Difícil>Normal — era a maior fonte de vantagem do Difícil, não um enfeite)
-const BLITZ_POINT_FACTOR := 0.5                    # pontos das cartas → fichas no Blitz, em relação ao Caos (1 pt = 0,25 blind × fator)
-var blitz := false
+const BLITZ_POINT_FACTOR := 0.5                    # pontos das cartas → fichas (1 pt = 0,25 blind × fator)
 var doubles: Array = []       # quantas vezes cada um dobrou a entrada nesse nível (0 a 2)
 var predicts: Array = []      # palpite de cada um (-1 = ainda não fez)
 var stakes: Array = []        # fichas que cada um pôs no pote do nível
@@ -107,8 +101,8 @@ func setup_match(config: Dictionary) -> void:
 	buy_in = int(config.get("buy_in", blind * BUY_IN_BLINDS))
 	levels = int(config.get("levels", 0))
 	start_leader = int(config.get("start_leader", 0)) % maxi(num_players, 1)
-	blitz = str(config.get("mode", "chaos")) == "blitz"
 	point_factor = float(config.get("point_factor", BLITZ_POINT_FACTOR))
+	trick_ante_factor = float(config.get("ante_factor", BLITZ_TRICK_ANTE_FACTOR))
 	carry = 0.0
 	hit_streak = 0
 	human_bonus = 0.0
@@ -137,21 +131,16 @@ func _setup_round() -> void:
 	var deck := Deck.build(rng)
 	# Blitz: recebe 10, descarta 2 antes de qualquer outra decisão (sempre, mesmo na conta nova) —
 	# o nível continua tendo HAND_SIZE (8) rodadas, só a mão inicial nasce maior pra escolher.
-	var deal_size := BLITZ_DEAL_SIZE if blitz else HAND_SIZE
-	var dealt := Deck.deal(deck, num_players, deal_size)
+	var dealt := Deck.deal(deck, num_players, BLITZ_DEAL_SIZE)
 	hands = dealt["hands"]
 	captured = []
-	combo_count = []
-	streak = []
 	last_winner = -1
 	level_start_stacks = stacks.duplicate()
 	for p in range(num_players):
-		streak.append(0)
 		captured.append([])
-		combo_count.append(0)
 	# Embaralha os modificadores: as 8 vazas do nível usam os 8 primeiros, sem repetir. Toda
 	# mesa de Blitz tem modificador em toda jogada, sem exceção.
-	modifier_sequence = (BlitzModifiers.blitz_pool() if blitz else BlitzModifiers.ALL).duplicate()
+	modifier_sequence = BlitzModifiers.blitz_pool().duplicate()
 	Deck.shuffle(modifier_sequence, rng)
 	modifier = -1
 	# Dealer: sorteado só no começo da partida (1ª rodada, `start_leader`); depois é sempre o vencedor da
@@ -185,8 +174,7 @@ func _setup_round() -> void:
 		stakes.append(0.0)
 		wins.append(0)
 		doubles.append(0)
-	if blitz:
-		pot = carry
+	pot = carry
 
 
 func _highest_player() -> int:
@@ -213,8 +201,6 @@ func active_modifier() -> int:
 	return modifier
 
 
-func is_active(mod: int) -> bool:
-	return modifier == mod
 
 
 func legal_for(player: int) -> Array:
@@ -282,7 +268,6 @@ func refill_bots() -> Array:
 			var fresh := float(rng.randi_range(BlitzEconomy.BOT_STACK_BLINDS[0], BlitzEconomy.BOT_STACK_BLINDS[1]) * blind)
 			stacks[p] = fresh
 			level_start_stacks[p] = fresh
-			streak[p] = 0
 			busted[p] = false   # novo jogador senta no lugar do que quebrou
 			styles[p] = rng.randi_range(0, 2)   # jogador novo, estilo novo (sorteado, nunca mostrado)
 			swapped.append(p)
@@ -302,7 +287,7 @@ func begin_trick() -> void:
 	button = leader  # aposta começa do jogador após o líder da vaza
 	# Todo mundo paga a ante E o blind inteiro antes das ações (torneio e rankeada): o blind é a
 	# aposta mínima da jogada. No Blitz a ante é só uma fração do blind e vem somada a ele.
-	var ante_size := float(blind) * ((BLITZ_TRICK_ANTE_FACTOR + 1.0) if blitz else 1.0)
+	var ante_size := float(blind) * (trick_ante_factor + 1.0)
 	for p in range(num_players):
 		folded[p] = busted[p]   # eliminado (torneio) fica fora da jogada: sem ante, sem fala e sem carta
 		var ante := minf(ante_size, stacks[p])
@@ -383,9 +368,8 @@ func bet_act(player: int, action: String, to := 0.0) -> Dictionary:
 			else:
 				folded[player] = true
 				session_stats[player]["folds"] += 1
-				# No Blitz o descarte é aleatório (custo fixo, sem entregar qual carta era fraca);
-				# no Caos (legado) continua a mais fraca virada.
-				_discard_random(player) if blitz else _discard_weakest(player)
+				# O descarte é aleatório: custo fixo, sem entregar qual carta era fraca.
+				_discard_random(player)
 		"check":
 			if not opt["can_check"]:
 				return {"ok": false, "error": "precisa pagar"}
@@ -498,21 +482,7 @@ func _trick_order(winner: int) -> Array:
 	return out
 
 
-## Quem desiste descarta a carta mais fraca (virada): as mãos continuam do mesmo tamanho.
-func _discard_weakest(player: int) -> CardData:
-	var hand: Array = hands[player]
-	if hand.is_empty():
-		return null
-	var worst: CardData = hand[0]
-	for c in hand:
-		if _card_worth(c) < _card_worth(worst):
-			worst = c
-	hand.erase(worst)
-	last_discard = {"player": player, "card": worst}
-	return worst
-
-
-## Blitz: desistir custa exatamente 1 carta aleatória (não a mais fraca) — o custo é o mesmo pra
+## Desistir custa exatamente 1 carta aleatória (não a mais fraca) — o custo é o mesmo pra
 ## todo mundo, sem entregar qual carta era boa ou ruim. As mãos continuam do mesmo tamanho.
 func _discard_random(player: int) -> CardData:
 	var hand: Array = hands[player]
@@ -522,12 +492,6 @@ func _discard_random(player: int) -> CardData:
 	hand.erase(picked)
 	last_discard = {"player": player, "card": picked}
 	return picked
-
-
-func _card_worth(c: CardData) -> float:
-	if c.is_louco():
-		return 60.0 if louco_can_win() else 5.0
-	return float(c.rank) + (100.0 if c.is_trunfo() else 0.0) + (50.0 if c.is_bout() else 0.0)
 
 
 ## Depois da aposta: define quem abre as cartas (o vencedor anterior; se ele desistiu, o próximo).
@@ -551,7 +515,7 @@ func walkover_player() -> int:
 ## Mesa desfeita no meio da rodada (torneio): as jogadas que faltam não são disputadas — não contam
 ## vitória pra ninguém — e o palpite é conferido com o que já foi jogado. Fecha a rodada na hora.
 func void_remaining_tricks() -> void:
-	if not blitz or is_round_over():
+	if is_round_over():
 		return
 	plays = []
 	betting = false
@@ -584,34 +548,25 @@ func resolve_walkover() -> Dictionary:
 	if winner == -1:
 		return {}
 	session_stats[winner]["bluffs"] += 1
-	# Ninguém jogou carta: o vencedor também descarta pra todas as mãos ficarem iguais — aleatória
-	# no Blitz (mesmo custo de quem desistiu), a mais fraca no Caos (legado).
-	var dropped := _discard_random(winner) if blitz else _discard_weakest(winner)
-	if blitz:
-		var ev := active_modifier()
-		var value := 2 if ev == BlitzModifiers.Modifier.VAZA_DOURADA else 1
-		wins[winner] += value
-		_settle_side_pots(winner)
-		var trick_pot_total := trick_pot
-		stacks[winner] += trick_pot_total
-		var trick_gain: float = trick_pot_total - float(contrib[winner])
-		trick_pot = 0.0
-		var result := {
-			"discarded": dropped,
-			"winner": winner, "winning_index": -1, "plays": [], "points": 0.0, "base_points": 0.0,
-			"mult": 1.0, "prize": 0.0, "pot": pot, "combos": [], "streak": 0, "streak_mult": 1.0,
-			"bonus": 0.0, "saque_amount": 0.0, "assalto_amount": 0.0, "curse_amount": 0.0,
-			"walkover": true, "trick_number": trick_number, "modifier": ev,
-			"value": value, "wins": wins.duplicate(), "rake": 0.0, "trick_pot": trick_pot_total, "trick_gain": trick_gain,
-			"gain": trick_gain, "pots": last_pots.duplicate(true),
-		}
-		return _finish_trick_blitz(result, winner)
+	# Ninguém jogou carta: o vencedor também descarta pra todas as mãos ficarem iguais (aleatória,
+	# mesmo custo de quem desistiu).
+	var dropped := _discard_random(winner)
+	var ev := active_modifier()
+	var value := 2 if ev == BlitzModifiers.Modifier.VAZA_DOURADA else 1
+	wins[winner] += value
+	_settle_side_pots(winner)
+	var trick_pot_total := trick_pot
+	stacks[winner] += trick_pot_total
+	var trick_gain: float = trick_pot_total - float(contrib[winner])
+	trick_pot = 0.0
 	var result := {
 		"discarded": dropped,
 		"winner": winner, "winning_index": -1, "plays": [], "points": 0.0, "base_points": 0.0,
-		"mult": 1.0, "prize": 0.0, "pot": trick_pot, "combos": [], "streak": 0, "streak_mult": 1.0,
-		"bonus": 0.0, "saque_amount": 0.0, "assalto_amount": 0.0, "walkover": true,
-		"trick_number": trick_number, "modifier": active_modifier(),
+		"mult": 1.0, "prize": 0.0, "pot": pot, "combos": [], "streak": 0, "streak_mult": 1.0,
+		"bonus": 0.0, "saque_amount": 0.0, "assalto_amount": 0.0, "curse_amount": 0.0,
+		"walkover": true, "trick_number": trick_number, "modifier": ev,
+		"value": value, "wins": wins.duplicate(), "rake": 0.0, "trick_pot": trick_pot_total, "trick_gain": trick_gain,
+		"gain": trick_gain, "pots": last_pots.duplicate(true),
 	}
 	return _finish_trick(result, winner)
 
@@ -648,11 +603,6 @@ func card_value(c: CardData, _player: int = -1) -> float:
 ## Se `card`, jogada por `player` agora, venceria a jogada como está.
 func would_win(card: CardData, player: int) -> bool:
 	return TrickRules.would_win_mod(card, player, plays, modifier)
-
-
-## Pontos das cartas viram fichas (pagas pelos rivais): 1 ponto = PRIZE_PER_POINT blinds.
-func chips_of(points: float) -> float:
-	return roundf(points * PRIZE_PER_POINT * float(blind))
 
 
 ## Fichas que os modificadores Saque, Assalto e Maldição movem (sempre STEAL_BLINDS blinds no total,
@@ -695,123 +645,6 @@ func _richest_rival(winner: int) -> int:
 	return best
 
 
-func _resolve_trick() -> Dictionary:
-	var ev := active_modifier()
-	var idx := TrickRules.winning_index_mod(plays, ev)
-	var winner: int = plays[idx]["player"]
-	var cards: Array = plays.map(func(p): return p["card"])
-	captured[winner].append_array(cards)
-	if blitz:
-		return _resolve_trick_blitz(idx, winner, ev)
-	var base_points := 0.0
-	for c in cards:
-		base_points += card_value(c, winner)
-	var mult := 1.0
-	if ev == BlitzModifiers.Modifier.VAZA_DOURADA:
-		mult *= GOLD_MULT
-	var combos: Array = []
-	var bonus := 0.0
-	var prev_streak: int = streak[last_winner] if last_winner != -1 else 0
-	var broke := last_winner != -1 and last_winner != winner and prev_streak >= 2
-	for q in range(num_players):
-		streak[q] = streak[q] + 1 if q == winner else 0
-	var streak_mult := BlitzCombos.streak_mult(int(streak[winner]))
-	mult *= streak_mult
-	if streak[winner] >= 3:
-		combos.append("MAO_QUENTE")
-	for cid in BlitzCombos.detect(plays):
-		combos.append(cid)
-		if cid == "CHUVA_TRUNFOS":
-			mult *= BlitzCombos.CHUVA_MULT
-		elif cid == "REALEZA":
-			mult *= BlitzCombos.REALEZA_MULT
-		elif cid == "ESCADA":
-			bonus += BlitzCombos.ESCADA_BONUS
-	if broke:
-		bonus += BREAK_BONUS
-		combos.append("CORTADO")
-	var wcard: CardData = plays[idx]["card"]
-	var lead := TrickRules.lead_suit(plays)
-	if wcard.is_trunfo() and lead != CardData.Suit.TRUNFO and lead != -1:
-		for pl in plays:
-			var pc: CardData = pl["card"]
-			if pc.suit == lead and pc.rank == 14:
-				bonus += KING_CUT_BONUS
-				combos.append("CORTE_REI")
-				break
-	combo_count[winner] += combos.size()
-	var points := base_points * mult + bonus
-	var raw_prize := chips_of(points)
-	# Prêmio das cartas: pago pelos rivais que jogaram a jogada (soma zero, a casa não cria fichas).
-	var rivals: Array = []
-	for pl in plays:
-		if int(pl["player"]) != winner:
-			rivals.append(int(pl["player"]))
-	var chips := _modifier_chips(ev, winner, rivals)
-	var saque_amount := float(chips["saque"])
-	var assalto_amount := float(chips["assalto"])
-	var prize := 0.0
-	if raw_prize > 0.0 and not rivals.is_empty():
-		var share := ceilf(raw_prize / float(rivals.size()))
-		for q in rivals:
-			var pay := minf(share, stacks[q])
-			stacks[q] -= pay
-			prize += pay
-	var result := {
-		"winner": winner, "winning_index": idx, "plays": plays.duplicate(), "points": points,
-		"base_points": base_points, "mult": mult, "prize": prize, "pot": trick_pot, "combos": combos,
-		"streak": int(streak[winner]), "streak_mult": streak_mult, "bonus": bonus,
-		"saque_amount": saque_amount, "assalto_amount": assalto_amount, "curse_amount": float(chips["curse"]),
-		"walkover": false, "trick_number": trick_number, "modifier": ev,
-	}
-	return _finish_trick(result, winner)
-
-
-## Paga o pote (menos a taxa da casa) e o bônus dos rivais ao vencedor, fecha a rodada e, no fim do nível, o resultado.
-func _finish_trick(result: Dictionary, winner: int) -> Dictionary:
-	if bool(result.get("walkover", false)):
-		var prev_streak: int = streak[last_winner] if last_winner != -1 else 0
-		for q in range(num_players):
-			streak[q] = streak[q] + 1 if q == winner else 0
-		result["streak"] = int(streak[winner])
-		result["broke"] = last_winner != -1 and last_winner != winner and prev_streak >= 2
-	last_winner = winner
-	_settle_side_pots(winner)
-	# Taxa da casa: só quando as cartas foram jogadas (sem disputa, sem taxa).
-	var rake := 0.0
-	if rake_on and not bool(result.get("walkover", false)):
-		rake = BlitzEconomy.rake_of(trick_pot, blind)
-		house_rake += rake
-		if contrib[0] > 0.0:
-			human_rake += rake * contrib[0] / maxf(trick_pot, 1.0)
-	result["rake"] = rake
-	stacks[winner] += trick_pot - rake + float(result["prize"]) + float(result["saque_amount"]) + float(result["assalto_amount"])
-	session_stats[winner]["pots"] += 1
-	result["stacks"] = stacks.duplicate()
-	result["gain"] = trick_pot - rake + float(result["prize"]) + float(result["saque_amount"]) + float(result["assalto_amount"]) - contrib[winner]
-	trick_pot = 0.0
-	history.append(result)
-	plays = []
-	trick_number += 1
-	leader = winner
-	current = winner
-	trick_resolved.emit(result)
-	if is_round_over():
-		var deltas: Array = []
-		for p in range(num_players):
-			deltas.append(stacks[p] - level_start_stacks[p])
-		round_result = {
-			"round": round_index, "modifier": modifier,
-			"stacks": stacks.duplicate(), "deltas": deltas,
-			"tricks_won": tricks_won(),
-		}
-		round_finished.emit(round_result)
-		if is_match_over():
-			match_result = make_standings()
-			match_finished.emit(match_result)
-	return result
-
-
 ## Cópia leve do estado do Blitz pra simulação (bots/Oráculo): sem histórico, rng novo.
 ## As cartas são compartilhadas (imutáveis); os arrays são copiados.
 func clone_for_sim() -> BlitzEngine:
@@ -820,19 +653,17 @@ func clone_for_sim() -> BlitzEngine:
 	c.blind = blind
 	c.buy_in = buy_in
 	c.levels = levels
-	c.blitz = blitz
 	c.point_factor = point_factor
 	c.styles = styles.duplicate()
 	c.rake_on = rake_on
+	c.trick_ante_factor = trick_ante_factor
 	c.bonus_on = bonus_on
 	c.stacks = stacks.duplicate()
 	c.level_start_stacks = level_start_stacks.duplicate()
 	c.round_index = round_index
 	c.modifier_sequence = modifier_sequence.duplicate()
 	c.modifier = modifier
-	c.streak = streak.duplicate()
 	c.last_winner = last_winner
-	c.combo_count = combo_count.duplicate()
 	c.hand_no = hand_no
 	c.pot = pot
 	c.trick_pot = trick_pot
@@ -887,7 +718,7 @@ func blitz_entry() -> float:
 ## Palpite (0 a 8) de um jogador; a entrada sai da stack e vai pro pote do nível. Todos os
 ## palpites são revelados juntos depois.
 func blitz_place(player: int, predict: int) -> bool:
-	if not blitz or predicts[player] != -1 or busted[player]:
+	if predicts[player] != -1 or busted[player]:
 		return false
 	var amount := minf(blitz_entry(), stacks[player])
 	stacks[player] -= amount
@@ -913,7 +744,7 @@ func can_double(player: int) -> bool:
 ## Cobrir a dobra/triplicada de um rival: mesmo efeito de `double_down`, mas sem a espera da
 ## rodada — é uma resposta imediata ao lance de outro jogador.
 func can_cover(player: int) -> bool:
-	if not doubles_enabled or not blitz or is_round_over() or int(doubles[player]) >= BLITZ_MAX_DOUBLES:
+	if not doubles_enabled or is_round_over() or int(doubles[player]) >= BLITZ_MAX_DOUBLES:
 		return false
 	var need := blitz_need(player)
 	return need >= 0 and need <= tricks_left() and stacks[player] >= blitz_entry()
@@ -921,7 +752,7 @@ func can_cover(player: int) -> bool:
 
 ## Verdadeiro se a mão ainda tem cartas de sobra (recebeu 10, ainda não descartou até 8).
 func can_discard(player: int) -> bool:
-	return blitz and (hands[player] as Array).size() > HAND_SIZE
+	return (hands[player] as Array).size() > HAND_SIZE
 
 
 ## Descarta exatamente BLITZ_DISCARD_SIZE cartas (precisam estar na mão, sem repetir). Sempre a
@@ -989,7 +820,12 @@ func blitz_status(player: int) -> String:
 ## chegar aqui) e a contagem (Rodada Dourada→Dobrada) importam pro palpite. Saque, Assalto ao
 ## Líder e Rodada Maldita ainda mexem em fichas de verdade, à parte do palpite — os outros 5
 ## modificadores não têm efeito nenhum aqui (só valem no Caos).
-func _resolve_trick_blitz(idx: int, winner: int, ev: int) -> Dictionary:
+func _resolve_trick() -> Dictionary:
+	var ev := active_modifier()
+	var idx := TrickRules.winning_index_mod(plays, ev)
+	var winner: int = plays[idx]["player"]
+	var cards: Array = plays.map(func(p): return p["card"])
+	captured[winner].append_array(cards)
 	# Rodada Dobrada (Dourada no Blitz) conta 2 vitórias; os pontos NÃO são multiplicados.
 	var value := 2 if ev == BlitzModifiers.Modifier.VAZA_DOURADA else 1
 	wins[winner] += value
@@ -1031,10 +867,10 @@ func _resolve_trick_blitz(idx: int, winner: int, ev: int) -> Dictionary:
 		"value": value, "wins": wins.duplicate(), "rake": 0.0, "trick_pot": trick_pot_total, "trick_gain": trick_gain,
 		"gain": prize + saque_amount + assalto_amount - curse_amount + trick_gain, "pots": last_pots.duplicate(true),
 	}
-	return _finish_trick_blitz(result, winner)
+	return _finish_trick(result, winner)
 
 
-func _finish_trick_blitz(result: Dictionary, winner: int) -> Dictionary:
+func _finish_trick(result: Dictionary, winner: int) -> Dictionary:
 	last_winner = winner
 	result["stacks"] = stacks.duplicate()
 	history.append(result)
@@ -1193,8 +1029,6 @@ func tricks_left() -> int:
 	return HAND_SIZE - trick_number
 
 
-func tricks_won_by(player: int) -> int:
-	return int(tricks_won()[player])
 
 
 ## Chamado pela UI depois do resumo do nível: distribui o próximo (a mesa não acaba).

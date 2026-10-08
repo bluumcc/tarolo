@@ -4,7 +4,7 @@ extends SceneTree
 
 func session(diffs: Array, seed_i: int, levels: int, use_seat0_bot := true) -> Dictionary:
 	var e := BlitzEngine.new()
-	e.setup_match({"seed": seed_i * 17 + 3, "levels": 0, "mode": "blitz", "blind": 10, "stacks": [400, 400, 400, 400]})
+	e.setup_match({"seed": seed_i * 17 + 3, "levels": 0, "blind": 10, "stacks": [400, 400, 400, 400]})
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_i + 4242
 	var start: float = e.stacks[0]

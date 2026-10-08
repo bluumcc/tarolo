@@ -28,7 +28,7 @@ func _init() -> void:
 	var blind := 10.0
 	for r in range(n):
 		var e := BlitzEngine.new()
-		e.setup_match({"seed": 9000 + r, "mode": "blitz", "blind": int(blind), "stacks": [4000.0, 4000.0, 4000.0, 4000.0]})
+		e.setup_match({"seed": 9000 + r, "blind": int(blind), "stacks": [4000.0, 4000.0, 4000.0, 4000.0]})
 		e.rake_on = false
 		e.bonus_on = false
 		if not SimLib.play_level(e, rng, diffs, "bot"):

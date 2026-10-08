@@ -12,8 +12,6 @@ const LEGACY := 99
 ## Calculista joga equilibrado; Cauteloso prioriza o palpite e só dobra com quase certeza;
 ## Agressivo persegue os pontos, cobre mais e às vezes dobra sem estar no alvo (blefe).
 enum Style { CALC, CAUTELOSO, AGRESSIVO }
-const STYLE_NAMES := ["Calculista", "Cauteloso", "Agressivo"]
-const STYLE_ICONS := ["◆", "◇", "▲"]
 ## Chance de um Agressivo dobrar sem estar no alvo (blefe), por decisão de dobrar disponível.
 const BLUFF_CHANCE := 0.05
 
@@ -42,7 +40,7 @@ static func choose(engine: BlitzEngine, player: int, difficulty: int, rng: Rando
 	var legal: Array = engine.legal_for(player)
 	if legal.size() == 1:
 		return legal[0]
-	if engine.blitz and difficulty != LEGACY:
+	if difficulty != LEGACY:
 		return _blitz_choose(engine, player, difficulty, rng)
 	if difficulty == LEGACY:
 		difficulty = BotAI.Difficulty.HARD
@@ -60,16 +58,13 @@ static func choose(engine: BlitzEngine, player: int, difficulty: int, rng: Rando
 	var high_stakes := ev in [mods.VAZA_DOURADA, mods.SAQUE] \
 		or (ev == mods.ASSALTO_LIDER and player == engine._highest_player()) \
 		or engine.pot > float(engine.blind) * 8.0
-	var blitz_win := false
-	if engine.blitz:
-		# Blitz: joga pra fechar o palpite. Já no alvo (ou estourou) foge das rodadas; se falta,
-		# tenta ganhar na proporção do que falta pelas rodadas que restam.
-		high_stakes = false
-		var need := int(engine.predicts[player]) - int(engine.wins[player])
-		var left := engine.tricks_left()
-		blitz_win = need > 0 and (need >= left or rng.randf() < float(need) / float(left))
-		want_lose = not blitz_win
-		high_stakes = blitz_win and need >= left
+	# Joga pra fechar o palpite. Já no alvo (ou estourou) foge das rodadas; se falta, tenta
+	# ganhar na proporção do que falta pelas rodadas que restam.
+	var need := int(engine.predicts[player]) - int(engine.wins[player])
+	var left := engine.tricks_left()
+	var blitz_win := need > 0 and (need >= left or rng.randf() < float(need) / float(left))
+	want_lose = not blitz_win
+	high_stakes = blitz_win and need >= left
 
 	var is_last := engine.plays.size() == engine.active_count() - 1
 	var winners: Array = legal.filter(func(c: CardData) -> bool: return engine.would_win(c, player))
@@ -79,7 +74,7 @@ static func choose(engine: BlitzEngine, player: int, difficulty: int, rng: Rando
 		if not losers.is_empty():
 			# Blitz: perder com a carta mais forte que ainda perde (descarta força embaixo de uma
 			# carta maior) evita ser obrigado a vencer mais tarde.
-			if engine.blitz and not engine.plays.is_empty() and (difficulty == BotAI.Difficulty.HARD or rng.randf() < 0.4):
+			if not engine.plays.is_empty() and (difficulty == BotAI.Difficulty.HARD or rng.randf() < 0.4):
 				return _strongest_loser(losers)
 			return _cheapest(engine, losers, player)
 		return _cheapest(engine, winners, player)
@@ -94,7 +89,7 @@ static func choose(engine: BlitzEngine, player: int, difficulty: int, rng: Rando
 			return pool[0]
 		return pool[0] if inverted else pool[pool.size() - 1]
 
-	if engine.blitz and blitz_win and engine.plays.is_empty() and not inverted:
+	if blitz_win and engine.plays.is_empty() and not inverted:
 		var strong: Array = legal.filter(func(c: CardData) -> bool: return not c.is_louco())
 		if not strong.is_empty():
 			strong.sort_custom(func(a: CardData, b: CardData) -> bool:
@@ -102,16 +97,6 @@ static func choose(engine: BlitzEngine, player: int, difficulty: int, rng: Rando
 					return a.is_trunfo()
 				return a.rank > b.rank)
 			return strong[0]
-
-	if not engine.blitz and engine.plays.is_empty() and not inverted and engine.pot > float(engine.blind) * float(engine.active_count()) * 1.2:
-		# Rodada aumentada: abre com a carta mais forte pra defender o pote.
-		var power: Array = legal.filter(func(c: CardData) -> bool: return not c.is_louco() and engine.card_value(c, player) >= 0.0)
-		if not power.is_empty():
-			power.sort_custom(func(a: CardData, b: CardData) -> bool:
-				if a.is_trunfo() != b.is_trunfo():
-					return a.is_trunfo()
-				return a.rank > b.rank)
-			return power[0]
 
 	if engine.plays.is_empty():
 		var lead_pool: Array = legal.filter(func(c: CardData) -> bool: return not c.is_louco() and not c.is_bout() and engine.card_value(c, player) >= 0.0)
@@ -234,7 +219,7 @@ static func win_chance(engine: BlitzEngine, player: int, difficulty: int, rng: R
 static func bet_decision(engine: BlitzEngine, player: int, difficulty: int, rng: RandomNumberGenerator) -> Dictionary:
 	var opt := engine.bet_options(player)
 	var pwin := win_chance(engine, player, difficulty, rng)
-	if engine.blitz and int(engine.predicts[player]) >= 0:
+	if int(engine.predicts[player]) >= 0:
 		var needed := int(engine.predicts[player]) - int(engine.wins[player])
 		var remaining := BlitzEngine.HAND_SIZE - engine.trick_number
 		var bias := 0.0
@@ -248,7 +233,7 @@ static func bet_decision(engine: BlitzEngine, player: int, difficulty: int, rng:
 	# Stack curta: push/fold — nunca limp. Quanto menos blinds, mais urgente ir all-in.
 	# Vale pra torneio (pressão do cego escalando) e pra mesas comuns no fim de um nível ruim.
 	var stack_bb: float = float(engine.stacks[player]) / maxf(float(engine.blind), 1.0)
-	if engine.blitz and stack_bb < 8.0 and not bool(opt["can_check"]):
+	if stack_bb < 8.0 and not bool(opt["can_check"]):
 		var push_threshold := 0.38 if stack_bb >= 4.0 else 0.0
 		if pwin >= push_threshold:
 			if bool(opt["can_raise"]):

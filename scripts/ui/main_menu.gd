@@ -790,7 +790,6 @@ func _start_ranked_matchmaking() -> void:
 
 
 func _ranked_search(exclude_blind: int) -> void:
-	GameState.chaos_mode = "blitz"
 	var fichas := int(SaveManager.section("profile")["fichas"])
 	if GameState.ranked_rooms_open(fichas).is_empty():
 		var cheapest := GameState.ranked_room_buy_in(GameState.RANKED_ROOMS[0])
@@ -862,7 +861,6 @@ func _ranked_search(exclude_blind: int) -> void:
 	enter.disabled = not affordable
 	enter.pressed.connect(func():
 		GameState.ranked_table = {"blind": blind, "stack_blinds": GameState.RANKED_STACK_BLINDS, "players": int(room.get("players", 4))}
-		GameState.chaos_mode = "blitz"
 		get_tree().change_scene_to_file("res://scenes/BlitzScene.tscn"))
 	bv.add_child(enter)
 	if not affordable:

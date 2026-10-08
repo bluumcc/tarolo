@@ -40,7 +40,7 @@ func _init() -> void:
 
 func _engine(seed_v: int, players: int, stacks: Array, blind := 10) -> BlitzEngine:
 	var e := BlitzEngine.new()
-	e.setup_match({"seed": seed_v, "levels": 1, "mode": "blitz", "blind": blind, "players": players, "stacks": stacks})
+	e.setup_match({"seed": seed_v, "levels": 1, "blind": blind, "players": players, "stacks": stacks})
 	return e
 
 

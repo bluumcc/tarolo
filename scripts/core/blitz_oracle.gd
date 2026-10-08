@@ -36,7 +36,7 @@ static func _world(engine: BlitzEngine, me: int, known_mods: int, place_predicts
 		sim.hands[p] = unseen.slice(idx, idx + n)
 		idx += n
 	# Modificadores ainda não revelados: sorteia a ordem do que resta.
-	var pool := BlitzModifiers.blitz_pool() if engine.blitz else BlitzModifiers.ALL.duplicate()
+	var pool := BlitzModifiers.blitz_pool()
 	var known: Array = []
 	for i in range(known_mods):
 		known.append(engine.modifier_sequence[i])

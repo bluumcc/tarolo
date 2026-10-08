@@ -64,23 +64,7 @@ const STEAL_BLINDS := 3
 ## Desempate do Pitagórico, do mais forte ao mais fraco: Espadas, Copas, Paus, Ouros.
 const TIE_ORDER := [CardData.Suit.ESPADAS, CardData.Suit.COPAS, CardData.Suit.PAUS, CardData.Suit.OUROS]
 
-const COMBO_NAMES := {
-	"MAO_QUENTE": "MÃO QUENTE",
-	"CORTADO": "CORTADO",
-	"CORTE_REI": "CORTE DE REI",
-	"CHUVA_TRUNFOS": "CHUVA DE ARCANOS",
-	"REALEZA": "REALEZA",
-	"ESCADA": "ESCADA",
-}
 
-const COMBO_DESCRIPTIONS := {
-	"MAO_QUENTE": "3 jogadas seguidas: pontos ×1,5 (4 seguidas: ×2)",
-	"CORTADO": "Você quebrou a sequência de alguém: +2 pts",
-	"CORTE_REI": "Cortou um Rei com arcano maior: +3 pts",
-	"CHUVA_TRUNFOS": "3 ou mais arcanos maiores na mesa: pontos ×2",
-	"REALEZA": "3 ou mais figuras (Valete, Cavaleiro, Dama, Rei) na mesa: pontos ×1,5",
-	"ESCADA": "3 cartas seguidas do mesmo naipe na mesa: +3 pts",
-}
 
 
 ## Os 8 modificadores são sorteáveis (o Blitz usa todos).
@@ -107,9 +91,6 @@ static func desc_of(modifier: int) -> String:
 	return str(DESCRIPTIONS[modifier])
 
 
-## Descrição de uma linha (cabe na faixa do card da mesa).
-static func short_of(modifier: int) -> String:
-	return str(DESCRIPTIONS[modifier])
 
 
 static func tip_of(modifier: int) -> String:

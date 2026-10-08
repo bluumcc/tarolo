@@ -78,6 +78,3 @@ const BLITZ_RAKE_CAP_BLINDS := 2.0
 static func blitz_rake_of(pot: float, blind: int) -> float:
 	return minf(roundf(pot * BLITZ_RAKE_PCT), roundf(BLITZ_RAKE_CAP_BLINDS * float(blind)))
 
-
-static func rake_of(pot: float, blind: int) -> float:
-	return minf(roundf(pot * RAKE_PCT), roundf(RAKE_CAP_BLINDS * float(blind)))

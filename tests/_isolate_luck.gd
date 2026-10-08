@@ -17,7 +17,7 @@ func run_pair(seed_i: int) -> Dictionary:
 	var results := {}
 	for policy in ["hard", "normal"]:
 		var e := BlitzEngine.new()
-		e.setup_match({"seed": seed_i, "mode": "blitz", "blind": 10, "stacks": [400.0,400.0,400.0,400.0]})
+		e.setup_match({"seed": seed_i, "blind": 10, "stacks": [400.0,400.0,400.0,400.0]})
 		e.rake_on = false
 		e.bonus_on = false
 		e.hands = []

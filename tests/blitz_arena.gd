@@ -47,7 +47,7 @@ func pick_card(kind0: String, e: BlitzEngine, p: int, rng: RandomNumberGenerator
 
 func run_session(kinds: Array, seat: int, seed_i: int) -> Array:
 	var e := BlitzEngine.new()
-	var cfg := {"seed": seed_i * 31 + 7, "levels": 0, "mode": "blitz", "blind": 10, "point_factor": factor, "stacks": [400, 400, 400, 400]}
+	var cfg := {"seed": seed_i * 31 + 7, "levels": 0, "blind": 10, "point_factor": factor, "stacks": [400, 400, 400, 400]}
 	cfg.merge(opts)
 	e.setup_match(cfg)
 	for p in range(4):

@@ -88,7 +88,6 @@ var discard_picks: Array = []   # Blitz: cartas marcadas na mão pra descartar (
 var shown_pot := 0.0
 var pot_locked := false        # contador do pote rolando: o refresh não sobrescreve
 
-const FLAME := UIKit.COMBO
 
 
 func _ready() -> void:
@@ -110,8 +109,7 @@ func _ready() -> void:
 		action_color.append(UIKit.MUTED)
 		shown_totals.append(engine.stacks[p])
 	_build_ui()
-	if engine.blitz:
-		_set_discard_chrome(true)
+	_set_discard_chrome(true)
 	get_viewport().size_changed.connect(_on_resize)
 	_refresh_hud()
 	_rebuild_hand()
@@ -137,7 +135,7 @@ func _show_insufficient_fichas() -> void:
 	v.add_theme_constant_override("separation", DS.SP_L)
 	box.add_child(v)
 	v.add_child(UIKit.label("FICHAS INSUFICIENTES", 28, UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER))
-	var l := UIKit.label("Você precisa de %d fichas pra sentar na Mesa %s. Jogue Vanilla ou Ranqueado, ou volte ao menu e peça um empréstimo da casa." % [int(config["buy_in"]), "Blitz" if str(config.get("mode", "chaos")) == "blitz" else "Caos"], 32, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var l := UIKit.label("Você precisa de %d fichas pra sentar na Mesa %s. Jogue Vanilla ou Ranqueado, ou volte ao menu e peça um empréstimo da casa." % [int(config["buy_in"]), "Blitz"], 32, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(620, 0)
 	v.add_child(l)
@@ -154,18 +152,14 @@ const HAND_RAISE := 28.0   ## o leque sobe um pouco da base da faixa da mão
 const BAR_H := 83.6       ## altura da barra de baixo: cards laterais (palpite, tempo), botões de ação e card do prêmio — todos iguais
 const ACT_H := BAR_H
 const HEADER_H := 82.5       ## altura dos três cards do header (menu, dots, ajuda): +10%
-const POT_CARD_W := 300.0   ## largura fixa do card do pote (cabe "POTE ◎ 99999")
-const BANNER_SLOT_H := 46.0   ## faixa dos avisos de ação, logo abaixo do topo
 const MOD_GAP := 10.0       ## folga embaixo do leque, em cima da barra de baixo
 const BANNER_H := 100.0    ## do topo da zona até a mão: faixa de avisos, abaixo do seu avatar
 const AVATAR_TO_FAN := 38.0   ## do topo do leque (na zona) até a referência do seu avatar; dá folga entre o stack e as cartas
 const MY_SEAT_RISE := 21.0 ## quanto o centro do seu avatar fica acima do topo do card roxo
 const SIDE_W := 150.0     ## largura dos dois cards laterais (pote e prêmio)
-const LEFT_W := 132.0     ## largura dos dois cards laterais (palpite e tempo)
 const SIDE_COL_W := 420.0   ## desktop: coluna da direita (registro, modificador, prêmio, pote e ações)
 const SIDE_MARGIN := 24.0
 const LOG_LINES := 6
-const MAX_UI_W := 900.0    ## em tela larga o jogo não estica além disso
 
 var stage: Control
 var margin_box: MarginContainer
@@ -916,8 +910,6 @@ func _rebuild_hand() -> void:
 	_layout_hand.call_deferred()
 
 
-func _plural(n: int, one: String, many: String) -> String:
-	return "%d %s" % [n, one if n == 1 else many]
 
 
 # ------------------------------------------------------------------ rodadas / modificador
@@ -944,13 +936,12 @@ func _lock_table_size() -> void:
 
 func _announce_round() -> void:
 	_lock_table_size()
-	if engine.blitz:
-		_set_discard_chrome(true)
+	_set_discard_chrome(true)
 	_refresh_hud()
 	_rebuild_hand()
 	var kicker := "RITUAL %d%s" % [engine.round_index + 1, (" DE %d" % engine.levels) if engine.levels > 0 else ""]
 	var lines: Array = []
-	if engine.round_index == 0 and engine.blitz:
+	if engine.round_index == 0:
 		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "ENTRADA ◎%d" % int(engine.blitz_entry()), "text": "Em cada Ritual você sacrifica 2 cartas, faz a sua profecia (quantas jogadas vai ganhar) e paga a entrada. Acertou o número exato, leva o pote. Cada jogada ainda paga fichas pelos pontos das cartas. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.MONEY})
 	elif engine.round_index == 0:
 		lines.append({"head": "MESA %s" % str(config.get("table_name", "")).to_upper(), "title": "BLIND ◎%d" % engine.blind, "text": "Todo mundo paga o blind a cada jogada. Você senta com ◎%d e leva de volta o que tiver quando sair." % engine.buy_in, "color": UIKit.MONEY})
@@ -1291,7 +1282,7 @@ func _wait(seconds: float) -> void:
 func _wait_human() -> CardData:
 	human_turn = true
 	await _tip("turn", "SUA VEZ!", "Toque numa carta pra selecioná-la (ela sobe) e toque de novo pra jogar. Você tem 10 segundos por jogada.")
-	if engine.blitz and engine.can_double(0):
+	if engine.can_double(0):
 		await _tip("double", "PODE DOBRAR!", "A partir da 4ª jogada, o botão DOBRAR paga mais uma entrada e dobra o peso da sua profecia no pote; da 6ª em diante dá pra TRIPLICAR. Vale a pena quando você já está no alvo e a mão que sobrou é fraca demais pra ganhar mais uma jogada. Só dá pra dobrar até duas vezes por Ritual.")
 	var ls := TrickRules.lead_suit(engine.plays)
 	if ls == -1:
@@ -1329,9 +1320,6 @@ func _on_play_timeout() -> void:
 	human_card_chosen.emit(weakest)
 
 
-func _mmss(seconds: float) -> String:
-	var t := maxi(int(ceil(seconds)), 0)
-	return "%d:%02d" % [t / 60, t % 60]
 
 
 ## Relógio único da vez: liga com `_clock_start`, desliga com `_clock_stop`. O card TEMPO mostra os
@@ -1623,28 +1611,23 @@ func _unhandled_input(event: InputEvent) -> void:
 # última jogada espera o rateio do palpite, que ainda pode devolver fichas.
 
 func _run_round() -> void:
-	if engine.blitz:
-		if not await _blitz_open_level():
-			return
+	if not await _blitz_open_level():
+		return
 	while not engine.is_round_over():
 		if not is_inside_tree() or finished:
 			return
 		# Zerou as fichas = fora na hora (você e os bots), sem seguir "sentado fora" jogando cartas.
 		# Torneio: você é eliminado com a colocação. Ranqueado: você escolhe repor/recomprar ou sair.
-		if engine.blitz:
-			if await _bust_broke():
+		if await _bust_broke():
+			return
+		if bool(config.get("tournament", false)) and not allin_notice_shown and engine.stacks[0] > 0.0 and engine.stacks[0] < float(engine.blind) * (1.0 + BlitzEngine.BLITZ_TRICK_ANTE_FACTOR):
+			allin_notice_shown = true   # as fichas não cobrem blind + taxa: a jogada vai em all-in
+			_banner("All-in", "Suas fichas não cobrem o blind e a taxa: você joga em all-in.", UIKit.MUTED)
+			await _wait(2.4)
+			if not is_inside_tree() or finished:
 				return
-			if bool(config.get("tournament", false)) and not allin_notice_shown and engine.stacks[0] > 0.0 and engine.stacks[0] < float(engine.blind) * (1.0 + BlitzEngine.BLITZ_TRICK_ANTE_FACTOR):
-				allin_notice_shown = true   # as fichas não cobrem blind + taxa: a jogada vai em all-in
-				_banner("All-in", "Suas fichas não cobrem o blind e a taxa: você joga em all-in.", UIKit.MUTED)
-				await _wait(2.4)
-				if not is_inside_tree() or finished:
-					return
-			if engine.stacks[0] <= 0.0 and not bool(config.get("tournament", false)):
-				if not await _ensure_solvent(true):
-					return
-		else:
-			if not await _ensure_solvent():
+		if engine.stacks[0] <= 0.0 and not bool(config.get("tournament", false)):
+			if not await _ensure_solvent(true):
 				return
 		if await _fast_forward_if_alone():
 			break
@@ -1667,12 +1650,11 @@ func _run_round() -> void:
 			return
 	if not is_inside_tree() or finished:
 		return
-	if engine.blitz:
-		await _blitz_settlement()
-		if bool(config.get("tournament", false)):
-			await _bust_broke()
-		if not is_inside_tree() or finished:
-			return
+	await _blitz_settlement()
+	if bool(config.get("tournament", false)):
+		await _bust_broke()
+	if not is_inside_tree() or finished:
+		return
 	var choice := await _show_round_summary()
 	if not is_inside_tree() or finished:
 		return
@@ -1692,7 +1674,7 @@ func _play_cards() -> void:
 			return
 		var p := engine.current
 		_refresh_hud()
-		if engine.blitz and (p != 0 or GameState.autoplay) and BlitzBot.wants_double(engine, p, int(config["difficulty"][p]), bot_rng):
+		if (p != 0 or GameState.autoplay) and BlitzBot.wants_double(engine, p, int(config["difficulty"][p]), bot_rng):
 			if p != 0 and not GameState.autoplay:
 				await _wait(bot_rng.randf_range(0.5, 1.0) * BlitzBot.style_delay_mult(engine, p))
 				if not is_inside_tree() or finished:
@@ -1704,7 +1686,7 @@ func _play_cards() -> void:
 		if p == 0 and not GameState.autoplay:   # sem fichas só tira você das apostas: as cartas (e o palpite) continuam sendo suas
 			card = await _wait_human()
 		else:
-			await _wait(0.9 if p == 0 else (bot_rng.randf_range(0.55, 0.95) if engine.blitz else bot_rng.randf_range(0.9, 1.5)))
+			await _wait(0.9 if p == 0 else bot_rng.randf_range(0.55, 0.95))
 			if not is_inside_tree():
 				return
 			card = BlitzBot.choose(engine, p, int(config["difficulty"][p]), bot_rng)
@@ -1781,7 +1763,7 @@ func _ensure_solvent(mid_level := false) -> bool:
 ## nível fecha; o torneio então realoca você numa mesa com gente (`Tournament.rebalance`).
 ## Devolve true se fechou o nível.
 func _fast_forward_if_alone() -> bool:
-	if not bool(config.get("tournament", false)) or not engine.blitz or engine.is_round_over():
+	if not bool(config.get("tournament", false)) or engine.is_round_over():
 		return false
 	var alive := 0
 	for p in range(engine.num_players):
@@ -1807,7 +1789,7 @@ func _fast_forward_if_alone() -> bool:
 ## Torneio: quem ficou com 0 fichas está fora — bots saem da mesa com um aviso; se for você, a mesa
 ## acaba na hora (colocação e prêmio vêm do resultado do torneio). Devolve true se a mesa acabou.
 func _bust_broke() -> bool:
-	if not engine.blitz or not is_inside_tree() or finished:
+	if not is_inside_tree() or finished:
 		return false
 	var is_tour := bool(config.get("tournament", false))
 	var out: Array = engine.bust_broke(is_tour)
@@ -1832,15 +1814,6 @@ func _bust_broke() -> bool:
 
 # ------------------------------------------------------------------ apostas
 
-func _hand_label() -> String:
-	var s := BlitzBot.hand_strength(engine, 0)
-	if s >= 0.75:
-		return "FORTE ★★★"
-	if s >= 0.55:
-		return "BOA ★★☆"
-	if s >= 0.35:
-		return "MÉDIA ★☆☆"
-	return "FRACA ☆☆☆"
 
 
 ## Ações de aposta do jogador na barra de baixo: DESISTIR / PASSAR ou PAGAR / APOSTAR ou
@@ -1921,11 +1894,6 @@ func _human_bet() -> Dictionary:
 	return st.get("result", {"action": "check"})
 
 
-## Por que o AUMENTAR não aparece — a pergunta que o jogador faria.
-func _no_raise_reason(opt: Dictionary) -> String:
-	if float(engine.stacks[0]) <= float(opt["call"]):
-		return "Pagar já é seu all-in."
-	return "Rivais não cobrem mais."
 
 
 ## Seletor de valor do aumento: atalhos (mínimo, ½ pote, pote, all-in) e − / + de 1 blind.
@@ -2006,89 +1974,6 @@ func _build_raise_picker(body: VBoxContainer, opt: Dictionary, st: Dictionary, d
 # ------------------------------------------------------------------ pote
 
 # ------------------------------------------------------------------ jogada resolvida
-
-func _resolve_trick(result: Dictionary) -> void:
-	if engine.blitz:
-		await _resolve_trick_blitz(result)
-		return
-	var winner: int = result["winner"]
-	var win_view: CardView
-	for v in table_views:
-		if int(v["player"]) == winner:
-			win_view = v["view"]
-	await _wait(0.2)
-	if not is_inside_tree():
-		return
-	if win_view:
-		FX.win_pulse(win_view, _table_scale())
-
-	var pot_amt := float(result["pot"])
-	var prize := float(result["prize"])
-	var gain := float(result.get("gain", 0.0))
-	if winner == 0 and gain > best_gain:
-		best_gain = gain
-	var wname := str(config["names"][winner]).to_upper()
-	var notes: Array = []
-	if int(result.get("modifier", -1)) == BlitzModifiers.Modifier.VAZA_DOURADA:
-		notes.append("transmutação: 2 vitórias")
-	var sub := "Pote ◎%d" % int(pot_amt)
-	if absf(prize) >= 1.0:
-		sub += "  ·  bônus dos rivais %s◎%d" % ["+" if prize >= 0.0 else "−", absi(int(prize))]
-	var rake := float(result.get("rake", 0.0))
-	if rake >= 1.0:
-		sub += "  ·  taxa da casa ◎%d" % int(rake)
-	if float(result.get("mult", 1.0)) > 1.0:
-		sub += "  (×%s)" % UIKit.fmt_dec(float(result["mult"]), 2)
-	if not notes.is_empty():
-		sub += "  (%s)" % ", ".join(notes)
-	_banner("%s venceu!" % wname, sub, UIKit.ME if winner == 0 else UIKit.INK)
-	Sfx.play("chip")
-	var punch := clampf((pot_amt + prize) / (float(engine.blind) * 16.0), 0.0, 1.0)
-	if punch > 0.25:
-		FX.shake(main_area, punch)
-	FX.burst(popup_layer, table_center.global_position - popup_layer.global_position + table_center.size / 2.0, UIKit.ME if winner == 0 else UIKit.CHIPS, 8 + int(punch * 20))
-	await _wait(1.0)
-	if not is_inside_tree():
-		return
-	var extras: Array = []
-	var streak_n := int(result.get("streak", 0))
-	if streak_n >= 2 and not ("MAO_QUENTE" in result.get("combos", [])):
-		extras.append(["♨ SEQUÊNCIA ×%s!" % UIKit.fmt_dec(float(result.get("streak_mult", 1.0)), 2), "%s ganhou %d jogadas seguidas" % [wname, streak_n], FLAME])
-	for id in result.get("combos", []):
-		extras.append([str(BlitzModifiers.COMBO_NAMES[id]) + "!", "%s — %s" % [wname, BlitzModifiers.COMBO_DESCRIPTIONS[id]], UIKit.COMBO])
-	if float(result.get("saque_amount", 0.0)) > 0.0:
-		extras.append(["⚔ SAQUE!", "%s levou ◎%d dos rivais" % [wname, int(result["saque_amount"])], UIKit.LOSS])
-	if float(result.get("assalto_amount", 0.0)) > 0.0:
-		extras.append(["⚔ ASSALTO!", "%s roubou ◎%d de quem tinha mais fichas" % [wname, int(result["assalto_amount"])], UIKit.LOSS])
-	if int(result.get("modifier", -1)) == BlitzModifiers.Modifier.VAZA_MALDITA:
-		extras.append(["☠ MALDIÇÃO!", "%s pagou ◎%d aos rivais por vencer essa jogada" % [wname, int(result.get("curse_amount", 0.0))], UIKit.LOSS])
-	for e in extras:
-		_banner(e[0], e[1], e[2])
-		Sfx.play("combo")
-		FX.burst(popup_layer, _seat_center(winner) - popup_layer.global_position, e[2], 18)
-		FX.shake(main_area, clampf(0.25 + 0.15 * float(streak_n), 0.0, 0.8))
-		_refresh_hud()
-		await _wait(1.3)
-		if not is_inside_tree():
-			return
-
-	# O pote (com o prêmio) voa pro vencedor.
-	await _collect_pot(winner, pot_amt - rake + maxf(prize, 0.0) + float(result.get("saque_amount", 0.0)) + float(result.get("assalto_amount", 0.0)), gain)
-	if not is_inside_tree():
-		return
-	var target := _slot_pos(winner) + (_slot_pos(winner) - table_center.size / 2.0 + CardView.SIZE / 2.0) * 0.8
-	var tw := create_tween().set_parallel(true)
-	for v in table_views:
-		var cv: CardView = v["view"]
-		tw.tween_property(cv, "position", target, GameState.anim(0.3))
-		tw.tween_property(cv, "modulate:a", 0.0, GameState.anim(0.3))
-	await tw.finished
-	for v in table_views:
-		(v["view"] as CardView).queue_free()
-	table_views.clear()
-	_banner_clear()
-	_refresh_hud()
-
 
 # ------------------------------------------------------------------ resumo de rodada / fim
 
@@ -2257,14 +2142,13 @@ func _show_results(summary: Dictionary) -> void:
 	v.add_child(HSeparator.new())
 	var st: Dictionary = engine.session_stats[0]
 	var stat := "%d jogadas na mesa · %d potes ganhos · %d blefes vencidos · %d desistências" % [engine.hand_no, int(st["pots"]), int(st["bluffs"]), int(st["folds"])]
-	if engine.blitz:
-		stat = "%d rituais · %d profecias certas · %d por 1 de diferença" % [int(st["levels"]), int(st["hits"]), int(st["near"])]
+	stat = "%d rituais · %d profecias certas · %d por 1 de diferença" % [int(st["levels"]), int(st["hits"]), int(st["near"])]
 	var stat_l := UIKit.label(stat, 26, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	stat_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(stat_l)
 	if best_gain > 0.0:
 		v.add_child(UIKit.label("★ Maior pote seu: +◎%d" % int(best_gain), 30, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
-	if engine.blitz and engine.human_bonus >= 1.0:
+	if engine.human_bonus >= 1.0:
 		v.add_child(UIKit.label("Prêmios de sequência: +◎%d" % int(engine.human_bonus), 26, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER))
 	if engine.human_rake >= 1.0:
 		v.add_child(UIKit.label("Taxa da casa nos seus potes: ◎%d" % int(engine.human_rake), 24, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
@@ -2339,14 +2223,14 @@ func _refresh_hud() -> void:
 		(dealer_badges[p] as Control).visible = engine.hand_no > 0 and engine.button == p
 		var idx := order.find(p)
 		var ob := order_badges[p] as PanelContainer
-		ob.visible = p != 0 or (engine.blitz and bool(blitz_revealed[0]))   # você também mostra suas vitórias
+		ob.visible = p != 0 or bool(blitz_revealed[0])   # você também mostra suas vitórias
 		if true:
 			var wl := ob.get_child(0) as Label
 			wl.text = str(int(engine.wins[p]))
 			var fill := UIKit.PURPLE_DEEP
 			var edge := UIKit.MUTED
 			var ink := UIKit.INK
-			if p == 0 and engine.blitz and not blitz_showdown:
+			if p == 0 and not blitz_showdown:
 				var need0 := engine.blitz_need(0)   # verde ao bater o palpite, vermelho se passar dele
 				if need0 == 0:
 					edge = UIKit.OK
@@ -2356,7 +2240,7 @@ func _refresh_hud() -> void:
 					edge = UIKit.LOSS
 					fill = edge.darkened(0.6)
 					ink = edge
-			if blitz_showdown and engine.blitz:
+			if blitz_showdown:
 				var hit := engine.blitz_status(p) == "hit"
 				edge = UIKit.OK if hit else UIKit.LOSS
 				fill = edge.darkened(0.6)
@@ -2382,62 +2266,6 @@ func _reset_actions() -> void:
 	for p in range(engine.num_players):
 		action_text[p] = ""
 		action_color[p] = UIKit.MUTED
-
-
-## Fichas na frente do jogador (até juntar no pote) e a linha de situação: É A VEZ / PRÓXIMO /
-## última ação / chamas da sequência.
-func _refresh_bet_tags(p: int, idx: int) -> void:
-	if engine.blitz:
-		_refresh_blitz_tag(p, idx)
-		return
-	if bet_pills[p] == null or prog_tags[p] == null:
-		return   # a mesa Blitz (única em uso) não tem essa linha de situação por assento
-	var streak: int = engine.streak[p] if p < engine.streak.size() else 0
-	var flames := ""
-	if streak >= 2:
-		flames = "%s×%s" % ["♨".repeat(BlitzCombos.flame_level(streak)), UIKit.fmt_dec(BlitzCombos.streak_mult(streak), 2)]
-	var pile := float(engine.contrib[p]) if not bets_gathered and phase != "idle" else 0.0
-	var pill := bet_pills[p] as Control
-	(bet_tags[p] as Label).text = "◎ " + UIKit.fmt_short(pile)
-	(bet_tags[p] as Label).add_theme_color_override("font_color", UIKit.LOSS if engine.folded[p] else UIKit.BRAND)
-	pill.modulate.a = 1.0 if pile > 0.0 else 0.0
-	var status := ""
-	var col := UIKit.MUTED
-	if idx == 0:
-		status = "▶ É A VEZ" if p != 0 else "▶ SUA VEZ"
-		col = UIKit.TURN
-	elif idx == 1:
-		status = "PRÓXIMO"
-		col = UIKit.INK
-	elif phase != "idle" and engine.folded[p]:
-		status = "✕ DESISTIU"
-		col = UIKit.LOSS
-	elif str(action_text[p]) != "":
-		status = str(action_text[p])
-		col = action_color[p]
-	elif phase == "play" and engine.plays.any(func(pl): return int(pl["player"]) == p):
-		status = "✓ JOGOU"
-	if flames != "":
-		status = (status + " " + flames).strip_edges()
-	var st := prog_tags[p] as Label
-	st.text = status
-	st.add_theme_color_override("font_color", col if flames == "" or status != flames else FLAME)
-
-
-func _refresh_pot() -> void:
-	if engine.blitz:
-		_refresh_pot_blitz()
-		return
-	if not pot_locked:
-		shown_pot = engine.pot if phase != "idle" or bets_gathered else 0.0
-		pot_label.text = _pot_text(shown_pot)
-	var sub := ""
-	if phase == "bet" and engine.bet_level > float(engine.blind):
-		sub = "aposta em ◎ %d" % int(engine.bet_level)
-	elif phase == "bet":
-		sub = "blind ◎ %d de cada" % engine.blind
-	pot_sub.text = sub
-	_layout_table.call_deferred()
 
 
 ## Faz o pote rolar até o valor atual (pop dourado).
@@ -2538,7 +2366,7 @@ func _betting_phase() -> void:
 				var opt0 := engine.bet_options(0)
 				act = {"action": "check"} if bool(opt0["can_check"]) else {"action": "fold"}
 			else:
-				var fold_tip := "Quem desiste descarta 1 carta aleatória da mão." if engine.blitz else "Quem desiste descarta a carta mais fraca, virada."
+				var fold_tip := "Quem desiste descarta 1 carta aleatória da mão."
 				await _tip("bet", "SUA VEZ DE APOSTAR", "Todo mundo já pagou a ante. Você pode PASSAR, AUMENTAR, PAGAR ou DESISTIR. Só quem fica na jogada joga carta, e quem vence leva o pote. %s" % fold_tip)
 				act = await _human_bet()
 			if not is_inside_tree() or finished:
@@ -2690,7 +2518,7 @@ func _resolve_walkover(result: Dictionary) -> void:
 		_rebuild_hand()
 	if winner == 0 and float(result.get("gain", 0.0)) > best_gain:
 		best_gain = float(result["gain"])
-	var collected := float(result["trick_pot"]) if engine.blitz else float(result["pot"])
+	var collected := float(result["trick_pot"])
 	await _collect_pot(winner, collected, float(result.get("gain", 0.0)))
 	_banner_clear()
 	_refresh_hud()
@@ -2929,15 +2757,6 @@ func _human_predict() -> int:
 	return pick
 
 
-func _hand_label_blitz() -> String:
-	var ex := BlitzBot.expected_wins(engine, 0)
-	if ex >= 3.5:
-		return "MUITO FORTE ★★★"
-	if ex >= 2.5:
-		return "FORTE ★★☆"
-	if ex >= 1.5:
-		return "MÉDIA ★☆☆"
-	return "FRACA ☆☆☆"
 
 
 ## Dobrar/triplicar (seu próprio lance, `is_cover = false`) ou cobrir o lance de um rival (reage
@@ -3034,14 +2853,14 @@ func _human_cover_choice(actor: int) -> bool:
 
 
 func _on_double_pressed() -> void:
-	if engine.blitz and phase == "play" and not finished:
+	if phase == "play" and not finished:
 		_apply_double(0)
 
 
 func _refresh_double_button() -> void:
 	if double_btn == null:
 		return
-	var show := engine.blitz and phase == "play" and not finished and not modal_open and engine.can_double(0)
+	var show := phase == "play" and not finished and not modal_open and engine.can_double(0)
 	double_btn.visible = show
 	_refresh_idle_card()
 	if show:
@@ -3052,7 +2871,7 @@ func _refresh_double_button() -> void:
 ## estourou ou sem tempo de chegar lá, neutro enquanto ainda dá). A aposta da jogada, no card
 ## ao lado do seu avatar, enquanto a jogada vale. Rivais: só o selo de vitórias do avatar — o
 ## alvo deles é segredo até o fim da rodada.
-func _refresh_blitz_tag(p: int, _idx: int) -> void:
+func _refresh_bet_tags(p: int, _idx: int) -> void:
 	if p != 0:
 		return
 	var pile := float(engine.contrib[0]) if (phase == "bet" and not bets_gathered) else 0.0   # some quando as apostas vão pro pote, igual aos rivais
@@ -3070,14 +2889,14 @@ func _refresh_round_dots() -> void:
 		var dobrada := int(h.get("modifier", -1)) == BlitzModifiers.Modifier.VAZA_DOURADA
 		results.append(2 if (won and dobrada) else (1 if won else 0))   # 2 = vitória que valia por duas (dourado)
 	var need := 0
-	if engine.blitz and bool(blitz_revealed[0]):
+	if bool(blitz_revealed[0]):
 		need = engine.blitz_need(0)
 		if need > engine.tricks_left():
 			need = 0   # não dá mais pra bater o palpite: nada de iluminar os dots
 	round_dots.set_state(BlitzEngine.HAND_SIZE, results, need)
 
 
-func _refresh_pot_blitz() -> void:
+func _refresh_pot() -> void:
 	var in_trick := phase == "bet" or (phase == "play" and bets_gathered)
 	if not pot_locked:
 		if hold_pot >= 0.0:
@@ -3123,7 +2942,7 @@ func _side_pot_note(result: Dictionary) -> String:
 	return " · " + " · ".join(parts)
 
 
-func _resolve_trick_blitz(result: Dictionary) -> void:
+func _resolve_trick(result: Dictionary) -> void:
 	var winner: int = result["winner"]
 	var win_view: CardView
 	for v in table_views:

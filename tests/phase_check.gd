@@ -17,7 +17,6 @@ func _ready() -> void:
 	SaveManager.section("profile")["fichas"] = 100000
 	for k in ["blitz_intro", "turn", "power", "double", "bet", "predict", "discard"]:
 		SaveManager.section("tips")[k] = true
-	GameState.chaos_mode = "blitz"
 	GameState.autoplay = false
 	GameState.ranked_table = {"blind": 10, "stack_blinds": 40, "players": 4}
 	Engine.time_scale = 4.0

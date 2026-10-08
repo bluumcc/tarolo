@@ -185,7 +185,6 @@ func find_ranked_room(fichas: int, exclude_blind: int = -1) -> Dictionary:
 
 
 
-var chaos_mode := "blitz"    # só "blitz" existe hoje (Caos removido); campo mantido por compatibilidade de save
 
 
 func blitz_buy_in(table: int = -1) -> int:
@@ -236,7 +235,6 @@ func blitz_config() -> Dictionary:
 		"blind": blind,
 		"buy_in": buy_in,
 		"table_name": table_name,
-		"mode": chaos_mode,
 		"levels": 3 if autoplay else 0,
 		"entered": entered,
 	}
@@ -364,7 +362,6 @@ func tournament_table_config() -> Dictionary:
 		"buy_in": 0,
 		"stacks": stacks,
 		"table_name": "Torneio · %d restantes · blind ◎%d" % [alive, blind],
-		"mode": "blitz",
 		"levels": 1,
 		"entered": true,
 		"tournament": true,
