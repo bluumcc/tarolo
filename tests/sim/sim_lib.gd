@@ -11,7 +11,7 @@ static func total_chips(e: BlitzEngine) -> float:
 	var s := 0.0
 	for x in e.stacks:
 		s += float(x)
-	return s + e.trick_pot + e.pot + e.carry + e.house_rake - e.human_bonus
+	return s + e.trick_pot + e.pot + e.carry + e.house_rake - e.human_bonus + e.cashed_out - e.cashed_in
 
 
 ## Política de aposta. mode: "bot" (decisão do bot), "fuzz" (ação válida aleatória, incl. all-in).
@@ -38,7 +38,7 @@ static func bet_step(e: BlitzEngine, rng: RandomNumberGenerator, mode: String, d
 
 ## Joga UM nível completo. `on_trick` é chamado depois de cada jogada resolvida (invariantes).
 ## Devolve false se o motor travou (guarda de iterações).
-static func play_level(e: BlitzEngine, rng: RandomNumberGenerator, diffs: Array, mode: String, on_trick: Callable = Callable()) -> bool:
+static func play_level(e: BlitzEngine, rng: RandomNumberGenerator, diffs: Array, mode: String, on_trick: Callable = Callable(), dynamic := false) -> bool:
 	var n := e.num_players
 	for p in range(n):
 		if e.can_discard(p):
@@ -50,6 +50,15 @@ static func play_level(e: BlitzEngine, rng: RandomNumberGenerator, diffs: Array,
 		guard += 1
 		if guard > 40:
 			return false
+		if dynamic:
+			e.pop_table_events()   # gente entrando e saindo entre as jogadas (mesa ranqueada)
+		var alive := 0
+		for q in range(e.num_players):
+			if not e.busted[q]:
+				alive += 1
+		if alive < 2:
+			e.void_remaining_tricks()   # sobrou só um: o Ritual não vale (a cena realoca)
+			return true
 		e.draw_trick_modifier()
 		e.begin_trick()
 		var bg := 0
