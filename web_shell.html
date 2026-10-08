@@ -133,6 +133,11 @@ window.__BUILD = 'diag-3';
 	};
 	__dbg('=== NOVA SESSAO === build=' + (window.__BUILD || '?') + ' ' + navigator.userAgent.slice(0, 90));
 	__dbg('dpr=' + window.devicePixelRatio + ' mem=' + (navigator.deviceMemory || '?') + ' screen=' + screen.width + 'x' + screen.height);
+	var wm = null;
+	function hook(f) { return function () { return f.apply(this, arguments).then(function (r) { try { var ex = (r.instance || r).exports; for (var k in ex) { if (ex[k] instanceof WebAssembly.Memory) { wm = ex[k]; } } } catch (e) {} return r; }); }; }
+	WebAssembly.instantiate = hook(WebAssembly.instantiate.bind(WebAssembly));
+	if (WebAssembly.instantiateStreaming) { WebAssembly.instantiateStreaming = hook(WebAssembly.instantiateStreaming.bind(WebAssembly)); }
+	function heap() { return wm ? Math.round(wm.buffer.byteLength / 1048576) + 'MB' : '?'; }
 	function vv() { var v = window.visualViewport; return v ? Math.round(v.width) + 'x' + Math.round(v.height) : '?'; }
 	if (window.visualViewport) { visualViewport.addEventListener('resize', function () { __dbg('vv resize ' + vv()); }); }
 	window.addEventListener('resize', function () { __dbg('win resize ' + innerWidth + 'x' + innerHeight); });
@@ -147,7 +152,7 @@ window.__BUILD = 'diag-3';
 		c.addEventListener('webglcontextrestored', function () { __dbg('webgl restored'); });
 		setInterval(function () {
 			var k = document.getElementById('canvas');
-			__dbg('hb canvas=' + k.width + 'x' + k.height + ' vv=' + vv());
+			__dbg('hb canvas=' + k.width + 'x' + k.height + ' vv=' + vv() + ' wasmheap=' + heap());
 		}, 1000);
 	});
 }());
