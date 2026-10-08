@@ -562,9 +562,8 @@ func resolve_walkover() -> Dictionary:
 	trick_pot = 0.0
 	var result := {
 		"discarded": dropped,
-		"winner": winner, "winning_index": -1, "plays": [], "points": 0.0, "base_points": 0.0,
-		"mult": 1.0, "prize": 0.0, "pot": pot, "combos": [], "streak": 0, "streak_mult": 1.0,
-		"bonus": 0.0, "saque_amount": 0.0, "assalto_amount": 0.0, "curse_amount": 0.0,
+		"winner": winner, "plays": [], "points": 0.0, "prize": 0.0,
+		"saque_amount": 0.0, "assalto_amount": 0.0, "curse_amount": 0.0,
 		"walkover": true, "trick_number": trick_number, "modifier": ev,
 		"value": value, "wins": wins.duplicate(), "rake": 0.0, "trick_pot": trick_pot_total, "trick_gain": trick_gain,
 		"gain": trick_gain, "pots": last_pots.duplicate(true),
@@ -861,9 +860,8 @@ func _resolve_trick() -> Dictionary:
 	trick_pot = 0.0
 	stacks[winner] += prize + saque_amount + assalto_amount
 	var result := {
-		"winner": winner, "winning_index": idx, "plays": plays.duplicate(), "points": base_points,
-		"base_points": base_points, "mult": 1.0, "prize": prize, "pot": pot, "combos": [], "streak": 0,
-		"streak_mult": 1.0, "bonus": 0.0, "saque_amount": saque_amount, "assalto_amount": assalto_amount, "assalto_from": assalto_from,
+		"winner": winner, "plays": plays.duplicate(), "points": base_points, "prize": prize,
+		"saque_amount": saque_amount, "assalto_amount": assalto_amount, "assalto_from": assalto_from,
 		"curse_amount": curse_amount, "walkover": false, "trick_number": trick_number, "modifier": ev,
 		"value": value, "wins": wins.duplicate(), "rake": 0.0, "trick_pot": trick_pot_total, "trick_gain": trick_gain,
 		"gain": prize + saque_amount + assalto_amount - curse_amount + trick_gain, "pots": last_pots.duplicate(true),
