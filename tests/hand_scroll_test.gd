@@ -130,5 +130,28 @@ func _ready() -> void:
 	await _frames()
 	check(throws == 1 and card.visible and taps == 1, "arrasto pra baixo não faz nada")
 
+	# carta inclinada (ponta do leque): o ponto agarrado fica embaixo do mouse durante todo o arrasto
+	scroller.set_scroll(0.0)
+	card.visible = true
+	card.rotation = 0.5
+	await _frames()
+	var grab_pt: Vector2 = card.get_global_transform() * (CardView.SIZE * Vector2(0.75, 0.3))
+	_mouse(grab_pt, true)
+	await _frames(1)
+	var steps := [Vector2(0, -30), Vector2(0, -80), Vector2(10, -140)]
+	for st in steps:
+		var cur: Vector2 = grab_pt + st
+		_move(cur)
+		await _frames(1)
+		if layer.get_child_count() > 0:
+			var gh := layer.get_child(0) as Control
+			var under: Vector2 = gh.get_global_transform() * scroller._grab_local
+			check(under.distance_to(cur) < 1.5, "carta inclinada: o ponto agarrado acompanha o mouse (erro %.1f px em %s)" % [under.distance_to(cur), str(st)])
+		else:
+			check(false, "carta inclinada: arrasto não começou")
+	_mouse(grab_pt + steps[2], false)
+	await get_tree().create_timer(0.5).timeout
+	card.rotation = 0.0
+
 	print("HANDSCROLL: %s" % ("OK" if failures == 0 else "%d falhas" % failures))
 	get_tree().quit(1 if failures > 0 else 0)

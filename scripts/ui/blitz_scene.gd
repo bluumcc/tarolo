@@ -486,9 +486,9 @@ func _build_side_column() -> void:
 	mod_desc_label.max_lines_visible = 3
 	mv.add_child(mod_desc_label)
 	side_col.add_child(mod)
-	# Quando há cena/modal (que ficam só na área da esquerda), a coluna também escurece.
+	# Quando há cena/modal (que ficam só na área da esquerda), a coluna não recebe toque (e não escurece).
 	side_dim = ColorRect.new()
-	side_dim.color = Color(0.02, 0.02, 0.05, 0.82)
+	side_dim.color = Color(0.0, 0.0, 0.0, 0.0)   # sem véu: só impede tocar na coluna com um modal aberto
 	side_dim.anchor_left = 1.0
 	side_dim.anchor_right = 1.0
 	side_dim.anchor_top = 0.0
@@ -1074,8 +1074,7 @@ func _count_down(go: Button, lbl: Label, hold: float) -> void:
 ## Mensagem na aba em cima da barra de baixo. `color` pinta o título.
 func _banner(title: String, sub: String, color: Color) -> void:
 	var tone := _tone(color)
-	if docked_wide:
-		_log_push(title, tone)
+	_log_push(title, tone)   # o Registro existe no desktop (coluna) e no celular (painel do "?")
 	banner_title.text = title
 	_fit_banner()
 	banner_title.add_theme_color_override("font_color", tone)
@@ -1517,30 +1516,76 @@ func _intro_slides() -> void:
 	modal_open = false
 
 
-## Ajuda (botão "?"): painel que desliza da direita — o modificador ativo e, embaixo, o tutorial
-## (placeholder por enquanto). Fecha pelo X, tocando fora ou com swipe pra direita.
+## Ajuda (botão "?"): painel que desliza da direita e espelha a coluna da direita do desktop: registro,
+## modificador, prêmio e pote (com a divisão quando há laterais). Fecha pelo X, tocando fora ou com
+## swipe pra direita.
 func _open_help() -> void:
 	var sp := SidePanel.open(overlay_layer, "AJUDA", true)
 	var m := engine.modifier
 	var tone := _modifier_color(m) if m != -1 else UIKit.TR_GOLD
+	# Registro: as últimas mensagens, a mais nova embaixo.
+	var lines: Array = []
+	for l in log_labels:
+		var lb := l as Label
+		if lb.text != "":
+			lines.append({"text": lb.text, "color": lb.get_theme_color("font_color")})
+	var reg := _help_card("REGISTRO", UIKit.TR_PURPLE_LIGHT)
+	if lines.is_empty():
+		reg.add_child(UIKit.serif_label("Sem mensagens ainda.", 24, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_LEFT))
+	for ln in lines:
+		var rl := UIKit.serif_label(str(ln["text"]), 24, ln["color"], HORIZONTAL_ALIGNMENT_LEFT)
+		rl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		reg.add_child(rl)
+	sp.body.add_child(reg.get_parent())
+	# Modificador ativo.
+	var mod := _help_card("MODIFICADOR", tone)
+	var nm := UIKit.serif_label(_modifier_label(m).to_upper() if m != -1 else "NENHUM", 30, tone, HORIZONTAL_ALIGNMENT_CENTER)
+	nm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	mod.add_child(nm)
+	var ds := UIKit.serif_label(BlitzModifiers.desc_of(m) if m != -1 else "O modificador é sorteado no começo de cada jogada.", 24, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	ds.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	mod.add_child(ds)
+	sp.body.add_child(mod.get_parent())
+	# Prêmio (quem acertar a profecia leva).
+	var prize := _help_card("PRÊMIO", UIKit.TR_CYAN)
+	prize.add_child(UIKit.serif_label("◎ %s" % UIKit.fmt_short(engine.pot), 34, UIKit.TR_CYAN, HORIZONTAL_ALIGNMENT_CENTER))
+	prize.add_child(UIKit.serif_label("quem acertar a profecia leva", 22, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER))
+	sp.body.add_child(prize.get_parent())
+	# Pote da jogada, com a divisão quando há laterais.
+	var in_trick := phase == "bet" or (phase == "play" and bets_gathered)
+	var pot := _help_card("POTE", UIKit.TR_GOLD)
+	var total := engine.trick_pot if in_trick else (engine.pot if engine.pot > 0.0 else engine.carry)
+	pot.add_child(UIKit.serif_label("◎ %s" % UIKit.fmt_short(total), 34, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	pot.add_child(UIKit.serif_label("aposta da jogada" if in_trick else "entradas da profecia", 22, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER))
+	var layers: Array = engine.pot_layers() if in_trick else []
+	if layers.size() > 1:
+		for i in range(layers.size()):
+			var layer: Dictionary = layers[i]
+			var names: Array = []
+			for q in (layer["eligible"] as Array):
+				names.append(_pname(q))
+			var title := "Pote principal" if i == 0 else "Lateral %d" % i
+			var who := ", ".join(names)
+			if (layer["eligible"] as Array).size() == 1 and i > 0:
+				title = "Sem cobertura"
+				who = "volta pra %s" % names[0]
+			var row := UIKit.serif_label("%s  ◎ %s  ·  %s" % [title, UIKit.fmt_short(float(layer["amount"])), who], 22, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_LEFT)
+			row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			pot.add_child(row)
+	sp.body.add_child(pot.get_parent())
+
+
+## Cartão do painel de ajuda: devolve o VBox de dentro (o PanelContainer é `get_parent()` dele).
+func _help_card(caption: String, tone: Color) -> VBoxContainer:
 	var card := PanelContainer.new()
 	card.add_theme_stylebox_override("panel", UIKit.rim_box(UIKit.TR_PURPLE_DARK.darkened(0.3), tone.lightened(0.15), tone.darkened(0.4), "small", 14, 16, 14))
 	var cv := VBoxContainer.new()
 	cv.add_theme_constant_override("separation", 8)
 	card.add_child(cv)
-	var cap := UIKit.serif_label("MODIFICADOR ATIVO", 18, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
+	var cap := UIKit.serif_label(caption, 18, UIKit.muted_lilac(), HORIZONTAL_ALIGNMENT_CENTER)
 	cap.autowrap_mode = TextServer.AUTOWRAP_OFF
 	cv.add_child(cap)
-	var nm := UIKit.serif_label(_modifier_label(m).to_upper() if m != -1 else "NENHUM", 30, tone, HORIZONTAL_ALIGNMENT_CENTER)
-	nm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	cv.add_child(nm)
-	var ds := UIKit.serif_label(BlitzModifiers.desc_of(m) if m != -1 else "O modificador é sorteado no começo de cada jogada.", 24, UIKit.TR_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
-	ds.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	cv.add_child(ds)
-	sp.body.add_child(card)
-	var tut := UIKit.action_button("TUTORIAL", UIKit.ActionKind.GOLD, 26)
-	tut.custom_minimum_size = Vector2(0, 72)
-	sp.body.add_child(tut)   # placeholder: ainda sem tutorial
+	return cv
 
 
 ## Menu (hambúrguer): painel que desliza da esquerda, com as opções da pausa. O jogo fica pausado

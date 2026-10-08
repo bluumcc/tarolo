@@ -25,6 +25,8 @@ var _start_scroll := 0.0
 var _card: CardView
 var _ghost: CardView
 var _ghost_origin := Vector2.ZERO
+var _last_cursor := Vector2.ZERO
+var _grab_local := Vector2.ZERO   # onde, na carta (coordenadas dela), o dedo/mouse agarrou
 var _base_scale := Vector2.ONE
 var deselect_on_cancel := false  # puxar de volta antes do limite também tira a seleção da carta
 var ghost_scale_mult := 1.0     # a carta arrastada aparece maior que a da mão (tamanho "destacado")
@@ -148,6 +150,10 @@ func _begin_card_drag(c: CardView) -> void:
 	_ghost.set_selected(c.selected)
 	_ghost_origin = c.global_position
 	_base_scale = c.scale * ghost_scale_mult
+	# O ponto agarrado fica sempre embaixo do dedo/mouse, mesmo quando a carta desencosta do leque,
+	# endireita e cresce (senão as cartas das pontas, bem inclinadas, pulam pro meio).
+	_grab_local = c.get_global_transform().affine_inverse() * _press_pos
+	_place_ghost(_press_pos)
 	_armed = false
 	c.visible = false
 
@@ -155,13 +161,29 @@ func _begin_card_drag(c: CardView) -> void:
 func _update_card_drag(d: Vector2) -> void:
 	if _ghost == null or not is_instance_valid(_ghost):
 		return
-	_ghost.global_position = _ghost_origin + d
 	var up := maxf(0.0, -d.y)
 	_ghost.rotation = lerp_angle(_card.rotation, 0.0, clampf(up / THROW_DISTANCE, 0.0, 1.0))
+	_place_ghost(_press_pos + d)
 	var armed_now := up >= THROW_DISTANCE
 	if armed_now != _armed:
 		_armed = armed_now
-		create_tween().tween_property(_ghost, "scale", _base_scale * (1.12 if _armed else 1.0), 0.1)
+		var from_scale := _ghost.scale
+		var to_scale := _base_scale * (1.12 if _armed else 1.0)
+		var tw := create_tween()
+		tw.tween_method(func(k: float):
+			if _ghost != null and is_instance_valid(_ghost):
+				_ghost.scale = from_scale.lerp(to_scale, k)
+				_place_ghost(_last_cursor), 0.0, 1.0, 0.1)
+
+
+## Põe a carta arrastada de modo que o ponto agarrado (`_grab_local`) fique exatamente em `cursor`,
+## seja qual for a rotação e a escala dela no momento.
+func _place_ghost(cursor: Vector2) -> void:
+	_last_cursor = cursor
+	# `global_position` de um Control é onde cai o canto (0,0) do transform final (o pivô já está embutido):
+	# ponto local p vai pra global_position + rotação·escala·p.
+	var xf := Transform2D(_ghost.rotation, _ghost.scale, 0.0, Vector2.ZERO)
+	_ghost.global_position = cursor - xf * _grab_local
 
 
 func _finish_card_drag() -> void:
