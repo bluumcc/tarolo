@@ -348,17 +348,19 @@ quebra, mesas se fundindo, até sobrar 1 campeão.
 
 
 ## Mesa ranqueada dinâmica: gente entra e sai (Ranqueada/Blitz; torneio não muda)
-- **Mesa de 6 lugares.** Você senta com 4 a 6 ocupados (`ranked_table["players"]`); os vagos
+- **Mesa de 6 lugares.** Você senta com 3 a 6 ocupados (`ranked_table["players"]`); os vagos
   aparecem como lugar vazio. Config: `dynamic_seats` + `vacant` (`GameState.blitz_config`).
 - **Quem sai** (sem ser eliminado): no máx. 1 por Ritual (45%), entre uma jogada e outra. Leva as
   fichas (`cashed_out`); a entrada da profecia que já pôs fica no pote (dinheiro morto, como a de
-  um eliminado). Nunca deixa a mesa com menos de 4 sentados nem sem rival vivo pra você.
+  um eliminado). Nunca deixa a mesa com menos de 3 sentados nem sem rival vivo pra você.
 - **Quem entra:** no máx. 1 por Ritual (55%), num lugar vago. Fica **em espera** (assento apagado):
   sem mão, sem blind, sem profecia. Entra no jogo no começo do próximo Ritual (`waiting`).
-- **Mesa abaixo de 4:** ao abrir o Ritual, `ensure_seated(MIN_SEATED)` senta gente nova na hora.
+- **Mesa abaixo de 3:** ao abrir o Ritual, `ensure_seated(MIN_SEATED)` senta gente nova na hora.
 - **Ficou sozinho:** se todos os rivais quebram ou saem no meio do Ritual, o Ritual é desfeito
   (`void_remaining_tricks`: as entradas voltam) em vez de rodar as jogadas sozinho; o Ritual
   seguinte já abre com gente nova ("realocado").
+- **No multiplayer (decisão):** as mesas com menos gente têm prioridade pra receber quem entra,
+  pra nenhuma ficar abaixo do mínimo de 3. Hoje, com bots, `ensure_seated` faz esse papel.
 - **Conservação de fichas:** `total_chips` inclui `cashed_out − cashed_in` e fecha a cada Ritual
   (`tests/test_runner.gd::_test_dynamic_seats`, 40 Rituais simulados).
 - **Mesa e telas:** a geometria usa sempre 6 assentos; lugar vago = marcador ✦ (`vacant_slots`),

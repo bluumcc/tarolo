@@ -114,14 +114,16 @@ func _run() -> void:
 		print("Blitz %d: %dº lugar | %s" % [i + 1, int(s["placement"]) + 1, " | ".join(s["lines"])])
 	check((GameState.ranked()["history"] as Array).size() == 8, "fila única: toda mesa de blitz completa aplica LP/MMR (tem %d)" % (GameState.ranked()["history"] as Array).size())
 
-	# Mesa ranqueada de 6 lugares: gente sai e entra durante a partida (4 a 6 sentados no começo).
+	# Mesa ranqueada de 6 lugares: gente sai e entra durante a partida (3 a 6 sentados no começo).
 	var before: int = (GameState.ranked()["history"] as Array).size()
 	for i in range(6):
-		GameState.ranked_table = {"blind": 20, "stack_blinds": GameState.RANKED_STACK_BLINDS, "players": 4 + (i % 3)}
+		GameState.ranked_table = {"blind": 20, "stack_blinds": GameState.RANKED_STACK_BLINDS, "players": 3 + (i % 4)}
 		var s := await _play_blitz()
-		check(int(s["placement"]) >= 0, "mesa ranqueada %d (%d sentados): terminou" % [i + 1, 4 + (i % 3)])
+		check(int(s["placement"]) >= 0, "mesa ranqueada %d (%d sentados): terminou" % [i + 1, 3 + (i % 4)])
 	GameState.ranked_table = {}
-	check((GameState.ranked()["history"] as Array).size() == before + 6, "mesas ranqueadas dinâmicas aplicam LP/MMR")
+	# LP só conta com um Ritual completo (8 jogadas): mesa desfeita ou quebra cedo não pontua.
+	var grew: int = (GameState.ranked()["history"] as Array).size() - before
+	check(grew >= 1 and grew <= 6, "mesas ranqueadas dinâmicas aplicam LP/MMR só quando há Ritual completo (%d de 6)" % grew)
 
 	for i in range(4):
 		await _run_tournament(i + 1)

@@ -214,9 +214,9 @@ func blitz_config() -> Dictionary:
 	if not ranked_table.is_empty():
 		blind = int(ranked_table["blind"])
 		buy_in = blind * int(ranked_table["stack_blinds"])
-		# A mesa ranqueada tem 6 lugares; você entra numa com 4 a 6 sentados e, durante a partida,
+		# A mesa ranqueada tem 6 lugares; você entra numa com 3 a 6 sentados e, durante a partida,
 		# gente sai e gente nova senta (espera o próximo Ritual). Ver BlitzEngine.pop_table_events.
-		var occupied := clampi(int(ranked_table.get("players", 4)), 4, BlitzEngine.TABLE_SEATS)
+		var occupied := clampi(int(ranked_table.get("players", 4)), BlitzEngine.MIN_SEATED, BlitzEngine.TABLE_SEATS)
 		n_players = BlitzEngine.TABLE_SEATS
 		dynamic = true
 		var free_seats: Array = range(1, n_players)

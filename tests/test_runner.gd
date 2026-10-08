@@ -143,7 +143,7 @@ func _test_dynamic_seats() -> void:
 	check(sat_ok, "quem senta antes do Ritual já joga ele")
 
 	# Simulação: 40 Rituais com gente entrando e saindo. Nada trava, nenhuma ficha some,
-	# a mesa nunca fica com menos de 4 sentados e você nunca perde o assento.
+	# a mesa nunca fica com menos de 3 sentados e você nunca perde o assento.
 	var sim := BlitzEngine.new()
 	sim.setup_match({"seed": 77, "levels": 0, "blind": 10, "players": 6, "stacks": [600.0, 600.0, 600.0, 600.0, 600.0, 600.0], "dynamic_seats": true})
 	var srng := RandomNumberGenerator.new()
@@ -173,7 +173,7 @@ func _test_dynamic_seats() -> void:
 			sim.stacks[0] += 600.0
 			sim.cashed_in += 600.0
 	check(sim_ok, "40 Rituais com gente entrando e saindo: terminam e nenhuma ficha some")
-	check(min_seated >= BlitzEngine.MIN_SEATED and seat0, "a mesa nunca fica com menos de 4 sentados e o seu assento nunca vaga")
+	check(min_seated >= BlitzEngine.MIN_SEATED and seat0, "a mesa nunca fica com menos de 3 sentados e o seu assento nunca vaga")
 	check(lefts > 0 and joins > 0, "no meio disso, de fato entra e sai gente (saídas %d, entradas %d)" % [lefts, joins])
 
 

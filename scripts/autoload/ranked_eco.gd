@@ -185,7 +185,7 @@ func find_table(fichas: int, exclude_blind: int = -1) -> Dictionary:
 		if blind == exclude_blind:
 			continue
 		var waiting := bots.filter(func(b: Dictionary) -> bool: return int(b["status"]) == 1 and int(b["room_blind"]) == blind)
-		if waiting.size() >= 3:
+		if waiting.size() >= 2:
 			candidates.append({"blind": blind, "players": waiting.size() + 1, "rounds_left": 0})
 
 	# Fallback: qualquer sala exceto a excluída
@@ -194,7 +194,7 @@ func find_table(fichas: int, exclude_blind: int = -1) -> Dictionary:
 			if int(r["blind"]) != exclude_blind:
 				var blind := int(r["blind"])
 				var waiting := bots.filter(func(b: Dictionary) -> bool: return int(b["room_blind"]) == blind)
-				candidates.append({"blind": blind, "players": maxi(4, waiting.size() + 1), "rounds_left": _rng.randi_range(2, 6)})
+				candidates.append({"blind": blind, "players": maxi(3, waiting.size() + 1), "rounds_left": _rng.randi_range(2, 6)})
 
 	var only_room := candidates.is_empty()
 	if only_room:
@@ -207,7 +207,7 @@ func find_table(fichas: int, exclude_blind: int = -1) -> Dictionary:
 	var best: Dictionary = candidates[0]
 	return {
 		"blind":       int(best["blind"]),
-		"players":     clampi(int(best["players"]), 4, 6),
+		"players":     clampi(int(best["players"]), 3, 6),
 		"rounds_left": int(best["rounds_left"]),
 		"affordable":  fichas >= int(best["blind"]) * GameState.RANKED_STACK_BLINDS,
 		"only_room":   only_room,
