@@ -100,6 +100,7 @@ if (__isIOS && window.devicePixelRatio > 2) {
 	Object.defineProperty(window, 'devicePixelRatio', { configurable: true, get: function () { return 2; } });
 }
 
+window.__BUILD = 'sem-audio-2';
 // Modo diagnóstico (?debug na URL): grava um log que sobrevive ao crash da aba e mostra, na
 // abertura seguinte, o que aconteceu antes da morte. Sem ?debug não faz nada.
 (function () {
@@ -121,7 +122,7 @@ if (__isIOS && window.devicePixelRatio > 2) {
 		try { localStorage.setItem(KEY, JSON.stringify(log)); } catch (e) {}
 		render();
 	};
-	__dbg('=== NOVA SESSAO === ' + navigator.userAgent.slice(0, 90));
+	__dbg('=== NOVA SESSAO === build=' + (window.__BUILD || '?') + ' ' + navigator.userAgent.slice(0, 90));
 	__dbg('dpr=' + window.devicePixelRatio + ' mem=' + (navigator.deviceMemory || '?') + ' screen=' + screen.width + 'x' + screen.height);
 	function vv() { var v = window.visualViewport; return v ? Math.round(v.width) + 'x' + Math.round(v.height) : '?'; }
 	if (window.visualViewport) { visualViewport.addEventListener('resize', function () { __dbg('vv resize ' + vv()); }); }
@@ -209,7 +210,7 @@ if (window.visualViewport) {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":true,"fileSizes":{"index.pck":7286608,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":true,"fileSizes":{"index.pck":7286656,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
@@ -292,6 +293,7 @@ const engine = new Engine(GODOT_CONFIG);
 		setStatusMode('progress');
 		__dbg('startGame');
 		engine.startGame({
+			'mainPack': 'index.pck?v=' + window.__BUILD,
 			'onPrint': function () { __dbg('GD ' + Array.prototype.join.call(arguments, ' ')); },
 			'onPrintError': function () { __dbg('GDERR ' + Array.prototype.join.call(arguments, ' ')); },
 			'onProgress': function (current, total) {
