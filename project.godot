@@ -20,6 +20,10 @@ run/main_scene="res://scenes/MainMenu.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
+[audio]
+
+general/default_playback_type.web=0
+
 [autoload]
 
 SaveManager="*res://scripts/autoload/save_manager.gd"
@@ -41,10 +45,6 @@ window/handheld/orientation=6
 [gui]
 
 common/drop_mouse_on_gui_input_disabled=true
-
-[audio]
-
-general/default_playback_type.web=0
 
 [rendering]
 
