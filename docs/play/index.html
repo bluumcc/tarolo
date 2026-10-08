@@ -93,71 +93,6 @@ body {
 // teclado só pelo tamanho (nada de eventos de foco, que ficam trocando a cada toque): se a altura
 // visível é bem menor que a maior já vista com a mesma largura, seguimos reportando a maior.
 // Mudanças pequenas (barra de endereço do Safari) continuam sendo seguidas normalmente.
-window.__BUILD = 'diag-3';
-// Variantes de diagnóstico (só por URL, nunca ativas por padrão): ?dpr=N força a densidade do canvas.
-(function () {
-	var m = /[?&]dpr=([0-9.]+)/.exec(location.search);
-	if (m) { var v = parseFloat(m[1]); Object.defineProperty(window, 'devicePixelRatio', { configurable: true, get: function () { return v; } }); }
-}());
-// Registro de execuções (?debug): uma linha por abertura da página, com a última batida de vida e se
-// a saída foi limpa. Uma execução sem saída limpa que parou de bater = a aba foi morta pelo sistema.
-(function () {
-	if (!/[?&]debug\b/.test(location.search)) { return; }
-	var KEY = 'tarolo_runs', id = Date.now(), runs = [];
-	try { runs = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) {}
-	var run = { id: id, q: location.search, build: window.__BUILD, ua: navigator.userAgent.slice(0, 80), alive: 0, clean: false };
-	runs.push(run); if (runs.length > 30) { runs.shift(); }
-	function save() { try { localStorage.setItem(KEY, JSON.stringify(runs)); } catch (e) {} }
-	save();
-	setInterval(function () { run.alive = Math.round((Date.now() - id) / 100) / 10; save(); }, 500);
-	window.addEventListener('pagehide', function () { run.clean = true; save(); });
-}());
-// Modo diagnóstico (?debug na URL): grava um log que sobrevive ao crash da aba e mostra, na
-// abertura seguinte, o que aconteceu antes da morte. Sem ?debug não faz nada.
-(function () {
-	if (!/[?&]debug\b/.test(location.search)) { window.__dbg = function () {}; return; }
-	var KEY = 'tarolo_dbg', t0 = Date.now(), log = [];
-	try { log = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) {}
-	var box = null;
-	function render() {
-		if (!box && document.body) {
-			box = document.createElement('pre');
-			box.style.cssText = 'position:fixed;left:0;top:0;right:0;max-height:55%;overflow:auto;margin:0;padding:4px;background:rgba(0,0,0,.82);color:#7CFC9A;font:10px/1.25 monospace;z-index:99999;pointer-events:none;white-space:pre-wrap;';
-			document.body.appendChild(box);
-		}
-		if (box) { box.textContent = log.slice(-45).join('\n'); }
-	}
-	window.__dbg = function (m) {
-		log.push(((Date.now() - t0) / 1000).toFixed(1) + 's ' + m);
-		if (log.length > 120) { log.shift(); }
-		try { localStorage.setItem(KEY, JSON.stringify(log)); } catch (e) {}
-		render();
-	};
-	__dbg('=== NOVA SESSAO === build=' + (window.__BUILD || '?') + ' ' + navigator.userAgent.slice(0, 90));
-	__dbg('dpr=' + window.devicePixelRatio + ' mem=' + (navigator.deviceMemory || '?') + ' screen=' + screen.width + 'x' + screen.height);
-	var wm = null;
-	function hook(f) { return function () { return f.apply(this, arguments).then(function (r) { try { var ex = (r.instance || r).exports; for (var k in ex) { if (ex[k] instanceof WebAssembly.Memory) { wm = ex[k]; } } } catch (e) {} return r; }); }; }
-	WebAssembly.instantiate = hook(WebAssembly.instantiate.bind(WebAssembly));
-	if (WebAssembly.instantiateStreaming) { WebAssembly.instantiateStreaming = hook(WebAssembly.instantiateStreaming.bind(WebAssembly)); }
-	function heap() { return wm ? Math.round(wm.buffer.byteLength / 1048576) + 'MB' : '?'; }
-	function vv() { var v = window.visualViewport; return v ? Math.round(v.width) + 'x' + Math.round(v.height) : '?'; }
-	if (window.visualViewport) { visualViewport.addEventListener('resize', function () { __dbg('vv resize ' + vv()); }); }
-	window.addEventListener('resize', function () { __dbg('win resize ' + innerWidth + 'x' + innerHeight); });
-	window.addEventListener('orientationchange', function () { __dbg('orientationchange'); });
-	window.addEventListener('error', function (e) { __dbg('ERR ' + e.message); });
-	window.addEventListener('unhandledrejection', function (e) { __dbg('REJ ' + e.reason); });
-	document.addEventListener('visibilitychange', function () { __dbg('visibility ' + document.visibilityState); });
-	window.addEventListener('pagehide', function () { __dbg('pagehide'); });
-	window.addEventListener('DOMContentLoaded', function () {
-		var c = document.getElementById('canvas');
-		c.addEventListener('webglcontextlost', function () { __dbg('WEBGL CONTEXT LOST'); });
-		c.addEventListener('webglcontextrestored', function () { __dbg('webgl restored'); });
-		setInterval(function () {
-			var k = document.getElementById('canvas');
-			__dbg('hb canvas=' + k.width + 'x' + k.height + ' vv=' + vv() + ' wasmheap=' + heap());
-		}, 1000);
-	});
-}());
 var __fullH = 0, __lastW = 0;
 function __vvSize() {
 	var w = Math.round(window.visualViewport.width);
@@ -226,7 +161,7 @@ if (window.visualViewport) {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":true,"fileSizes":{"index.pck":11029200,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":true,"fileSizes":{"index.pck":27656992,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
@@ -307,12 +242,7 @@ const engine = new Engine(GODOT_CONFIG);
 		}
 	} else {
 		setStatusMode('progress');
-		__dbg('startGame');
 		engine.startGame({
-			'args': /[?&]noaudio\b/.test(location.search) ? ['--audio-driver', 'Dummy'] : [],
-			'mainPack': 'index.pck?v=' + window.__BUILD,
-			'onPrint': function () { __dbg('GD ' + Array.prototype.join.call(arguments, ' ')); },
-			'onPrintError': function () { __dbg('GDERR ' + Array.prototype.join.call(arguments, ' ')); },
 			'onProgress': function (current, total) {
 				if (current > 0 && total > 0) {
 					statusProgress.value = current;
@@ -323,7 +253,6 @@ const engine = new Engine(GODOT_CONFIG);
 				}
 			},
 		}).then(() => {
-			__dbg('startGame resolved');
 			setStatusMode('hidden');
 		}, displayFailureNotice);
 	}

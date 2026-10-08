@@ -11,8 +11,6 @@ var _music: AudioStreamPlayer
 
 
 func _ready() -> void:
-	if _web_mobile():
-		return   # celular na web: sem áudio nenhum (o Safari do iPhone derrubava a aba); play() fica mudo
 	_streams["card"] = _noise_burst(0.06, 0.5)
 	_streams["chip"] = _tones([1760.0, 2637.0], 0.05, 0.35)
 	_streams["tick"] = _tones([1320.0], 0.03, 0.25)
@@ -28,23 +26,13 @@ func _ready() -> void:
 		p.bus = "SFX"
 		add_child(p)
 		_players.append(p)
-	if DisplayServer.get_name() == "headless":
-		return
 	_music = AudioStreamPlayer.new()
 	_music.bus = "Music"
 	_music.stream = _drone()
 	_music.volume_db = -14.0
 	add_child(_music)
-	var no_music := OS.has_feature("web") and bool(JavaScriptBridge.eval("/[?&]nomusic\\b/.test(location.search)", true))
-	if not no_music:
-		print("[dbg] music play")
+	if DisplayServer.get_name() != "headless":
 		_music.play()
-
-
-func _web_mobile() -> bool:
-	if not OS.has_feature("web"):
-		return false
-	return bool(JavaScriptBridge.eval("/iPhone|iPad|iPod|Android/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)", true))
 
 
 func play(name: String, pitch: float = 1.0) -> void:

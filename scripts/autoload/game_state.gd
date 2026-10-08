@@ -48,13 +48,11 @@ func table_add(deltas: Array) -> void:
 
 
 func _ready() -> void:
-	print("[dbg] GameState ready")
 	_install_symbol_font()
 	get_tree().root.theme = UIKit.build_theme()
 	apply_settings()
 	get_tree().root.size_changed.connect(_update_content_scale)
 	_update_content_scale()
-	_start_debug_stats()
 
 
 ## O navegador do celular não tem fonte com ♥ ♦ ♠ ♣ ✦ ✶ ♛ (o PC usa a fonte do sistema e
@@ -75,33 +73,12 @@ func _install_symbol_font() -> void:
 		display.allow_system_fallback = false
 
 
-## Só na web com ?debug: imprime (no painel do shell) a memória que o próprio motor enxerga.
-func _start_debug_stats() -> void:
-	if not OS.has_feature("web") or not bool(JavaScriptBridge.eval("/[?&]debug\\b/.test(location.search)", true)):
-		return
-	var t := Timer.new()
-	t.wait_time = 2.0
-	t.autostart = true
-	add_child(t)
-	t.timeout.connect(func():
-		var mb := 1.0 / 1048576.0
-		print("[mem] static=%.0fMB tex=%.0fMB buf=%.0fMB vid=%.0fMB nodes=%d res=%d obj=%d" % [
-			Performance.get_monitor(Performance.MEMORY_STATIC) * mb,
-			Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) * mb,
-			Performance.get_monitor(Performance.RENDER_BUFFER_MEM_USED) * mb,
-			Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) * mb,
-			int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
-			int(Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT)),
-			int(Performance.get_monitor(Performance.OBJECT_COUNT))]))
-
-
 ## Resolução base 1920x1200 no paisagem (PC) e 720x1280 no retrato (smartphone),
 ## para a UI não encolher pela metade em telas verticais.
 func _update_content_scale() -> void:
 	var win := get_tree().root.size
 	var portrait := win.y > win.x
 	get_tree().root.content_scale_size = Vector2i(720, 1280) if portrait else Vector2i(1920, 1200)
-	print("[dbg] content_scale win=", win, " portrait=", portrait)
 
 
 # ------------------------------------------------------------------ settings
