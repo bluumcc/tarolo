@@ -11,6 +11,8 @@ var _music: AudioStreamPlayer
 
 
 func _ready() -> void:
+	if _web_mobile():
+		return   # celular na web: sem áudio nenhum (o Safari do iPhone derrubava a aba); play() fica mudo
 	_streams["card"] = _noise_burst(0.06, 0.5)
 	_streams["chip"] = _tones([1760.0, 2637.0], 0.05, 0.35)
 	_streams["tick"] = _tones([1320.0], 0.03, 0.25)
@@ -26,8 +28,8 @@ func _ready() -> void:
 		p.bus = "SFX"
 		add_child(p)
 		_players.append(p)
-	if DisplayServer.get_name() == "headless" or _web_mobile():
-		return   # celular na web: sem música (o Safari do iPhone derrubava a aba)
+	if DisplayServer.get_name() == "headless":
+		return
 	_music = AudioStreamPlayer.new()
 	_music.bus = "Music"
 	_music.stream = _drone()
