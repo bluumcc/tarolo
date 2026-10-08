@@ -309,8 +309,11 @@ quebra, mesas se fundindo, até sobrar 1 campeão.
   jogadores (`Tournament.MIN_TABLE`/`MAX_TABLE`): 16 → 6/5/5, depois 11 → 6/5 etc., sempre com
   no máximo 1 de diferença entre mesas. Heads-up (1x1) só na final com 2 sobreviventes: nele a
   dificuldade não decide o resultado (`tests/blitz_size_sim.gd`), então o torneio o evita.
-  Se todos os rivais de você quebrarem no meio do nível, as jogadas que faltam são resolvidas
-  na hora ("mesa desfeita") e você é realocado na rodada seguinte.
+  Se sobrarem poucos na mesa no meio do nível ("mesa desfeita"), o Ritual **não vale** e você é
+  realocado na rodada seguinte. Nada some: a jogada em andamento devolve ante e blind, cada
+  sobrevivente recebe a própria entrada da profecia de volta, e o resto do pote (entrada de quem
+  foi eliminado e o acumulado) é dividido entre os sobreviventes. Não há multa nem conferência da
+  profecia com jogadas que não aconteceram (`BlitzEngine.void_remaining_tricks`).
 - **A stack viaja com o jogador.** Cada `entrant` (humano ou bot) carrega sua própria stack real
   ao longo do torneio inteiro — não é mais "mesa neutra reiniciada a cada fase". Quem quebra
   (stack chega a 0) é eliminado e sai; ninguém senta no lugar dele (ao contrário da mesa de

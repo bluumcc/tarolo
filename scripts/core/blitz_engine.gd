@@ -513,23 +513,58 @@ func walkover_player() -> int:
 	return int(active_players()[0])
 
 
-## Mesa desfeita no meio da rodada (torneio): as jogadas que faltam não são disputadas — não contam
-## vitória pra ninguém — e o palpite é conferido com o que já foi jogado. Fecha a rodada na hora.
+## Mesa desfeita no meio do nível (torneio: sobraram poucos jogadores): o nível não aconteceu e nada
+## some junto com a mesa. A jogada em andamento devolve as fichas já pagas; cada sobrevivente recebe a
+## própria entrada da profecia de volta; o que sobra no pote (entrada de quem foi eliminado e o
+## acumulado dos níveis anteriores) é dividido entre os sobreviventes. Sem conferir a profecia com
+## jogadas que não aconteceram e sem multa.
 func void_remaining_tricks() -> void:
 	if is_round_over():
 		return
+	# Jogada em andamento (ante/blind já pagos, ainda sem vencedor): cada um recebe o que pôs.
+	if trick_pot > 0.0:
+		for p in range(num_players):
+			stacks[p] += float(contrib[p])
+			contrib[p] = 0.0
+		trick_pot = 0.0
 	plays = []
 	betting = false
 	to_act = []
-	trick_pot = 0.0
-	if trick_number == 0:
-		# Nenhuma jogada foi disputada: o nível não aconteceu — devolve as entradas do palpite.
-		for p in range(num_players):
-			stacks[p] += float(stakes[p])
-			pot -= float(stakes[p])
-			stakes[p] = 0.0
+	var alive: Array = []
+	for p in range(num_players):
+		if not busted[p]:
+			alive.append(p)
+	var refunds: Array = []
+	var net: Array = []
+	for p in range(num_players):
+		var back := float(stakes[p]) if not busted[p] else 0.0
+		stacks[p] += back
+		pot -= back
+		refunds.append(back)
+		net.append(back - float(stakes[p]))
+	var pool_left := pot
+	if not alive.is_empty() and pot > 0.0:
+		var share := floorf(pot / float(alive.size()))
+		for p in alive:
+			stacks[p] += share
+			refunds[p] = float(refunds[p]) + share
+			net[p] = float(net[p]) + share
+		var rest := pot - share * float(alive.size())
+		stacks[alive[0]] += rest
+		refunds[alive[0]] = float(refunds[alive[0]]) + rest
+		net[alive[0]] = float(net[alive[0]]) + rest
 	trick_number = HAND_SIZE
-	blitz_result = _settle_blitz()
+	blitz_result = {
+		"voided": true,
+		"predicts": predicts.duplicate(), "stakes": stakes.duplicate(), "wins": wins.duplicate(), "doubles": doubles.duplicate(),
+		"hits": [], "near": [], "payouts": refunds.map(func(_x): return 0.0), "refunds": refunds, "net": net,
+		"pool": pool_left, "rake": 0.0, "carry_in": carry, "carry_out": 0.0,
+		"bonus": 0.0, "streak": hit_streak, "carry_returned": 0.0,
+	}
+	for p in range(num_players):
+		stakes[p] = 0.0
+	pot = 0.0
+	carry = 0.0
 	var deltas: Array = []
 	for p in range(num_players):
 		deltas.append(stacks[p] - level_start_stacks[p])

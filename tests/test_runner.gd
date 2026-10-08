@@ -596,9 +596,11 @@ func _test_blitz_engine() -> void:
 		vd.blitz_place(vd_p, 1 if vd_p == 0 else 5)
 	vd.wins[0] = 1   # já bateu o palpite
 	vd.trick_number = 4
+	var vd_total := SimLib.total_chips(vd)
 	vd.void_remaining_tricks()
 	check(vd.is_round_over() and int(vd.wins[0]) == 1, "mesa desfeita: nenhuma vitória de graça nas jogadas que faltavam")
-	check((vd.blitz_result["hits"] as Array).has(0), "mesa desfeita: quem já tinha batido o palpite leva o prêmio")
+	check((vd.blitz_result["hits"] as Array).is_empty() and bool(vd.blitz_result["voided"]), "mesa desfeita no meio do nível: ninguém leva prêmio com o nível incompleto")
+	check(absf(SimLib.total_chips(vd) - vd_total) < SimLib.EPS and is_zero_approx(vd.pot) and is_zero_approx(vd.carry), "mesa desfeita: nenhuma ficha some, todas voltam pros jogadores")
 	# Desfeita antes de qualquer jogada: o nível não aconteceu, as entradas voltam
 	var vz := BlitzEngine.new()
 	vz.setup_match({"seed": 9, "levels": 1, "blind": 10, "players": 3, "stacks": [500.0, 500.0, 500.0]})
@@ -606,6 +608,24 @@ func _test_blitz_engine() -> void:
 		vz.blitz_place(vz_p, 2)
 	vz.void_remaining_tricks()
 	check(is_equal_approx(float(vz.stacks[0]) + float(vz.stacks[1]) + float(vz.stacks[2]), 1500.0) and is_equal_approx(float(vz.stacks[0]), 500.0), "mesa desfeita antes da 1ª jogada devolve as entradas do palpite")
+
+	# Desfeita no meio do nível com alguém eliminado e uma jogada em andamento: nada some.
+	var vm := BlitzEngine.new()
+	vm.setup_match({"seed": 12, "levels": 1, "blind": 10, "players": 3, "stacks": [500.0, 500.0, 500.0]})
+	_discard_all(vm)
+	for vm_p in range(3):
+		vm.blitz_place(vm_p, 2)
+	vm.begin_trick()   # ante e blind já pagos, jogada sem vencedor
+	var vm_stake := float(vm.stakes[2])
+	var vm_before := SimLib.total_chips(vm)
+	vm.busted[2] = true
+	vm.folded[2] = true
+	vm.void_remaining_tricks()
+	var vm_after := float(vm.stacks[0]) + float(vm.stacks[1]) + float(vm.stacks[2])
+	check(absf(SimLib.total_chips(vm) - vm_before) < SimLib.EPS and absf(vm_after - 1500.0) < SimLib.EPS, "mesa desfeita no meio de uma jogada: ante e blind pagos voltam, nenhuma ficha some")
+	check(vm.stacks[0] > 500.0 - 0.01 and vm.stacks[1] > 500.0 - 0.01 and vm_stake > 0.0, "mesa desfeita: os sobreviventes não saem no prejuízo")
+	check(absf(float(vm.stacks[0]) - float(vm.stacks[1])) <= 1.0, "mesa desfeita: a entrada de quem foi eliminado é dividida entre os sobreviventes")
+	check(bool(vm.blitz_result["voided"]) and is_zero_approx(vm.carry) and is_zero_approx(vm.pot) and is_zero_approx(vm.trick_pot), "mesa desfeita não deixa pote nem acumulado pra uma mesa que acabou")
 
 	# ---- Aposta estilo poker
 	var p1 := BlitzEngine.new()

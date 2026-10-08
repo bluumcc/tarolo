@@ -38,6 +38,8 @@ var selected_view: CardView
 var throw_from := Vector2.ZERO
 var has_throw_from := false
 var status_label: Label
+const BANNER_FONT_MIN := 15
+var banner_font := 26           # fonte cheia do aviso (a de `_fit_banner` parte daqui)
 var banner_title: Label         # aviso de ação ("Fulano pagou", "Sua vez"...): linha no card do header, embaixo dos losangos
 var clock_on := false          # relógio da vez rodando (card TEMPO)
 var clock_left := 0.0
@@ -320,7 +322,13 @@ func _build_ui() -> void:
 func _build_banner(parent: Control) -> void:
 	banner_title = UIKit.serif_label("", 22, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	banner_title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	# A largura do aviso nunca depende do texto: um Label sem corte alarga o card e estica a mesa
+	# inteira pra fora da tela enquanto o aviso estiver visível. `_fit_banner` reduz a fonte antes.
+	banner_title.clip_text = true
+	banner_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	banner_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	banner_title.custom_minimum_size = Vector2(0, 28)   # altura reservada: nada se mexe quando o aviso aparece
+	banner_font = banner_title.get_theme_font_size("font_size")
 	banner_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	parent.add_child(banner_title)
 
@@ -1059,6 +1067,7 @@ func _banner(title: String, sub: String, color: Color) -> void:
 	if docked_wide:
 		_log_push(title, tone)
 	banner_title.text = title
+	_fit_banner()
 	banner_title.add_theme_color_override("font_color", tone)
 	banner_title.modulate.a = 0.0
 	create_tween().tween_property(banner_title, "modulate:a", 1.0, GameState.anim(0.12))
@@ -1084,6 +1093,19 @@ func _tone(c: Color) -> Color:
 ## Nome pro aviso: "Você" ou o nome do rival (só a inicial maiúscula).
 func _pname(p: int) -> String:
 	return "Você" if p == 0 else str(config["names"][p]).capitalize()
+
+
+## Encolhe a fonte do aviso (até BANNER_FONT_MIN) pra o texto caber na largura do card; se mesmo
+## assim não couber, o corte com reticências do próprio Label segura.
+func _fit_banner() -> void:
+	var avail := banner_title.size.x
+	if avail < 80.0 and banner_title.get_parent_control() != null:
+		avail = banner_title.get_parent_control().size.x - 24.0
+	var font := banner_title.get_theme_font("font")
+	var fs := banner_font
+	while fs > BANNER_FONT_MIN and font.get_string_size(banner_title.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > avail:
+		fs -= 1
+	banner_title.add_theme_font_size_override("font_size", fs)
 
 
 func _banner_clear() -> void:
@@ -1776,11 +1798,11 @@ func _fast_forward_if_alone() -> bool:
 	var other_tables := (GameState.tournament.get("tables", []) as Array).size() > 1
 	if alive > 2 or (alive == 2 and not other_tables):
 		return false
-	_banner("Mesa desfeita", "Sobraram poucos nessa mesa. As jogadas que faltam não valem; a profecia vale pelo que já foi jogado.", UIKit.MUTED)
+	_banner("Mesa desfeita", "Sobraram poucos nessa mesa. O Ritual não vale: as entradas voltam pra quem ficou.", UIKit.MUTED)
 	await _wait(2.2)
 	if not is_inside_tree() or finished:
 		return true
-	engine.void_remaining_tricks()   # sem vitórias de graça: a profecia é conferida com as jogadas disputadas
+	engine.void_remaining_tricks()   # o Ritual não vale: nada some, as entradas voltam pra quem ficou
 	_banner_clear()
 	_refresh_hud()
 	return true
@@ -2017,13 +2039,18 @@ func _show_round_summary() -> String:
 			var b: Dictionary = r["blitz"]
 			var hit: bool = (b["hits"] as Array).has(p)
 			var near: bool = (b["near"] as Array).has(p)
-			var verdict := "ACERTOU ✓" if hit else ("ERROU POR 1" if near else "ERROU ✕")
-			var sub_l := UIKit.label("profecia %d · fez %d · %s%s" % [int(b["predicts"][p]), int(b["wins"][p]), verdict, " · ×%d" % (1 + int(b["doubles"][p])) if int(b["doubles"][p]) > 0 else ""], 22, UIKit.OK if hit else (UIKit.MUTED if near else UIKit.LOSS), HORIZONTAL_ALIGNMENT_CENTER)
+			var voided_lvl := bool(b.get("voided", false))
+			var verdict := "ENTRADA DEVOLVIDA" if voided_lvl else ("ACERTOU ✓" if hit else ("ERROU POR 1" if near else "ERROU ✕"))
+			var sub_l := UIKit.label("profecia %d · fez %d · %s%s" % [int(b["predicts"][p]), int(b["wins"][p]), verdict, " · ×%d" % (1 + int(b["doubles"][p])) if int(b["doubles"][p]) > 0 else ""], 22, UIKit.OK if hit else (UIKit.MUTED if (near or voided_lvl) else UIKit.LOSS), HORIZONTAL_ALIGNMENT_CENTER)
 			v.add_child(sub_l)
 	if r.has("blitz") and float(r["blitz"]["bonus"]) > 0.0:
 		var bl := UIKit.label("Prêmio de sequência da casa: +◎%d (%d acertos seguidos)" % [int(r["blitz"]["bonus"]), int(r["blitz"]["streak"])], 24, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
 		bl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(bl)
+	if r.has("blitz") and bool(r["blitz"].get("voided", false)):
+		var vl := UIKit.label("Mesa desfeita: o Ritual não valeu e ninguém perdeu entrada.", 24, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		vl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(vl)
 	if r.has("blitz") and float(r["blitz"]["carry_out"]) > 0.0:
 		var cl := UIKit.label("Ninguém acertou: ◎%d acumulam pro próximo Ritual" % int(r["blitz"]["carry_out"]), 24, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
 		cl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -3035,7 +3062,11 @@ func _blitz_settlement() -> void:
 		return
 	var title := ""
 	var col := UIKit.MONEY
-	if hits.is_empty():
+	var voided := bool(br.get("voided", false))
+	if voided:
+		title = "Mesa desfeita: entradas devolvidas"
+		col = UIKit.MUTED
+	elif hits.is_empty():
 		title = "Ninguém acertou"
 		col = UIKit.COMBO
 	else:
@@ -3043,7 +3074,7 @@ func _blitz_settlement() -> void:
 		title = "%s acertou" % names[0] if names.size() == 1 else "Acertaram: %s" % " e ".join(names)
 		col = UIKit.OK if hits.has(0) else UIKit.INK
 	_banner(title, "", col)
-	Sfx.play("win" if hits.has(0) else ("lose" if hits.is_empty() else "chip"))
+	Sfx.play("chip" if voided else ("win" if hits.has(0) else ("lose" if hits.is_empty() else "chip")))
 	var pot_at := _global_center(pot_box)
 	for p in range(engine.num_players):
 		var payout := float(br["payouts"][p])
@@ -3058,6 +3089,8 @@ func _blitz_settlement() -> void:
 					Sfx.play("jackpot")
 					FX.chip_rain(popup_layer, 22)
 			await _wait(0.5)
+		elif voided and net > 0.0:
+			FX.float_text(popup_layer, _seat_center(p), "+◎ " + UIKit.fmt_short(net), UIKit.OK)
 		elif net < 0.0:
 			FX.float_text(popup_layer, _seat_center(p), "−◎ " + UIKit.fmt_short(absf(net)), UIKit.LOSS)
 	if float(br["net"][0]) > best_gain:
