@@ -9,7 +9,7 @@ func _ready() -> void:
 		var kv := a.trim_prefix("--").split("=")
 		args[kv[0]] = kv[1] if kv.size() > 1 else ""
 	SaveManager.persist = false
-	SaveManager.section("profile")["fichas"] = maxi(int(SaveManager.section("profile").get("fichas", 0)), 5000)   # sempre há fichas pra sentar na mesa
+	SaveManager.section("profile")["fichas"] = maxi(int(SaveManager.section("profile").get("fichas", 0)), 5000000)   # sempre há fichas pra sentar na mesa
 	var scene: String = str(args.get("scene", "menu"))
 	if args.has("speed"):
 		Engine.time_scale = float(args["speed"])   # acelera timers/tweens (a jogada do humano estoura sozinha)
@@ -20,7 +20,7 @@ func _ready() -> void:
 	var path: String = lookup[scene]
 	GameState.autoplay = scene == "game" or args.has("auto")
 	if args.has("players"):
-		GameState.ranked_table = {"blind": 10, "stack_blinds": 40, "players": int(args["players"])}   # mesa rankeada de N lugares
+		GameState.ranked_table = {"blind": int(args.get("blind", "10")), "stack_blinds": int(args.get("stack_blinds", "40")), "players": int(args["players"])}   # mesa rankeada de N lugares
 	if args.has("hand_layout"):
 		SaveManager.section("settings")["hand_layout"] = str(args["hand_layout"])
 	if scene == "tutorial":
