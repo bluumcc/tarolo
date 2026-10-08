@@ -126,6 +126,7 @@ static func legal_cards_for(hand: Array, plays: Array, must_cover: bool, modifie
 ## Índice da carta vencedora sob um modificador de jogada (-1 = nenhum). O Louco só vence na Loucura.
 ##  - Loucura: O Louco vence qualquer carta, até arcano maior.
 ##  - Oposição: vence a MENOR carta do naipe líder; Trunfo só vale se abriu a jogada (aí o naipe é Trunfo).
+##    Nessa jogada de Trunfo, O Louco conta como o menor arcano maior (abaixo do Mago) e vence.
 ##  - Silêncio: Trunfo não corta; vence a MAIOR carta do naipe líder (se o Trunfo abriu, eles disputam).
 ##  - Pitagórico: vence o maior Trunfo, se houver; senão o maior número, qualquer naipe (empate: ver TIE_ORDER).
 static func winning_index_mod(plays: Array, modifier: int) -> int:
@@ -138,12 +139,16 @@ static func winning_index_mod(plays: Array, modifier: int) -> int:
 					return i
 		mods.VAZA_INVERTIDA:
 			var low := -1
+			var low_rank := 0
 			for i in range(plays.size()):
 				var c: CardData = plays[i]["card"]
-				if c.is_louco() or c.suit != ls:
+				var louco_baixo := c.is_louco() and ls == CardData.Suit.TRUNFO   # o Louco é o arcano 0
+				if not louco_baixo and (c.is_louco() or c.suit != ls):
 					continue
-				if low == -1 or c.rank < (plays[low]["card"] as CardData).rank:
+				var r := 0 if louco_baixo else c.rank
+				if low == -1 or r < low_rank:
 					low = i
+					low_rank = r
 			if low != -1:
 				return low
 		mods.SILENCIO:

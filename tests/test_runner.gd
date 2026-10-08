@@ -385,6 +385,25 @@ func _test_blitz_engine() -> void:
 		{"player": 3, "card": c(4, 20)},
 	]
 	check(TrickRules.winning_index_mod(opo_trunfo, mods.VAZA_INVERTIDA) == 1, "Oposição: se o arcano maior abriu, vence o menor arcano maior")
+	var opo_louco := [
+		{"player": 0, "card": c(4, 15)},
+		{"player": 1, "card": c(4, 2)},
+		{"player": 2, "card": CardData.louco()},
+		{"player": 3, "card": c(4, 1)},
+	]
+	check(TrickRules.winning_index_mod(opo_louco, mods.VAZA_INVERTIDA) == 2, "Oposição: com arcano maior aberto, O Louco (0) vence até o Mago (1)")
+	var opo_louco_aberto := [
+		{"player": 0, "card": CardData.louco()},
+		{"player": 1, "card": c(4, 7)},
+		{"player": 2, "card": c(4, 3)},
+	]
+	check(TrickRules.winning_index_mod(opo_louco_aberto, mods.VAZA_INVERTIDA) == 0, "Oposição: O Louco que abre a jogada de arcano maior também é o menor")
+	var opo_louco_naipe := [
+		{"player": 0, "card": c(1, 9)},
+		{"player": 1, "card": CardData.louco()},
+		{"player": 2, "card": c(1, 3)},
+	]
+	check(TrickRules.winning_index_mod(opo_louco_naipe, mods.VAZA_INVERTIDA) == 2, "Oposição: em naipe comum O Louco segue sem naipe e não vence")
 
 	# Silêncio: arcano maior não vence naipe (vence a maior do naipe). Se ele abriu, disputam entre si.
 	var sil := [

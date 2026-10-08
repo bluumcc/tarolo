@@ -37,7 +37,7 @@ const ICONS := {
 ## Texto curto (uma linha, entende-se em segundos). Serve de descrição na tela e na faixa da mesa.
 const DESCRIPTIONS := {
 	Modifier.LOUCO_VENCE: "O Louco vence qualquer carta, até arcano maior.",
-	Modifier.VAZA_INVERTIDA: "Vence a menor carta do naipe. Arcano maior só vale se abrir a jogada.",
+	Modifier.VAZA_INVERTIDA: "Vence a menor carta do naipe. Arcano maior só vale se abrir a jogada (e aí O Louco é o menor deles).",
 	Modifier.VAZA_DOURADA: "O vencedor conta 2 vitórias na profecia.",
 	Modifier.SAQUE: "O vencedor rouba 3 blinds, divididos entre os rivais.",
 	Modifier.ASSALTO_LIDER: "O vencedor rouba 3 blinds do rival com mais fichas.",
@@ -49,7 +49,7 @@ const DESCRIPTIONS := {
 ## Dica de jogada — o que fazer DIFERENTE por causa do modificador dessa jogada.
 const TIPS := {
 	Modifier.LOUCO_VENCE: "Quem tiver O Louco na mão ganha a jogada na hora, se o jogar.",
-	Modifier.VAZA_INVERTIDA: "Jogue baixo para ganhar. Se um arcano maior abrir a jogada, vence o menor arcano maior.",
+	Modifier.VAZA_INVERTIDA: "Jogue baixo para ganhar. Se um arcano maior abrir a jogada, vence o menor arcano maior: O Louco conta como o menor de todos.",
 	Modifier.VAZA_DOURADA: "Faltam 2 vitórias para a sua profecia? Ganhar só essa já fecha a conta. Se não quer ganhar, fuja dela.",
 	Modifier.SAQUE: "Ganhar rende fichas dos rivais, além de contar a vitória. Só ganhe se também servir à sua profecia.",
 	Modifier.ASSALTO_LIDER: "Rouba do rival com mais fichas na mesa, não de quem está perto na profecia.",
