@@ -4,7 +4,7 @@ extends SceneTree
 ## estilo virar dominado pelos outros dois; (3) a escada Difícil > Normal > Fácil quebrar.
 ## Uso: godot --headless --path . -s res://tests/blitz_gate.gd
 
-const SESSIONS := 24
+const SESSIONS := 80   # 24 era pequeno demais: qualquer mudança de regra reembaralhava e dava falso alarme
 const LEVELS := 16
 var fails := 0
 
