@@ -270,7 +270,15 @@ static func bet_decision(engine: BlitzEngine, player: int, difficulty: int, rng:
 			steps = rng.randi_range(2, 3)
 		elif pwin >= 0.5:
 			steps = rng.randi_range(1, 2)
-		var to := float(engine.bet_level) + blind * float(steps)
+		# Tamanho do aumento: no mínimo 1–3 blinds, e com pote grande acompanha o pote (1/3, 1/2 ou
+		# 3/4 dele), pra uma aposta deixar de ser trocado com 80 blinds na mesa.
+		var pot_frac := 0.33 if steps == 1 else (0.5 if steps == 2 else 0.75)
+		var size := maxf(blind * float(steps), float(opt["pot"]) * pot_frac)
+		# Não joga mais que 1/3 do que tem de uma vez, salvo mão muito forte (ou o stack já é curto).
+		var eff_stack := float(engine.stacks[player]) + float(engine.contrib[player])
+		if pwin < 0.75:
+			size = minf(size, maxf(blind * float(steps), eff_stack / 3.0))
+		var to := float(engine.bet_level) + size
 		to = clampf(to, float(opt["min_to"]), float(opt["max_to"]))
 		if pwin >= 0.92 and rng.randf() < 0.1:
 			to = float(opt["max_to"])
@@ -282,7 +290,13 @@ static func bet_decision(engine: BlitzEngine, player: int, difficulty: int, rng:
 		return {"action": "check", "to": 0.0, "bluff": false}
 	var call_amt: float = opt["call"]
 	var odds := call_amt / (float(opt["pot"]) + call_amt)
-	if pwin > odds * call_margin or (bluffing and rng.randf() < 0.5):
+	# Pagar muito do próprio stack pede mão mais forte; quem já pôs metade do que tinha está
+	# "preso" ao pote e paga com a margem normal.
+	var stack_now := float(engine.stacks[player])
+	var committed := float(engine.contrib[player]) >= stack_now
+	var risk := call_amt / maxf(stack_now, 1.0)
+	var margin := call_margin if committed else call_margin + 0.5 * maxf(0.0, risk - 0.25)
+	if pwin > odds * margin or (bluffing and rng.randf() < 0.5):
 		return {"action": "call", "to": 0.0, "bluff": false}
 	return {"action": "fold", "to": 0.0, "bluff": false}
 

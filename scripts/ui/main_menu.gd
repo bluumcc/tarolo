@@ -783,27 +783,61 @@ func _reopen_settings() -> void:
 	_open_settings()
 
 
-## Rankeada = Blitz, numa fila única: procura uma sala com gente (e que o saldo pague), mostra
-## buy-in e blind, e você escolhe ENTRAR, PROCURAR OUTRA ou SAIR. Os pontos valem igual em toda sala.
+## Ranqueada = Blitz, numa fila única com 5 níveis. Você escolhe o nível num popup de cards (o saldo
+## precisa pagar o buy-in de 80 blinds), o jogo procura uma mesa dele e você escolhe ENTRAR, PROCURAR
+## OUTRA ou SAIR. Os pontos valem igual em todos os níveis.
 func _start_ranked_matchmaking() -> void:
-	_ranked_search(-1)
-
-
-func _ranked_search(exclude_blind: int) -> void:
 	var fichas := int(SaveManager.section("profile")["fichas"])
 	if GameState.ranked_rooms_open(fichas).is_empty():
-		var cheapest := GameState.ranked_room_buy_in(GameState.RANKED_ROOMS[0])
-		var v := _modal("FICHAS INSUFICIENTES")
-		var msg := UIKit.label("A menor sala pede ◎%s pra sentar." % UIKit.fmt_int(cheapest), 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-		msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		v.add_child(msg)
-		var shop := UIKit.button("RECARGA E PACOTES", UIKit.OK)
-		shop.pressed.connect(func(): _close_modal(); _open_fichas())
-		v.add_child(shop)
-		var cl := UIKit.button("FECHAR", UIKit.MUTED)
-		cl.pressed.connect(_close_modal)
-		v.get_meta("modal_footer", v).add_child(cl)
+		_ranked_no_funds()
 		return
+	_ranked_pick_level(fichas)
+
+
+func _ranked_no_funds() -> void:
+	var cheapest := GameState.ranked_room_buy_in(GameState.RANKED_ROOMS[0])
+	var v := _modal("FICHAS INSUFICIENTES")
+	var msg := UIKit.label("O nível mais barato pede ◎%s pra sentar." % UIKit.fmt_int(cheapest), 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(msg)
+	var shop := UIKit.button("RECARGA E PACOTES", UIKit.OK)
+	shop.pressed.connect(func(): _close_modal(); _open_fichas())
+	v.add_child(shop)
+	var cl := UIKit.button("FECHAR", UIKit.MUTED)
+	cl.pressed.connect(_close_modal)
+	v.get_meta("modal_footer", v).add_child(cl)
+
+
+## Popup com os 5 níveis. Os que o saldo não paga ficam apagados e mostram quanto falta.
+func _ranked_pick_level(fichas: int) -> void:
+	var v := _modal("RANQUEADA")
+	var hint := UIKit.label("Escolha o nível da mesa. Buy-in de %d blinds." % GameState.RANKED_STACK_BLINDS, 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(hint)
+	for room in GameState.RANKED_ROOMS:
+		var blind := int(room["blind"])
+		var cost := GameState.ranked_room_buy_in(room)
+		var ok := fichas >= cost
+		var b := UIKit.button("%s  %s" % [str(room["numeral"]), str(room["name"])], UIKit.ACTION if ok else UIKit.MUTED, 28)
+		b.custom_minimum_size = Vector2(0, 76)
+		b.disabled = not ok
+		b.pressed.connect(func():
+			_close_modal()
+			_ranked_search(blind))
+		v.add_child(b)
+		var info := "Blind ◎%s  ·  Buy-in ◎%s" % [UIKit.fmt_int(blind), UIKit.fmt_int(cost)]
+		if not ok:
+			info += "  ·  faltam ◎%s" % UIKit.fmt_int(cost - fichas)
+		v.add_child(UIKit.label(info, 20, UIKit.MONEY if ok else UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+	var cl := UIKit.button("FECHAR", UIKit.MUTED)
+	cl.pressed.connect(_close_modal)
+	v.get_meta("modal_footer", v).add_child(cl)
+
+
+## Procura uma mesa do nível `level_blind` e mostra o resultado.
+func _ranked_search(level_blind: int) -> void:
+	var fichas := int(SaveManager.section("profile")["fichas"])
+	var level := GameState.ranked_room_for_blind(level_blind)
 
 	var ov := UIKit.overlay()
 	_overlay.add_child(ov)
@@ -812,8 +846,8 @@ func _ranked_search(exclude_blind: int) -> void:
 	bv.add_theme_constant_override("separation", 20)
 	bv.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 96.0, 520.0), 0)
 	box.add_child(bv)
-	bv.add_child(UIKit.label("RANQUEADA", 38, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
-	var status_lbl := UIKit.label("Procurando sala...", 26, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	bv.add_child(UIKit.label("%s  %s" % [str(level["numeral"]), str(level["name"])], 38, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+	var status_lbl := UIKit.label("Procurando mesa...", 26, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	status_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bv.add_child(status_lbl)
 	var cancel_btn := UIKit.button("CANCELAR", UIKit.MUTED, 24)
@@ -828,13 +862,13 @@ func _ranked_search(exclude_blind: int) -> void:
 	while elapsed < wait:
 		if not is_instance_valid(ov):
 			return
-		status_lbl.text = "Procurando sala...  %ds" % (int(elapsed) + 1)
+		status_lbl.text = "Procurando mesa...  %ds" % (int(elapsed) + 1)
 		await get_tree().create_timer(GameState.anim(0.25)).timeout
 		elapsed += 0.25
 	if not is_instance_valid(ov):
 		return
 
-	var room := GameState.find_ranked_room(fichas, exclude_blind)
+	var room := GameState.find_ranked_room(fichas, level_blind)
 	var lobby := GameState.find_ranked_lobby()
 	var names := ", ".join(lobby.map(func(p: Dictionary) -> String: return str(p["name"])))
 	UIKit.sfx("combo")
@@ -844,8 +878,7 @@ func _ranked_search(exclude_blind: int) -> void:
 	var n_found: int = int(room.get("players", 4))
 	var affordable: bool = bool(room.get("affordable", true))
 	var rounds_left: int = int(room.get("rounds_left", 0))
-	var only_room: bool = bool(room.get("only_room", false))
-	bv.add_child(UIKit.label("SALA ENCONTRADA", 34, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
+	bv.add_child(UIKit.label("MESA ENCONTRADA", 34, UIKit.DANGER, HORIZONTAL_ALIGNMENT_CENTER))
 	var info_color := UIKit.MONEY if affordable else UIKit.MUTED
 	bv.add_child(UIKit.label("Buy-in ◎%s  ·  Blind ◎%s  ·  %d jogadores" % [UIKit.fmt_int(GameState.ranked_room_buy_in(room)), UIKit.fmt_int(blind), n_found], 26, info_color, HORIZONTAL_ALIGNMENT_CENTER))
 	if rounds_left > 0:
@@ -883,9 +916,6 @@ func _ranked_search(exclude_blind: int) -> void:
 	var other := UIKit.button("PROCURAR OUTRA", UIKit.PURPLE, 22)
 	other.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	other.custom_minimum_size = Vector2(0, 64)
-	if only_room:
-		other.disabled = true
-		other.tooltip_text = "Só existe essa sala no momento"
 	other.pressed.connect(func():
 		ov.queue_free()
 		_ranked_search(blind))

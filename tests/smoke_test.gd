@@ -114,10 +114,33 @@ func _run() -> void:
 		print("Blitz %d: %dº lugar | %s" % [i + 1, int(s["placement"]) + 1, " | ".join(s["lines"])])
 	check((GameState.ranked()["history"] as Array).size() == 8, "fila única: toda mesa de blitz completa aplica LP/MMR (tem %d)" % (GameState.ranked()["history"] as Array).size())
 
+	# Os 5 níveis: cada um acha mesa do próprio blind, com 3 a 6 lugares; o popup abre e lista os 5.
+	check(GameState.RANKED_ROOMS.size() == 5, "ranqueada tem 5 níveis")
+	for r in GameState.RANKED_ROOMS:
+		var found := GameState.find_ranked_room(10000000, int(r["blind"]))
+		check(int(found["blind"]) == int(r["blind"]) and int(found["players"]) >= 3 and int(found["players"]) <= 6 and bool(found["affordable"]), "nível %s acha mesa do próprio blind" % r["name"])
+		check(not bool(GameState.find_ranked_room(0, int(r["blind"]))["affordable"]), "nível %s sem saldo não é acessível" % r["name"])
+	SaveManager.section("profile")["fichas"] = 2000
+	var pm := await _open("res://scenes/MainMenu.tscn")
+	pm._start_ranked_matchmaking()
+	await get_tree().process_frame
+	var enabled := 0
+	var total := 0
+	for n in pm._overlay.find_children("*", "Button", true, false):
+		if (n as Button).text.contains("  O ") or (n as Button).text.contains("  A "):
+			total += 1
+			if not (n as Button).disabled:
+				enabled += 1
+	check(total == 5, "popup lista os 5 níveis (%d)" % total)
+	check(enabled == 1, "com ◎2.000 só o nível de blind 10 (◎800) está liberado; o de blind 30 pede ◎2.400 (%d)" % enabled)
+	pm.queue_free()
+	await get_tree().process_frame
+
 	# Mesa ranqueada de 6 lugares: gente sai e entra durante a partida (3 a 6 sentados no começo).
 	var before: int = (GameState.ranked()["history"] as Array).size()
 	for i in range(6):
-		GameState.ranked_table = {"blind": 20, "stack_blinds": GameState.RANKED_STACK_BLINDS, "players": 3 + (i % 4)}
+		SaveManager.section("profile")["fichas"] = 200000   # a mesa cobra o buy-in de 80 blinds do nível
+		GameState.ranked_table = {"blind": int(GameState.RANKED_ROOMS[i % 5]["blind"]), "stack_blinds": GameState.RANKED_STACK_BLINDS, "players": 3 + (i % 4)}
 		var s := await _play_blitz()
 		check(int(s["placement"]) >= 0, "mesa ranqueada %d (%d sentados): terminou" % [i + 1, 3 + (i % 4)])
 	GameState.ranked_table = {}

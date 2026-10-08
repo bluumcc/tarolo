@@ -156,15 +156,16 @@ const BLITZ_TABLES := [
 ]
 var blitz_table := 0
 
-## Rankeada = fila única com poucas salas (buy-in e blind fixos por sala). Quem busca partida cai
-## numa sala que tenha gente e que o saldo pague; os pontos valem igual em qualquer sala.
+## Ranqueada = fila única com 5 níveis (arcanos). Quem toca em JOGAR escolhe o nível e o jogo procura
+## uma mesa dele. O buy-in é fixo (80 blinds) em todos; os pontos valem igual em qualquer nível.
 const RANKED_ROOMS := [
-	{"blind": 10,   "weight": 4},
-	{"blind": 50,   "weight": 3},
-	{"blind": 250,  "weight": 2},
-	{"blind": 1000, "weight": 1},
+	{"name": "O LOUCO",       "numeral": "0",   "blind": 10},
+	{"name": "O MAGO",        "numeral": "I",   "blind": 30},
+	{"name": "A SACERDOTISA", "numeral": "II",  "blind": 100},
+	{"name": "O IMPERADOR",   "numeral": "IV",  "blind": 300},
+	{"name": "O MUNDO",       "numeral": "XXI", "blind": 1000},
 ]
-const RANKED_STACK_BLINDS := 40   # buy-in de toda sala: 40 blinds
+const RANKED_STACK_BLINDS := 80   # buy-in de todo nível: 80 blinds (stack fundo, joga à vontade)
 var ranked_table := {}   # {blind, stack_blinds} da mesa ranqueada que está sendo aberta
 
 
@@ -179,8 +180,16 @@ func ranked_rooms_open(fichas: int) -> Array:
 
 ## Delega ao ecossistema ao vivo (RankedEco). Retorna a sala mais acessível excluindo `exclude_blind`.
 ## Campos do resultado: blind, players, rounds_left, affordable, only_room.
-func find_ranked_room(fichas: int, exclude_blind: int = -1) -> Dictionary:
-	return RankedEco.find_table(fichas, exclude_blind)
+func find_ranked_room(fichas: int, blind: int) -> Dictionary:
+	return RankedEco.find_table(fichas, blind)
+
+
+## Nível (RANKED_ROOMS) do blind dado.
+func ranked_room_for_blind(blind: int) -> Dictionary:
+	for r in RANKED_ROOMS:
+		if int(r["blind"]) == blind:
+			return r
+	return RANKED_ROOMS[0]
 
 
 
@@ -227,7 +236,7 @@ func blitz_config() -> Dictionary:
 		difficulty = [BotAI.Difficulty.NORMAL]
 		for _i in range(n_players - 1):
 			difficulty.append(d)
-		table_name = "Ranqueada · blind ◎%d · mesa de %d lugares" % [blind, n_players]
+		table_name = "Ranqueada · %s · blind ◎%d" % [str(ranked_room_for_blind(blind)["name"]).capitalize(), blind]
 		stacks = [float(buy_in)]
 		for i in range(1, n_players):
 			stacks.append(0.0 if vacant.has(i) else float(randi_range(int(BlitzEconomy.BOT_STACK_BLINDS[0]), int(BlitzEconomy.BOT_STACK_BLINDS[1])) * blind))

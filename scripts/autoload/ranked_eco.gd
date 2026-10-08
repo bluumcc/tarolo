@@ -166,51 +166,36 @@ func _natural_churn() -> void:
 
 # ── API para o matchmaking ─────────────────────────────────────────────────
 
-## Retorna a mesa mais acessível ao jogador excluindo o blind recusado.
-## Campos: blind, players, rounds_left, affordable, only_room.
-func find_table(fichas: int, exclude_blind: int = -1) -> Dictionary:
-	# Candidatos: mesas com vaga ou prestes a terminar (player entra na próxima)
+## Procura uma mesa do nível (blind) escolhido pelo jogador.
+## Campos: blind, players, rounds_left, affordable.
+func find_table(fichas: int, level_blind: int) -> Dictionary:
+	# Candidatos do nível escolhido: mesas com vaga ou prestes a terminar (você entra na próxima)
 	var candidates: Array = []
 	for table in tables:
-		if int(table["blind"]) == exclude_blind:
+		if int(table["blind"]) != level_blind:
 			continue
 		var sz := (table["seats"] as Array).size()
 		var rl  := int(table["rounds_left"])
 		if sz < 6 or rl <= 1:
-			candidates.append({"blind": int(table["blind"]), "players": sz, "rounds_left": rl})
+			candidates.append({"players": sz, "rounds_left": rl})
 
-	# Salas com fila suficiente para formar mesa imediata
-	for r in GameState.RANKED_ROOMS:
-		var blind := int(r["blind"])
-		if blind == exclude_blind:
-			continue
-		var waiting := bots.filter(func(b: Dictionary) -> bool: return int(b["status"]) == 1 and int(b["room_blind"]) == blind)
-		if waiting.size() >= 2:
-			candidates.append({"blind": blind, "players": waiting.size() + 1, "rounds_left": 0})
+	# Fila suficiente para formar mesa imediata
+	var waiting := bots.filter(func(b: Dictionary) -> bool: return int(b["status"]) == 1 and int(b["room_blind"]) == level_blind)
+	if waiting.size() >= 2:
+		candidates.append({"players": waiting.size() + 1, "rounds_left": 0})
 
-	# Fallback: qualquer sala exceto a excluída
+	# Nível sem gente (os níveis caros têm poucos bots com saldo): monta uma mesa na hora
 	if candidates.is_empty():
-		for r in GameState.RANKED_ROOMS:
-			if int(r["blind"]) != exclude_blind:
-				var blind := int(r["blind"])
-				var waiting := bots.filter(func(b: Dictionary) -> bool: return int(b["room_blind"]) == blind)
-				candidates.append({"blind": blind, "players": maxi(3, waiting.size() + 1), "rounds_left": _rng.randi_range(2, 6)})
-
-	var only_room := candidates.is_empty()
-	if only_room:
-		# Único recurso: a sala excluída de volta
-		for r in GameState.RANKED_ROOMS:
-			candidates.append({"blind": int(r["blind"]), "players": 4, "rounds_left": _rng.randi_range(1, 5)})
+		candidates.append({"players": _rng.randi_range(3, 6), "rounds_left": 0})
 
 	# Prefere mesa prestes a abrir (rounds_left baixo)
 	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["rounds_left"]) < int(b["rounds_left"]))
 	var best: Dictionary = candidates[0]
 	return {
-		"blind":       int(best["blind"]),
-		"players":     clampi(int(best["players"]), 3, 6),
+		"blind":       level_blind,
+		"players":     clampi(int(best["players"]), BlitzEngine.MIN_SEATED, BlitzEngine.TABLE_SEATS),
 		"rounds_left": int(best["rounds_left"]),
-		"affordable":  fichas >= int(best["blind"]) * GameState.RANKED_STACK_BLINDS,
-		"only_room":   only_room,
+		"affordable":  fichas >= level_blind * GameState.RANKED_STACK_BLINDS,
 	}
 
 

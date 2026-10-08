@@ -929,6 +929,22 @@ func _test_blitz_engine() -> void:
 		if BlitzBot.bet_decision(pb, 3, BotAI.Difficulty.HARD, pbr)["action"] == "raise":
 			raises_strong += 1
 	check(raises_strong > raises, "bot aumenta mais com mão forte que com mão fraca (%d > %d)" % [raises_strong, raises])
+	# Stack e blind: com pote grande e stack fundo, o aumento forte acompanha o pote (não fica em 1–3 blinds).
+	var pd := BlitzEngine.new()
+	pd.setup_match({"seed": 6, "blind": 10, "stacks": [800.0, 800.0, 800.0, 800.0]})
+	pd.hands[3] = pb.hands[3]
+	pd.modifier = BlitzModifiers.Modifier.VAZA_DOURADA
+	pd.begin_trick()
+	pd.trick_pot = 300.0
+	var big_to := 0.0
+	var pdr := RandomNumberGenerator.new()
+	pdr.seed = 5
+	for i in range(60):
+		var dec := BlitzBot.bet_decision(pd, pd.bet_actor(), BotAI.Difficulty.HARD, pdr)
+		if dec["action"] == "raise":
+			big_to = maxf(big_to, float(dec["to"]) - float(pd.bet_level))
+	check(big_to > 3.0 * 10.0, "com pote grande o aumento passa de 3 blinds (maior: %.0f)" % big_to)
+	check(big_to <= 800.0 / 3.0 + 10.0 or big_to <= 300.0 * 0.75 + 0.5, "e não joga mais que 1/3 do stack sem mão muito forte (%.0f)" % big_to)
 	pb.bet_act(pb.bet_actor(), "raise", 60.0)
 	var facing := BlitzBot.bet_decision(pb, pb.bet_actor(), BotAI.Difficulty.NORMAL, pbr)
 	check(facing["action"] in ["call", "fold", "raise"], "diante de aumento o bot paga, aumenta ou desiste (não passa)")

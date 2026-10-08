@@ -284,6 +284,25 @@ o "Ranqueado" de hoje é a vitrine da liga + um atalho pro Blitz, não uma fila 
   `BlitzScene.tscn` (antes abria `GameScene.tscn`, o motor Vanilla — por isso o Ranqueado nunca
   bateu com a regra "Blitz é a espinha dorsal do elo").
 
+## Ranqueada: 5 níveis (arcanos) e buy-in fixo de 80 blinds
+Ao tocar em JOGAR RANQUEADA abre um popup com 5 cards; o jogador escolhe o nível e o jogo procura
+uma mesa dele (`RankedEco.find_table(fichas, blind)`; nível sem gente monta uma mesa na hora).
+
+| Nível | Blind | Buy-in (80 blinds) |
+|---|---|---|
+| 0 · O Louco | ◎10 | ◎800 |
+| I · O Mago | ◎30 | ◎2.400 |
+| II · A Sacerdotisa | ◎100 | ◎8.000 |
+| IV · O Imperador | ◎300 | ◎24.000 |
+| XXI · O Mundo | ◎1.000 | ◎80.000 |
+
+- Definição única em `GameState.RANKED_ROOMS` (nome, numeral, blind) e `RANKED_STACK_BLINDS = 80`.
+- Nível que o saldo não paga fica apagado no popup, com "faltam ◎X".
+- LP/MMR dependem da colocação (não das fichas): valem igual em todos os níveis.
+- Economia ajustada ao buy-in maior: saldo inicial ◎2.400 (3 entradas do nível 0), recarga diária
+  libera abaixo de ◎800 e paga ◎900.
+- Os bots sentam com 30 a 60 blinds (você, com 80: stack mais fundo que os rivais).
+
 ## Carteiras: Fichas (jogo) e Gemas (cosmético)
 
 - **Fichas** continuam sem valor monetário, não saem do jogo. A recarga grátis (`BlitzEconomy.

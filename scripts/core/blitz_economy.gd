@@ -6,9 +6,9 @@ extends RefCounted
 ## - Fontes: saldo inicial, recarga diária, compra de pacotes, vitórias contra os bots.
 ## - Ralos: taxa da casa em cada pote e o que os jogadores perdem pros bots.
 
-const START_FICHAS := 1500        # 3 entradas da mesa Iniciante (blind 10, stack 400)
-const DAILY_MIN := 400            # abaixo disso (não paga nem a entrada mais barata) libera a recarga
-const DAILY_AMOUNT := 500         # 1 entrada Iniciante + folga
+const START_FICHAS := 2400        # 3 entradas do nível mais barato da ranqueada (blind 10, 80 blinds = 800)
+const DAILY_MIN := 800            # abaixo disso (não paga nem a entrada mais barata) libera a recarga
+const DAILY_AMOUNT := 900         # 1 entrada do nível mais barato + folga
 const RAKE_PCT := 0.03            # taxa da casa sobre o pote quando há disputa de cartas
 const RAKE_CAP_BLINDS := 1.5      # teto da taxa por rodada, em blinds
 const BOT_STACK_BLINDS := [30, 60]  # bot novo senta com 30 a 60 blinds
