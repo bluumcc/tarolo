@@ -54,6 +54,7 @@ func _ready() -> void:
 	apply_settings()
 	get_tree().root.size_changed.connect(_update_content_scale)
 	_update_content_scale()
+	_start_debug_stats()
 
 
 ## O navegador do celular não tem fonte com ♥ ♦ ♠ ♣ ✦ ✶ ♛ (o PC usa a fonte do sistema e
@@ -72,6 +73,26 @@ func _install_symbol_font() -> void:
 	dt.default_font = display
 	if OS.get_environment("TAROLO_NO_SYSFONT") == "1":
 		display.allow_system_fallback = false
+
+
+## Só na web com ?debug: imprime (no painel do shell) a memória que o próprio motor enxerga.
+func _start_debug_stats() -> void:
+	if not OS.has_feature("web") or not bool(JavaScriptBridge.eval("/[?&]debug\\b/.test(location.search)", true)):
+		return
+	var t := Timer.new()
+	t.wait_time = 2.0
+	t.autostart = true
+	add_child(t)
+	t.timeout.connect(func():
+		var mb := 1.0 / 1048576.0
+		print("[mem] static=%.0fMB tex=%.0fMB buf=%.0fMB vid=%.0fMB nodes=%d res=%d obj=%d" % [
+			Performance.get_monitor(Performance.MEMORY_STATIC) * mb,
+			Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) * mb,
+			Performance.get_monitor(Performance.RENDER_BUFFER_MEM_USED) * mb,
+			Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) * mb,
+			int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
+			int(Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT)),
+			int(Performance.get_monitor(Performance.OBJECT_COUNT))]))
 
 
 ## Resolução base 1920x1200 no paisagem (PC) e 720x1280 no retrato (smartphone),

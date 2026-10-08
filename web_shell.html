@@ -91,14 +91,25 @@ body {
 // teclado só pelo tamanho (nada de eventos de foco, que ficam trocando a cada toque): se a altura
 // visível é bem menor que a maior já vista com a mesma largura, seguimos reportando a maior.
 // Mudanças pequenas (barra de endereço do Safari) continuam sendo seguidas normalmente.
-// iPhone: o canvas nasce na densidade nativa (3x = ~3 milhões de pixels) e o iOS mata a aba por
-// memória. Limita a 2x: o framebuffer fica ~55% menor.
-var __isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-if (__isIOS && window.devicePixelRatio > 2) {
-	Object.defineProperty(window, 'devicePixelRatio', { configurable: true, get: function () { return 2; } });
-}
-
-window.__BUILD = 'sem-audio-2';
+window.__BUILD = 'diag-3';
+// Variantes de diagnóstico (só por URL, nunca ativas por padrão): ?dpr=N força a densidade do canvas.
+(function () {
+	var m = /[?&]dpr=([0-9.]+)/.exec(location.search);
+	if (m) { var v = parseFloat(m[1]); Object.defineProperty(window, 'devicePixelRatio', { configurable: true, get: function () { return v; } }); }
+}());
+// Registro de execuções (?debug): uma linha por abertura da página, com a última batida de vida e se
+// a saída foi limpa. Uma execução sem saída limpa que parou de bater = a aba foi morta pelo sistema.
+(function () {
+	if (!/[?&]debug\b/.test(location.search)) { return; }
+	var KEY = 'tarolo_runs', id = Date.now(), runs = [];
+	try { runs = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) {}
+	var run = { id: id, q: location.search, build: window.__BUILD, ua: navigator.userAgent.slice(0, 80), alive: 0, clean: false };
+	runs.push(run); if (runs.length > 30) { runs.shift(); }
+	function save() { try { localStorage.setItem(KEY, JSON.stringify(runs)); } catch (e) {} }
+	save();
+	setInterval(function () { run.alive = Math.round((Date.now() - id) / 100) / 10; save(); }, 500);
+	window.addEventListener('pagehide', function () { run.clean = true; save(); });
+}());
 // Modo diagnóstico (?debug na URL): grava um log que sobrevive ao crash da aba e mostra, na
 // abertura seguinte, o que aconteceu antes da morte. Sem ?debug não faz nada.
 (function () {
@@ -291,6 +302,7 @@ const engine = new Engine(GODOT_CONFIG);
 		setStatusMode('progress');
 		__dbg('startGame');
 		engine.startGame({
+			'args': /[?&]noaudio\b/.test(location.search) ? ['--audio-driver', 'Dummy'] : [],
 			'mainPack': 'index.pck?v=' + window.__BUILD,
 			'onPrint': function () { __dbg('GD ' + Array.prototype.join.call(arguments, ' ')); },
 			'onPrintError': function () { __dbg('GDERR ' + Array.prototype.join.call(arguments, ' ')); },

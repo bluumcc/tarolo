@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tarolo diagnóstico</title>
+<style>
+body{margin:0;padding:16px;background:#0b0b14;color:#e8e6ff;font:15px/1.4 -apple-system,system-ui,sans-serif}
+h1{font-size:20px;margin:0 0 4px}p{color:#a8a5c8;margin:4px 0 12px}
+a.v{display:block;margin:8px 0;padding:14px;border-radius:12px;background:#241a46;color:#fff;text-decoration:none;font-weight:600}
+a.v small{display:block;font-weight:400;color:#b9b4d6;margin-top:2px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}td,th{padding:6px 4px;border-bottom:1px solid #2a2547;text-align:left}
+.ok{color:#7CFC9A}.bad{color:#ff6b7f}button{margin-top:12px;padding:12px;border-radius:10px;border:0;background:#6b46ff;color:#fff;font-weight:600;width:100%}
+pre{white-space:pre-wrap;background:#14122a;padding:8px;border-radius:8px;font-size:12px}
+</style></head><body>
+<h1>Tarolo · diagnóstico</h1>
+<p>Toque em cada variante, espere 30 segundos (ou até travar) e volte para esta página. O resultado aparece abaixo sozinho.</p>
+<a class="v" href="./?debug&x=1">A · Normal<small>o jogo como está hoje</small></a>
+<a class="v" href="./?debug&noaudio">B · Sem sistema de áudio<small>motor com driver de áudio desligado</small></a>
+<a class="v" href="./?debug&dpr=1.5">C · Resolução menor (1,5x)<small>testa o peso da tela</small></a>
+<a class="v" href="./?debug&noaudio&dpr=1.5">D · Sem áudio e resolução menor<small>os dois juntos</small></a>
+<h1 style="margin-top:20px">Resultados</h1>
+<table id="t"><tr><th>Variante</th><th>Viveu</th><th>Saída</th></tr></table>
+<button id="c">Copiar relatório</button>
+<pre id="r"></pre>
+<script>
+var runs=[];try{runs=JSON.parse(localStorage.getItem('tarolo_runs')||'[]')}catch(e){}
+var out=[],t=document.getElementById('t');
+runs.slice().reverse().forEach(function(r){
+  var tag=r.q.replace('?debug','').replace(/^&/,'')||'normal';
+  var res=r.clean?'<span class="ok">saiu normal</span>':(r.alive>=29?'<span class="ok">aberta (≥30s)</span>':'<span class="bad">MORREU</span>');
+  var row=document.createElement('tr');row.innerHTML='<td>'+tag+'</td><td>'+r.alive+'s</td><td>'+res+'</td>';t.appendChild(row);
+  out.push(tag+' | viveu '+r.alive+'s | '+(r.clean?'limpa':'sem saída limpa')+' | build '+r.build+' | '+r.ua);
+});
+document.getElementById('r').textContent=out.join('\n')||'Nenhuma execução registrada ainda.';
+document.getElementById('c').onclick=function(){var s=out.join('\n');if(navigator.clipboard){navigator.clipboard.writeText(s)}this.textContent='Copiado'};
+</script></body></html>

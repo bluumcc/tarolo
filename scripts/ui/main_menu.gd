@@ -14,6 +14,11 @@ var _last_wide  := false
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_last_wide = _is_wide()
+	if OS.has_feature("web") and bool(JavaScriptBridge.eval("/[?&]mesa\\b/.test(location.search)", true)):
+		SaveManager.section("profile")["fichas"] = 100000   # atalho de medição: entra direto numa mesa
+		GameState.chaos_table = 0
+		get_tree().change_scene_to_file("res://scenes/ChaosScene.tscn")
+		return
 	print("[dbg] menu build start ", get_viewport_rect().size)
 	_build()
 	print("[dbg] menu build done")
