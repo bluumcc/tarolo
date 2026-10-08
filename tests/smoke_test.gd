@@ -109,10 +109,13 @@ func _run() -> void:
 	var lobby := await _open("res://scenes/RankedLobby.tscn")
 	lobby.queue_free()
 
+	var lp_tables := 0
 	for i in range(8):
 		var s := await _play_blitz()
 		print("Blitz %d: %dº lugar | %s" % [i + 1, int(s["placement"]) + 1, " | ".join(s["lines"])])
-	check((GameState.ranked()["history"] as Array).size() == 8, "fila única: toda mesa de blitz completa aplica LP/MMR (tem %d)" % (GameState.ranked()["history"] as Array).size())
+		lp_tables += 1 if " | ".join(s["lines"]).contains(" LP") else 0
+	# LP só entra com um Ritual completo: quem quebra antes disso não pontua.
+	check((GameState.ranked()["history"] as Array).size() == lp_tables and lp_tables >= 5, "fila única: toda mesa com Ritual completo aplica LP/MMR (%d de 8, histórico %d)" % [lp_tables, (GameState.ranked()["history"] as Array).size()])
 
 	# Os 5 níveis: cada um acha mesa do próprio blind, com 3 a 6 lugares; o popup abre e lista os 5.
 	check(GameState.RANKED_ROOMS.size() == 5, "ranqueada tem 5 níveis")

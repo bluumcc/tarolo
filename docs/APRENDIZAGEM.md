@@ -37,12 +37,12 @@ pagar/desistir, modificador, dobrar. São 14 termos. O objetivo é que a primeir
 ### A. Ritual de Iniciação (tutorial jogável) — a peça central
 Primeira partida de quem entra pela primeira vez. Mesa curta, controlada e sem custo.
 
-- **Formato:** 1 Ritual de **4 jogadas** (não 8), 3 jogadores (você + 2 bots fixos), sem fichas em risco (o saldo volta intacto; ao final há um prêmio de boas-vindas).
+- **Formato:** 1 Ritual de **6 jogadas** (não 8; ver decisão 4), 3 jogadores (você + 2 bots fixos), sem fichas em risco (o saldo volta intacto; ao final há um prêmio de boas-vindas).
 - **Mão montada** (não aleatória), pensada para ensinar:
   - jogada 1: ganhar com a carta mais alta do naipe;
   - jogada 2: um bot corta com arcano maior, a pessoa vê o Trunfo ganhar;
   - jogada 3: pagar um aumento (uma aposta, com a ação sugerida);
-  - jogada 4: **perder de propósito** para fechar a profecia.
+  - jogadas 4 a 6: dois modificadores novos e **perder de propósito** para fechar a profecia.
 - **Fluxo, com cartão curto e destaque a cada passo:**
   1. *Jogue uma carta.* (destaca a mão; só a carta certa é jogável)
   2. *Maior carta do naipe vence.* (resultado + as fichas das cartas)
@@ -51,9 +51,9 @@ Primeira partida de quem entra pela primeira vez. Mesa curta, controlada e sem c
   5. *Aposta.* Passar / pagar, uma vez.
   6. *Feche a conta.* Se já está no alvo, jogue para perder.
   7. *Resultado:* quem acertou leva o pote. Prêmio e convite para o ranqueado.
-- **Um modificador só**, o mais simples de ver (sugestão: Oposição), explicado na hora em que aparece.
+- **Um modificador por jogada**, como no jogo de verdade, do mais simples ao mais estranho, cada um explicado na hora em que aparece.
 - **Pular:** botão discreto desde o início; pular marca "já sei jogar" e abre direto o ranqueado. Dá para refazer no menu (AJUDA → Treino).
-- **Recompensa:** fichas de boas-vindas + um verso de carta exclusivo (depende de arte; até lá só fichas).
+- **Recompensa:** ◎2.000 fichas de boas-vindas (+ verso de carta exclusivo quando houver arte).
 - **O que fica de fora de propósito:** sacrifício das 2 cartas, dobrar, Louco, potes laterais, taxa, ante. Entram nas camadas B e D.
 
 Para construir isso, o motor precisa de: tamanho de mão e número de jogadas configuráveis (hoje `HAND_SIZE = 8`
@@ -208,9 +208,12 @@ Sem servidor de métricas ainda, a medição é por observação, com 5 a 10 pes
 
 Quando existir servidor, os mesmos eventos viram métricas (tutorial concluído, pulado, abandono por passo).
 
-## 10. Decisões em aberto
+## 10. Decisões tomadas
 
-1. O tutorial é **obrigatório** na primeira vez ou sempre pulável desde o primeiro toque? (Sugestão: pulável, com pedido de confirmação.)
-2. Prêmio do tutorial: só fichas, ou fichas + algo que só ele dá (verso de carta quando houver arte)?
-3. O Clássico fica fora do menu principal (dentro de "Outros modos") ou com card próprio, mas menor?
-4. Modificador usado no tutorial: Oposição (a mais visual) ou o mais simples de explicar?
+1. **Tutorial pulável** desde o primeiro toque (com confirmação).
+2. **Prêmio do tutorial: ◎2.000 fichas** (paga mais de duas entradas do nível mais barato, ◎800). Verso de carta exclusivo entra quando houver arte.
+3. **Clássico** já tem a aba própria no menu: nada muda ali.
+4. **Modificadores no tutorial:** toda jogada tem um, então o tutorial **mostra vários**, um por jogada, apresentados na ordem
+   do mais simples para o mais estranho. Cada um ganha uma frase de ≤ 12 palavras na hora em que aparece (a mesma do anúncio em tela cheia).
+   Por isso o Ritual de Iniciação passa de 4 para **6 jogadas** (a definir na fase 4), com a mão montada para que cada
+   modificador mude algo visível.

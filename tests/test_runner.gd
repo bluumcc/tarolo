@@ -123,6 +123,7 @@ func _test_dynamic_seats() -> void:
 	jn.begin_trick()
 	check(is_equal_approx(float(jn.stacks[5]), 500.0) and not jn.active_players().has(5), "quem espera não paga blind nem joga")
 	check(not jn.blitz_place(5, 3), "quem espera não faz profecia")
+	check(not jn.to_act.has(5) and jn.folded[5], "quem espera (mesmo com fichas) não entra na fila de apostas")
 	jn.betting = false
 	jn.trick_pot = 0.0
 	for jq in range(6):
@@ -141,6 +142,10 @@ func _test_dynamic_seats() -> void:
 	for fe in fl_ev:
 		sat_ok = sat_ok and not bool(fl.busted[int(fe["seat"])]) and not bool(fl.waiting[int(fe["seat"])])
 	check(sat_ok, "quem senta antes do Ritual já joga ele")
+	var hands_ok := true
+	for fh in fl_ev:
+		hands_ok = hands_ok and (fl.hands[int(fh["seat"])] as Array).size() == BlitzEngine.BLITZ_DEAL_SIZE
+	check(hands_ok, "quem senta antes do Ritual recebe as 10 cartas (nunca chega sem mão)")
 
 	# Simulação: 40 Rituais com gente entrando e saindo. Nada trava, nenhuma ficha some,
 	# a mesa nunca fica com menos de 3 sentados e você nunca perde o assento.
@@ -155,6 +160,7 @@ func _test_dynamic_seats() -> void:
 	var sim_ok := true
 	var min_seated := 99
 	var seat0 := true
+	var sizes := {}
 	for lvl in range(40):
 		var seated_before := sim.seated_count()
 		var done := SimLib.play_level(sim, srng, diffs, "bot", Callable(), true)
@@ -168,13 +174,31 @@ func _test_dynamic_seats() -> void:
 			joins += 1 if sim.waiting[sq] else 0
 		sim.advance_round()
 		sim.refill_bots()
-		sim.ensure_seated(BlitzEngine.MIN_SEATED)
+		sim.ensure_seated(BlitzEngine.TARGET_SEATED)
+		sizes[sim.seated_count()] = int(sizes.get(sim.seated_count(), 0)) + 1
 		if float(sim.stacks[0]) < float(sim.blind) * 12.0:   # recompra (entra como ficha nova na conta)
 			sim.stacks[0] += 600.0
 			sim.cashed_in += 600.0
 	check(sim_ok, "40 Rituais com gente entrando e saindo: terminam e nenhuma ficha some")
 	check(min_seated >= BlitzEngine.MIN_SEATED and seat0, "a mesa nunca fica com menos de 3 sentados e o seu assento nunca vaga")
+	var mid := int(sizes.get(4, 0)) + int(sizes.get(5, 0))
+	check(float(mid) / 40.0 >= 0.6, "a mesa fica na maior parte do tempo com 4 a 5 sentados (%d de 40 Rituais; tamanhos %s)" % [mid, str(sizes)])
 	check(lefts > 0 and joins > 0, "no meio disso, de fato entra e sai gente (saídas %d, entradas %d)" % [lefts, joins])
+
+	# Quem quebra sai de verdade: sem migalhas jogando all-in e sem voltar na hora com fichas novas.
+	var br := BlitzEngine.new()
+	br.setup_match({"seed": 31, "levels": 0, "blind": 10, "players": 6, "buy_in": 800.0, "stacks": [800.0, 800.0, 7.0, 800.0, 0.0, 0.0], "vacant": [4, 5], "dynamic_seats": true})
+	var br_total := SimLib.total_chips(br)
+	check(br.bust_broke(false, 10.0) == [2] and bool(br.busted[2]) and is_zero_approx(float(br.stacks[2])), "rival que não cobre o blind (7 < 10) é eliminado")
+	check(is_equal_approx(br.cashed_out, 7.0) and absf(SimLib.total_chips(br) - br_total) < SimLib.EPS, "as migalhas saem com ele e nenhuma ficha some")
+	check(br.bust_broke(false).is_empty(), "sem o limite do blind, quem tem ficha segue (torneio não muda)")
+	br.stacks[3] = 0.0
+	br.busted[3] = true
+	check(br.refill_bots().is_empty() and bool(br.vacant[2]) and bool(br.vacant[3]), "na mesa ranqueada quem quebrou deixa o assento vago, não volta com fichas novas")
+	check(br.seated_count() == 2, "sobraram 2 sentados (você e 1)")
+	var sat := br.ensure_seated(BlitzEngine.MIN_SEATED)
+	check(sat.size() == 1 and br.seated_count() == BlitzEngine.MIN_SEATED, "ao abrir o Ritual a mesa volta ao mínimo de 3")
+	check(is_equal_approx(float(br.stacks[int(sat[0]["seat"])]), 800.0), "quem senta chega com o mesmo stack de todos (80 blinds)")
 
 
 ## Contas: regras de validação, backend local e o serviço da conta ativa (convidado → cadastrada).

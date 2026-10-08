@@ -44,12 +44,14 @@ var folded: Array = []        # desistiu dessa rodada (não joga carta)
 var busted: Array = []        # stack zerou: fora do jogo até o fim da mesa
 var vacant: Array = []        # assento sem ninguém (mesa ranqueada de 6 lugares com menos gente)
 var waiting: Array = []       # sentou no meio do Ritual: espera o próximo (sem mão, sem ante, sem profecia)
+var reserve_hands: Array = []  # mão dealt pra cada assento no começo do Ritual (vago ou não); vai pra quem sentar antes da primeira jogada
 var dynamic_seats := false    # mesa ranqueada: gente entra e sai entre as jogadas (torneio e testes: desligado)
 var cashed_out := 0.0         # fichas que saíram da mesa com quem foi embora
 var cashed_in := 0.0          # fichas que entraram na mesa com quem sentou
 var _leave_at := -1           # jogada em que alguém vai embora neste Ritual (-1 = ninguém)
 var _join_at := -1            # jogada em que alguém senta neste Ritual (-1 = ninguém)
 const TABLE_SEATS := 6        # lugares da mesa ranqueada
+const TARGET_SEATED := 4      # ao abrir o Ritual a mesa é completada até aqui (o alvo é 4 a 5; 3 e 6 são passageiros)
 const MIN_SEATED := 3         # a mesa dinâmica nunca fica com menos gente sentada que isso
 var bet_level := 0.0          # valor que todos precisam igualar
 var raises := 0
@@ -156,7 +158,9 @@ func _setup_round() -> void:
 	# o nível continua tendo HAND_SIZE (8) rodadas, só a mão inicial nasce maior pra escolher.
 	var dealt := Deck.deal(deck, num_players, BLITZ_DEAL_SIZE)
 	hands = dealt["hands"]
+	reserve_hands = []
 	for p in range(num_players):
+		reserve_hands.append(hands[p])   # a mão de um assento vago fica guardada: quem sentar antes do Ritual começar recebe ela
 		if vacant[p]:
 			hands[p] = []
 	captured = []
@@ -273,10 +277,19 @@ func bust_cant_enter(include_human := true) -> Array:
 	return out
 
 
-func bust_broke(include_human := true) -> Array:
+## `min_stack` > 0 (ranqueada): rival que não cobre mais o blind também sai; as migalhas dele saem
+## da mesa com ele (`cashed_out`), pra ninguém ficar jogando all-in com meia ficha.
+func bust_broke(include_human := true, min_stack := 0.0) -> Array:
 	var newly: Array = []
 	for p in range(0 if include_human else 1, num_players):
-		if not busted[p] and stacks[p] <= 0.0:
+		if busted[p] or vacant[p] or waiting[p]:
+			continue
+		if stacks[p] <= 0.0:
+			busted[p] = true
+			newly.append(p)
+		elif p != 0 and min_stack > 0.0 and stacks[p] < min_stack:
+			cashed_out += stacks[p]
+			stacks[p] = 0.0
 			busted[p] = true
 			newly.append(p)
 	return newly
@@ -328,6 +341,8 @@ func seat_now(p: int, stack: float, style: int) -> bool:
 	_sit(p, stack, style)
 	waiting[p] = false
 	busted[p] = false
+	if p < reserve_hands.size() and trick_number == 0 and plays.is_empty():
+		hands[p] = (reserve_hands[p] as Array).duplicate()
 	return true
 
 
@@ -362,17 +377,34 @@ func ensure_seated(min_n: int) -> Array:
 	return out
 
 
-## Sorteia, a cada Ritual, se alguém vai sair e se alguém vai entrar, e em que jogada. Nem todo Ritual
-## tem movimento (a mesa não troca de gente toda hora).
+## Sorteia, a cada Ritual, se alguém vai sair e se alguém vai entrar, e em que jogada. A mesa tende a
+## ficar com 4 a 5 sentados: com 3 ou menos a entrada é prioridade (certa e cedo); com 6 a saída é
+## prioridade. 3 e 6 são estados passageiros.
 func _plan_table_events() -> void:
 	_leave_at = -1
 	_join_at = -1
 	if not dynamic_seats:
 		return
-	if rng.randf() < 0.45:
+	var n := seated_count()
+	var p_join := 0.0
+	var p_leave := 0.0
+	match n:
+		0, 1, 2, 3:
+			p_join = 1.0
+			p_leave = 0.0
+		4:
+			p_join = 0.45
+			p_leave = 0.12
+		5:
+			p_join = 0.12
+			p_leave = 0.3
+		_:
+			p_join = 0.0
+			p_leave = 0.9
+	if rng.randf() < p_leave:
 		_leave_at = rng.randi_range(1, 6)
-	if rng.randf() < 0.55:
-		_join_at = rng.randi_range(0, 6)
+	if rng.randf() < p_join:
+		_join_at = rng.randi_range(0, 2) if n <= MIN_SEATED else rng.randi_range(0, 6)
 
 
 ## Chamar antes de cada jogada (e só entre jogadas): aplica a saída e/ou a entrada agendadas pra essa
@@ -409,6 +441,8 @@ func pop_table_events() -> Array:
 ## Bots sem fichas pro blind saem e um novo jogador senta com 15 a 30 blinds (varia, como
 ## gente de verdade). Devolve os assentos trocados.
 func refill_bots() -> Array:
+	if dynamic_seats:
+		return _vacate_broke()
 	var swapped: Array = []
 	for p in range(1, num_players):
 		if vacant[p] or waiting[p]:
@@ -423,6 +457,21 @@ func refill_bots() -> Array:
 			styles[p] = rng.randi_range(0, 2)   # jogador novo, estilo novo (sorteado, nunca mostrado)
 			swapped.append(p)
 	return swapped
+
+
+## Mesa ranqueada: quem quebrou não volta com fichas novas; o assento fica vago e gente nova senta
+## depois (`pop_table_events` / `ensure_seated`). Assim quem foi eliminado sai de verdade.
+func _vacate_broke() -> Array:
+	for p in range(1, num_players):
+		if vacant[p] or waiting[p]:
+			continue
+		if stacks[p] < blind:
+			cashed_out += stacks[p]
+			stacks[p] = 0.0
+			hands[p] = []
+			busted[p] = true
+			vacant[p] = true
+	return []
 
 
 ## Abre a rodada de apostas: gira o botão, cobra a ante de todos (quem tem menos precisa ter
@@ -452,7 +501,7 @@ func begin_trick() -> void:
 	to_act = []
 	for i in range(1, num_players + 1):
 		var q := (button + i) % num_players
-		if stacks[q] > 0.0:
+		if stacks[q] > 0.0 and not folded[q]:   # eliminado, vago ou em espera não aposta (mesmo com fichas)
 			to_act.append(q)
 	betting = true
 	# Quase todo mundo all-in na ante: ninguém tem o que decidir.
@@ -860,6 +909,7 @@ func clone_for_sim() -> BlitzEngine:
 	c.busted = busted.duplicate()
 	c.vacant = vacant.duplicate()
 	c.waiting = waiting.duplicate()
+	c.reserve_hands = reserve_hands.duplicate(true)
 	c.cashed_out = cashed_out
 	c.cashed_in = cashed_in
 	c.bet_level = bet_level

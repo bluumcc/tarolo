@@ -1867,7 +1867,7 @@ func _bust_broke() -> bool:
 	if not is_inside_tree() or finished:
 		return false
 	var is_tour := bool(config.get("tournament", false))
-	var out: Array = engine.bust_broke(is_tour)
+	var out: Array = engine.bust_broke(is_tour, float(engine.blind) if engine.dynamic_seats else 0.0)
 	for p in out:
 		if p == 0:
 			continue
@@ -2664,7 +2664,7 @@ func _blitz_open_level() -> bool:
 		# Torneio: ninguém senta no lugar de quem quebrou — a mesa só encolhe (MTT de verdade).
 		for q in engine.refill_bots():
 			await _new_player_sits(q)
-		for ev in engine.ensure_seated(BlitzEngine.MIN_SEATED):
+		for ev in engine.ensure_seated(BlitzEngine.TARGET_SEATED):
 			_assign_new_name(int(ev["seat"]))
 			shown_totals[int(ev["seat"])] = engine.stacks[int(ev["seat"])]
 		_refresh_hud()

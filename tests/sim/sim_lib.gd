@@ -52,6 +52,10 @@ static func play_level(e: BlitzEngine, rng: RandomNumberGenerator, diffs: Array,
 			return false
 		if dynamic:
 			e.pop_table_events()   # gente entrando e saindo entre as jogadas (mesa ranqueada)
+			e.bust_broke(false, float(e.blind))   # como a cena: quem não cobre o blind sai antes da jogada
+			if e.stacks[0] <= 0.0:   # como a cena: você sem fichas recompra na hora (ou a mesa acaba)
+				e.stacks[0] += float(e.buy_in)
+				e.cashed_in += float(e.buy_in)
 		var alive := 0
 		for q in range(e.num_players):
 			if not e.busted[q]:

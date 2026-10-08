@@ -186,7 +186,9 @@ func find_table(fichas: int, level_blind: int) -> Dictionary:
 
 	# Nível sem gente (os níveis caros têm poucos bots com saldo): monta uma mesa na hora
 	if candidates.is_empty():
-		candidates.append({"players": _rng.randi_range(3, 6), "rounds_left": 0})
+		var roll := _rng.randf()
+		var size := 3 if roll < 0.12 else (4 if roll < 0.52 else (5 if roll < 0.92 else 6))   # 4 a 5 na maioria
+		candidates.append({"players": size, "rounds_left": 0})
 
 	# Prefere mesa prestes a abrir (rounds_left baixo)
 	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["rounds_left"]) < int(b["rounds_left"]))
