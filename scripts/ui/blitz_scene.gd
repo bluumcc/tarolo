@@ -1711,6 +1711,8 @@ func _run_round() -> void:
 		await _table_events()
 		if not is_inside_tree() or finished:
 			return
+		if await _fast_forward_if_alone():
+			break
 		await _trick_start()
 		if not is_inside_tree() or finished:
 			return
