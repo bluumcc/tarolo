@@ -1,6 +1,6 @@
 class_name BlitzBot
 extends RefCounted
-## IA dos bots da Mesa Caos: escolhem a carta (ciente do modificador) e decidem as apostas
+## IA dos bots da Mesa Blitz: escolhem a carta (ciente do modificador) e decidem as apostas
 ## (passar, aumentar, pagar, desistir) pela força da mão, com blefe nos níveis difíceis.
 
 

@@ -55,7 +55,7 @@ const GOLD_LIGHT := Color("#FFE999")
 const TITLE_OUTLINE := Color("#2A1490")
 const GOOD_ON_LIGHT := Color("#1E8A5C")     ## verde legível sobre carta clara
 const BAD_ON_LIGHT := Color("#D42A3C")
-## Painéis do Vanilla (duelo chefe x defesa).
+## Painéis do Clássico (duelo chefe x defesa).
 const BOSS_BG := Color(0.20, 0.07, 0.08, 0.9)
 const BOSS_TRACK := Color("#2a1715")
 const BOSS_META_TEXT := Color("#f0c7c2")
@@ -83,7 +83,7 @@ const TR_PURPLE_LIGHT  := Color("#4f346a")  ## roxo-claro — superfícies eleva
 const TR_PURPLE        := Color("#191430")  ## roxo-normal — painéis, modais
 const TR_PURPLE_DARK   := Color("#140c33")  ## roxo-escuro — fundo da tela, camada mais profunda
 
-## Duelo do Vanilla: o Atacante é o "chefe" (vermelho), a Defesa é o time contra ele (azul).
+## Duelo do Clássico: o Atacante é o "chefe" (vermelho), a Defesa é o time contra ele (azul).
 const BOSS := Color("#E2463B")
 const DEF := Color("#5AA9FF")
 const BOSS_TEXT := Color("#FF7A6E")   ## versão legível (texto) do vermelho do chefe

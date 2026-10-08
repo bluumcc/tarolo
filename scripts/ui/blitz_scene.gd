@@ -1,5 +1,5 @@
 extends Control
-## BlitzScene.tscn — mesa do modo Caos: 5 rodadas curtas de 8 cartas, todo mundo joga
+## BlitzScene.tscn — mesa do modo Blitz: poker de rodadas com palpite por nível, todo mundo joga
 ## pra si (sem Atacante/Defesa), com um modificador novo a cada rodada e um bônus de
 ## Fôlego pra quem estiver por baixo no total. Layout pensado pra celular (retrato):
 ## uma pilha vertical — status dos jogadores no topo, área de jogo compacta no meio,
@@ -135,7 +135,7 @@ func _show_insufficient_fichas() -> void:
 	v.add_theme_constant_override("separation", DS.SP_L)
 	box.add_child(v)
 	v.add_child(UIKit.label("FICHAS INSUFICIENTES", 28, UIKit.LOSS, HORIZONTAL_ALIGNMENT_CENTER))
-	var l := UIKit.label("Você precisa de %d fichas pra sentar na Mesa %s. Jogue Vanilla ou Ranqueado, ou volte ao menu e peça um empréstimo da casa." % [int(config["buy_in"]), "Blitz"], 32, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	var l := UIKit.label("Você precisa de %d fichas pra sentar na Mesa Blitz. Jogue o Clássico ou volte ao menu e peça um empréstimo da casa." % int(config["buy_in"]), 32, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(620, 0)
 	v.add_child(l)
@@ -1104,7 +1104,7 @@ func _trick_start() -> void:
 		return
 	var m := engine.modifier
 	if m == -1:
-		# Defensivo: toda jogada de Blitz/Caos sorteia modificador, sem exceção — isto nunca
+		# Defensivo: toda jogada de Blitz sorteia modificador, sem exceção — isto nunca
 		# deveria disparar, mas evita travar a tela cheia se `modifier_sequence` vier vazio.
 		_banner_clear()
 		return

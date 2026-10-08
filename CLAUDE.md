@@ -48,9 +48,9 @@ Em `scripts/ui/`, todos desenhados em código (sem textura/shader) e só com tok
 - **Avisos de ação** (`_banner`): só título curto, na cor do tipo de ação, numa linha dentro do card do header (embaixo dos losangos); o pote fica num card fixo logo abaixo e nunca some.
 
 ## Princípios do produto
-- **O Vanilla é sempre o modo mais fiel ao Jeu de Tarot lúdico (Tarot francês).** Regras oficiais (seguir naipe, cortar com Trunfo, obrigação de cobrir com Trunfo maior, Bouts, licitação, contratos) não devem ser alteradas pra "melhorar o jogo". Variações de regra pertencem ao Caos (ou a modos novos), nunca ao Vanilla.
-- O Caos é o modo dinâmico/experimental: poker de rodadas (blind, stack, apostas), modificadores e combos. Ver `docs/MESA_CAOS.md`.
-- **Ranqueado é o Blitz, fila única** (não o Vanilla): toda mesa real de Blitz vale fichas E LP/MMR ao mesmo tempo, sem distinção casual/ranqueada. Vanilla é 100% recreativo, nunca mexe em elo. Ver `docs/BLITZ.md`.
+- **O Clássico (motor `MatchEngine`, cena `game_scene.gd`) é sempre o modo mais fiel ao Jeu de Tarot lúdico (Tarot francês).** Regras oficiais (seguir naipe, cortar com Trunfo, obrigação de cobrir com Trunfo maior, Bouts, licitação, contratos) não devem ser alteradas pra "melhorar o jogo". Variações de regra pertencem ao Blitz (ou a modos novos), nunca ao Clássico.
+- O Blitz é o modo dinâmico: poker de rodadas (blind, stack, apostas), palpite por nível e modificadores. Ver `docs/BLITZ.md`.
+- **Ranqueado é o Blitz, fila única** (não o Clássico): toda mesa real de Blitz vale fichas E LP/MMR ao mesmo tempo, sem distinção casual/ranqueada. O Clássico é 100% recreativo, nunca mexe em elo. Ver `docs/BLITZ.md`.
 
 ## Vocabulário
 Partida → Rodada → Jogada (uma "jogada" tem 4 cartas, uma de cada jogador; uma "rodada" tem 8 jogadas: mão nova, descarte, palpite e sorteio do dealer).
@@ -58,7 +58,7 @@ Partida → Rodada → Jogada (uma "jogada" tem 4 cartas, uma de cada jogador; u
 ## Fluxo
 - Godot 4.3, UI em código. Testes: `godot --headless --path . -s res://tests/test_runner.gd` e `res://tests/Smoke.tscn`.
 - Web export em `docs/play` (`godot --headless --path . --export-release "Web" docs/play/index.html`) e push direto no `main`.
-- Modos de mesa: **Caos** (aposta por rodada, `docs/MESA_CAOS.md`) e **Blitz** (palpite de vitórias por nível, `docs/BLITZ.md`); mesma cena/motor, flag `engine.blitz`.
+- Modos: **Blitz** (`BlitzEngine`, `blitz_scene.gd`, `docs/BLITZ.md`; ranqueado e torneios) e **Clássico** (`MatchEngine`, `game_scene.gd`). O antigo modo Caos foi removido por inteiro: não existe flag de modo, o Blitz é o único motor de mesa.
 
 ## Testes e economia de tokens
 Rodar a bateria inteira pra toda mudança é desperdício — escalonar pelo que mudou:

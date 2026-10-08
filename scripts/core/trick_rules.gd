@@ -32,7 +32,7 @@ static func highest_trunfo(plays: Array) -> int:
 
 
 ## Cartas que o jogador pode jogar agora.
-## `must_cover` = false (Mesa Caos): quem pode cobrir NÃO é obrigado a jogar Trunfo maior;
+## `must_cover` = false (Mesa Blitz): quem pode cobrir NÃO é obrigado a jogar Trunfo maior;
 ## qualquer Trunfo serve quando o naipe (ou o corte) pede Trunfo.
 static func legal_cards(hand: Array, plays: Array, must_cover: bool = true) -> Array:
 	var louco := hand.filter(func(c: CardData) -> bool: return c.is_louco())
@@ -77,7 +77,7 @@ static func is_legal(card: CardData, hand: Array, plays: Array, must_cover: bool
 
 ## Índice (dentro de `plays`) da carta vencedora. Por padrão O Louco nunca vence: Trunfo
 ## mais alto vence qualquer naipe comum; sem Trunfo, vence a maior carta do naipe líder.
-## `louco_can_win` (modo Caos, modificador "O Louco Vence"): O Louco passa a valer como
+## `louco_can_win` (modo Blitz, modificador "O Louco Vence"): O Louco passa a valer como
 ## um Trunfo fraquinho — perde pra qualquer Trunfo de verdade, mas vence naipe comum.
 static func winning_index(plays: Array, louco_can_win: bool = false) -> int:
 	var ls := lead_suit(plays)

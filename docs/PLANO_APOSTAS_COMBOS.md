@@ -1,3 +1,6 @@
+> **Histórico:** este plano é do antigo modo Caos, hoje removido — ele virou o Blitz (`docs/BLITZ.md`). Os combos e
+> sequências descritos aqui foram apagados do código.
+
 # Plano: apostas centrais + combos + HUD + animações (modo Caos)
 
 Vocabulário: **Partida → Nível → Rodada → Vez** (Caos: 5 níveis de 8 rodadas).

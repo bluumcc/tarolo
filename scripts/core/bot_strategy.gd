@@ -1,6 +1,6 @@
 class_name BotStrategy
 extends RefCounted
-## Jogo estratégico dos bots no Vanilla. Só usa o que um jogador de verdade sabe: a própria
+## Jogo estratégico dos bots no Clássico. Só usa o que um jogador de verdade sabe: a própria
 ## mão, o que já foi jogado (nas rodadas e na mesa), quem é o Atacante e o contrato — nunca a
 ## mão dos outros.
 ##

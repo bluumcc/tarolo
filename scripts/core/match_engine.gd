@@ -1,6 +1,6 @@
 class_name MatchEngine
 extends RefCounted
-## Estado puro de um nível de Tarot Vanilla (sem UI): licitação, talão, rodadas e a
+## Estado puro de um nível de Tarot Clássico (sem UI): licitação, talão, rodadas e a
 ## pontuação final do atacante contra a defesa.
 
 signal trick_resolved(result: Dictionary)

@@ -58,9 +58,9 @@ Regras:
 ## 4. Implementação proposta (em etapas)
 1. **Tokens:** consolidar em `UIKit` os papéis acima (`ACTION`, `MONEY`, `TURN`, `GAIN`, `LOSS`, `INFO`, `COMBO`, `MODIFIER`, `TEXT_ON_LIGHT`) e trocar as cores soltas por eles.
 2. **Botões:** texto escuro em GOLD/OK; ação primária em VIOLET; secundários com face mais escura (contraste 3:1 contra o fundo).
-3. **Mesa Caos:** anel e números de ordem em ciano; dourado só nas fichas e no pote; status com ícone (▲ PAGOU, ▼ DESISTIU, ↑ AUMENTOU, ✓ PASSOU).
+3. **Mesa Blitz:** anel e números de ordem em ciano; dourado só nas fichas e no pote; status com ícone (▲ PAGOU, ▼ DESISTIU, ↑ AUMENTOU, ✓ PASSOU).
 4. **Vanilla:** BOSS/DEF só em bordas e preenchimentos, texto em INK.
-5. **Menu:** cards de modo com uma cor de identidade cada (Caos vermelho, Vanilla azul, Ranqueado dourado, Tutorial verde), botão primário único.
+5. **Menu:** cards de modo com uma cor de identidade cada (Blitz vermelho, Clássico azul, Ranqueado dourado, Tutorial verde), botão primário único.
 6. **Revisão:** script que percorre a árvore e falha se algum texto tiver contraste < 4,5:1 (3:1 para texto grande).
 
 ## 5. Popups no celular

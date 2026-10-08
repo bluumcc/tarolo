@@ -1,12 +1,12 @@
 extends Node
 ## Estado da sessão: modo atual, lobby ranqueado e fechamento de partidas.
 
-## Vanilla é só recreativo (sem Mode.RANKED): o Elo agora é inteiramente do Blitz, fila única —
+## Clássico é só recreativo (sem Mode.RANKED): o Elo agora é inteiramente do Blitz, fila única —
 ## toda mesa real de Blitz vale fichas E LP/MMR ao mesmo tempo (`report_blitz_match`). Mesa de
 ## torneio é um caminho totalmente separado (`report_tournament_table`) que nunca toca o Elo.
 enum Mode { CLASSIC }
 
-const MODE_NAMES := ["Vanilla"]
+const MODE_NAMES := ["Clássico"]
 const BOT_NAMES := ["João", "Ana", "Felipe", "Mateus", "Lucas", "Sabrina", "Joana", "Pedro", "Márcio", "Júnior", "Fábio", "Marcos"]
 
 var mode: int = Mode.CLASSIC
@@ -24,7 +24,7 @@ func start_tutorial() -> void:
 
 var ranked_lobby: Array = []   # [{name, mmr}] adversários encontrados no matchmaking
 var last_summary: Dictionary = {}
-## Mesa contínua do Vanilla: os mesmos jogadores ficam sentados e o placar acumula, mão
+## Mesa contínua do Clássico: os mesmos jogadores ficam sentados e o placar acumula, mão
 ## após mão, até alguém levantar. {names, totals, hands}
 var table: Dictionary = {}
 
@@ -37,7 +37,7 @@ func leave_table() -> void:
 	table = {}
 
 
-## Soma os pontos da mão ao placar da mesa (só Vanilla, fora do tutorial).
+## Soma os pontos da mão ao placar da mesa (só Clássico, fora do tutorial).
 func table_add(deltas: Array) -> void:
 	if table.is_empty():
 		return
@@ -148,7 +148,7 @@ func player_name() -> String:
 	return str(SaveManager.section("profile")["name"])
 
 
-## Mesas do Caos: blind, com buy-in de 20 blinds (a stack com que você senta).
+## Mesas do Blitz: blind, com buy-in de 20 blinds (a stack com que você senta).
 const BLITZ_TABLES := [
 	{"name": "Iniciante", "blind": 10, "bots": [0, 0, 1]},   # Fácil, Fácil, Normal
 	{"name": "Regular", "blind": 50, "bots": [1, 1, 2]},     # Normal, Normal, Difícil
@@ -457,8 +457,8 @@ func _tables_from(survivors: Array, old_tables: Array) -> Array:
 	return out
 
 
-## Dificuldade dos bots no Vanilla (Ajustes): 0 Fácil, 1 Normal, 2 Difícil. O tutorial usa
-## sempre Fácil (jogadas previsíveis). Vanilla é recreativo — não lê elo nenhum.
+## Dificuldade dos bots no Clássico (Ajustes): 0 Fácil, 1 Normal, 2 Difícil. O tutorial usa
+## sempre Fácil (jogadas previsíveis). Clássico é recreativo — não lê elo nenhum.
 func bots_difficulty() -> int:
 	if tutorial:
 		return BotAI.Difficulty.EASY
@@ -483,7 +483,7 @@ func match_config() -> Dictionary:
 	return cfg
 
 
-## Fecha a partida de Vanilla (recreativo puro — nunca mexe em elo) e devolve um resumo para
+## Fecha a partida de Clássico (recreativo puro — nunca mexe em elo) e devolve um resumo para
 ## a tela de resultado.
 ## result: { placement: int, taker: int, contract: int, success: bool, deltas: Array }
 func report_match(result: Dictionary) -> Dictionary:

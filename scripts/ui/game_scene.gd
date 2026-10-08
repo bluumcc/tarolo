@@ -1,5 +1,5 @@
 extends Control
-## GameScene.tscn — mesa de Tarot Vanilla (Clássico e Ranqueado usam a mesma mesa).
+## GameScene.tscn — mesa do modo Clássico (o Ranqueado é Blitz, em blitz_scene.gd).
 ## Layout pensado pra celular (retrato): pilha vertical — status dos jogadores no topo,
 ## área de jogo compacta no meio, sua mão embaixo — em vez de uma mesa espalhada que só
 ## faz sentido em paisagem. Assentos: 0 = jogador, 1/2/3 = bots, em ordem de turno.
@@ -213,7 +213,7 @@ func _build_ui() -> void:
 	center_col.add_child(status_label)
 
 	# Mão — cartas sempre no tamanho real (nunca encolhidas pra caber); quando não cabem
-	# todas na tela (mão cheia do Vanilla, até 18 cartas), a mão rola de lado. Duas
+	# todas na tela (mão cheia do Clássico, até 18 cartas), a mão rola de lado. Duas
 	# variantes (Configurações): fileira reta, ou leque em arco.
 	var hand_scroll := HandScroller.new()
 	hand_scroll.custom_minimum_size = Vector2(0, CardView.SIZE.y + CardView.MAX_LIFT + 6)
@@ -375,7 +375,7 @@ func _build_arena() -> void:
 
 
 func _draw_arena() -> void:
-	# Mesa oval, igual à do Caos: mesmo feltro e mesma borda, pra as duas telas parecerem
+	# Mesa oval, igual à do Blitz: mesmo feltro e mesma borda, pra as duas telas parecerem
 	# do mesmo jogo.
 	var sb := UIKit.box(UIKit.TABLE_FILL, UIKit.TABLE_EDGE, 3, 200, 0)
 	arena.draw_style_box(sb, Rect2(Vector2.ZERO, arena.size))
@@ -646,7 +646,7 @@ func _layout_table() -> void:
 ## Encaixa a mão inteira na largura disponível, mesmo em celular: primeiro reduz o
 ## espaçamento até as cartas se sobreporem (efeito "leque"); se ainda faltar espaço
 ## As cartas nunca encolhem: com poucas cartas, um espaçamento normal e a mão centralizada;
-## com muitas (mão cheia do Vanilla), sobrepõe em leque até um limite que ainda dá pra
+## com muitas (mão cheia do Clássico), sobrepõe em leque até um limite que ainda dá pra
 ## reconhecer cada carta — e se mesmo assim não couber, a rolagem horizontal cobre o resto.
 ## As cartas nunca encolhem: fileira reta ou leque, escolhido em Configurações — nos dois
 ## casos a sobreposição cresce com a mão até um limite que ainda dá pra reconhecer cada
@@ -1642,7 +1642,7 @@ func _show_results(summary: Dictionary, r: Dictionary) -> void:
 			v.add_child(UIKit.label("%s  %s%d" % [str(config["names"][p]).to_upper(), "+" if tot >= 0 else "", tot], 32, UIKit.ME if p == 0 else UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER))
 	if tutorial:
 		v.add_child(HSeparator.new())
-		var tut_close := UIKit.label("Tutorial concluído! Isso não afeta suas Gemas nem seu elo — quando quiser, jogue de verdade no Vanilla ou Ranqueado.", 30, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
+		var tut_close := UIKit.label("Tutorial concluído! Isso não afeta suas Gemas nem seu elo — quando quiser, jogue de verdade no Clássico ou no Blitz ranqueado.", 30, UIKit.OK, HORIZONTAL_ALIGNMENT_CENTER)
 		tut_close.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		tut_close.custom_minimum_size = Vector2(620, 0)
 		v.add_child(tut_close)

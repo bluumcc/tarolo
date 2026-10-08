@@ -1,11 +1,12 @@
 class_name BlitzEngine
 extends RefCounted
-## Estado puro da Mesa Caos: um "poker de rodadas". Cada nível distribui 8 cartas e sorteia
-## um modificador. Cada rodada (4 cartas) é uma mão de aposta: todos pagam o blind (ante),
-## falam na ordem do botão (passar, aumentar, pagar ou desistir) e só quem ficou joga carta.
-## Quem leva a rodada leva o pote, mais um bônus pago pelos rivais pelas cartas, modificadores e
-## combos. O placar é a stack de fichas de cada um. A mesa não tem fim: cada nível novo
-## redistribui as cartas e sorteia outro modificador.
+## Estado puro da Mesa Blitz: um "poker de rodadas" com palpite por nível. Cada nível dá 10 cartas
+## (sacrifica 2, fica com 8), cada jogada sorteia um modificador, e todo mundo faz a sua profecia
+## (quantas jogadas vai ganhar) antes de começar. Cada jogada é uma mão de aposta: todos pagam o
+## blind e a ante, falam na ordem do botão (passar, aumentar, pagar ou desistir) e só quem ficou
+## joga carta. Quem leva a jogada leva o pote dela, mais fichas pelos pontos das cartas; no fim do
+## nível, quem acertou a profecia leva o pote do nível. O placar é a stack de fichas de cada um.
+## A mesa não tem fim: cada nível novo redistribui as cartas.
 
 signal trick_resolved(result: Dictionary)
 signal round_finished(result: Dictionary)
@@ -819,7 +820,7 @@ func blitz_status(player: int) -> String:
 ## No Blitz, só o que muda QUEM vence (Louco Vence/Rodada Invertida, já aplicados antes de
 ## chegar aqui) e a contagem (Rodada Dourada→Dobrada) importam pro palpite. Saque, Assalto ao
 ## Líder e Rodada Maldita ainda mexem em fichas de verdade, à parte do palpite — os outros 5
-## modificadores não têm efeito nenhum aqui (só valem no Caos).
+## modificadores não têm efeito nenhum aqui.
 func _resolve_trick() -> Dictionary:
 	var ev := active_modifier()
 	var idx := TrickRules.winning_index_mod(plays, ev)
@@ -829,7 +830,7 @@ func _resolve_trick() -> Dictionary:
 	# Rodada Dobrada (Dourada no Blitz) conta 2 vitórias; os pontos NÃO são multiplicados.
 	var value := 2 if ev == BlitzModifiers.Modifier.VAZA_DOURADA else 1
 	wins[winner] += value
-	# Pontos das cartas (já com o modificador) viram fichas pagas pelos rivais, como no Caos, só
+	# Pontos das cartas (já com o modificador) viram fichas pagas pelos rivais, só
 	# que num fator menor: o palpite continua sendo o prêmio principal, os pontos são o tempero.
 	var base_points := 0.0
 	for pl in plays:

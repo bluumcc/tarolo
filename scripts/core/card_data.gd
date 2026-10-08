@@ -1,7 +1,7 @@
 class_name CardData
 extends RefCounted
 ## Uma carta do baralho de Tarot (78 cartas): 4 naipes de 14 cartas, 21 Trunfos e O Louco.
-## Compartilhada pelos modos Vanilla e Caos — só muda quantas cartas cada um recebe na mão.
+## Compartilhada pelos modos Clássico e Blitz — só muda quantas cartas cada um recebe na mão.
 
 enum Suit { OUROS, PAUS, COPAS, ESPADAS, TRUNFO, LOUCO }
 

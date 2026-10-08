@@ -1,15 +1,15 @@
 # Modo Blitz
 
-O Blitz é o Caos com **palpite por nível** no lugar da aposta por rodada. Mesma mesa, mesmas
-stacks, mesmas cartas (as regras de carta do Caos: qualquer Trunfo vale), mas o dinheiro só se
-move **no fim do nível**, conforme quem acertou quantas rodadas ia ganhar.
+O Blitz é um poker de rodadas com **palpite por nível**: mesa com blind e stack, cartas onde
+qualquer Trunfo vale, e o dinheiro principal só se move **no fim do nível**, conforme quem
+acertou quantas rodadas ia ganhar.
 
 Pensado para **PvP** (jogadores reais entre si): a mesa hoje só roda contra bots porque o
 servidor multiplayer ainda não existe, mas toda a economia (entrada, dobrar/cobrir, taxa) já é
 desenhada como um sistema fechado entre jogadores — a casa não cria fichas, só cobra taxa.
 
-Código: `BlitzEngine` com `blitz = true` (config `"mode": "blitz"`), `BlitzBot.blitz_*`,
-`BlitzScene` (mesma cena, ramos `engine.blitz`). Simulação: `tests/blitz_sim.gd`.
+Código: `BlitzEngine` (`scripts/core/blitz_engine.gd`), `BlitzBot`, `BlitzScene`
+(`scripts/ui/blitz_scene.gd`). Simulação: `tests/blitz_sim.gd`.
 
 ## Regras (o que o jogador aprende)
 1. **Palpite:** no início do nível você vê a mão e diz quantas rodadas vai ganhar (0 a 8). A ★ sugere
@@ -82,7 +82,7 @@ jogador que fizer a sequência.
   quando o PvP estiver rodando de verdade.
 - Fichas se conservam entre os jogadores (testado): o que sai da casa em rakeback é sempre menor
   que o que ela cobrou. O pote acumulado fica na mesa.
-- Mesas e bots: as mesmas do Caos (Iniciante blind 10, Regular blind 50, Alta blind 200), stack de
+- Mesas e bots: Iniciante blind 10, Regular blind 50, Alta blind 200, stack de
   40 blinds.
 
 ## Calibração dos bots
@@ -211,16 +211,12 @@ fica pra quando houver amostra maior.
 `var blitz_showdown` (`blitz_scene.gd`) controla a revelação; sem UI nova além da pílula existente.
 
 ## Modo Caos removido
-O modo Caos (aposta por rodada, sem palpite) foi tirado do jogo: sumiu do menu, do Smoke test e
-da sua documentação própria (`docs/ECONOMIA.md`, `docs/MESA_CAOS.md`, `tests/economy_sim.gd` —
-removidos). O Blitz é o único modo de mesa daqui pra frente.
-
-**O que NÃO foi removido, de propósito:** o motor (`BlitzEngine`) e a cena (`blitz_scene.gd`)
-continuam compartilhados entre os dois modos por baixo do capô — ainda têm `if engine.blitz else
-...` para o Caos em alguns pontos (textos de intro, título do popup). Como `engine.blitz` nunca
-mais é `false` (nada no menu cria uma mesa sem ser Blitz), esse código fica morto, mas inofensivo.
-Não arranquei linha a linha porque é um arquivo de ~2200 linhas compartilhado com o Blitz ativo —
-fazer isso com segurança é um corte à parte, não uma linha de continuação desta sessão.
+O modo Caos (aposta por rodada, sem palpite) foi tirado do jogo e, numa limpeza posterior, o
+código dele também: o Blitz é o único motor de mesa. Saíram a flag `engine.blitz` e o campo `mode`
+da config, a pontuação clássica (multiplicadores, combos, sequências, corte do rei), o descarte da
+carta mais fraca, o `blitz_combos.gd` e a UI legada da cena. Arquivos e classes foram renomeados de
+`chaos_*`/`Chaos*` para `blitz_*`/`Blitz*`. Restam só ganchos úteis, como o `ante_factor` da config
+(os testes de aposta usam 0 pra isolar a mecânica do ante).
 
 ## Aposta por rodada (cada uma das 8 rodadas é uma mini-mão de poker)
 Motivação: o palpite sozinho não dava espaço suficiente pra estratégia virar ficha — a aposta é
@@ -245,19 +241,19 @@ prêmio principal.
 (1× blind), porque a rodada de Blitz já carrega o custo da entrada do palpite por cima; cobrar o
 blind inteiro de novo por rodada ficaria caro demais depressa.
 
-**Desistir custa 1 carta aleatória, não dinheiro extra além do que já apostou.** No Caos quem
-desiste descarta a carta mais fraca (`_discard_weakest`) — no Blitz, decisão explícita: descarta
+**Desistir custa 1 carta aleatória, não dinheiro extra além do que já apostou.** No antigo Caos
+(removido) quem desistia descartava a carta mais fraca; no Blitz a decisão é explícita: descarta
 uma carta **sorteada** da mão (`_discard_random`), pra não entregar de graça qual carta era boa ou
 ruim. Em ambos os casos o consumo é de exatamente 1 carta por rodada, jogada ou descartada — as
 mãos continuam do mesmo tamanho (nunca ficam sem carta antes da 8ª rodada).
 
-**Reaproveitado quase 100% do Caos:** motor (`begin_trick`, `bet_actor`, `bet_cap`, `to_call`,
+**Origem:** a aposta por rodada veio do antigo Caos e foi reaproveitada quase por inteiro. Motor (`begin_trick`, `bet_actor`, `bet_cap`, `to_call`,
 `bet_options`, `bet_act`, `walkover_player`/`resolve_walkover`) e UI (`_betting_phase`,
 `_human_bet`, `_gather_bets`, `_show_bet_action`) já eram mode-agnósticos — a única mudança real
 foi: (1) separar `pot` de `trick_pot` dentro do motor (os dois existiam misturados por engano, já
 que até aqui só um modo usava pote por rodada de cada vez), (2) a ante proporcional
 (`BLITZ_TRICK_ANTE_FACTOR`), (3) o descarte aleatório condicional no fold, e (4) pagar `trick_pot`
-pro vencedor dentro de `_resolve_trick_blitz`/`resolve_walkover` (que antes só cuidavam do palpite
+pro vencedor dentro de `_resolve_trick`/`resolve_walkover` (que antes só cuidavam do palpite
 e não sabiam que existia um pote de rodada a liquidar).
 
 **Bots:** `BlitzBot.bet_decision` agora é ciente do palpite — ajusta o quanto "quer vencer" essa

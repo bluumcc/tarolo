@@ -1,7 +1,7 @@
 class_name HelpContent
 extends RefCounted
 ## Textos das ajudas em passos (um parágrafo por passo, sem quebras de linha), usados pelo
-## StepsModal. Vanilla segue o Jeu de Tarot; o Blitz tem as próprias regras.
+## StepsModal. Clássico segue o Jeu de Tarot; o Blitz tem as próprias regras.
 
 static func vanilla() -> Array:
 	return [
@@ -23,7 +23,7 @@ static func bout() -> Array:
 
 static func blitz_intro() -> Array:
 	return [
-		{"icon": "♠ ♥ ◆ ♣", "title": "GANHE JOGADAS", "text": "Cada Ritual tem 8 jogadas de 1 carta por jogador. Vence a maior do naipe e o arcano maior corta, como no Vanilla. Cada carta tem pontos (mostrados nela): quem vence a jogada leva fichas dos rivais por esses pontos. Um modificador sorteado muda as regras da jogada, sempre anunciado antes."},
+		{"icon": "♠ ♥ ◆ ♣", "title": "GANHE JOGADAS", "text": "Cada Ritual tem 8 jogadas de 1 carta por jogador. Vence a maior do naipe e o arcano maior corta, como no Clássico. Cada carta tem pontos (mostrados nela): quem vence a jogada leva fichas dos rivais por esses pontos. Um modificador sorteado muda as regras da jogada, sempre anunciado antes."},
 		{"icon": "1 2 3", "title": "PREPARAÇÃO: SACRIFÍCIO E PROFECIA", "text": "No começo do Ritual você recebe 10 cartas e sacrifica 2. Depois faz a sua profecia: quantas jogadas vai ganhar (0 a 8), e paga a entrada. Todos revelam juntos. Acertou o número exato: leva o pote. Errou por 1: recebe metade da entrada de volta. A estrela ★ mostra a profecia que combina com a sua mão.", "color": UIKit.TURN},
 		{"icon": "◎ ×2", "title": "JOGUE PRA FECHAR A CONTA", "text": "Chegou na profecia? Agora é fugir das jogadas que sobraram, jogando fora as suas cartas fortes debaixo de cartas maiores. Ninguém acertou? O pote acumula pro próximo Ritual. Acertou 3 vezes seguidas? A casa paga um prêmio especial.", "color": UIKit.MONEY},
 	]
