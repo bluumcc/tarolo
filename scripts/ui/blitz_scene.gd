@@ -1306,7 +1306,7 @@ func _wait_human() -> CardData:
 	await _tip("turn", "SUA VEZ!", "Toque numa carta pra selecioná-la (ela sobe) e toque de novo pra jogar. Você tem 10 segundos por jogada.")
 	if engine.can_double(0):
 		await _tip("double", "PODE DOBRAR!", "A partir da 4ª jogada, o botão DOBRAR paga mais uma entrada e dobra o peso da sua profecia no pote; da 6ª em diante dá pra TRIPLICAR. Vale a pena quando você já está no alvo e a mão que sobrou é fraca demais pra ganhar mais uma jogada. Só dá pra dobrar até duas vezes por Ritual.")
-	var ls := TrickRules.lead_suit(engine.plays)
+	var ls := TrickRules.blitz_lead_suit(engine.plays)
 	if ls == -1:
 		_banner("Sua vez", "", UIKit.TURN)
 	elif ls == CardData.Suit.TRUNFO:

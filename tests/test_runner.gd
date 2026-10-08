@@ -404,6 +404,31 @@ func _test_blitz_engine() -> void:
 		{"player": 2, "card": c(1, 3)},
 	]
 	check(TrickRules.winning_index_mod(opo_louco_naipe, mods.VAZA_INVERTIDA) == 2, "Oposição: em naipe comum O Louco segue sem naipe e não vence")
+	var opo_louco_abre := [
+		{"player": 0, "card": CardData.louco()},
+		{"player": 1, "card": c(1, 9)},
+		{"player": 2, "card": c(2, 2)},
+	]
+	check(TrickRules.winning_index_mod(opo_louco_abre, mods.VAZA_INVERTIDA) == 0, "Oposição: O Louco abriu (naipe é arcano maior) e os outros jogaram outros naipes: o Louco vence")
+	# O Louco abre a jogada: o naipe é Trunfo e quem tem arcano maior é obrigado a jogar um.
+	check(TrickRules.blitz_lead_suit([{"player": 0, "card": CardData.louco()}]) == CardData.Suit.TRUNFO, "Blitz: O Louco que abre faz o naipe ser Trunfo")
+	check(TrickRules.blitz_lead_suit([{"player": 0, "card": c(1, 5)}, {"player": 1, "card": CardData.louco()}]) == CardData.Suit.PAUS, "Blitz: O Louco que não abre não muda o naipe")
+	var louco_aberto := [{"player": 0, "card": CardData.louco()}]
+	check(TrickRules.legal_cards_for([c(4, 5), c(1, 3)], louco_aberto, false, mods.SAQUE).size() == 1, "Blitz: com O Louco aberto, quem tem arcano maior é obrigado a jogá-lo")
+	check(TrickRules.legal_cards_for([c(1, 3), c(2, 4)], louco_aberto, false, mods.SAQUE).size() == 2, "Blitz: com O Louco aberto, quem não tem arcano maior joga qualquer carta")
+	check(TrickRules.legal_cards([c(4, 5), c(1, 3)], louco_aberto, false).size() == 2, "Clássico: com O Louco aberto a regra oficial segue (a próxima carta define o naipe)")
+	var sem_trunfo := [
+		{"player": 0, "card": CardData.louco()},
+		{"player": 1, "card": c(1, 9)},
+		{"player": 2, "card": c(1, 3)},
+	]
+	check(TrickRules.winning_index_mod(sem_trunfo, mods.SAQUE) == 1, "Louco aberto e ninguém com arcano maior: vence a maior do naipe da primeira carta real (O Louco não vence)")
+	var silencio_louco := [
+		{"player": 0, "card": CardData.louco()},
+		{"player": 1, "card": c(4, 5)},
+		{"player": 2, "card": c(4, 9)},
+	]
+	check(TrickRules.winning_index_mod(silencio_louco, mods.SILENCIO) == 2, "Silêncio: O Louco abriu (naipe Trunfo), os arcanos maiores disputam e o maior vence")
 
 	# Silêncio: arcano maior não vence naipe (vence a maior do naipe). Se ele abriu, disputam entre si.
 	var sil := [

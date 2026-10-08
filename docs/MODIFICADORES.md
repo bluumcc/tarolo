@@ -18,7 +18,7 @@ Código: `scripts/core/blitz_modifiers.gd` (lista, nomes, textos), `scripts/core
 | Nome | Texto (uma linha) | Regra |
 |---|---|---|
 | Loucura | O Louco vence qualquer carta, até arcano maior. | Quem jogar O Louco vence a jogada. |
-| Oposição | Vence a menor carta do naipe. Arcano maior só vale se abrir a jogada. | Vence a menor do naipe da 1ª carta. Trunfo não corta. Se o Trunfo abriu, vence o menor Trunfo, e O Louco conta como o arcano 0 (o menor de todos). |
+| Oposição | Vence a menor carta do naipe. Arcano maior só vale se abrir a jogada. | Vence a menor do naipe da 1ª carta. Trunfo não corta. Se o Trunfo abriu, vence o menor Trunfo, e O Louco conta como o arcano 0 (o menor de todos), inclusive quando é ele que abre a jogada. |
 | Transmutação | O vencedor conta 2 vitórias na profecia. | A vitória vale por 2. Os pontos das cartas não são multiplicados. |
 | Saque | O vencedor rouba 3 blinds, divididos entre os rivais. | Cada rival que jogou paga a sua parte (limitada ao que tem). |
 | Assalto | O vencedor rouba 3 blinds do rival com mais fichas. | Tira do rival mais rico (se o vencedor lidera, tira do segundo). |

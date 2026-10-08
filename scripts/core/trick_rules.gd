@@ -21,6 +21,15 @@ static func lead_suit(plays: Array) -> int:
 	return -1
 
 
+## Naipe da jogada no Blitz: O Louco é um arcano maior, então se ELE abre a jogada o naipe é Trunfo
+## (quem tem Trunfo é obrigado a jogar um). No Clássico vale a regra oficial (`lead_suit`: a próxima
+## carta define o naipe).
+static func blitz_lead_suit(plays: Array) -> int:
+	if not plays.is_empty() and (plays[0]["card"] as CardData).is_louco():
+		return CardData.Suit.TRUNFO
+	return lead_suit(plays)
+
+
 ## Maior Trunfo já jogado nesta rodada (0 = nenhum Trunfo na mesa ainda).
 static func highest_trunfo(plays: Array) -> int:
 	var best := 0
@@ -34,10 +43,10 @@ static func highest_trunfo(plays: Array) -> int:
 ## Cartas que o jogador pode jogar agora.
 ## `must_cover` = false (Mesa Blitz): quem pode cobrir NÃO é obrigado a jogar Trunfo maior;
 ## qualquer Trunfo serve quando o naipe (ou o corte) pede Trunfo.
-static func legal_cards(hand: Array, plays: Array, must_cover: bool = true) -> Array:
+static func legal_cards(hand: Array, plays: Array, must_cover: bool = true, louco_leads_trunfo: bool = false) -> Array:
 	var louco := hand.filter(func(c: CardData) -> bool: return c.is_louco())
 	var rest := hand.filter(func(c: CardData) -> bool: return not c.is_louco())
-	var ls := lead_suit(plays)
+	var ls := blitz_lead_suit(plays) if louco_leads_trunfo else lead_suit(plays)
 
 	if ls == -1:
 		return hand.duplicate()  # abrindo a rodada (ou só O Louco na mesa): qualquer carta
@@ -120,18 +129,19 @@ static func would_win(card: CardData, player: int, plays: Array, louco_can_win: 
 static func legal_cards_for(hand: Array, plays: Array, must_cover: bool, modifier: int) -> Array:
 	if modifier == BlitzModifiers.Modifier.PITAGORICO:
 		return hand.duplicate()
-	return legal_cards(hand, plays, must_cover)
+	return legal_cards(hand, plays, must_cover, true)
 
 
 ## Índice da carta vencedora sob um modificador de jogada (-1 = nenhum). O Louco só vence na Loucura.
 ##  - Loucura: O Louco vence qualquer carta, até arcano maior.
 ##  - Oposição: vence a MENOR carta do naipe líder; Trunfo só vale se abriu a jogada (aí o naipe é Trunfo).
-##    Nessa jogada de Trunfo, O Louco conta como o menor arcano maior (abaixo do Mago) e vence.
+##    Nessa jogada de Trunfo (inclusive quando O Louco abre), O Louco conta como o menor arcano maior
+##    (abaixo do Mago) e vence.
 ##  - Silêncio: Trunfo não corta; vence a MAIOR carta do naipe líder (se o Trunfo abriu, eles disputam).
 ##  - Pitagórico: vence o maior Trunfo, se houver; senão o maior número, qualquer naipe (empate: ver TIE_ORDER).
 static func winning_index_mod(plays: Array, modifier: int) -> int:
 	var mods := BlitzModifiers.Modifier
-	var ls := lead_suit(plays)
+	var ls := blitz_lead_suit(plays)
 	match modifier:
 		mods.LOUCO_VENCE:
 			for i in range(plays.size()):
