@@ -2304,7 +2304,7 @@ func _refresh_hud() -> void:
 		(hud_badges[p] as Control).modulate = Color(1, 1, 1, 0.3 if sitting else (0.45 if out else 1.0))
 		(hud_titles[p] as Label).text = "VOCÊ" if p == 0 else str(config["names"][p]).to_upper()
 		(hud_titles[p] as Label).add_theme_color_override("font_color", _turn_color if p == turn_player else UIKit.TR_WHITE)
-		(dealer_badges[p] as Control).visible = engine.hand_no > 0 and engine.button == p
+		(dealer_badges[p] as Control).visible = engine.hand_no > 0 and engine.button == p and not waiting
 		var idx := order.find(p)
 		var ob := order_badges[p] as PanelContainer
 		ob.visible = (p != 0 or bool(blitz_revealed[0])) and not waiting   # você também mostra suas vitórias
