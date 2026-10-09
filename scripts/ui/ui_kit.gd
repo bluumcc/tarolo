@@ -68,6 +68,11 @@ const HUD_DIM := Color(0.8, 0.78, 0.86, 1.0)
 const HINT_BG := Color(0.10, 0.08, 0.14, 0.9)
 const TOAST_BG := Color(0.03, 0.03, 0.07, 0.92)
 
+## Cores dos botões PNG e HUD da mesa (Figma export).
+const BTN_OFF_WHITE := Color("#ABBCED")  ## texto dos botões azuis
+const BTN_DARK      := Color("#191919")  ## texto dos botões rosas
+const HUD_PINK      := Color("#D651F8")  ## valores dos chips HUD (pote, vitórias, prêmio)
+
 ## Paleta Tarot Royale — ver docs/PALETA.md para referência completa.
 const TR_BLACK  := Color("#080413")   ## sombra / contorno / fundo de carta
 const TR_WHITE  := Color("#e8e7e6")   ## branco — texto principal, face de carta
@@ -245,6 +250,36 @@ static func action_button(text: String, kind: int, size: int = 22) -> Button:
 	b.add_theme_stylebox_override("disabled", rim_box(TR_PURPLE_DARK, TR_PURPLE_LIGHT, TR_PURPLE, "small", 12, 4))
 	b.pressed.connect(func(): sfx("tick"))
 	return b
+
+
+## Botão com face PNG (9-patch). kind determina a cor do texto:
+##   0 = azul (text off-white)   1 = rosa (text preto)   outro = azul
+static func img_button(tex_normal: Texture2D, tex_pressed: Texture2D, tex_inactive: Texture2D,
+		text: String, font_size: int = 30, kind: int = 0) -> Button:
+	var ink := BTN_DARK if kind == 1 else BTN_OFF_WHITE
+	var btn := Button.new()
+	btn.text = text
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.custom_minimum_size = Vector2(0, 68)
+	var make_style := func(tex: Texture2D) -> StyleBoxTexture:
+		var s := StyleBoxTexture.new()
+		s.texture = tex
+		s.texture_margin_left = 24
+		s.texture_margin_right = 24
+		s.texture_margin_top = 14
+		s.texture_margin_bottom = 14
+		return s
+	btn.add_theme_stylebox_override("normal", make_style.call(tex_normal))
+	btn.add_theme_stylebox_override("pressed", make_style.call(tex_pressed))
+	btn.add_theme_stylebox_override("hover", make_style.call(tex_normal))
+	btn.add_theme_stylebox_override("focus", make_style.call(tex_normal))
+	btn.add_theme_stylebox_override("disabled", make_style.call(tex_inactive))
+	btn.add_theme_font_override("font", serif())
+	btn.add_theme_font_size_override("font_size", font_size)
+	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		btn.add_theme_color_override(c, ink)
+	btn.add_theme_color_override("font_disabled_color", Color(ink, 0.5))
+	return btn
 
 
 ## Face de botão 3D: cor viva, contorno escuro e base grossa; ao apertar, "afunda".

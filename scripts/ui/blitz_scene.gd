@@ -77,6 +77,8 @@ var _turn_color := UIKit.TR_CYAN.lightened(0.15)   # moldura/nome de quem joga a
 var pot_label: Label
 var pot_sub: Label
 var pot_prize_label: Label   # prêmio do palpite — visível quando o trick_pot está em destaque
+var hud_pot_label: Label    # chip POTE no topo
+var hud_prize_label: Label  # chip PRÊMIO no topo
 var bet_tags: Array = []       # "◎25 · 3" por assento
 var prog_tags: Array = []      # "1/3 ♨×1,5" ao vivo por assento
 var hold_stacks: Array = []      # Blitz: stacks de antes da liquidação (a tela só muda depois da animação)
@@ -181,13 +183,41 @@ var docked_wide := false
 var side_dim: ColorRect
 
 
+func _hud_chip(tex_path: String, caption: String, initial_val: String) -> Array:
+	var chip := Control.new()
+	chip.custom_minimum_size = Vector2(0, HEADER_H)
+	chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bg := TextureRect.new()
+	bg.texture = load(tex_path) as Texture2D
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_child(bg)
+	var vbox := VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 2)
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	chip.add_child(vbox)
+	var cap := UIKit.label(caption, 18, UIKit.BTN_OFF_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	cap.autowrap_mode = TextServer.AUTOWRAP_OFF
+	vbox.add_child(cap)
+	var val := UIKit.label(initial_val, 22, UIKit.HUD_PINK, HORIZONTAL_ALIGNMENT_CENTER)
+	val.autowrap_mode = TextServer.AUTOWRAP_OFF
+	vbox.add_child(val)
+	return [chip, val]
+
+
 func _build_ui() -> void:
-	add_child(UIKit.background())
-	var dim := ColorRect.new()   # mesa de runas sobre quase-preto: escurece o fundo azulado
-	dim.color = Color(UIKit.TR_BLACK, 0.62)
-	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(dim)
+	var bg_tex := TextureRect.new()
+	bg_tex.texture = load("res://assets/ui/partida-fundo.png") as Texture2D
+	bg_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg_tex.stretch_mode = TextureRect.STRETCH_COVER
+	bg_tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(bg_tex)
 
 	margin_box = MarginContainer.new()
 	margin_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -212,9 +242,9 @@ func _build_ui() -> void:
 	dealer_badges.resize(engine.num_players)
 	seat_nodes.resize(engine.num_players)
 
-	# Topo: menu · losangos das jogadas · ajuda. Bordas neutras, como as do card do tempo.
+	# Topo: POTE chip | RODADAS chip (dots + mensagem de ação) | PRÊMIO chip
 	var topbar := HBoxContainer.new()
-	topbar.add_theme_constant_override("separation", 12)
+	topbar.add_theme_constant_override("separation", 8)
 	root.add_child(topbar)
 	var neutral := UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 14, 8)
 	var menu_btn := Widgets.icon_button("☰")
@@ -224,33 +254,40 @@ func _build_ui() -> void:
 	menu_btn.add_theme_color_override("font_color", UIKit.TR_WHITE)
 	menu_btn.pressed.connect(_open_pause)
 	topbar.add_child(menu_btn)
-	var info_box := PanelContainer.new()
-	info_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info_box.custom_minimum_size = Vector2(0, HEADER_H)
-	info_box.add_theme_stylebox_override("panel", UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 14, 6))
+	# Chip POTE
+	var pote_arr := _hud_chip("res://assets/ui/hud-pote.png", "POTE", "◎ 0")
+	hud_pot_label = pote_arr[1]
+	topbar.add_child(pote_arr[0])
+	# Chip RODADAS — dots de jogadas + faixa de mensagem de ação
+	var rodadas_ctrl := Control.new()
+	rodadas_ctrl.custom_minimum_size = Vector2(0, HEADER_H)
+	rodadas_ctrl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rodadas_ctrl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var rodadas_bg := TextureRect.new()
+	rodadas_bg.texture = load("res://assets/ui/hud-rodadas.png") as Texture2D
+	rodadas_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rodadas_bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	rodadas_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	rodadas_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rodadas_ctrl.add_child(rodadas_bg)
+	var rodadas_v := VBoxContainer.new()
+	rodadas_v.alignment = BoxContainer.ALIGNMENT_CENTER
+	rodadas_v.add_theme_constant_override("separation", 4)
+	rodadas_v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rodadas_v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	rodadas_ctrl.add_child(rodadas_v)
 	round_dots = RoundDots.new()
 	round_dots.set_state(BlitzEngine.HAND_SIZE, [], 0)
-	var info_v := VBoxContainer.new()
-	info_v.alignment = BoxContainer.ALIGNMENT_CENTER
-	info_v.add_theme_constant_override("separation", 0)
-	info_v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	info_box.add_child(info_v)
-	info_v.add_theme_constant_override("separation", 12)   # gap entre os dots e a mensagem
-	info_v.add_child(round_dots)
-	_build_banner(info_v)
-	topbar.add_child(info_box)
-	var help_btn := Widgets.icon_button("?")
-	help_btn.custom_minimum_size = Vector2(HEADER_H, HEADER_H)
-	for sn in ["normal", "hover", "pressed", "focus"]:
-		help_btn.add_theme_stylebox_override(sn, neutral)
-	help_btn.add_theme_color_override("font_color", UIKit.TR_WHITE)
-	help_btn.pressed.connect(_open_help)
-	topbar.add_child(help_btn)
-	# Os dois cards laterais acompanham a altura do header e ficam sempre quadrados.
+	rodadas_v.add_child(round_dots)
+	_build_banner(rodadas_v)
+	topbar.add_child(rodadas_ctrl)
+	# Chip PRÊMIO
+	var premio_arr := _hud_chip("res://assets/ui/hud-premio.png", "PRÊMIO", "◎ 0")
+	hud_prize_label = premio_arr[1]
+	topbar.add_child(premio_arr[0])
 	topbar.resized.connect(func():
-		for b in [menu_btn, help_btn]:
-			if not is_equal_approx(b.custom_minimum_size.x, topbar.size.y):
-				b.custom_minimum_size = Vector2(topbar.size.y, HEADER_H))
+		if not is_equal_approx(menu_btn.custom_minimum_size.x, topbar.size.y):
+			menu_btn.custom_minimum_size = Vector2(topbar.size.y, HEADER_H))
 
 	# Palco: a mesa de runas com os rivais sentados na borda, a distâncias iguais; você embaixo.
 	stage = Control.new()
@@ -326,7 +363,7 @@ func _build_ui() -> void:
 
 ## Aviso de ação: título curto, na cor do tipo de ação, numa linha dentro do card do header (embaixo dos losangos).
 func _build_banner(parent: Control) -> void:
-	banner_title = UIKit.serif_label("", 22, UIKit.TR_GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	banner_title = UIKit.serif_label("", 22, UIKit.BTN_OFF_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
 	banner_title.autowrap_mode = TextServer.AUTOWRAP_OFF
 	# A largura do aviso nunca depende do texto: um Label sem corte alarga o card e estica a mesa
 	# inteira pra fora da tela enquanto o aviso estiver visível. `_fit_banner` reduz a fonte antes.
@@ -1951,8 +1988,19 @@ func _human_bet() -> Dictionary:
 	var done := func(result: Dictionary) -> void:
 		st["result"] = result
 		item_chosen.emit(1)
+	var _tex_azul_n := load("res://assets/ui/botao-azul-normal.png") as Texture2D
+	var _tex_azul_p := load("res://assets/ui/botao-azul-pressionado.png") as Texture2D
+	var _tex_azul_i := load("res://assets/ui/botao-azul-inativo.png") as Texture2D
+	var _tex_rosa_n := load("res://assets/ui/botao-rosa-normal.png") as Texture2D
+	var _tex_rosa_p := load("res://assets/ui/botao-rosa-pressionado.png") as Texture2D
+	var _tex_rosa_i := load("res://assets/ui/botao-rosa-inativo.png") as Texture2D
 	var mk := func(text: String, kind: int, cb: Callable) -> Button:
-		var b := UIKit.action_button(text, kind, 20)
+		var use_rosa := kind == UIKit.ActionKind.GOLD
+		var b := UIKit.img_button(
+			_tex_rosa_n if use_rosa else _tex_azul_n,
+			_tex_rosa_p if use_rosa else _tex_azul_p,
+			_tex_rosa_i if use_rosa else _tex_azul_i,
+			text, 20, 1 if use_rosa else 0)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.custom_minimum_size = Vector2(0, ACT_H)
 		b.pressed.connect(cb)
@@ -2732,6 +2780,8 @@ func _blitz_open_level() -> bool:
 	pot_locked = true
 	shown_pot = engine.carry
 	pot_label.text = _pot_text(shown_pot)
+	if hud_pot_label:
+		hud_pot_label.text = _pot_text(shown_pot)
 	_set_pot_cards(false)   # só aparecem (juntos) depois do palpite, quando as entradas de verdade entram
 	_refresh_hud()
 	var pick: int
@@ -2777,6 +2827,8 @@ func _blitz_reveal() -> void:
 		if not is_inside_tree():
 			return
 	pot_label.text = _pot_text(engine.pot)
+	if hud_pot_label:
+		hud_pot_label.text = _pot_text(engine.pot)
 	shown_pot = engine.pot
 	if not GameState.autoplay:
 		Sfx.play("combo")
@@ -3041,8 +3093,12 @@ func _refresh_pot() -> void:
 		else:
 			shown_pot = engine.pot if engine.pot > 0.0 else engine.carry
 		pot_label.text = _pot_text(shown_pot)
+	if hud_pot_label:
+		hud_pot_label.text = _pot_text(shown_pot)
 	# Quando o trick_pot está em destaque, mostra o prêmio do palpite abaixo como secundário.
 	pot_prize_label.text = "◎ " + UIKit.fmt_short(engine.pot)
+	if hud_prize_label:
+		hud_prize_label.text = pot_prize_label.text
 	var sub := ""
 	if phase == "bet":
 		sub = "aposta da jogada"
