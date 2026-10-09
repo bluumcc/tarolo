@@ -2040,32 +2040,32 @@ func _human_bet() -> Dictionary:
 				var hi := int(opt["max_to"])
 				st["to"] = clampi(int(st["to"]), lo, hi)
 				var mine_in := int(engine.contrib[0])
-				var cancel_b := mk.call("CANCELAR", UIKit.ActionKind.DANGER, func():
+				var cancel_b: Button = mk.call("CANCELAR", UIKit.ActionKind.DANGER, func():
 					st["raising"] = false
 					(st["render"] as Callable).call())
 				cancel_b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 				bet_row.add_child(cancel_b)
-				var minus_b := UIKit.img_button(_tex_azul_n, _tex_azul_p, _tex_azul_i, "−", 24, 0)
+				var minus_b: Button = UIKit.img_button(_tex_azul_n, _tex_azul_p, _tex_azul_i, "−", 24, 0)
 				minus_b.custom_minimum_size = Vector2(ACT_H, ACT_H)
 				minus_b.disabled = int(st["to"]) <= lo
 				minus_b.pressed.connect(func():
 					st["to"] = maxi(int(st["to"]) - blind, lo)
 					(st["render"] as Callable).call())
 				bet_row.add_child(minus_b)
-				var val_lbl := UIKit.label("◎%d" % (int(st["to"]) - mine_in), 22, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+				var val_lbl: Label = UIKit.label("◎%d" % (int(st["to"]) - mine_in), 22, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
 				val_lbl.custom_minimum_size = Vector2(72, 0)
 				val_lbl.size_flags_vertical = Control.SIZE_FILL
 				val_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 				bet_row.add_child(val_lbl)
-				var plus_b := UIKit.img_button(_tex_azul_n, _tex_azul_p, _tex_azul_i, "+", 24, 0)
+				var plus_b: Button = UIKit.img_button(_tex_azul_n, _tex_azul_p, _tex_azul_i, "+", 24, 0)
 				plus_b.custom_minimum_size = Vector2(ACT_H, ACT_H)
 				plus_b.disabled = int(st["to"]) >= hi
 				plus_b.pressed.connect(func():
 					st["to"] = mini(int(st["to"]) + blind, hi)
 					(st["render"] as Callable).call())
 				bet_row.add_child(plus_b)
-				var verb := "APOSTAR" if can_check else "AUMENTAR"
-				var ok_b := mk.call(verb, UIKit.ActionKind.GOLD, func(): done.call({"action": "raise", "to": float(st["to"])}))
+				var verb: String = "APOSTAR" if can_check else "AUMENTAR"
+				var ok_b: Button = mk.call(verb, UIKit.ActionKind.GOLD, func(): done.call({"action": "raise", "to": float(st["to"])}))
 				ok_b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 				bet_row.add_child(ok_b)
 			return
