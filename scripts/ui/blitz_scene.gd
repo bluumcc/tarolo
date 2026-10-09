@@ -3097,7 +3097,7 @@ func _refresh_round_dots() -> void:
 	if hud_round_label != null:
 		hud_round_label.text = "RODADA %d/%d" % [mini(hand_num, BlitzEngine.HAND_SIZE), BlitzEngine.HAND_SIZE]
 	if hud_wins_label != null:
-		var target := engine.predicts[0] if bool(blitz_revealed[0]) else -1
+		var target: int = int(engine.predicts[0]) if bool(blitz_revealed[0]) else -1
 		if target >= 0:
 			hud_wins_label.text = "vitórias %d/%d" % [engine.wins[0], target]
 		else:
