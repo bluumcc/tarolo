@@ -257,6 +257,7 @@ func _build_ui() -> void:
 	var rodadas_ctrl := Control.new()
 	rodadas_ctrl.custom_minimum_size = Vector2(0, HEADER_H)
 	rodadas_ctrl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rodadas_ctrl.size_flags_vertical = Control.SIZE_SHRINK_END
 	rodadas_ctrl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var rodadas_bg := TextureRect.new()
 	rodadas_bg.texture = load("res://assets/ui/hud-rodadas.png") as Texture2D
@@ -295,7 +296,7 @@ func _build_ui() -> void:
 	var mesa_tex := TextureRect.new()
 	mesa_tex.texture = load("res://assets/ui/mesa.png") as Texture2D
 	mesa_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	mesa_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	mesa_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	mesa_tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mesa_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stage.add_child(mesa_tex)
@@ -2024,14 +2025,49 @@ func _human_bet() -> Dictionary:
 		for c in bet_row.get_children():
 			bet_row.remove_child(c)
 			c.queue_free()
-		if docked_wide and bool(st["raising"]):
-			# Desktop: as opções de aposta ocupam o lugar dos botões, na coluna da direita
-			# (confirmar APOSTAR/AUMENTAR e CANCELAR dentro do próprio bloco).
-			var pbody := VBoxContainer.new()
-			pbody.add_theme_constant_override("separation", 8)
-			pbody.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			bet_row.add_child(pbody)
-			_build_raise_picker(pbody, opt, st, done)
+		if bool(st["raising"]):
+			if docked_wide:
+				# Desktop: seletor completo na coluna da direita
+				var pbody := VBoxContainer.new()
+				pbody.add_theme_constant_override("separation", 8)
+				pbody.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				bet_row.add_child(pbody)
+				_build_raise_picker(pbody, opt, st, done)
+			else:
+				# Mobile: linha inline [CANCELAR | − | ◎VALOR | + | APOSTAR/AUMENTAR]
+				var blind := engine.blind
+				var lo := int(opt["min_to"])
+				var hi := int(opt["max_to"])
+				st["to"] = clampi(int(st["to"]), lo, hi)
+				var mine_in := int(engine.contrib[0])
+				var cancel_b := mk.call("CANCELAR", UIKit.ActionKind.DANGER, func():
+					st["raising"] = false
+					(st["render"] as Callable).call())
+				cancel_b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				bet_row.add_child(cancel_b)
+				var minus_b := UIKit.img_button(_tex_azul_n, _tex_azul_p, _tex_azul_i, "−", 24, 0)
+				minus_b.custom_minimum_size = Vector2(ACT_H, ACT_H)
+				minus_b.disabled = int(st["to"]) <= lo
+				minus_b.pressed.connect(func():
+					st["to"] = maxi(int(st["to"]) - blind, lo)
+					(st["render"] as Callable).call())
+				bet_row.add_child(minus_b)
+				var val_lbl := UIKit.label("◎%d" % (int(st["to"]) - mine_in), 22, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+				val_lbl.custom_minimum_size = Vector2(72, 0)
+				val_lbl.size_flags_vertical = Control.SIZE_FILL
+				val_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				bet_row.add_child(val_lbl)
+				var plus_b := UIKit.img_button(_tex_azul_n, _tex_azul_p, _tex_azul_i, "+", 24, 0)
+				plus_b.custom_minimum_size = Vector2(ACT_H, ACT_H)
+				plus_b.disabled = int(st["to"]) >= hi
+				plus_b.pressed.connect(func():
+					st["to"] = mini(int(st["to"]) + blind, hi)
+					(st["render"] as Callable).call())
+				bet_row.add_child(plus_b)
+				var verb := "APOSTAR" if can_check else "AUMENTAR"
+				var ok_b := mk.call(verb, UIKit.ActionKind.GOLD, func(): done.call({"action": "raise", "to": float(st["to"])}))
+				ok_b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				bet_row.add_child(ok_b)
 			return
 		if not can_check:
 			bet_row.add_child(mk.call("DESISTIR", UIKit.ActionKind.DANGER, func(): done.call({"action": "fold"})))
@@ -2041,22 +2077,6 @@ func _human_bet() -> Dictionary:
 			bet_row.add_child(mk.call("APOSTAR" if can_check else "AUMENTAR", UIKit.ActionKind.GOLD, func():
 				st["raising"] = not bool(st["raising"])
 				(st["render"] as Callable).call()))
-		if bool(st["raising"]):
-			var holder := MarginContainer.new()
-			holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-			holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			holder.add_theme_constant_override("margin_bottom", int(get_viewport_rect().size.y - bottom_bar.global_position.y + 8.0))
-			overlay_layer.add_child(holder)
-			var box := UIKit.panel(UIKit.PURPLE_DEEP, UIKit.BRAND, 14)
-			box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-			box.size_flags_vertical = Control.SIZE_SHRINK_END
-			box.custom_minimum_size = Vector2(minf(get_viewport_rect().size.x - 48.0, 640.0), 0)
-			holder.add_child(box)
-			var body := VBoxContainer.new()
-			body.add_theme_constant_override("separation", 8)
-			box.add_child(body)
-			_build_raise_picker(body, opt, st, done)
-			st["picker"] = holder
 	bet_row.visible = true
 	_refresh_idle_card()
 	(st["render"] as Callable).call()

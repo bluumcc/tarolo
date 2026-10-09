@@ -268,6 +268,11 @@ static func img_button(tex_normal: Texture2D, tex_pressed: Texture2D, tex_inacti
 		s.texture_margin_right = 24
 		s.texture_margin_top = 14
 		s.texture_margin_bottom = 14
+		# Content margins explícitos e iguais em todos os estados para o texto não deslocar ao pressionar
+		s.content_margin_left = 20.0
+		s.content_margin_right = 20.0
+		s.content_margin_top = 12.0
+		s.content_margin_bottom = 12.0
 		return s
 	btn.add_theme_stylebox_override("normal", make_style.call(tex_normal))
 	btn.add_theme_stylebox_override("pressed", make_style.call(tex_pressed))

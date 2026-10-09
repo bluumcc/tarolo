@@ -1,8 +1,8 @@
 class_name SeatView
 extends Control
 ## Assento de um jogador na mesa.
-## Rival: avatar sempre visível; toque → painel lateral com nome+stack aparece por STACK_SECONDS.
-##   Assentos da esquerda/topo expandem para a DIREITA; assentos da direita expandem para a ESQUERDA.
+## Rival: avatar sempre visível; toque → card cresce lateralmente como um único elemento.
+##   Avatar fixo no lugar; zona de texto aparece ao lado (direita por padrão, esquerda se flip).
 ## Você (always_stack): plaquinha abaixo do avatar sempre visível com nome+stack.
 ## Interface pública mantida: name_label, stack_label, bet_label, avatar, layout(), W, H,
 ## AVATAR_CENTER_Y, PLATE_RATIO.
@@ -15,8 +15,7 @@ const AVATAR_TOP := 2.0
 const AVATAR_CENTER_Y := AVATAR_TOP + HexAvatar.SIZE_PX.y / 2.0
 const STACK_SECONDS := 7.0
 const WIDE_SCALE := 1.3
-const EXP_W := 110.0   ## largura do painel lateral expandido
-const EXP_PAD := 6.0   ## gap entre avatar e painel lateral
+const EXP_W := 100.0   ## largura da zona de texto no card expandido
 
 var avatar: HexAvatar
 var name_label: Label
@@ -27,7 +26,7 @@ var _plate: PanelContainer
 var _exp_panel: PanelContainer
 var _stack_row: HBoxContainer
 var _always := false
-var _flip := false      ## true = avatar à direita, painel à esquerda (assentos do lado direito da mesa)
+var _flip := false      ## true = avatar à direita, texto à esquerda
 var _token := 0
 
 var _sb_normal: StyleBoxFlat
@@ -40,6 +39,16 @@ func setup(p: int, always_stack: bool = false, flip_expand: bool = false) -> Sea
 	custom_minimum_size = Vector2(W, H)
 	size = Vector2(W, H)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	if not _always:
+		# Painel de fundo — adicionado ANTES do avatar para ficar atrás dele
+		_sb_normal = UIKit.box(UIKit.PURPLE_DEEP.darkened(0.2), UIKit.VIOLET, 2, 10, 0)
+		_sb_active = UIKit.box(UIKit.PURPLE_DEEP.darkened(0.2), UIKit.BRAND, 3, 10, 0)
+		_exp_panel = PanelContainer.new()
+		_exp_panel.add_theme_stylebox_override("panel", _sb_normal)
+		_exp_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		_exp_panel.visible = false
+		add_child(_exp_panel)
 
 	avatar = HexAvatar.new().setup(p)
 	avatar.position = Vector2((W - avatar.size.x) / 2.0, AVATAR_TOP)
@@ -66,31 +75,38 @@ func setup(p: int, always_stack: bool = false, flip_expand: bool = false) -> Sea
 		row.add_child(stack_row)
 		_stack_row = stack_row
 	else:
-		_sb_normal = UIKit.box(UIKit.PURPLE_DEEP.darkened(0.2), UIKit.VIOLET, 2, 10, 4)
-		_sb_active = UIKit.box(UIKit.PURPLE_DEEP.darkened(0.2), UIKit.BRAND, 3, 10, 4)
-
-		_exp_panel = PanelContainer.new()
-		_exp_panel.add_theme_stylebox_override("panel", _sb_normal)
-		_exp_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-		_exp_panel.custom_minimum_size = Vector2(EXP_W, 0)
-		_exp_panel.visible = false
-		add_child(_exp_panel)
+		# HBox dentro do painel: [espaçador(avatar) | vbox texto] ou [vbox texto | espaçador(avatar)]
+		# O espaçador ocupa a mesma largura do avatar para o texto não sobrepor ao hex.
+		var hbox := HBoxContainer.new()
+		hbox.add_theme_constant_override("separation", 0)
+		hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_exp_panel.add_child(hbox)
 
 		var vbox := VBoxContainer.new()
 		vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 		vbox.add_theme_constant_override("separation", 4)
 		vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_exp_panel.add_child(vbox)
+		vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 		name_label = UIKit.serif_label("", 17, UIKit.BTN_OFF_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
 		name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 		name_label.clip_text = true
-		name_label.custom_minimum_size = Vector2(EXP_W - 16.0, 0)
 		vbox.add_child(name_label)
 
 		var stack_row := _make_stack_row()
 		vbox.add_child(stack_row)
 		_stack_row = stack_row
+
+		var spacer := Control.new()
+		spacer.custom_minimum_size = Vector2(avatar.size.x, 0)
+		spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+		if _flip:
+			hbox.add_child(vbox)
+			hbox.add_child(spacer)
+		else:
+			hbox.add_child(spacer)
+			hbox.add_child(vbox)
 
 		avatar.gui_input.connect(_on_gui_input)
 		_exp_panel.gui_input.connect(_on_gui_input)
@@ -128,15 +144,17 @@ func layout() -> void:
 		bet_label.size = Vector2(W, bh)
 		bet_label.position = Vector2(0.0, -bh - 2.0)
 	elif not _always and _exp_panel != null:
-		# O avatar permanece no lugar; o painel aparece ao lado
 		var ah := avatar.size.y
 		var ph := _exp_panel.get_combined_minimum_size().y
 		var panel_h := maxf(ph, ah)
-		_exp_panel.size = Vector2(EXP_W, panel_h)
+		var total_w := avatar.size.x + EXP_W
+		_exp_panel.size = Vector2(total_w, panel_h)
 		if _flip:
-			_exp_panel.position = Vector2(avatar.position.x - EXP_W - EXP_PAD, AVATAR_TOP)
+			# painel se estende para a ESQUERDA: cobre [texto | avatar]
+			_exp_panel.position = Vector2(avatar.position.x - EXP_W, AVATAR_TOP)
 		else:
-			_exp_panel.position = Vector2(avatar.position.x + avatar.size.x + EXP_PAD, AVATAR_TOP)
+			# painel se estende para a DIREITA: cobre [avatar | texto]
+			_exp_panel.position = Vector2(avatar.position.x, AVATAR_TOP)
 		var bh := bet_label.get_combined_minimum_size().y
 		bet_label.size = Vector2(W, bh)
 		bet_label.position = Vector2(0.0, avatar.position.y + avatar.size.y + 4.0)
