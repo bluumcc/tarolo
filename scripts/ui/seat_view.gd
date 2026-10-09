@@ -22,7 +22,6 @@ var name_label: Label
 var stack_label: Label
 var bet_label: Label
 
-var _plate: PanelContainer
 var _exp_panel: PanelContainer
 var _stack_row: HBoxContainer
 var _always := false
@@ -40,74 +39,54 @@ func setup(p: int, always_stack: bool = false, flip_expand: bool = false) -> Sea
 	size = Vector2(W, H)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	if not _always:
-		# Painel de fundo — adicionado ANTES do avatar para ficar atrás dele
-		_sb_normal = UIKit.box(UIKit.PURPLE_DEEP.darkened(0.2), UIKit.VIOLET, 2, 10, 0)
-		_sb_active = UIKit.box(UIKit.PURPLE_DEEP.darkened(0.2), UIKit.BRAND, 3, 10, 0)
-		_exp_panel = PanelContainer.new()
-		_exp_panel.add_theme_stylebox_override("panel", _sb_normal)
-		_exp_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-		_exp_panel.visible = false
-		add_child(_exp_panel)
+	# Painel de fundo — adicionado ANTES do avatar para ficar atrás dele
+	_sb_normal = UIKit.box(UIKit.PURPLE_DEEP.darkened(0.2), UIKit.VIOLET, 2, 10, 0)
+	_sb_active = UIKit.box(UIKit.PURPLE_DEEP.darkened(0.2), UIKit.BRAND, 3, 10, 0)
+	_exp_panel = PanelContainer.new()
+	_exp_panel.add_theme_stylebox_override("panel", _sb_normal)
+	_exp_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	# always_stack = sempre expandido (p=0); demais: começa colapsado e togla no toque
+	_exp_panel.visible = _always
+	add_child(_exp_panel)
 
 	avatar = HexAvatar.new().setup(p)
 	avatar.position = Vector2((W - avatar.size.x) / 2.0, AVATAR_TOP)
 	add_child(avatar)
 
-	if _always:
-		_plate = PanelContainer.new()
-		_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var sb := UIKit.box_cached(UIKit.PURPLE_DEEP.darkened(0.2), UIKit.VIOLET, 2, 10, 4)
-		_plate.add_theme_stylebox_override("panel", sb)
-		add_child(_plate)
+	# HBox dentro do painel: [espaçador(avatar) | vbox texto] ou [vbox texto | espaçador(avatar)]
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 0)
+	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_exp_panel.add_child(hbox)
 
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_plate.add_child(row)
+	var vbox := VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 4)
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
-		name_label = UIKit.serif_label("", 19, UIKit.BTN_OFF_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
-		name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-		row.add_child(name_label)
+	name_label = UIKit.serif_label("", 17, UIKit.BTN_OFF_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	name_label.clip_text = true
+	vbox.add_child(name_label)
 
-		var stack_row := _make_stack_row()
-		row.add_child(stack_row)
-		_stack_row = stack_row
+	var stack_row := _make_stack_row()
+	vbox.add_child(stack_row)
+	_stack_row = stack_row
+
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(avatar.size.x, 0)
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	if _flip:
+		hbox.add_child(vbox)
+		hbox.add_child(spacer)
 	else:
-		# HBox dentro do painel: [espaçador(avatar) | vbox texto] ou [vbox texto | espaçador(avatar)]
-		# O espaçador ocupa a mesma largura do avatar para o texto não sobrepor ao hex.
-		var hbox := HBoxContainer.new()
-		hbox.add_theme_constant_override("separation", 0)
-		hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_exp_panel.add_child(hbox)
+		hbox.add_child(spacer)
+		hbox.add_child(vbox)
 
-		var vbox := VBoxContainer.new()
-		vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-		vbox.add_theme_constant_override("separation", 4)
-		vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-
-		name_label = UIKit.serif_label("", 17, UIKit.BTN_OFF_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
-		name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-		name_label.clip_text = true
-		vbox.add_child(name_label)
-
-		var stack_row := _make_stack_row()
-		vbox.add_child(stack_row)
-		_stack_row = stack_row
-
-		var spacer := Control.new()
-		spacer.custom_minimum_size = Vector2(avatar.size.x, 0)
-		spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-		if _flip:
-			hbox.add_child(vbox)
-			hbox.add_child(spacer)
-		else:
-			hbox.add_child(spacer)
-			hbox.add_child(vbox)
-
+	if not _always:
+		# rivais: toque no avatar ou no painel togla expansão
 		avatar.gui_input.connect(_on_gui_input)
 		_exp_panel.gui_input.connect(_on_gui_input)
 
@@ -136,28 +115,22 @@ func _make_stack_row() -> HBoxContainer:
 
 
 func layout() -> void:
-	if _always and _plate != null:
-		var ps := _plate.get_combined_minimum_size()
-		_plate.size = Vector2(maxf(ps.x, PLATE_MIN_W), ps.y)
-		_plate.position = Vector2((W - _plate.size.x) / 2.0, avatar.position.y + avatar.size.y + 4.0)
-		var bh := bet_label.get_combined_minimum_size().y
-		bet_label.size = Vector2(W, bh)
-		bet_label.position = Vector2(0.0, -bh - 2.0)
-	elif not _always and _exp_panel != null:
+	if _exp_panel != null:
 		var ah := avatar.size.y
 		var ph := _exp_panel.get_combined_minimum_size().y
 		var panel_h := maxf(ph, ah)
 		var total_w := avatar.size.x + EXP_W
 		_exp_panel.size = Vector2(total_w, panel_h)
 		if _flip:
-			# painel se estende para a ESQUERDA: cobre [texto | avatar]
 			_exp_panel.position = Vector2(avatar.position.x - EXP_W, AVATAR_TOP)
 		else:
-			# painel se estende para a DIREITA: cobre [avatar | texto]
 			_exp_panel.position = Vector2(avatar.position.x, AVATAR_TOP)
 		var bh := bet_label.get_combined_minimum_size().y
 		bet_label.size = Vector2(W, bh)
-		bet_label.position = Vector2(0.0, avatar.position.y + avatar.size.y + 4.0)
+		if _always:
+			bet_label.position = Vector2(0.0, -bh - 2.0)
+		else:
+			bet_label.position = Vector2(0.0, avatar.position.y + avatar.size.y + 4.0)
 
 
 func _on_gui_input(event: InputEvent) -> void:
