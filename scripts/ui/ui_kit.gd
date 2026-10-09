@@ -140,6 +140,36 @@ static func chunky(face: Color, pressed: bool = false) -> StyleBoxFlat:
 	return sb
 
 
+## Botão com textura PNG (botao-azul-*.png / botao-rosa-*.png).
+## tex_normal, tex_pressed, tex_inactive: texturas para os três estados.
+static func img_button(tex_normal: Texture2D, tex_pressed: Texture2D, tex_inactive: Texture2D,
+		text: String, font_size: int = 30) -> Button:
+	var btn := Button.new()
+	btn.text = text
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.custom_minimum_size = Vector2(0, 68)
+	var make_style := func(tex: Texture2D) -> StyleBoxTexture:
+		var s := StyleBoxTexture.new()
+		s.texture = tex
+		s.texture_margin_left = 24
+		s.texture_margin_right = 24
+		s.texture_margin_top = 14
+		s.texture_margin_bottom = 14
+		return s
+	btn.add_theme_stylebox_override("normal", make_style.call(tex_normal))
+	btn.add_theme_stylebox_override("pressed", make_style.call(tex_pressed))
+	btn.add_theme_stylebox_override("hover", make_style.call(tex_normal))
+	btn.add_theme_stylebox_override("focus", make_style.call(tex_normal))
+	btn.add_theme_stylebox_override("disabled", make_style.call(tex_inactive))
+	btn.add_theme_font_override("font", serif())
+	btn.add_theme_font_size_override("font_size", font_size)
+	btn.add_theme_color_override("font_color", INK)
+	btn.add_theme_color_override("font_hover_color", INK)
+	btn.add_theme_color_override("font_pressed_color", INK)
+	btn.add_theme_color_override("font_disabled_color", Color(INK, 0.5))
+	return btn
+
+
 ## Luminância relativa (WCAG) e razão de contraste entre duas cores.
 static func luminance(c: Color) -> float:
 	var f := func(v: float) -> float: return v / 12.92 if v <= 0.03928 else pow((v + 0.055) / 1.055, 2.4)

@@ -50,7 +50,10 @@ var dealer_badges: Array = []
 var phase := "idle"            # "bet" | "play" | "idle"
 var bets_gathered := false     # apostas já juntadas no pote
 var first_round_done := false
-var info_label: Label
+var info_label: Label        # HUD rodadas: "JOGADA X/Y"
+var hud_wins_label: Label   # HUD vitórias: "VITÓRIAS X/Y"
+var hud_pot_label: Label    # HUD chip POTE: valor atual
+var hud_prize_label: Label  # HUD chip PRÊMIO: buy-in em jogo
 var trick_dots: HBoxContainer
 var shown_totals: Array = []
 var modifier_label: Label
@@ -144,16 +147,23 @@ func _show_insufficient_fichas() -> void:
 # ------------------------------------------------------------------ UI
 
 func _build_ui() -> void:
-	add_child(UIKit.background())
+	# Fundo: imagem de partida (full screen, atrás de tudo).
+	var bg_tex := TextureRect.new()
+	bg_tex.texture = load("res://assets/ui/partida-fundo.png") as Texture2D
+	bg_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg_tex.stretch_mode = TextureRect.STRETCH_COVER
+	bg_tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(bg_tex)
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 16)
+		margin.add_theme_constant_override("margin_" + side, 12)
 	add_child(margin)
 
 	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 10)
+	root.add_theme_constant_override("separation", 8)
 	margin.add_child(root)
 
 	hud_badges.resize(engine.num_players)
@@ -167,35 +177,14 @@ func _build_ui() -> void:
 	dealer_badges.resize(engine.num_players)
 	seat_nodes.resize(engine.num_players)
 
-	# Barra de topo — título + ações, uma linha só, sempre no mesmo lugar (como o topo
-	# de qualquer app) -------------------------------------------------
-	var topbar := HBoxContainer.new()
-	topbar.add_theme_constant_override("separation", 12)
-	root.add_child(topbar)
-	var menu_btn := Widgets.icon_button("☰")
-	menu_btn.pressed.connect(_open_pause)
-	topbar.add_child(menu_btn)
-	var info_box := UIKit.panel(UIKit.SURFACE, UIKit.BLACK, 8)
-	info_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var info_v := VBoxContainer.new()
-	info_v.add_theme_constant_override("separation", 4)
-	info_box.add_child(info_v)
-	info_label = UIKit.label("", 28, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	info_v.add_child(info_label)
-	trick_dots = HBoxContainer.new()
-	trick_dots.alignment = BoxContainer.ALIGNMENT_CENTER
-	trick_dots.add_theme_constant_override("separation", 8)
-	info_v.add_child(trick_dots)
-	topbar.add_child(info_box)
-	var help_btn := Widgets.icon_button("?", UIKit.ACTION.darkened(0.1))
-	help_btn.pressed.connect(_open_help)
-	topbar.add_child(help_btn)
+	# HUD do topo: 3 chips PNG (pote | rodadas | prêmio) + botões de menu/ajuda nas pontas.
+	root.add_child(_build_top_hud())
 
 	# Corpo: em tela larga vira duas colunas (placar à esquerda, mesa à direita); no
 	# celular empilha. Cada bloco tem espaço próprio — nada flutua por cima de outro.
 	main_area = BoxContainer.new()
 	main_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	main_area.add_theme_constant_override("separation", 20)
+	main_area.add_theme_constant_override("separation", 12)
 	root.add_child(main_area)
 	side_col = VBoxContainer.new()
 	side_col.add_theme_constant_override("separation", 12)
@@ -203,10 +192,8 @@ func _build_ui() -> void:
 	var center_col := VBoxContainer.new()
 	center_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	center_col.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	center_col.add_theme_constant_override("separation", 12)
+	center_col.add_theme_constant_override("separation", 8)
 	main_area.add_child(center_col)
-
-	# (Os 3 rivais ficam sentados ao redor da mesa — veja _build_seats.)
 
 	# Regra do nível — aviso fixo, sempre visível.
 	mod_box = UIKit.panel(UIKit.OK.darkened(0.75), UIKit.OK, 10)
@@ -222,25 +209,42 @@ func _build_ui() -> void:
 		_refresh_hud())
 	side_col.add_child(mod_box)
 
-
-	# Assentos: os 4 jogadores em fileira, na ordem de jogo, esticados na largura toda.
+	# Assentos: fileira de avatares acima da mesa.
 	center_col.add_child(_build_seats())
 
-	# Faixa de avisos — espaço RESERVADO (nunca cobre carta nem placar): resultado da
-	# rodada, combos, evento surpresa. Uma mensagem por vez, sempre no mesmo lugar. Altura
-	# FIXA (nunca cresce com o texto) — é um `Panel` puro com clip, não um Container que se
-	# redimensiona pros filhos: textos longos truncam (title) ou quebram e cortam (sub) em vez
-	# de esticar o card.
+	# Mesa de jogo com imagem circular — as cartas jogadas ficam dentro.
+	table_center = Panel.new()
+	table_center.name = "TableCenter"
+	table_center.custom_minimum_size = Vector2(0, 300)
+	table_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var clear_sb := StyleBoxFlat.new()
+	clear_sb.bg_color = Color.TRANSPARENT
+	table_center.add_theme_stylebox_override("panel", clear_sb)
+	table_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mesa_tex := TextureRect.new()
+	mesa_tex.texture = load("res://assets/ui/mesa.png") as Texture2D
+	mesa_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	mesa_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	mesa_tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	mesa_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	table_center.add_child(mesa_tex)
+	center_col.add_child(table_center)
+	_build_pot()
+	table_center.resized.connect(_layout_table)
+
+	# Faixa de avisos — ABAIXO da mesa (acima dos botões). Espaço reservado, altura fixa.
 	banner_box = Panel.new()
-	banner_box.custom_minimum_size = Vector2(0, 88)
+	banner_box.custom_minimum_size = Vector2(0, 72)
 	banner_box.clip_contents = true
-	banner_box.add_theme_stylebox_override("panel", UIKit.box(UIKit.PURPLE_DEEP, UIKit.MUTED, 3, 4, 12))
+	var banner_sb := StyleBoxFlat.new()
+	banner_sb.bg_color = Color.TRANSPARENT
+	banner_box.add_theme_stylebox_override("panel", banner_sb)
 	var bv := VBoxContainer.new()
 	bv.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bv.offset_left = 14.0
 	bv.offset_right = -14.0
-	bv.offset_top = 8.0
-	bv.offset_bottom = -8.0
+	bv.offset_top = 4.0
+	bv.offset_bottom = -4.0
 	bv.alignment = BoxContainer.ALIGNMENT_CENTER
 	bv.add_theme_constant_override("separation", 2)
 	banner_box.add_child(bv)
@@ -252,17 +256,6 @@ func _build_ui() -> void:
 	banner_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bv.add_child(banner_sub)
 	center_col.add_child(banner_box)
-
-	# Mesa de jogo — só a rodada atual, cada carta numa vaga fixa por assento.
-	table_center = Panel.new()
-	table_center.name = "TableCenter"
-	table_center.custom_minimum_size = Vector2(0, 340)
-	table_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	table_center.add_theme_stylebox_override("panel", UIKit.box(UIKit.TABLE_FILL, UIKit.TABLE_EDGE, 3, 40, 0))
-	table_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	center_col.add_child(table_center)
-	_build_pot()
-	table_center.resized.connect(_layout_table)
 
 	var status_row := HBoxContainer.new()
 	status_row.add_theme_constant_override("separation", 10)
@@ -285,7 +278,7 @@ func _build_ui() -> void:
 	turn_bar.show_percentage = false
 	turn_bar.min_value = 0.0
 	turn_bar.max_value = TURN_SECONDS
-	turn_bar.custom_minimum_size = Vector2(0, 18)
+	turn_bar.custom_minimum_size = Vector2(0, 14)
 	turn_bar.modulate.a = 0.0
 	turn_bar.add_theme_stylebox_override("background", UIKit.box(UIKit.PURPLE_DEEP, UIKit.PURPLE, 2, 7, 0))
 	turn_bar.add_theme_stylebox_override("fill", UIKit.box(UIKit.BRAND, UIKit.BRAND, 0, 7, 0))
@@ -344,51 +337,72 @@ func _on_resize() -> void:
 	_layout_hand()
 
 
-## Fileira de assentos, na ordem de jogo, cada um numa coluna do mesmo tamanho: avatar
-## redondo, nome, stack, as fichas apostadas na frente e a situação (vez / próximo / ação).
+## Fileira de assentos com HexAvatar (PNG). Você (p=0): avatar + nome + stack sempre visíveis.
+## Rivais (p>0): só avatar; toque expande por SeatView.STACK_SECONDS mostrando nome+stack.
 func _build_seats() -> HBoxContainer:
 	seat_row = HBoxContainer.new()
 	seat_row.add_theme_constant_override("separation", 0)
 	seat_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for p in range(engine.num_players):
-		var seat := VBoxContainer.new()
-		seat.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		seat.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		seat.add_theme_constant_override("separation", 1)
-		seat.alignment = BoxContainer.ALIGNMENT_BEGIN
+		var col := VBoxContainer.new()
+		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.add_theme_constant_override("separation", 2)
+		col.alignment = BoxContainer.ALIGNMENT_BEGIN
+
+		# Avatar hexagonal com PNGs.
+		var avatar := HexAvatar.new().setup(p)
+		avatar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		col.add_child(avatar)
+
+		# Badge de ordem de fala (canto superior esquerdo do avatar).
+		var ord := HexAvatar.make_badge("", UIKit.PURPLE_DEEP, UIKit.MUTED, UIKit.INK)
+		ord.position = avatar.position + Vector2(0, 0)
+		ord.z_index = 1
+
+		# Para posicionar badges sobre o avatar usamos um wrapper Control.
 		var wrap := Control.new()
-		wrap.custom_minimum_size = Vector2(100, 96)
+		wrap.custom_minimum_size = Vector2(HexAvatar.SIZE_PX.x + HexAvatar.BADGE_PX, HexAvatar.SIZE_PX.y)
 		wrap.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var ring := PanelContainer.new()
-		ring.custom_minimum_size = Vector2(84, 84)
-		ring.size = Vector2(84, 84)
-		ring.position = Vector2(8, 10)
-		ring.pivot_offset = Vector2(42, 42)
-		ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var face := Portrait.new().setup(p, UIKit.CLEAR, 68.0)
-		face.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		face.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		ring.add_child(face)
-		wrap.add_child(ring)
-		var ord := _badge("", UIKit.PURPLE_DEEP, UIKit.MUTED)
-		ord.position = Vector2(0, 0)
+		avatar.position = Vector2(HexAvatar.BADGE_PX / 2.0, 0.0)
+		avatar.reparent(wrap, false)
+		ord.position = Vector2(0.0, HexAvatar.SIZE_PX.y * 0.35)
 		wrap.add_child(ord)
-		var dl := _badge("D", UIKit.INK, UIKit.MUTED)
-		dl.position = Vector2(66, 62)
-		dl.visible = false
-		wrap.add_child(dl)
-		seat.add_child(wrap)
-		var name_l := UIKit.label("", 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+		col.add_child(wrap)
+
+		# Nome e stack: sempre visíveis para você (p=0); ocultos por padrão para rivais.
+		var name_l := UIKit.label("", 18, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 		name_l.autowrap_mode = TextServer.AUTOWRAP_OFF
 		name_l.clip_text = true
-		seat.add_child(name_l)
-		var stack_l := UIKit.label("◎ 0", 28, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
-		seat.add_child(stack_l)
-		var gap := Control.new()
-		gap.custom_minimum_size = Vector2(0, 10)
-		gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		seat.add_child(gap)
+		name_l.visible = (p == 0)
+		col.add_child(name_l)
+		var stack_l := UIKit.label("◎ 0", 22, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+		stack_l.visible = (p == 0)
+		col.add_child(stack_l)
+
+		if p != 0:
+			# Toque no avatar rival: mostra nome+stack por STACK_SECONDS.
+			var expand_token := [0]
+			avatar.gui_input.connect(func(event: InputEvent):
+				if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
+					return
+				if name_l.visible:
+					expand_token[0] += 1
+					name_l.visible = false
+					stack_l.visible = false
+					Sfx.play("tick")
+				else:
+					Sfx.play("tick")
+					name_l.visible = true
+					stack_l.visible = true
+					expand_token[0] += 1
+					var tok := expand_token[0]
+					get_tree().create_timer(SeatView.STACK_SECONDS).timeout.connect(func():
+						if tok == expand_token[0] and is_instance_valid(name_l):
+							name_l.visible = false
+							stack_l.visible = false))
+
 		var pill := UIKit.panel(UIKit.SURFACE_DEEP, UIKit.MONEY, 6)
 		pill.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -403,27 +417,24 @@ func _build_seats() -> HBoxContainer:
 		pv.add_child(bet_l)
 		pill.add_child(pv)
 		pill.modulate.a = 0.0
-		seat.add_child(pill)
-		var status_l := UIKit.label("", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		col.add_child(pill)
+
+		var status_l := UIKit.label("", 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 		status_l.autowrap_mode = TextServer.AUTOWRAP_OFF
 		status_l.clip_text = true
-		var status_wrap := MarginContainer.new()
-		status_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		status_wrap.add_theme_constant_override("margin_top", 6)
-		status_wrap.add_theme_constant_override("margin_bottom", 6)
-		status_wrap.add_child(status_l)
-		seat.add_child(status_wrap)
-		seat_row.add_child(seat)
-		seat_nodes[p] = seat
-		hud_badges[p] = seat
+		col.add_child(status_l)
+
+		seat_row.add_child(col)
+		seat_nodes[p] = col
+		hud_badges[p] = col
 		hud_titles[p] = name_l
 		hud_totals[p] = stack_l
 		bet_tags[p] = bet_l
 		bet_pills[p] = pill
 		prog_tags[p] = status_l
 		order_badges[p] = ord
-		dealer_badges[p] = dl
-		seat_avatars[p] = ring
+		dealer_badges[p] = avatar.dealer_badge
+		seat_avatars[p] = avatar
 	return seat_row
 
 
@@ -439,6 +450,78 @@ func _badge(text: String, fill: Color, border: Color) -> PanelContainer:
 	l.autowrap_mode = TextServer.AUTOWRAP_OFF
 	b.add_child(l)
 	return b
+
+
+## HUD do topo: 3 chips PNG (pote | rodadas | prêmio) flanqueados pelos botões ☰ e ?.
+func _build_top_hud() -> HBoxContainer:
+	var bar := HBoxContainer.new()
+	bar.add_theme_constant_override("separation", 6)
+
+	var menu_btn := Widgets.icon_button("☰")
+	menu_btn.pressed.connect(_open_pause)
+	bar.add_child(menu_btn)
+
+	# Chip POTE.
+	var pote_chip := _hud_chip("res://assets/ui/hud-pote.png", "POTE")
+	bar.add_child(pote_chip)
+	hud_pot_label = UIKit.label("◎ 0", 24, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+	hud_pot_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	(pote_chip.get_child(1) as VBoxContainer).add_child(hud_pot_label)
+
+	# Chip RODADAS (centro, fill).
+	var rod_chip := _hud_chip("res://assets/ui/hud-rodadas.png", "")
+	rod_chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.add_child(rod_chip)
+	info_label = UIKit.label("JOGADA 0/8", 22, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	info_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	(rod_chip.get_child(1) as VBoxContainer).add_child(info_label)
+	hud_wins_label = UIKit.label("VITÓRIAS 0/0", 18, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+	hud_wins_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	(rod_chip.get_child(1) as VBoxContainer).add_child(hud_wins_label)
+	# Reusa trick_dots como placeholder inerte pra não quebrar o código que chama Widgets.progress_dots.
+	trick_dots = HBoxContainer.new()
+	trick_dots.visible = false
+	add_child(trick_dots)
+
+	# Chip PRÊMIO.
+	var pre_chip := _hud_chip("res://assets/ui/hud-premio.png", "PRÊMIO")
+	bar.add_child(pre_chip)
+	hud_prize_label = UIKit.label("◎ 0", 24, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+	hud_prize_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	(pre_chip.get_child(1) as VBoxContainer).add_child(hud_prize_label)
+
+	var help_btn := Widgets.icon_button("?", UIKit.ACTION.darkened(0.1))
+	help_btn.pressed.connect(_open_help)
+	bar.add_child(help_btn)
+
+	return bar
+
+
+## Chip individual do HUD do topo: fundo PNG + VBox de labels.
+func _hud_chip(tex_path: String, caption: String) -> Control:
+	var chip := Control.new()
+	chip.custom_minimum_size = Vector2(110, 56)
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var tex := TextureRect.new()
+	tex.texture = load(tex_path) as Texture2D
+	tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_child(tex)
+	var vbox := VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 0)
+	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	vbox.offset_left = 8.0
+	vbox.offset_right = -8.0
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_child(vbox)
+	if caption != "":
+		var cap := UIKit.label(caption, 16, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		cap.autowrap_mode = TextServer.AUTOWRAP_OFF
+		vbox.add_child(cap)
+	return chip
 
 
 ## Pote da rodada no centro da mesa.
@@ -1271,17 +1354,29 @@ func _human_bet() -> Dictionary:
 		row.add_theme_constant_override("separation", 10)
 		body.add_child(row)
 		if not bool(opt["can_check"]):
-			var fold := UIKit.button("DESISTIR", UIKit.DANGER, 30)
+			var fold := UIKit.img_button(
+				load("res://assets/ui/botao-azul-normal.png"),
+				load("res://assets/ui/botao-azul-pressionado.png"),
+				load("res://assets/ui/botao-azul-inativo.png"),
+				"DESISTIR", 28)
 			fold.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			fold.pressed.connect(func(): done.call({"action": "fold"}))
 			row.add_child(fold)
 		var main_txt := "PASSAR" if bool(opt["can_check"]) else "PAGAR ◎%d" % call_amt
-		var main := UIKit.button(main_txt, UIKit.OK, 30)
+		var main := UIKit.img_button(
+			load("res://assets/ui/botao-azul-normal.png"),
+			load("res://assets/ui/botao-azul-pressionado.png"),
+			load("res://assets/ui/botao-azul-inativo.png"),
+			main_txt, 28)
 		main.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		main.pressed.connect(func(): done.call({"action": "check" if bool(opt["can_check"]) else "call"}))
 		row.add_child(main)
 		if bool(opt["can_raise"]) and not bool(st["raising"]):
-			var rb := UIKit.button("AUMENTAR", UIKit.MONEY, 30)
+			var rb := UIKit.img_button(
+				load("res://assets/ui/botao-rosa-normal.png"),
+				load("res://assets/ui/botao-rosa-pressionado.png"),
+				load("res://assets/ui/botao-rosa-inativo.png"),
+				"AUMENTAR", 28)
 			rb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			rb.pressed.connect(func():
 				st["raising"] = true
@@ -1698,8 +1793,16 @@ func _refresh_hud() -> void:
 			ob.add_theme_stylebox_override("panel", UIKit.box_cached(UIKit.TURN if idx == 0 else UIKit.PURPLE_DEEP, UIKit.TURN if idx == 0 else UIKit.MUTED, 3, 15, 0))
 			(ob.get_child(0) as Label).add_theme_color_override("font_color", UIKit.TEXT_ON_LIGHT if idx == 0 else UIKit.INK)
 		_refresh_bet_tags(p, idx)
-	info_label.text = "NÍVEL %d%s · %s ◎%d" % [engine.round_index + 1, ("/%d" % engine.levels) if engine.levels > 0 else "", "ENTRADA" if engine.blitz else "BLIND", int(engine.blitz_entry()) if engine.blitz else engine.blind]
-	Widgets.progress_dots(trick_dots, ChaosEngine.HAND_SIZE, engine.trick_number)
+	# HUD rodadas chip.
+	info_label.text = "JOGADA %d/%d" % [engine.trick_number + 1, ChaosEngine.HAND_SIZE]
+	if hud_wins_label != null:
+		var total_wins := 0
+		for p2 in range(engine.num_players):
+			if p2 < engine.wins.size():
+				total_wins += int(engine.wins[p2])
+		hud_wins_label.text = "VIT. %d/%d" % [int(engine.wins[0]) if engine.wins.size() > 0 else 0, engine.predicts[0] if engine.blitz and engine.predicts.size() > 0 and int(engine.predicts[0]) >= 0 else engine.trick_number]
+	if hud_prize_label != null:
+		hud_prize_label.text = "◎ %d" % int(engine.buy_in)
 	var rest := _rest_banner()
 	modifier_label.text = "%s — %s" % [rest[0], rest[1]] if modifier_expanded else str(rest[0])
 	_refresh_pot()
@@ -1758,6 +1861,8 @@ func _refresh_pot() -> void:
 	if not pot_locked:
 		shown_pot = engine.pot if phase != "idle" or bets_gathered else 0.0
 		pot_label.text = _pot_text(shown_pot)
+		if hud_pot_label != null:
+			hud_pot_label.text = "◎ %d" % int(shown_pot)
 	var sub := ""
 	if phase == "bet" and engine.bet_level > float(engine.blind):
 		sub = "aposta em ◎ %d" % int(engine.bet_level)
@@ -1802,13 +1907,15 @@ func _update_turn_highlight(turn_player: int) -> void:
 	turn_pulse_token += 1
 	var my_token := turn_pulse_token
 	for p in range(seat_avatars.size()):
-		var avatar: PanelContainer = seat_avatars[p]
+		var avatar := seat_avatars[p] as HexAvatar
+		if avatar == null:
+			continue
 		var active := p == turn_player
-		avatar.add_theme_stylebox_override("panel", UIKit.box_cached(UIKit.PURPLE_DEEP, UIKit.TURN if active else UIKit.MUTED, 6 if active else 3, 42, 0))
+		avatar.set_active(active)
 		if not active:
 			avatar.scale = Vector2.ONE
-	if turn_player >= 0:
-		FX.pulse_while(seat_avatars[turn_player], 1.1, func(): return my_token == turn_pulse_token)
+	if turn_player >= 0 and seat_avatars[turn_player] is HexAvatar:
+		FX.pulse_while(seat_avatars[turn_player] as HexAvatar, 1.1, func(): return my_token == turn_pulse_token)
 
 
 # ------------------------------------------------------------------ apostas
@@ -2421,6 +2528,8 @@ func _refresh_pot_blitz() -> void:
 		else:
 			shown_pot = engine.pot if engine.pot > 0.0 else engine.carry
 		pot_label.text = _pot_text(shown_pot)
+		if hud_pot_label != null:
+			hud_pot_label.text = "◎ %d" % int(shown_pot)
 	var sub := ""
 	if phase == "predict":
 		sub = "quem acertar leva"
