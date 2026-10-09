@@ -6,7 +6,7 @@ extends Control
 
 const RADIUS := 47.0
 const SIZE_PX := Vector2(81.0, 94.0)
-const PORTRAIT_PX := 70.0
+const PORTRAIT_PX := 60.0
 const BADGE_PX := 38.0
 const WARN_FRAC := 0.6
 const URGENT_FRAC := 0.3

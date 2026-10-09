@@ -1,8 +1,9 @@
 class_name SeatView
 extends Control
 ## Assento de um jogador na mesa.
-## Rival: avatar recolhido (PNG) por padrão; toque expande por STACK_SECONDS mostrando nome+stack.
-## Você (always_stack): sempre expandido (nome + stack visíveis).
+## Rival: avatar sempre visível; toque → painel lateral com nome+stack aparece por STACK_SECONDS.
+##   Assentos da esquerda/topo expandem para a DIREITA; assentos da direita expandem para a ESQUERDA.
+## Você (always_stack): plaquinha abaixo do avatar sempre visível com nome+stack.
 ## Interface pública mantida: name_label, stack_label, bet_label, avatar, layout(), W, H,
 ## AVATAR_CENTER_Y, PLATE_RATIO.
 
@@ -14,6 +15,8 @@ const AVATAR_TOP := 2.0
 const AVATAR_CENTER_Y := AVATAR_TOP + HexAvatar.SIZE_PX.y / 2.0
 const STACK_SECONDS := 7.0
 const WIDE_SCALE := 1.3
+const EXP_W := 110.0   ## largura do painel lateral expandido
+const EXP_PAD := 6.0   ## gap entre avatar e painel lateral
 
 var avatar: HexAvatar
 var name_label: Label
@@ -21,24 +24,22 @@ var stack_label: Label
 var bet_label: Label
 
 var _plate: PanelContainer
-var _exp_panel: Control
-var _exp_tex: TextureRect
+var _exp_panel: PanelContainer
 var _stack_row: HBoxContainer
 var _always := false
+var _flip := false      ## true = avatar à direita, painel à esquerda (assentos do lado direito da mesa)
 var _token := 0
 
-var _tex_exp_normal: Texture2D
-var _tex_exp_active: Texture2D
+var _sb_normal: StyleBoxFlat
+var _sb_active: StyleBoxFlat
 
 
-func setup(p: int, always_stack: bool = false) -> SeatView:
+func setup(p: int, always_stack: bool = false, flip_expand: bool = false) -> SeatView:
 	_always = always_stack
+	_flip = flip_expand
 	custom_minimum_size = Vector2(W, H)
 	size = Vector2(W, H)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	_tex_exp_normal = load("res://assets/ui/jogador-expandido-normal.png") as Texture2D
-	_tex_exp_active = load("res://assets/ui/jogador-expandido-vez.png") as Texture2D
 
 	avatar = HexAvatar.new().setup(p)
 	avatar.position = Vector2((W - avatar.size.x) / 2.0, AVATAR_TOP)
@@ -64,38 +65,32 @@ func setup(p: int, always_stack: bool = false) -> SeatView:
 		var stack_row := _make_stack_row()
 		row.add_child(stack_row)
 		_stack_row = stack_row
-		_stack_row.visible = true
 	else:
-		_exp_panel = Control.new()
+		_sb_normal = UIKit.box(UIKit.PURPLE_DEEP.darkened(0.2), UIKit.VIOLET, 2, 10, 4)
+		_sb_active = UIKit.box(UIKit.PURPLE_DEEP.darkened(0.2), UIKit.BRAND, 3, 10, 4)
+
+		_exp_panel = PanelContainer.new()
+		_exp_panel.add_theme_stylebox_override("panel", _sb_normal)
 		_exp_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		_exp_panel.custom_minimum_size = Vector2(EXP_W, 0)
 		_exp_panel.visible = false
 		add_child(_exp_panel)
 
-		_exp_tex = TextureRect.new()
-		_exp_tex.texture = _tex_exp_normal
-		_exp_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		_exp_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		_exp_tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		_exp_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_exp_panel.add_child(_exp_tex)
-
 		var vbox := VBoxContainer.new()
 		vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-		vbox.add_theme_constant_override("separation", 2)
+		vbox.add_theme_constant_override("separation", 4)
 		vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		_exp_panel.add_child(vbox)
 
 		name_label = UIKit.serif_label("", 17, UIKit.BTN_OFF_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
 		name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 		name_label.clip_text = true
-		name_label.custom_minimum_size = Vector2(PLATE_MIN_W - 16.0, 0)
+		name_label.custom_minimum_size = Vector2(EXP_W - 16.0, 0)
 		vbox.add_child(name_label)
 
 		var stack_row := _make_stack_row()
 		vbox.add_child(stack_row)
 		_stack_row = stack_row
-		_stack_row.visible = true
 
 		avatar.gui_input.connect(_on_gui_input)
 		_exp_panel.gui_input.connect(_on_gui_input)
@@ -133,10 +128,15 @@ func layout() -> void:
 		bet_label.size = Vector2(W, bh)
 		bet_label.position = Vector2(0.0, -bh - 2.0)
 	elif not _always and _exp_panel != null:
-		var ew := PLATE_MIN_W + 16.0
-		var eh := HexAvatar.SIZE_PX.y + 40.0
-		_exp_panel.size = Vector2(ew, eh)
-		_exp_panel.position = Vector2((W - ew) / 2.0, AVATAR_TOP - 20.0)
+		# O avatar permanece no lugar; o painel aparece ao lado
+		var ah := avatar.size.y
+		var ph := _exp_panel.get_combined_minimum_size().y
+		var panel_h := maxf(ph, ah)
+		_exp_panel.size = Vector2(EXP_W, panel_h)
+		if _flip:
+			_exp_panel.position = Vector2(avatar.position.x - EXP_W - EXP_PAD, AVATAR_TOP)
+		else:
+			_exp_panel.position = Vector2(avatar.position.x + avatar.size.x + EXP_PAD, AVATAR_TOP)
 		var bh := bet_label.get_combined_minimum_size().y
 		bet_label.size = Vector2(W, bh)
 		bet_label.position = Vector2(0.0, avatar.position.y + avatar.size.y + 4.0)
@@ -168,8 +168,8 @@ func _collapse() -> void:
 
 
 func set_expanded_active(on: bool) -> void:
-	if _exp_tex != null:
-		_exp_tex.texture = _tex_exp_active if on else _tex_exp_normal
+	if _exp_panel != null and _sb_normal != null and _sb_active != null:
+		_exp_panel.add_theme_stylebox_override("panel", _sb_active if on else _sb_normal)
 
 
 func show_stack() -> void:

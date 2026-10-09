@@ -25,6 +25,7 @@ var _r := 10.0                 ## raio horizontal (e das duas pontas arredondada
 var _half := 0.0               ## metade do trecho reto: a mesa é uma pílula (cápsula) em pé (celular)...
 var wide := false              ## ...ou deitada (PC/tela larga): `_r` vira o raio vertical e `_half` o trecho reto horizontal
 var seat_scale := 1.0           ## só na pílula (wide): os assentos crescem e a mesa abre espaço pra eles
+var draw_visual := true         ## false = pula o _draw() (quando mesa.png substitui o desenho por código)
 
 
 ## Ponto da borda da mesa (pílula) na direção `theta` a partir do centro; `s` encolhe a pílula
@@ -204,6 +205,8 @@ func _ring(scale: float) -> PackedVector2Array:
 ## Mesa-círculo de runas: miolo roxo escuro que esquenta pra borda, anéis neon e um anel de
 ## glifos astrológicos. Desenhada uma vez (só redesenha ao mudar de tamanho): custo zero por frame.
 func _draw() -> void:
+	if not draw_visual:
+		return
 	var core := UIKit.TR_PURPLE_DARK
 	var edge := UIKit.TR_RED_DARK.darkened(0.2)
 	for i in range(8):

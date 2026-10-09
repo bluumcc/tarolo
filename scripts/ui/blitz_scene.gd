@@ -79,6 +79,8 @@ var pot_sub: Label
 var pot_prize_label: Label   # prêmio do palpite — visível quando o trick_pot está em destaque
 var hud_pot_label: Label    # chip POTE no topo
 var hud_prize_label: Label  # chip PRÊMIO no topo
+var hud_round_label: Label  # chip central: "RODADA x/8"
+var hud_wins_label: Label   # chip central: "vitórias x/y"
 var bet_tags: Array = []       # "◎25 · 3" por assento
 var prog_tags: Array = []      # "1/3 ♨×1,5" ao vivo por assento
 var hold_stacks: Array = []      # Blitz: stacks de antes da liquidação (a tela só muda depois da animação)
@@ -217,6 +219,7 @@ func _build_ui() -> void:
 	bg_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	bg_tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bg_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bg_tex.modulate.a = 0.8
 	add_child(bg_tex)
 
 	margin_box = MarginContainer.new()
@@ -242,23 +245,15 @@ func _build_ui() -> void:
 	dealer_badges.resize(engine.num_players)
 	seat_nodes.resize(engine.num_players)
 
-	# Topo: POTE chip | RODADAS chip (dots + mensagem de ação) | PRÊMIO chip
+	# Topo: POTE chip | RODADA x/8 + vitórias x/y chip | PRÊMIO chip
 	var topbar := HBoxContainer.new()
 	topbar.add_theme_constant_override("separation", 8)
 	root.add_child(topbar)
-	var neutral := UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 14, 8)
-	var menu_btn := Widgets.icon_button("☰")
-	menu_btn.custom_minimum_size = Vector2(HEADER_H, HEADER_H)
-	for sn in ["normal", "hover", "pressed", "focus"]:
-		menu_btn.add_theme_stylebox_override(sn, neutral)
-	menu_btn.add_theme_color_override("font_color", UIKit.TR_WHITE)
-	menu_btn.pressed.connect(_open_pause)
-	topbar.add_child(menu_btn)
 	# Chip POTE
 	var pote_arr := _hud_chip("res://assets/ui/hud-pote.png", "POTE", "◎ 0")
 	hud_pot_label = pote_arr[1]
 	topbar.add_child(pote_arr[0])
-	# Chip RODADAS — dots de jogadas + faixa de mensagem de ação
+	# Chip RODADAS — "RODADA x/8" + "vitórias x/y"
 	var rodadas_ctrl := Control.new()
 	rodadas_ctrl.custom_minimum_size = Vector2(0, HEADER_H)
 	rodadas_ctrl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -272,22 +267,24 @@ func _build_ui() -> void:
 	rodadas_ctrl.add_child(rodadas_bg)
 	var rodadas_v := VBoxContainer.new()
 	rodadas_v.alignment = BoxContainer.ALIGNMENT_CENTER
-	rodadas_v.add_theme_constant_override("separation", 4)
+	rodadas_v.add_theme_constant_override("separation", 2)
 	rodadas_v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rodadas_v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	rodadas_ctrl.add_child(rodadas_v)
-	round_dots = RoundDots.new()
-	round_dots.set_state(BlitzEngine.HAND_SIZE, [], 0)
-	rodadas_v.add_child(round_dots)
-	_build_banner(rodadas_v)
+	hud_round_label = UIKit.label("RODADA 1/%d" % BlitzEngine.HAND_SIZE, 18, UIKit.BTN_OFF_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	hud_round_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	rodadas_v.add_child(hud_round_label)
+	hud_wins_label = UIKit.label("vitórias 0/?", 18, UIKit.HUD_PINK, HORIZONTAL_ALIGNMENT_CENTER)
+	hud_wins_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	rodadas_v.add_child(hud_wins_label)
 	topbar.add_child(rodadas_ctrl)
 	# Chip PRÊMIO
 	var premio_arr := _hud_chip("res://assets/ui/hud-premio.png", "PRÊMIO", "◎ 0")
 	hud_prize_label = premio_arr[1]
 	topbar.add_child(premio_arr[0])
-	topbar.resized.connect(func():
-		if not is_equal_approx(menu_btn.custom_minimum_size.x, topbar.size.y):
-			menu_btn.custom_minimum_size = Vector2(topbar.size.y, HEADER_H))
+	# round_dots mantido como nó interno (sem parent visível) — _refresh_round_dots() o atualiza
+	round_dots = RoundDots.new()
+	round_dots.set_state(BlitzEngine.HAND_SIZE, [], 0)
 
 	# Palco: a mesa de runas com os rivais sentados na borda, a distâncias iguais; você embaixo.
 	stage = Control.new()
@@ -295,10 +292,18 @@ func _build_ui() -> void:
 	stage.custom_minimum_size = Vector2(0, 300)
 	root.add_child(stage)
 	main_area = stage
+	var mesa_tex := TextureRect.new()
+	mesa_tex.texture = load("res://assets/ui/mesa.png") as Texture2D
+	mesa_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	mesa_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	mesa_tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	mesa_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stage.add_child(mesa_tex)
 	table_center = TableEllipse.new()
 	table_center.name = "TableCenter"
 	table_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	table_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	table_center.draw_visual = false
 	stage.add_child(table_center)
 	table_center.resized.connect(_layout_table)
 	for p in range(engine.num_players):
@@ -414,7 +419,7 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	bottom_bar.add_theme_constant_override("separation", 10)
 	root.add_child(bottom_bar)
 
-	# Esquerda: POTE. Meio: ações. Direita: PRÊMIO. (O relógio da vez é o anel do avatar.)
+	# Esquerda: POTE (só no desktop). Meio: banner + ações. Direita: PRÊMIO (só no desktop).
 	var pot := StatCard.new().setup("POTE", "◎ 0", UIKit.TR_GOLD, DS.FS_TITLE, DS.FS_LABEL)
 	pot.custom_minimum_size = Vector2(SIDE_W, 0)
 	pot_box = pot
@@ -427,6 +432,7 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	pot_sub = UIKit.label("", 18, UIKit.MUTED)   # sem lugar na tela
 	pot_sub.visible = false
 	pot.add_child(pot_sub)
+	pot.visible = false   # oculto no mobile; vai para a coluna lateral no desktop
 	bottom_bar.add_child(pot)
 
 	var mid := VBoxContainer.new()
@@ -435,6 +441,7 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	mid.alignment = BoxContainer.ALIGNMENT_END   # base alinhada com a dos cards laterais
 	mid.add_theme_constant_override("separation", 4)
 	bottom_bar.add_child(mid)
+	_build_banner(mid)
 	status_label = UIKit.label("", 20, UIKit.INK, HORIZONTAL_ALIGNMENT_CENTER)
 	status_label.add_theme_font_size_override("font_size", 20)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -462,6 +469,7 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 	pot_prize_label = prize_card.value
 	pot_prize_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	prize_card.modulate.a = 0.0
+	prize_card.visible = false   # oculto no mobile; vai para a coluna lateral no desktop
 	bottom_bar.add_child(prize_card)
 
 
@@ -561,6 +569,8 @@ func _dock_bottom(wide: bool) -> void:
 	if wide:
 		prize_card.custom_minimum_size = Vector2(0, 80)
 		pot_box.custom_minimum_size = Vector2(0, 80)
+		prize_card.visible = true
+		pot_box.visible = true
 		side_col.add_child(prize_card)
 		side_col.add_child(pot_box)
 		var gap := Control.new()
@@ -577,6 +587,8 @@ func _dock_bottom(wide: bool) -> void:
 			gap_node.queue_free()
 		pot_box.custom_minimum_size = Vector2(SIDE_W, 0)
 		prize_card.custom_minimum_size = Vector2(SIDE_W, 0)
+		prize_card.visible = false
+		pot_box.visible = false
 		bottom_bar.add_child(pot_box)
 		bottom_bar.add_child(bottom_mid)
 		bottom_bar.add_child(prize_card)
@@ -726,7 +738,7 @@ func _on_resize() -> void:
 ## nome abre o card do stack; você: nome e stack sempre à vista. Selo de vitórias no vértice de
 ## baixo à esquerda do avatar e o D do dealer à direita. A posição vem de `_layout_seats`.
 func _build_seat(p: int) -> SeatView:
-	var seat := SeatView.new().setup(p, p == 0)
+	var seat := SeatView.new().setup(p, p == 0, p == 4 or p == 5)
 	hud_titles[p] = seat.name_label
 	hud_totals[p] = seat.stack_label
 	seat_avatars[p] = seat.avatar
@@ -3081,6 +3093,15 @@ func _refresh_round_dots() -> void:
 		if need > engine.tricks_left():
 			need = 0   # não dá mais pra bater o palpite: nada de iluminar os dots
 	round_dots.set_state(BlitzEngine.HAND_SIZE, results, need)
+	var hand_num := engine.history.size() + 1
+	if hud_round_label != null:
+		hud_round_label.text = "RODADA %d/%d" % [mini(hand_num, BlitzEngine.HAND_SIZE), BlitzEngine.HAND_SIZE]
+	if hud_wins_label != null:
+		var target := engine.predicts[0] if bool(blitz_revealed[0]) else -1
+		if target >= 0:
+			hud_wins_label.text = "vitórias %d/%d" % [engine.wins[0], target]
+		else:
+			hud_wins_label.text = "vitórias %d/?" % engine.wins[0]
 
 
 func _refresh_pot() -> void:
