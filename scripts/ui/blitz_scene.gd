@@ -214,7 +214,7 @@ func _build_ui() -> void:
 	var bg_tex := TextureRect.new()
 	bg_tex.texture = load("res://assets/ui/partida-fundo.png") as Texture2D
 	bg_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	bg_tex.stretch_mode = TextureRect.STRETCH_COVER
+	bg_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	bg_tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bg_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg_tex)
