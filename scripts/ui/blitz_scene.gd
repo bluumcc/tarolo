@@ -293,21 +293,6 @@ func _build_ui() -> void:
 	stage.custom_minimum_size = Vector2(0, 300)
 	root.add_child(stage)
 	main_area = stage
-	var mesa_tex := TextureRect.new()
-	mesa_tex.texture = load("res://assets/ui/mesa.png") as Texture2D
-	mesa_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	mesa_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	# full width, grudada no bottom do stage
-	mesa_tex.anchor_left = 0.0
-	mesa_tex.anchor_right = 1.0
-	mesa_tex.anchor_top = 1.0
-	mesa_tex.anchor_bottom = 1.0
-	mesa_tex.offset_left = 0.0
-	mesa_tex.offset_right = 0.0
-	mesa_tex.offset_bottom = 0.0
-	mesa_tex.offset_top = -600.0
-	mesa_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stage.add_child(mesa_tex)
 	table_center = TableEllipse.new()
 	table_center.name = "TableCenter"
 	table_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
