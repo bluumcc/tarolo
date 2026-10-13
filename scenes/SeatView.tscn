@@ -1,0 +1,53 @@
+[gd_scene load_steps=2 format=3 uid="uid://cq7baxhylfnlt"]
+
+[ext_resource type="Script" uid="uid://nyujmobjjmk0" path="res://scripts/ui/seat_view.gd" id="1_seat"]
+
+[node name="SeatView" type="Control"]
+custom_minimum_size = Vector2(130, 127)
+mouse_filter = 2
+script = ExtResource("1_seat")
+
+[node name="ExpPanel" type="PanelContainer" parent="."]
+layout_mode = 0
+visible = false
+mouse_filter = 0
+
+[node name="HBox" type="HBoxContainer" parent="ExpPanel"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="Spacer" type="Control" parent="ExpPanel/HBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="TextZone" type="VBoxContainer" parent="ExpPanel/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="NameLabel" type="Label" parent="ExpPanel/HBox/TextZone"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="StackRow" type="HBoxContainer" parent="ExpPanel/HBox/TextZone"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="ChipLabel" type="Label" parent="ExpPanel/HBox/TextZone/StackRow"]
+layout_mode = 2
+text = "◎"
+mouse_filter = 2
+
+[node name="StackLabel" type="Label" parent="ExpPanel/HBox/TextZone/StackRow"]
+layout_mode = 2
+text = "0"
+mouse_filter = 2
+
+[node name="BetLabel" type="Label" parent="."]
+layout_mode = 0
+visible = false
+mouse_filter = 2

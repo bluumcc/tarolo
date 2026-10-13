@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
-[ext_resource type="Script" path="res://scripts/ui/blitz_scene.gd" id="1_blitz"]
+[ext_resource type="Script" uid="uid://18k51figlykq" path="res://scripts/ui/blitz_scene.gd" id="1_blitz"]
+[ext_resource type="Texture2D" uid="uid://df8gffwv0w0eh" path="res://assets/ui/partida-fundo.png" id="2_bg"]
 
 [node name="BlitzScene" type="Control"]
 layout_mode = 3
@@ -10,3 +11,97 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_blitz")
+
+[node name="BgTex" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = ExtResource("2_bg")
+expand_mode = 1
+stretch_mode = 6
+mouse_filter = 2
+modulate = Color(1, 1, 1, 0.8)
+
+[node name="MarginBox" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_bottom = 20
+
+[node name="Root" type="VBoxContainer" parent="MarginBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Topbar" type="HBoxContainer" parent="MarginBox/Root"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Stage" type="Control" parent="MarginBox/Root"]
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 300)
+mouse_filter = 2
+
+[node name="HandZone" type="Control" parent="MarginBox/Root"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="BottomBar" type="HBoxContainer" parent="MarginBox/Root"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 83.6)
+theme_override_constants/separation = 10
+
+[node name="SideCol" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -444.0
+offset_right = -24.0
+offset_top = 16.0
+offset_bottom = -20.0
+visible = false
+clip_contents = true
+custom_minimum_size = Vector2(420, 0)
+mouse_filter = 2
+theme_override_constants/separation = 10
+
+[node name="SideDim" type="ColorRect" parent="."]
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -468.0
+offset_right = 0.0
+visible = false
+z_index = 90
+mouse_filter = 0
+
+[node name="PhaseLayer" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+z_index = 60
+mouse_filter = 2
+
+[node name="PopupLayer" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+z_index = 20
+mouse_filter = 2
+
+[node name="OverlayLayer" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+z_index = 100
+mouse_filter = 2

@@ -11,6 +11,7 @@ signal slides_done
 signal match_finished(summary: Dictionary)
 
 const CARD_SCENE := preload("res://scenes/Card.tscn")
+const SEAT_SCENE := preload("res://scenes/SeatView.tscn")
 
 ## As cartas da mão têm o tamanho cheio; as da mesa ficam menores pra caber 4 lado a lado.
 ## Relógios da mesa (um só, `_clock_start`): estourou, jogamos por você.
@@ -102,10 +103,7 @@ func _ready() -> void:
 	bot_rng.randomize()
 	config = GameState.tournament_table_config() if not GameState.tournament.is_empty() else GameState.blitz_config()
 	if not bool(config.get("entered", true)):
-		add_child(UIKit.background())
-		overlay_layer = Control.new()
-		overlay_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		add_child(overlay_layer)
+		# overlay_layer é @onready (BgTex já existe na cena)
 		_show_insufficient_fichas()
 		return
 	engine.setup_match(config)
@@ -168,21 +166,26 @@ const SIDE_COL_W := 420.0   ## desktop: coluna da direita (registro, modificador
 const SIDE_MARGIN := 24.0
 const LOG_LINES := 6
 
-var stage: Control
-var margin_box: MarginContainer
-var bottom_bar: HBoxContainer
+## Nós estáticos definidos em BlitzScene.tscn — visíveis no editor Godot
+@onready var margin_box: MarginContainer = $MarginBox
+@onready var stage: Control = $MarginBox/Root/Stage
+@onready var hand_zone: Control = $MarginBox/Root/HandZone
+@onready var bottom_bar: HBoxContainer = $MarginBox/Root/BottomBar
+@onready var side_col: VBoxContainer = $SideCol
+@onready var side_dim: ColorRect = $SideDim
+@onready var phase_layer: Control = $PhaseLayer
+@onready var popup_layer: Control = $PopupLayer
+@onready var overlay_layer: Control = $OverlayLayer
+
 var bet_row: BoxContainer   # horizontal no celular; empilhada (vertical) no desktop
 var hand_scroller: HandScroller
-var hand_zone: Control
 var my_bet_pill: Control        # aposta da jogada: o Label do seu assento, em cima do avatar
 var my_bet_label: Label
-var side_col: VBoxContainer     # desktop: coluna da direita
 var log_labels: Array = []
 var log_last := ""
 var mod_name_label: Label
 var mod_desc_label: Label
 var docked_wide := false
-var side_dim: ColorRect
 
 
 func _hud_chip(tex_path: String, caption: String, initial_val: String) -> Array:
@@ -213,26 +216,9 @@ func _hud_chip(tex_path: String, caption: String, initial_val: String) -> Array:
 
 
 func _build_ui() -> void:
-	var bg_tex := TextureRect.new()
-	bg_tex.texture = load("res://assets/ui/partida-fundo.png") as Texture2D
-	bg_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	bg_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	bg_tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bg_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bg_tex.modulate.a = 0.8
-	add_child(bg_tex)
-
-	margin_box = MarginContainer.new()
-	margin_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for side in ["left", "right"]:
-		margin_box.add_theme_constant_override("margin_" + side, Widgets.MARGIN)
-	margin_box.add_theme_constant_override("margin_top", 16)
-	margin_box.add_theme_constant_override("margin_bottom", 20)
-	add_child(margin_box)
-
-	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 8)
-	margin_box.add_child(root)
+	# bg_tex, margin_box, stage, hand_zone, bottom_bar, side_col, side_dim,
+	# phase_layer, popup_layer, overlay_layer são @onready (definidos em BlitzScene.tscn)
+	main_area = stage
 
 	hud_badges.resize(engine.num_players)
 	hud_titles.resize(engine.num_players)
@@ -246,9 +232,7 @@ func _build_ui() -> void:
 	seat_nodes.resize(engine.num_players)
 
 	# Topo: POTE chip | RODADA x/8 + vitórias x/y chip | PRÊMIO chip
-	var topbar := HBoxContainer.new()
-	topbar.add_theme_constant_override("separation", 8)
-	root.add_child(topbar)
+	var topbar := $MarginBox/Root/Topbar as HBoxContainer
 	# Chip POTE
 	var pote_arr := _hud_chip("res://assets/ui/hud-pote.png", "POTE", "◎ 0")
 	hud_pot_label = pote_arr[1]
@@ -288,11 +272,6 @@ func _build_ui() -> void:
 	round_dots.set_state(BlitzEngine.HAND_SIZE, [], 0)
 
 	# Palco: a mesa de runas com os rivais sentados na borda, a distâncias iguais; você embaixo.
-	stage = Control.new()
-	stage.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	stage.custom_minimum_size = Vector2(0, 300)
-	root.add_child(stage)
-	main_area = stage
 	table_center = TableEllipse.new()
 	table_center.name = "TableCenter"
 	table_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -301,7 +280,7 @@ func _build_ui() -> void:
 	stage.add_child(table_center)
 	table_center.resized.connect(_layout_table)
 	for p in range(engine.num_players):
-		stage.add_child(_build_seat(p))
+		_build_seat(p)
 	# Assentos fixos extras: slots vazios para os lugares não ocupados nessa partida.
 	for s in range(engine.num_players, TableEllipse.FIXED_SEATS):
 		var slot := _build_empty_slot(s)
@@ -321,23 +300,13 @@ func _build_ui() -> void:
 	bet_pills[0] = my_bet_pill
 	bet_tags[0] = my_bet_label
 
-	_build_hand_zone(root)
-	_build_bottom_bar(root)
+	_build_hand_zone()
+	_build_bottom_bar()
 	_build_side_column()
 
-	phase_layer = Control.new()
-	phase_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	phase_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	phase_layer.z_index = 60   # acima do seu assento (z 50); a camada fica depois da mão na árvore, então também recebe o toque primeiro
-	add_child(phase_layer)
+	# phase_layer, popup_layer, overlay_layer são @onready (definidos em BlitzScene.tscn)
 	phase_screen = PhaseScreen.new()
 	phase_layer.add_child(phase_screen)
-
-	popup_layer = Control.new()
-	popup_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	popup_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	popup_layer.z_index = 20
-	add_child(popup_layer)
 
 	hand_scroller.ghost_layer = popup_layer
 	hand_scroller.throw_allowed = func() -> bool: return (phase == "discard" and discard_picks.size() < BlitzEngine.BLITZ_DISCARD_SIZE) or human_turn
@@ -346,12 +315,6 @@ func _build_ui() -> void:
 	hand_scroller.drag_cancelled.connect(func(v: CardView):
 		if selected_view == v:
 			selected_view = null)
-
-	overlay_layer = Control.new()
-	overlay_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	overlay_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	overlay_layer.z_index = 100   # por cima de tudo, inclusive do seu avatar (z 50)
-	add_child(overlay_layer)
 
 	overlay_layer.child_entered_tree.connect(func(_n): _sync_side_dim.call_deferred())
 	overlay_layer.child_exiting_tree.connect(func(_n): _sync_side_dim.call_deferred())
@@ -377,15 +340,10 @@ func _build_banner(parent: Control) -> void:
 
 ## Card central: a faixa de avisos fica logo abaixo do seu avatar (que cruza o topo do card), a
 ## mão em arco por cima do card (as cartas passam das bordas) e o prêmio no pé.
-func _build_hand_zone(root: VBoxContainer) -> void:
+func _build_hand_zone() -> void:
 	var hand_h := _hand_h()
-	var zone := Control.new()
-	hand_zone = zone
-	zone.custom_minimum_size = Vector2(0, BANNER_H + hand_h + _pot_h())
-	zone.mouse_filter = Control.MOUSE_FILTER_IGNORE   # só as cartas recebem toque: a zona vazia em cima delas não pode engolir botões (ex.: CONFIRMAR do palpite)
-	root.add_child(zone)
-
-	# Card do modificador (nome; tocar abre a regra) na base da zona, em cima da barra de baixo.
+	# hand_zone é @onready (definido em BlitzScene.tscn)
+	hand_zone.custom_minimum_size = Vector2(0, BANNER_H + hand_h + _pot_h())
 
 	# Mão em arco leve, sempre no tamanho real; rola de lado só se não couber.
 	hand_scroller = HandScroller.new()
@@ -396,7 +354,7 @@ func _build_hand_zone(root: VBoxContainer) -> void:
 	hand_scroller.offset_top = BANNER_H + _deck_drop()
 	hand_scroller.offset_bottom = BANNER_H + hand_h + _deck_drop()  # also kept in sync by _update_hand_scroller_margins
 	_update_hand_scroller_margins()
-	zone.add_child(hand_scroller)
+	hand_zone.add_child(hand_scroller)
 	hand_scroller.resized.connect(_layout_hand)
 	_update_hand_scroller_margins()
 	hand_container = Control.new()
@@ -407,11 +365,8 @@ func _build_hand_zone(root: VBoxContainer) -> void:
 
 ## Barra de baixo: palpite à esquerda, ações (ou o card de pote/prêmio, quando não há ação) no
 ## meio, relógio à direita. Os cards laterais têm `BAR_H`; o do meio, 75% disso.
-func _build_bottom_bar(root: VBoxContainer) -> void:
-	bottom_bar = HBoxContainer.new()
-	bottom_bar.custom_minimum_size = Vector2(0, BAR_H)
-	bottom_bar.add_theme_constant_override("separation", 10)
-	root.add_child(bottom_bar)
+func _build_bottom_bar() -> void:
+	# bottom_bar é @onready (definido em BlitzScene.tscn)
 
 	# Esquerda: POTE (só no desktop). Meio: banner + ações. Direita: PRÊMIO (só no desktop).
 	var pot := StatCard.new().setup("POTE", "◎ 0", UIKit.TR_GOLD, DS.FS_TITLE, DS.FS_LABEL)
@@ -472,21 +427,7 @@ func _build_bottom_bar(root: VBoxContainer) -> void:
 ## ações. Pote, prêmio e ações são os mesmos nós da barra de baixo do celular: `_dock_bottom` só
 ## muda de pai conforme a orientação.
 func _build_side_column() -> void:
-	side_col = VBoxContainer.new()
-	side_col.visible = false
-	side_col.add_theme_constant_override("separation", 10)
-	side_col.anchor_left = 1.0
-	side_col.anchor_right = 1.0
-	side_col.anchor_top = 0.0
-	side_col.anchor_bottom = 1.0
-	side_col.offset_left = -SIDE_COL_W - SIDE_MARGIN
-	side_col.offset_right = -SIDE_MARGIN
-	side_col.offset_top = 16.0
-	side_col.offset_bottom = -20.0
-	side_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	side_col.clip_contents = true
-	side_col.custom_minimum_size = Vector2(SIDE_COL_W, 0)
-	add_child(side_col)
+	# side_col e side_dim são @onready (definidos em BlitzScene.tscn)
 	var panel_box := UIKit.box_cached(UIKit.TR_PURPLE_DARK.darkened(0.3), UIKit.TR_PURPLE_LIGHT, 2, 12, UIKit.card_pad())
 	var reg := PanelContainer.new()
 	reg.add_theme_stylebox_override("panel", panel_box)
@@ -525,19 +466,6 @@ func _build_side_column() -> void:
 	mod_desc_label.max_lines_visible = 3
 	mv.add_child(mod_desc_label)
 	side_col.add_child(mod)
-	# Quando há cena/modal (que ficam só na área da esquerda), a coluna não recebe toque (e não escurece).
-	side_dim = ColorRect.new()
-	side_dim.color = Color(0.0, 0.0, 0.0, 0.0)   # sem véu: só impede tocar na coluna com um modal aberto
-	side_dim.anchor_left = 1.0
-	side_dim.anchor_right = 1.0
-	side_dim.anchor_top = 0.0
-	side_dim.anchor_bottom = 1.0
-	side_dim.offset_left = -(SIDE_COL_W + SIDE_MARGIN * 2.0)
-	side_dim.offset_right = 0.0
-	side_dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	side_dim.visible = false
-	side_dim.z_index = 90
-	add_child(side_dim)
 
 
 ## Leva pote, prêmio e ações pra coluna da direita (tela larga) ou de volta pra barra de baixo.
@@ -732,7 +660,9 @@ func _on_resize() -> void:
 ## nome abre o card do stack; você: nome e stack sempre à vista. Selo de vitórias no vértice de
 ## baixo à esquerda do avatar e o D do dealer à direita. A posição vem de `_layout_seats`.
 func _build_seat(p: int) -> SeatView:
-	var seat := SeatView.new().setup(p, p == 0, p == 4 or p == 5)
+	var seat: SeatView = SEAT_SCENE.instantiate()
+	stage.add_child(seat)   # @onready no SeatView dispara aqui
+	seat.setup(p, p == 0, p == 4 or p == 5)
 	hud_titles[p] = seat.name_label
 	hud_totals[p] = seat.stack_label
 	seat_avatars[p] = seat.avatar

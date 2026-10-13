@@ -22,8 +22,14 @@ var name_label: Label
 var stack_label: Label
 var bet_label: Label
 
-var _exp_panel: PanelContainer
-var _stack_row: HBoxContainer
+@onready var _exp_panel: PanelContainer = $ExpPanel
+@onready var _hbox: HBoxContainer = $ExpPanel/HBox
+@onready var _spacer: Control = $ExpPanel/HBox/Spacer
+@onready var _text_zone: VBoxContainer = $ExpPanel/HBox/TextZone
+@onready var _chip_lbl: Label = $ExpPanel/HBox/TextZone/StackRow/ChipLabel
+@onready var _stack_lbl: Label = $ExpPanel/HBox/TextZone/StackRow/StackLabel
+@onready var _bet_lbl: Label = $BetLabel
+
 var _always := false
 var _flip := false      ## true = avatar à direita, texto à esquerda
 var _token := 0
@@ -39,79 +45,53 @@ func setup(p: int, always_stack: bool = false, flip_expand: bool = false) -> Sea
 	size = Vector2(W, H)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	# Painel de fundo — adicionado ANTES do avatar para ficar atrás dele
 	_sb_normal = UIKit.box(UIKit.PURPLE_DEEP.darkened(0.2), UIKit.VIOLET, 2, 10, 0)
 	_sb_active = UIKit.box(UIKit.PURPLE_DEEP.darkened(0.2), UIKit.BRAND, 3, 10, 0)
-	_exp_panel = PanelContainer.new()
 	_exp_panel.add_theme_stylebox_override("panel", _sb_normal)
-	_exp_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	# always_stack = sempre expandido (p=0); demais: começa colapsado e togla no toque
 	_exp_panel.visible = _always
-	add_child(_exp_panel)
 
+	# Avatar hexagonal: sempre criado dinamicamente (precisa do número do assento)
 	avatar = HexAvatar.new().setup(p)
 	avatar.position = Vector2((W - avatar.size.x) / 2.0, AVATAR_TOP)
 	add_child(avatar)
 
-	# HBox dentro do painel: [espaçador(avatar) | vbox texto] ou [vbox texto | espaçador(avatar)]
-	var hbox := HBoxContainer.new()
-	hbox.add_theme_constant_override("separation", 0)
-	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_exp_panel.add_child(hbox)
+	# Spacer tem a largura do avatar para alinhar o texto ao lado dele
+	_spacer.custom_minimum_size = Vector2(avatar.size.x, 0)
 
-	var vbox := VBoxContainer.new()
-	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_theme_constant_override("separation", 4)
-	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Flip: texto à esquerda do avatar (assentos 4 e 5)
+	if _flip:
+		_hbox.move_child(_text_zone, 0)
 
-	name_label = UIKit.serif_label("", 17, UIKit.BTN_OFF_WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	# Configura labels (fontes e cores aplicadas aqui; a estrutura vem do .tscn)
+	name_label = $ExpPanel/HBox/TextZone/NameLabel
+	name_label.text = ""
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.add_theme_font_override("font", UIKit.serif())
+	name_label.add_theme_font_size_override("font_size", UIKit.snap_font(17))
+	name_label.add_theme_color_override("font_color", UIKit.BTN_OFF_WHITE)
 	name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	name_label.clip_text = true
-	vbox.add_child(name_label)
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	var stack_row := _make_stack_row()
-	vbox.add_child(stack_row)
-	_stack_row = stack_row
-
-	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(avatar.size.x, 0)
-	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	if _flip:
-		hbox.add_child(vbox)
-		hbox.add_child(spacer)
-	else:
-		hbox.add_child(spacer)
-		hbox.add_child(vbox)
+	stack_label = _stack_lbl
+	_chip_lbl.add_theme_font_size_override("font_size", 20)
+	_chip_lbl.add_theme_color_override("font_color", UIKit.HUD_PINK)
+	stack_label.add_theme_font_size_override("font_size", 20)
+	stack_label.add_theme_color_override("font_color", UIKit.HUD_PINK)
+	stack_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 
 	if not _always:
-		# rivais: toque no avatar ou no painel togla expansão
 		avatar.gui_input.connect(_on_gui_input)
 		_exp_panel.gui_input.connect(_on_gui_input)
 
-	bet_label = UIKit.label("", 22, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+	bet_label = _bet_lbl
+	bet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bet_label.add_theme_font_size_override("font_size", 22)
+	bet_label.add_theme_color_override("font_color", UIKit.MONEY)
 	bet_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	bet_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bet_label.visible = false
-	add_child(bet_label)
 
 	return self
-
-
-func _make_stack_row() -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var chip := UIKit.label("◎", 20, UIKit.HUD_PINK, HORIZONTAL_ALIGNMENT_CENTER)
-	chip.add_theme_font_size_override("font_size", 20)
-	row.add_child(chip)
-	stack_label = UIKit.label("0", 20, UIKit.HUD_PINK, HORIZONTAL_ALIGNMENT_CENTER)
-	stack_label.add_theme_font_size_override("font_size", 20)
-	stack_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	row.add_child(stack_label)
-	return row
 
 
 func layout() -> void:
