@@ -121,6 +121,7 @@ func set_selected(value: bool) -> void:
 	if selected == value:
 		return
 	selected = value
+	z_index = 50 if value else 0        # prioridade de input: carta selecionada recebe toque primeiro
 	body.z_index = 50 if value else 0   # a carta focada fica acima das vizinhas do leque
 	_lift(-32.0 if value else 0.0)
 	_refresh_border()
