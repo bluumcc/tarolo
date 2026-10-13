@@ -9,7 +9,11 @@ const POINTS := 120
 ## Folga entre o topo da área da mesa e o topo do avatar de cima (somada ao respiro de 8 px do
 ## layout, dá o triplo da folga que havia entre a faixa do modificador e o avatar).
 const TOP_GAP := 16.0
-const SIDE_GAP := 0.0
+const SIDE_GAP := 8.0   ## folga entre a borda do assento mais lateral e a borda da tela
+## cos(30°) = √3/2 — ângulo das laterais na mesa de 6 lugares fixos (p=1 em 150°, p=5 em 30°).
+## Sem esta correção o raio era limitado como se um assento estivesse em 0° (horizontal puro),
+## desperdiçando ~40 px de espaço em cada lado.
+const LATERAL_COS := 0.8660254
 ## Do centro do avatar pra baixo: parte de baixo do avatar + plaquinha de nome.
 const SEAT_BELOW := 78.0
 ## Quanto a mesa pode descer além da área do palco: o pedaço de baixo fica atrás do card roxo.
@@ -78,7 +82,7 @@ func fit() -> void:
 		_center = Vector2(size.x / 2.0, topc + _r)
 		queue_redraw()
 		return
-	var r_avail := maxf(size.x / 2.0 - seat_half_extent() - SIDE_GAP, 10.0)
+	var r_avail := maxf((size.x / 2.0 - seat_half_extent() - SIDE_GAP) / LATERAL_COS, 10.0)
 	var ry_cap := maxf((size.y + TABLE_DROP - topc) / 2.0, 20.0)
 	if my_seat_y > 0.0:
 		ry_cap = maxf(ry_cap, (my_seat_y - topc) / 2.0)
