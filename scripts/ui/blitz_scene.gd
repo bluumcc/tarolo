@@ -61,7 +61,6 @@ var round_dots: RoundDots
 var bottom_mid: Control          # meio da barra de baixo: ações OU o card de pote/prêmio
 var prize_card: StatCard         # PRÊMIO, canto inferior direito
 var table_players := 0           # nº de jogadores com que a mesa foi dimensionada; só é refeito entre rodadas
-var phase_layer: Control        # camada acima da mesa e da mão: etapas sem mesa (descarte, palpite)
 var phase_screen: PhaseScreen   # título, subtítulo e seu avatar grande com o anel do relógio
 var chrome_discard := false      # etapa sem mesa (descarte/palpite): sem modificador na faixa
 var shown_totals: Array = []
@@ -70,8 +69,6 @@ var best_gain := 0.0         # maior pote que o jogador levou na sessão
 var total_in := 0            # fichas que o jogador pôs na mesa (buy-in + recompras)
 var action_text: Array = []  # última ação de cada assento nessa jogada
 var action_color: Array = []
-var popup_layer: Control
-var overlay_layer: Control
 var table_views: Array = []
 var pot_box: Control             # card do POTE (faixa do topo); some enquanto há aviso de ação
 var _turn_color := UIKit.TR_CYAN.lightened(0.15)   # moldura/nome de quem joga agora
