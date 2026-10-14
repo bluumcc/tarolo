@@ -53,7 +53,7 @@ mouse_filter = 2
 
 [node name="BottomBar" type="HBoxContainer" parent="MarginBox/Root"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 83.6)
+custom_minimum_size = Vector2(0, 132.0)
 theme_override_constants/separation = 10
 
 [node name="SideCol" type="VBoxContainer" parent="."]

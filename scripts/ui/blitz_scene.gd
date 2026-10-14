@@ -151,7 +151,7 @@ func _show_insufficient_fichas() -> void:
 # ------------------------------------------------------------------ UI
 
 const HAND_RAISE := 28.0   ## o leque sobe um pouco da base da faixa da mão
-const BAR_H := 83.6       ## altura da barra de baixo: cards laterais (palpite, tempo), botões de ação e card do prêmio — todos iguais
+const BAR_H := 96.0       ## altura da barra de baixo: cards laterais (palpite, tempo), botões de ação e card do prêmio — todos iguais
 const ACT_H := BAR_H
 const HEADER_H := 82.5       ## altura dos três cards do header (menu, dots, ajuda): +10%
 const MOD_GAP := 10.0       ## folga embaixo do leque, em cima da barra de baixo
@@ -400,13 +400,14 @@ func _build_bottom_bar() -> void:
 	bet_row.add_theme_constant_override("separation", 6)
 	bet_row.custom_minimum_size = Vector2(0, ACT_H)
 	bet_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bet_row.visible = false
+	# Nunca some do layout (visible sempre true) para reservar espaço e evitar que
+	# banner_title salte de posição quando os botões aparecem/somem.
 	mid.add_child(bet_row)
 	double_btn = UIKit.action_button("DOBRAR", UIKit.ActionKind.GOLD, 24)
+	double_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	double_btn.custom_minimum_size = Vector2(0, ACT_H)
-	double_btn.visible = false
 	double_btn.pressed.connect(_on_double_pressed)
-	mid.add_child(double_btn)
+	# double_btn fica dentro do bet_row (slot compartilhado) em vez de ser irmão no mid.
 
 	var blue := UIKit.prize_blue()
 	prize_card = StatCard.new().setup("PRÊMIO", "◎ 0", blue, DS.FS_TITLE, DS.FS_LABEL)
@@ -1997,7 +1998,6 @@ func _human_bet() -> Dictionary:
 			bet_row.add_child(mk.call("APOSTAR" if can_check else "AUMENTAR", UIKit.ActionKind.GOLD, func():
 				st["raising"] = not bool(st["raising"])
 				(st["render"] as Callable).call()))
-	bet_row.visible = true
 	_refresh_idle_card()
 	(st["render"] as Callable).call()
 	_clock_start(BET_SECONDS, func():
@@ -2006,7 +2006,6 @@ func _human_bet() -> Dictionary:
 	await item_chosen
 	_clock_stop()
 	modal_open = false
-	bet_row.visible = false
 	_refresh_idle_card()
 	for c in bet_row.get_children():
 		c.queue_free()
@@ -3000,7 +2999,11 @@ func _refresh_double_button() -> void:
 	if double_btn == null:
 		return
 	var show := phase == "play" and not finished and not modal_open and engine.can_double(0)
-	double_btn.visible = show
+	var in_row := double_btn.get_parent() == bet_row
+	if show and not in_row:
+		bet_row.add_child(double_btn)
+	elif not show and in_row:
+		bet_row.remove_child(double_btn)
 	_refresh_idle_card()
 	if show:
 		double_btn.text = "%s ◎%d" % ["TRIPLICAR" if int(engine.doubles[0]) == 1 else "DOBRAR", int(engine.blitz_entry())]
