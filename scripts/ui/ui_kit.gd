@@ -264,10 +264,13 @@ static func img_button(tex_normal: Texture2D, tex_pressed: Texture2D, tex_inacti
 	var make_style := func(tex: Texture2D) -> StyleBoxTexture:
 		var s := StyleBoxTexture.new()
 		s.texture = tex
-		s.texture_margin_left = 24
-		s.texture_margin_right = 24
-		s.texture_margin_top = 14
-		s.texture_margin_bottom = 14
+		# Margens cobrindo o corte diagonal real dos PNGs (azul 411×145: esq 42px, topo 30px, baixo 37px;
+		# rosa 403×142: esq 34px, topo/baixo ~37px). Valores maiores que o chamfer evitam que a zona de
+		# esticamento do 9-patch distorça o corte reto em curva.
+		s.texture_margin_left = 48
+		s.texture_margin_right = 32
+		s.texture_margin_top = 40
+		s.texture_margin_bottom = 42
 		# Content margins explícitos e iguais em todos os estados para o texto não deslocar ao pressionar
 		s.content_margin_left = 20.0
 		s.content_margin_right = 20.0
