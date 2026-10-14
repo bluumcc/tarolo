@@ -403,7 +403,7 @@ func _build_bottom_bar() -> void:
 	# Nunca some do layout (visible sempre true) para reservar espaço e evitar que
 	# banner_title salte de posição quando os botões aparecem/somem.
 	mid.add_child(bet_row)
-	double_btn = UIKit.action_button("DOBRAR", UIKit.ActionKind.GOLD, 24)
+	double_btn = UIKit.action_button("DOBRAR", UIKit.ActionKind.GOLD, 26 if not _is_wide() else 24)
 	double_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	double_btn.custom_minimum_size = Vector2(0, ACT_H)
 	double_btn.pressed.connect(_on_double_pressed)
@@ -1934,7 +1934,7 @@ func _human_bet() -> Dictionary:
 			_tex_rosa_n if use_rosa else _tex_azul_n,
 			_tex_rosa_p if use_rosa else _tex_azul_p,
 			_tex_rosa_i if use_rosa else _tex_azul_i,
-			text, 20, 1 if use_rosa else 0)
+			text, (22 if not _is_wide() else 20), 1 if use_rosa else 0)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.custom_minimum_size = Vector2(0, ACT_H)
 		b.pressed.connect(cb)
@@ -1966,19 +1966,19 @@ func _human_bet() -> Dictionary:
 					(st["render"] as Callable).call())
 				cancel_b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 				bet_row.add_child(cancel_b)
-				var minus_b: Button = UIKit.img_button(_tex_azul_n, _tex_azul_p, _tex_azul_i, "−", 24, 0)
+				var minus_b: Button = UIKit.img_button(_tex_azul_n, _tex_azul_p, _tex_azul_i, "−", 26, 0)
 				minus_b.custom_minimum_size = Vector2(ACT_H, ACT_H)
 				minus_b.disabled = int(st["to"]) <= lo
 				minus_b.pressed.connect(func():
 					st["to"] = maxi(int(st["to"]) - blind, lo)
 					(st["render"] as Callable).call())
 				bet_row.add_child(minus_b)
-				var val_lbl: Label = UIKit.label("◎%d" % (int(st["to"]) - mine_in), 22, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
+				var val_lbl: Label = UIKit.label("◎%d" % (int(st["to"]) - mine_in), 24, UIKit.MONEY, HORIZONTAL_ALIGNMENT_CENTER)
 				val_lbl.custom_minimum_size = Vector2(72, 0)
 				val_lbl.size_flags_vertical = Control.SIZE_FILL
 				val_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 				bet_row.add_child(val_lbl)
-				var plus_b: Button = UIKit.img_button(_tex_azul_n, _tex_azul_p, _tex_azul_i, "+", 24, 0)
+				var plus_b: Button = UIKit.img_button(_tex_azul_n, _tex_azul_p, _tex_azul_i, "+", 26, 0)
 				plus_b.custom_minimum_size = Vector2(ACT_H, ACT_H)
 				plus_b.disabled = int(st["to"]) >= hi
 				plus_b.pressed.connect(func():

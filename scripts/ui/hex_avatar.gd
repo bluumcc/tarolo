@@ -48,7 +48,11 @@ func setup(seat: int) -> HexAvatar:
 	return self
 
 
+const CIRCLE_R := 40.0   ## raio visual do círculo (cabe em SIZE_PX = 81×94)
+
+
 func _hex_points() -> PackedVector2Array:
+	## Mantido apenas para posicionar os selos (wins_badge, dealer_badge).
 	var c := SIZE_PX / 2.0
 	var pts := PackedVector2Array()
 	for k in range(6):
@@ -58,12 +62,10 @@ func _hex_points() -> PackedVector2Array:
 
 
 func _draw() -> void:
-	var pts := _hex_points()
-	draw_colored_polygon(pts, _fill_color)
-	var closed := PackedVector2Array(pts)
-	closed.append(pts[0])
+	var c := SIZE_PX / 2.0
+	draw_circle(c, CIRCLE_R, _fill_color)
 	var bw := BORDER_W_ACTIVE if active else BORDER_W
-	draw_polyline(closed, _border_color, bw, true)
+	draw_arc(c, CIRCLE_R - bw * 0.5, 0.0, TAU, 64, _border_color, bw, true)
 
 
 func set_active(on: bool) -> void:
